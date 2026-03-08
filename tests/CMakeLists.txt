@@ -28,8 +28,8 @@ add_executable(TinyTerrorTests
     ${CMAKE_SOURCE_DIR}/src/dsp/power/PowerSupplyModel.cpp
     ${CMAKE_SOURCE_DIR}/src/dsp/power/LTPSolver.cpp
     ${CMAKE_SOURCE_DIR}/src/dsp/cabinet/SpeakerCoupling.cpp
-    ${CMAKE_SOURCE_DIR}/src/dsp/cabinet/CabinetSim.cpp
-    ${CMAKE_SOURCE_DIR}/src/dsp/OversampleSwitcher.cpp
+    # CabinetSim.cpp and OversampleSwitcher.cpp excluded — they depend on
+    # JUCE headers and no test file exercises them directly.
 )
 
 target_link_libraries(TinyTerrorTests PRIVATE Catch2::Catch2WithMain)

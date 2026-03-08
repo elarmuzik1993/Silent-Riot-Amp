@@ -3,8 +3,10 @@
 #include "utils/VoltageScale.h"
 #include "utils/Constants.h"
 #include "dsp/tubes/TriodeWaveshaper.h"
+#include "test_helpers.h"
 #include <cmath>
 using namespace tt;
+using namespace tt::test;
 using Catch::Approx;
 
 // ═══════════════════════════════════════════════════════════════
@@ -103,28 +105,22 @@ TEST_CASE("TriodeCurrent: never returns negative", "[triode_current]") {
 // Audio taper (used by gain/volume)
 // ═══════════════════════════════════════════════════════════════
 
-// audioTaper should be defined in a header — test the expected behavior
-// x^2 taper: 0→0, 0.5→0.25, 1→1
-namespace {
-    float audioTaper(float x) { return x * x; }
-}
-
 TEST_CASE("Audio taper: 0 maps to 0", "[taper]") {
-    REQUIRE(audioTaper(0.0f) == 0.0f);
+    REQUIRE(tt::audioTaper(0.0f) == 0.0f);
 }
 
 TEST_CASE("Audio taper: 1 maps to 1", "[taper]") {
-    REQUIRE(audioTaper(1.0f) == 1.0f);
+    REQUIRE(tt::audioTaper(1.0f) == 1.0f);
 }
 
 TEST_CASE("Audio taper: 0.5 maps to 0.25", "[taper]") {
-    REQUIRE(audioTaper(0.5f) == Approx(0.25f));
+    REQUIRE(tt::audioTaper(0.5f) == Approx(0.25f));
 }
 
 TEST_CASE("Audio taper: monotonically increasing", "[taper]") {
     float prev = 0.0f;
     for (float x = 0.0f; x <= 1.0f; x += 0.1f) {
-        float y = audioTaper(x);
+        float y = tt::audioTaper(x);
         REQUIRE(y >= prev);
         prev = y;
     }

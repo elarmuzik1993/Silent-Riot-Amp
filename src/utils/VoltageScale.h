@@ -35,31 +35,33 @@ struct VoltageScale {
     static constexpr float toAmps(float n)  { return n * N_TO_I; }
 
     // ── Common resistances (normalized) ──
-    static constexpr float R_100  = r(100.0f);
-    static constexpr float R_300  = r(300.0f);
-    static constexpr float R_470  = r(470.0f);
-    static constexpr float R_500  = r(500.0f);
-    static constexpr float R_820  = r(820.0f);
-    static constexpr float R_1K2  = r(1200.0f);
-    static constexpr float R_1K5  = r(1500.0f);
-    static constexpr float R_68K  = r(68000.0f);
-    static constexpr float R_100K = r(100000.0f);
-    static constexpr float R_500K = r(500000.0f);
-    static constexpr float R_1M   = r(1000000.0f);
+    // Note: use direct multiplication instead of r() to avoid calling
+    // a constexpr member function before the struct definition is complete.
+    static constexpr float R_100  = 100.0f * R_TO_N;
+    static constexpr float R_300  = 300.0f * R_TO_N;
+    static constexpr float R_470  = 470.0f * R_TO_N;
+    static constexpr float R_500  = 500.0f * R_TO_N;
+    static constexpr float R_820  = 820.0f * R_TO_N;
+    static constexpr float R_1K2  = 1200.0f * R_TO_N;
+    static constexpr float R_1K5  = 1500.0f * R_TO_N;
+    static constexpr float R_68K  = 68000.0f * R_TO_N;
+    static constexpr float R_100K = 100000.0f * R_TO_N;
+    static constexpr float R_500K = 500000.0f * R_TO_N;
+    static constexpr float R_1M   = 1000000.0f * R_TO_N;
 
     // ── Common voltages (normalized) ──
-    static constexpr float V_B_PLUS      = v(300.0f);
-    static constexpr float V_SCREEN      = v(280.0f);
-    static constexpr float V_PI          = v(280.0f);
-    static constexpr float V_PREAMP      = v(250.0f);
-    static constexpr float V_GUITAR      = v(0.5f);
-    static constexpr float V_BIAS_12AX7  = v(-1.5f);
-    static constexpr float V_THERMAL     = v(0.026f);
+    static constexpr float V_B_PLUS      = 300.0f * V_TO_N;
+    static constexpr float V_SCREEN      = 280.0f * V_TO_N;
+    static constexpr float V_PI          = 280.0f * V_TO_N;
+    static constexpr float V_PREAMP      = 250.0f * V_TO_N;
+    static constexpr float V_GUITAR      = 0.5f * V_TO_N;
+    static constexpr float V_BIAS_12AX7  = -1.5f * V_TO_N;
+    static constexpr float V_THERMAL     = 0.026f * V_TO_N;
 
     // ── Stage output impedances Rplate||rp ──
-    static constexpr float Z_OUT_V1A = r(38461.0f);   // 100K||62.5K
-    static constexpr float Z_OUT_V1B = r(47170.0f);   // (100K+68K)||62.5K
-    static constexpr float Z_OUT_PI  = r(38461.0f);    // 100K||62.5K per side
+    static constexpr float Z_OUT_V1A = 38461.0f * R_TO_N;   // 100K||62.5K
+    static constexpr float Z_OUT_V1B = 47170.0f * R_TO_N;   // (100K+68K)||62.5K
+    static constexpr float Z_OUT_PI  = 38461.0f * R_TO_N;    // 100K||62.5K per side
 };
 
 using VS = VoltageScale;
