@@ -25,6 +25,13 @@ struct PowerSupplyModel {
     SupplyNode powerNode, screenNode, piNode, preampNode;
     float preampCurrentAccum = 0.0f;
     float piCurrentAccum     = 0.0f;
+    float powerCurrent       = 0.0f;
+    float screenCurrent      = 0.0f;
+
+    float sourceImpedance_n  = 0.0f;
+    float rScreen_n          = 0.0f;
+    float rDrop1_n           = 0.0f;
+    float rDrop2_n           = 0.0f;
 
     void init();
     void recalcDecayCoeffs(float effectiveSR);

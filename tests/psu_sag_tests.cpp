@@ -251,6 +251,178 @@ TEST_CASE("Sag: envelope decays to zero after signal stops", "[sag]") {
     REQUIRE(sag.envelope == 0.0f);
 }
 
+// ═══════════════════════════════════════════════════════════════
+// PSU Droop — Spec Section 3.11 (impedance-based cascaded droop)
+// ═══════════════════════════════════════════════════════════════
+
+TEST_CASE("PSU droop: heavy power draw drops vPower", "[psu][droop]") {
+    PowerSupplyModel psu;
+    psu.init();
+    psu.recalcDecayCoeffs(TEST_SR);
+
+    // Moderate plate current: 1.0 normalized (1mA) through source impedance 0.08
+    // Expected rectifier droop: ~1.0 * 0.08 = 0.08 (8%)
+    float plateCurrent = 1.0f;
+    float screenCurrent = 0.25f;
+
+    for (int i = 0; i < 44100; ++i) {
+        psu.reportPowerDirect(plateCurrent, screenCurrent);
+        psu.update();
+        psu.resetCurrentDraw();
+    }
+
+    // Power node should have drooped below nominal
+    REQUIRE(psu.vPower() < V_POWER_NOMINAL_N);
+    // But should still be positive
+    REQUIRE(psu.vPower() > 0.0f);
+}
+
+TEST_CASE("PSU droop: screen droops through R_screen", "[psu][droop]") {
+    PowerSupplyModel psu;
+    psu.init();
+    psu.recalcDecayCoeffs(TEST_SR);
+
+    // Screen current creates additional drop through R_screen (0.00157)
+    float screenCurrent = 5.0f;  // 5mA → 5.0 * 0.00157 = ~0.008 extra drop
+
+    for (int i = 0; i < 44100; ++i) {
+        psu.reportPowerDirect(0.0f, screenCurrent);
+        psu.update();
+        psu.resetCurrentDraw();
+    }
+
+    // Screen should be lower than its nominal (power droop + R_screen droop)
+    REQUIRE(psu.vScreen() < V_SCREEN_NOMINAL_N);
+    // Screen nominal is below power nominal, plus it has the extra R_screen drop
+    // so screen should be further below its nominal than power is below its own nominal
+    float powerDelta  = V_POWER_NOMINAL_N - psu.vPower();
+    float screenDelta = V_SCREEN_NOMINAL_N - psu.vScreen();
+    REQUIRE(screenDelta > powerDelta);
+}
+
+TEST_CASE("PSU droop: cascaded droop to PI and preamp", "[psu][droop]") {
+    PowerSupplyModel psu;
+    psu.init();
+    psu.recalcDecayCoeffs(TEST_SR);
+
+    // Drive all stages with moderate current
+    float plateCurrent = 1.0f;
+    float screenCurrent = 0.25f;
+
+    for (int i = 0; i < 44100; ++i) {
+        psu.reportPowerDirect(plateCurrent, screenCurrent);
+        psu.reportPiLevel(0.5f);       // PI stage active
+        psu.reportPreampLevel(0.3f);   // Preamp stages active
+        psu.update();
+        psu.resetCurrentDraw();
+    }
+
+    // All nodes should droop below nominal
+    REQUIRE(psu.vPower()  < V_POWER_NOMINAL_N);
+    REQUIRE(psu.vScreen() < V_SCREEN_NOMINAL_N);
+    REQUIRE(psu.vPi()     < V_PI_NOMINAL_N);
+    REQUIRE(psu.vPreamp() < V_PREAMP_NOMINAL_N);
+}
+
+TEST_CASE("PSU droop: recovery to nominal after load removed", "[psu][droop]") {
+    PowerSupplyModel psu;
+    psu.init();
+    psu.recalcDecayCoeffs(TEST_SR);
+
+    // Apply moderate load
+    for (int i = 0; i < 22050; ++i) {
+        psu.reportPowerDirect(1.0f, 0.25f);
+        psu.reportPiLevel(0.5f);
+        psu.reportPreampLevel(0.3f);
+        psu.update();
+        psu.resetCurrentDraw();
+    }
+
+    // Confirm droop happened
+    REQUIRE(psu.vPower() < V_POWER_NOMINAL_N);
+
+    // Remove load and let recover for 1 second
+    for (int i = 0; i < 44100; ++i) {
+        psu.update();
+        psu.resetCurrentDraw();
+    }
+
+    // All nodes should have returned to nominal
+    REQUIRE(psu.vPower()  == Approx(V_POWER_NOMINAL_N).margin(0.001f));
+    REQUIRE(psu.vScreen() == Approx(V_SCREEN_NOMINAL_N).margin(0.001f));
+    REQUIRE(psu.vPi()     == Approx(V_PI_NOMINAL_N).margin(0.001f));
+    REQUIRE(psu.vPreamp() == Approx(V_PREAMP_NOMINAL_N).margin(0.001f));
+}
+
+TEST_CASE("PSU droop: screen responds faster than power", "[psu][droop]") {
+    PowerSupplyModel psu;
+    psu.init();
+    psu.recalcDecayCoeffs(TEST_SR);
+
+    // Screen tau (6ms) < power tau (10ms) → screen decay coefficient is smaller
+    // (lower decay = faster exponential tracking toward target)
+    REQUIRE(psu.screenNode.decay < psu.powerNode.decay);
+
+    // Verify with a step-response test: apply a step to both in isolation
+    // Screen should close more of the gap in 5ms than power does
+    SupplyNode fast, slow;
+    fast.init(1.0f, TAU_SCREEN_MS);   // 6ms (screen)
+    slow.init(1.0f, TAU_POWER_MS);    // 10ms (power)
+    fast.recalcDecay(TEST_SR);
+    slow.recalcDecay(TEST_SR);
+
+    float target = 0.8f;
+    for (int i = 0; i < 220; ++i) {   // ~5ms
+        fast.track(target);
+        slow.track(target);
+    }
+
+    float fastDist = std::abs(fast.voltage - target);
+    float slowDist = std::abs(slow.voltage - target);
+    REQUIRE(fastDist < slowDist);
+}
+
+TEST_CASE("PSU droop: preamp is most filtered (slowest)", "[psu][droop]") {
+    PowerSupplyModel psu;
+    psu.init();
+    psu.recalcDecayCoeffs(TEST_SR);
+
+    // Apply current through all stages for a very short burst (~5ms)
+    for (int i = 0; i < 220; ++i) {
+        psu.reportPowerDirect(1.0f, 0.25f);
+        psu.reportPiLevel(0.5f);
+        psu.reportPreampLevel(0.3f);
+        psu.update();
+        psu.resetCurrentDraw();
+    }
+
+    // Preamp (tau=80ms) should have barely moved in 5ms
+    float preampDelta = V_PREAMP_NOMINAL_N - psu.vPreamp();
+    float piDelta     = V_PI_NOMINAL_N - psu.vPi();
+
+    // PI (tau=35ms) should have drooped more than preamp (tau=80ms)
+    REQUIRE(piDelta > preampDelta);
+}
+
+TEST_CASE("PSU droop: zero current produces no droop", "[psu][droop]") {
+    PowerSupplyModel psu;
+    psu.init();
+    psu.recalcDecayCoeffs(TEST_SR);
+
+    // Run many samples with zero current
+    for (int i = 0; i < 44100; ++i) {
+        psu.reportPowerDirect(0.0f, 0.0f);
+        psu.update();
+        psu.resetCurrentDraw();
+    }
+
+    // All nodes should remain exactly at nominal
+    REQUIRE(psu.vPower()  == Approx(V_POWER_NOMINAL_N).margin(1e-6f));
+    REQUIRE(psu.vScreen() == Approx(V_SCREEN_NOMINAL_N).margin(1e-6f));
+    REQUIRE(psu.vPi()     == Approx(V_PI_NOMINAL_N).margin(1e-6f));
+    REQUIRE(psu.vPreamp() == Approx(V_PREAMP_NOMINAL_N).margin(1e-6f));
+}
+
 TEST_CASE("Sag: responds to signal magnitude, not sign", "[sag]") {
     SagEnvelope sagPos, sagNeg;
     sagPos.recalcCoeffs(TEST_SR);
