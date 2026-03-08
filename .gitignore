@@ -1,0 +1,14 @@
+build/
+build-*/
+cmake-build-*/
+CMakeFiles/
+CMakeCache.txt
+compile_commands.json
+*.vst3
+*.component
+*.so
+*.dylib
+.vscode/settings.json
+.idea/
+*.swp
+*~
