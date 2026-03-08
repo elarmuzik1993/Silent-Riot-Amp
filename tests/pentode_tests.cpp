@@ -40,7 +40,7 @@ TEST_CASE("Pentode: cutoff — zero current when grid far below bias", "[pentode
 // ── Screen voltage sensitivity ───────────────────────────────
 
 TEST_CASE("Pentode: lower screen voltage reduces plate current", "[pentode]") {
-    float vGrid = 0.1f;
+    float vGrid = -0.02f;  // moderate level, below EL84_IP_MAX_N clamp
     float vPlate = V_POWER_NOMINAL_N;
     
     PentodeOutput outHigh = pentodeWaveshaper(vGrid, PENTODE_BIAS_15W_N,
@@ -114,20 +114,22 @@ TEST_CASE("Pentode: screen current ratio near 0.25 at nominal plate", "[pentode]
 
 // ── 15W vs 7W bias ───────────────────────────────────────────
 
-TEST_CASE("Pentode: 7W bias is more negative than 15W", "[pentode]") {
-    REQUIRE(PENTODE_BIAS_7W_N < PENTODE_BIAS_15W_N);
+TEST_CASE("Pentode: 15W bias is more negative than 7W (colder)", "[pentode]") {
+    // 15W Class AB: Vgk = -9.6V (more negative, colder)
+    // 7W Class A:   Vgk = -7.0V (less negative, hotter)
+    REQUIRE(PENTODE_BIAS_15W_N < PENTODE_BIAS_7W_N);
 }
 
-TEST_CASE("Pentode: 7W mode reduces plate current (colder bias)", "[pentode]") {
-    float vGrid = 0.1f;
-    
+TEST_CASE("Pentode: 7W mode produces more quiescent current (hotter bias)", "[pentode]") {
+    float vGrid = -0.02f;  // moderate level, below clamp
+
     PentodeOutput out15W = pentodeWaveshaper(vGrid, PENTODE_BIAS_15W_N,
                                               V_POWER_NOMINAL_N, V_SCREEN_NOMINAL_N);
     PentodeOutput out7W  = pentodeWaveshaper(vGrid, PENTODE_BIAS_7W_N,
                                               V_POWER_NOMINAL_N, V_SCREEN_NOMINAL_N);
-    
-    // More negative bias → less current
-    REQUIRE(out7W.plateCurrent <= out15W.plateCurrent);
+
+    // Less negative bias (hotter) → more current
+    REQUIRE(out7W.plateCurrent >= out15W.plateCurrent);
 }
 
 // ── softConductionCurve ──────────────────────────────────────

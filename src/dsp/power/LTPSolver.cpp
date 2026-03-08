@@ -35,8 +35,10 @@ LTPOutput solveLTP(float vInput_n, float vSupply_n, LTPModel& ltp) {
     vPlateA = std::clamp(vPlateA, ltp.vCathode, vSupply_n);
     vPlateB = std::clamp(vPlateB, ltp.vCathode, vSupply_n);
 
-    float dcPlate = vSupply_n * 0.5f;
-    return { vPlateA - dcPlate, vPlateB - dcPlate, ltp.vCathode };
+    // Track quiescent DC plate with slow filter (acts like coupling cap)
+    float avgPlate = (vPlateA + vPlateB) * 0.5f;
+    ltp.dcPlateRef += 0.1f * (avgPlate - ltp.dcPlateRef);
+    return { vPlateA - ltp.dcPlateRef, vPlateB - ltp.dcPlateRef, ltp.vCathode, ltp.dcPlateRef };
 }
 
 } // namespace tt
