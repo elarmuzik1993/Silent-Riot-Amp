@@ -31,21 +31,21 @@ using Catch::Approx;
 // ── Audio taper ──────────────────────────────────────────────
 
 TEST_CASE("Audio taper: 0 maps to 0", "[chain]") {
-    REQUIRE(audioTaper(0.0f) == Approx(0.0f));
+    REQUIRE(tt::audioTaper(0.0f) == Approx(0.0f));
 }
 
 TEST_CASE("Audio taper: 1 maps to 1", "[chain]") {
-    REQUIRE(audioTaper(1.0f) == Approx(1.0f));
+    REQUIRE(tt::audioTaper(1.0f) == Approx(1.0f));
 }
 
 TEST_CASE("Audio taper: 0.5 maps to 0.25 (squared)", "[chain]") {
-    REQUIRE(audioTaper(0.5f) == Approx(0.25f));
+    REQUIRE(tt::audioTaper(0.5f) == Approx(0.25f));
 }
 
 TEST_CASE("Audio taper: monotonically increasing", "[chain]") {
     float prev = 0.0f;
     for (float x = 0.0f; x <= 1.0f; x += 0.01f) {
-        float y = audioTaper(x);
+        float y = tt::audioTaper(x);
         REQUIRE(y >= prev - 1e-6f);
         prev = y;
     }
@@ -72,7 +72,7 @@ TEST_CASE("V1a: guitar input produces output in spec range", "[chain][v1a]") {
 TEST_CASE("V1b: gain=1.0 produces clipped output", "[chain][v1b]") {
     // V1a output → Gain A (1.0) → V1b
     float v1aOut = 0.1f;  // typical V1a output
-    float gainA = audioTaper(1.0f);  // full gain
+    float gainA = tt::audioTaper(1.0f);  // full gain
     float v1bIn = v1aOut * gainA;
     
     float output = triodeWaveshaper(v1bIn, VS::V_BIAS_12AX7, VS::V_PREAMP, StageGains::V1B_GAIN);
@@ -85,7 +85,7 @@ TEST_CASE("V1b: gain=1.0 produces clipped output", "[chain][v1b]") {
 
 TEST_CASE("V1b: gain=0.0 produces zero output", "[chain][v1b]") {
     float v1aOut = 0.1f;
-    float gainA = audioTaper(0.0f);  // gain pot at zero
+    float gainA = tt::audioTaper(0.0f);  // gain pot at zero
     float v1bIn = v1aOut * gainA;
     
     REQUIRE(v1bIn == Approx(0.0f));
@@ -189,7 +189,7 @@ TEST_CASE("Full preamp chain: guitar → V1a → gain → V1b produces sound", "
     REQUIRE(std::abs(x) > 0.001f);  // not silence
     
     // Gain pot at 50%
-    x *= audioTaper(0.5f);
+    x *= tt::audioTaper(0.5f);
     
     // V1b
     x = triodeWaveshaper(x, VS::V_BIAS_12AX7, supply, StageGains::V1B_GAIN);

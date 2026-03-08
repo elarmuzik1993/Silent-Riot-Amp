@@ -253,7 +253,8 @@ void TinyTerrorProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
             osBlock.setSample(1, static_cast<int>(i), finalOut);
     }
 
-    oversampler->processSamplesDown(juce::dsp::AudioBlock<float>(buffer));
+    juce::dsp::AudioBlock<float> outputBlock(buffer);
+    oversampler->processSamplesDown(outputBlock);
 }
 
 // ── Boilerplate ──

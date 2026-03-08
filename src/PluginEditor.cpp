@@ -30,9 +30,9 @@ TinyTerrorEditor::~TinyTerrorEditor() { setLookAndFeel(nullptr); }
 void TinyTerrorEditor::paint(juce::Graphics& g) {
     g.fillAll(juce::Colour(0xFF1A1A1A));
     g.setColour(juce::Colour(0xFFFF6600));
-    g.setFont(juce::FontOptions(28.0f));
+    g.setFont(juce::Font(28.0f));
     g.drawText("TINY TERROR", getLocalBounds().removeFromTop(50), juce::Justification::centred);
-    g.setFont(juce::FontOptions(11.0f));
+    g.setFont(juce::Font(11.0f));
     g.setColour(juce::Colour(0xFF888888));
     g.drawText("MONOLIT BEATZ", getLocalBounds().removeFromBottom(20), juce::Justification::centred);
 }

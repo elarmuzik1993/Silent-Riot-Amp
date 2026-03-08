@@ -12,7 +12,7 @@ void AmpKnob::resized() {
 }
 void AmpKnob::paint(juce::Graphics& g) {
     g.setColour(juce::Colours::white);
-    g.setFont(juce::FontOptions(12.0f));
+    g.setFont(juce::Font(12.0f));
     g.drawText(label, getLocalBounds().removeFromTop(18), juce::Justification::centred);
 }
 } // namespace tt
