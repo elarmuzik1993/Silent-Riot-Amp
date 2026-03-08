@@ -20,7 +20,7 @@ struct OnePoleLP {
         float g  = wa / (2.0f * sampleRate);
         b0 = g / (1.0f + g);
         b1 = b0;
-        a1 = (1.0f - g) / (1.0f + g);
+        a1 = (g - 1.0f) / (1.0f + g);
     }
 
     void setFreqFast(float newFc, float sampleRate) {
@@ -28,7 +28,7 @@ struct OnePoleLP {
         float g = PI_F * fc / sampleRate;
         b0 = g / (1.0f + g);
         b1 = b0;
-        a1 = (1.0f - g) / (1.0f + g);
+        a1 = (g - 1.0f) / (1.0f + g);
     }
 
     float process(float x) {
@@ -51,7 +51,7 @@ struct OnePoleHP {
         float g  = wa / (2.0f * sampleRate);
         b0 = 1.0f / (1.0f + g);
         b1 = -b0;
-        a1 = (1.0f - g) / (1.0f + g);
+        a1 = (g - 1.0f) / (1.0f + g);
     }
 
     void setFreqFast(float newFc, float sampleRate) {
@@ -59,7 +59,7 @@ struct OnePoleHP {
         float g = PI_F * fc / sampleRate;
         b0 = 1.0f / (1.0f + g);
         b1 = -b0;
-        a1 = (1.0f - g) / (1.0f + g);
+        a1 = (g - 1.0f) / (1.0f + g);
     }
 
     float process(float x) {

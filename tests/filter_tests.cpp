@@ -210,7 +210,7 @@ TEST_CASE("Filter state doesn't produce denormals after silence", "[filter][deno
     for (int i = 0; i < 100000; ++i) lp.process(0.0f);
     
     // State should not be denormal
-    REQUIRE(!std::fpclassify(lp.z1) == FP_SUBNORMAL);
+    REQUIRE(std::fpclassify(lp.z1) != FP_SUBNORMAL);
 }
 
 // ── DynamicMillerLP ──────────────────────────────────────────
