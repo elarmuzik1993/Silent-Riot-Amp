@@ -20,6 +20,7 @@
 #include "dsp/power/SagEnvelope.h"
 #include "dsp/power/LTPSolver.h"
 #include "dsp/cabinet/SpeakerCoupling.h"
+#include "dsp/cabinet/OTSaturation.h"
 #include "dsp/cabinet/CabinetSim.h"
 #include "dsp/OversampleSwitcher.h"
 
@@ -61,6 +62,7 @@ private:
     tt::FilterBank          filterBank;
     tt::DynamicMillerLP     v1a_miller, v1b_miller;
     tt::SpeakerCoupling     speakerCoupling;
+    tt::OTSaturation        otSaturation;
     tt::PowerSupplyModel    psu;
     tt::SagEnvelope         sag;
     tt::LTPModel            ltpModel;
