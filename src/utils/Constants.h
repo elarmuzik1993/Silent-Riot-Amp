@@ -152,6 +152,10 @@ constexpr float SPK_ENV_TAU_MS      = 2.0f;
 constexpr float SPK_GAINMOD_DEPTH   = 2.0f;
 constexpr float SPK_GAINMOD_RANGE   = 0.5f;
 
+// ── OT core saturation ─────────────────────────────────────
+constexpr float OT_SAT_DRIVE        = 12.0f;   // saturation onset (higher = earlier)
+constexpr float OT_SAT_DC_FREQ      = 1.5f;    // integrator DC-block frequency (Hz)
+
 // ── Gain taper ──────────────────────────────────────────────
 constexpr float GAIN_TAPER_EXPONENT = 2.0f;
 

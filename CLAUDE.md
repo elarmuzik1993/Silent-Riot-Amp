@@ -53,9 +53,9 @@ cmake -B build -DTT_BUILD_TESTS=ON # Build with tests
 
 ## Implementation Phases
 
-- **Phase 1** (scaffolded): Preamp — VoltageScale, triode waveshaper, cascaded stages, gain, oversampling
-- **Phase 2**: Power section — LTP solver, tone, EL84 pentode, push-pull
-- **Phase 3**: Dynamics — PSU multi-node droop, sag, grid conduction, speaker coupling
+- **Phase 1** (done): Preamp — VoltageScale, triode waveshaper, cascaded stages, gain, oversampling
+- **Phase 2** (done): Power section — LTP solver, tone, EL84 pentode, push-pull, 15W/7W mode
+- **Phase 3** (in progress): Dynamics — PSU droop ✓, sag envelope ✓, grid conduction ✓, speaker coupling ✓, OT saturation (optional, not yet)
 - **Phase 4**: Cabinet IR loader, GUI (see UI spec), presets, polish
 
 ## Conventions
@@ -74,5 +74,5 @@ cmake -B build -DTT_BUILD_TESTS=ON # Build with tests
 - `triodeWaveshaper` gain is on INPUT only — do NOT scale output by stageGain
 - `reportPreampLevel()` takes SIGNAL level, NOT current
 - ParamSmoother `controlRate` must use BASE sample rate, not oversampled
-- PSU `update()` is currently STUBBED — targets track to nominal (no droop yet)
+- PSU droop impedance values (SOURCE_IMPEDANCE_N=0.08) produce aggressive sag with full pentode currents (~48mA/tube normalized to 48.0) — may need constant tuning after listening tests
 - `outputGainCompensation` hardcoded to 2.0 — needs tuning

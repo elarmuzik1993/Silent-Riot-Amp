@@ -88,6 +88,7 @@ void TinyTerrorProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
     speakerCoupling.recalcFilters(effectiveSR);
     psu.recalcDecayCoeffs(effectiveSR);
     sag.recalcCoeffs(effectiveSR);
+    otSaturation.recalcCoeffs(effectiveSR);
 
     // Grid conduction charge decay
     recalcGridChargeDecay(v1aGrid,  0.022f, effectiveSR);
@@ -233,7 +234,8 @@ void TinyTerrorProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
 
         // ── Speaker coupling + OT ──
         float otIn = speakerCoupling.process(powerOut);
-        float otOut = filterBank.ot_leakageLP.process(otIn);
+        float otSat = otSaturation.process(otIn);
+        float otOut = filterBank.ot_leakageLP.process(otSat);
 
         // ── Cabinet Sim ──
         float cabOut = otOut;

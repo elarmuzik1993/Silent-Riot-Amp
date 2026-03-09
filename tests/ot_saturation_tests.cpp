@@ -1,0 +1,129 @@
+// ═══════════════════════════════════════════════════════════════
+// OT Core Saturation Tests — flux-based model
+//
+// Tests for:
+//   - Zero input → zero output (no DC offset or state leakage)
+//   - Low-level signal passes near unity
+//   - High-level signal is compressed (saturation works)
+//   - Bass saturates more than treble (frequency-dependent)
+//   - Reset clears state
+// ═══════════════════════════════════════════════════════════════
+
+#include <catch2/catch_test_macros.hpp>
+#include <catch2/catch_approx.hpp>
+#include "test_helpers.h"
+#include "dsp/cabinet/OTSaturation.h"
+
+using namespace tt;
+using namespace tt::test;
+using Catch::Approx;
+
+TEST_CASE("OT saturation: zero input produces zero output", "[ot_sat]") {
+    OTSaturation sat;
+    sat.recalcCoeffs(TEST_SR);
+
+    for (int i = 0; i < 1000; ++i) {
+        float out = sat.process(0.0f);
+        REQUIRE(out == Approx(0.0f).margin(1e-10f));
+    }
+}
+
+TEST_CASE("OT saturation: low-level signal passes near unity", "[ot_sat]") {
+    OTSaturation sat;
+    sat.recalcCoeffs(TEST_SR);
+
+    // Use a small-amplitude 1kHz sine — should pass with gain ≈ 1.0
+    float freq = 1000.0f;
+    float amp = 0.001f;  // well below saturation threshold
+    int warmup = static_cast<int>(TEST_SR * 0.05f);  // 50ms warmup
+    int measure = static_cast<int>(TEST_SR * 0.05f);  // 50ms measure
+
+    // Warm up
+    for (int i = 0; i < warmup; ++i)
+        sat.process(amp * std::sin(2.0f * PI_F * freq * i / TEST_SR));
+
+    // Measure
+    float inPeak = 0.0f, outPeak = 0.0f;
+    for (int i = warmup; i < warmup + measure; ++i) {
+        float in = amp * std::sin(2.0f * PI_F * freq * i / TEST_SR);
+        float out = sat.process(in);
+        inPeak = std::max(inPeak, std::abs(in));
+        outPeak = std::max(outPeak, std::abs(out));
+    }
+
+    float gain = outPeak / inPeak;
+    REQUIRE(gain > 0.9f);
+    REQUIRE(gain < 1.1f);
+}
+
+TEST_CASE("OT saturation: high-level signal is compressed", "[ot_sat]") {
+    OTSaturation sat;
+    sat.recalcCoeffs(TEST_SR);
+
+    // Use a large-amplitude 100Hz sine — should be compressed
+    // powerOut in the plugin ranges ±10–50; flux ≈ amp/(2π*f), so
+    // amp=30 at 100Hz → flux ≈ 0.048, drive*flux ≈ 0.58 → real compression
+    float freq = 100.0f;
+    float amp = 30.0f;
+    int warmup = static_cast<int>(TEST_SR * 0.1f);
+    int measure = static_cast<int>(TEST_SR * 0.1f);
+
+    for (int i = 0; i < warmup; ++i)
+        sat.process(amp * std::sin(2.0f * PI_F * freq * i / TEST_SR));
+
+    float inPeak = 0.0f, outPeak = 0.0f;
+    for (int i = warmup; i < warmup + measure; ++i) {
+        float in = amp * std::sin(2.0f * PI_F * freq * i / TEST_SR);
+        float out = sat.process(in);
+        inPeak = std::max(inPeak, std::abs(in));
+        outPeak = std::max(outPeak, std::abs(out));
+    }
+
+    // Output peak should be less than input peak (compression)
+    REQUIRE(outPeak < inPeak);
+}
+
+TEST_CASE("OT saturation: bass saturates more than treble", "[ot_sat]") {
+    // Same amplitude at 80Hz vs 2kHz — bass should have lower output ratio
+    auto measureGain = [](float freq, float amp) {
+        OTSaturation sat;
+        sat.recalcCoeffs(TEST_SR);
+
+        int warmup = static_cast<int>(TEST_SR * 0.1f);
+        int measure = static_cast<int>(TEST_SR * 0.1f);
+
+        for (int i = 0; i < warmup; ++i)
+            sat.process(amp * std::sin(2.0f * PI_F * freq * i / TEST_SR));
+
+        float inPeak = 0.0f, outPeak = 0.0f;
+        for (int i = warmup; i < warmup + measure; ++i) {
+            float in = amp * std::sin(2.0f * PI_F * freq * i / TEST_SR);
+            float out = sat.process(in);
+            inPeak = std::max(inPeak, std::abs(in));
+            outPeak = std::max(outPeak, std::abs(out));
+        }
+        return outPeak / inPeak;
+    };
+
+    float amp = 30.0f;  // realistic powerOut level to engage saturation
+    float bassGain = measureGain(80.0f, amp);
+    float trebleGain = measureGain(2000.0f, amp);
+
+    // Bass should be more compressed (lower gain) than treble
+    REQUIRE(bassGain < trebleGain);
+}
+
+TEST_CASE("OT saturation: reset clears state", "[ot_sat]") {
+    OTSaturation sat;
+    sat.recalcCoeffs(TEST_SR);
+
+    // Process some signal to build up state
+    for (int i = 0; i < 2000; ++i)
+        sat.process(2.0f * std::sin(2.0f * PI_F * 200.0f * i / TEST_SR));
+
+    sat.reset();
+
+    // After reset, zero input should give zero output
+    float out = sat.process(0.0f);
+    REQUIRE(out == Approx(0.0f).margin(1e-10f));
+}
