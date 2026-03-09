@@ -80,6 +80,7 @@ private:
     float outputGainCompensation = 2.0f;  // tuned so max cab output ≈ ±1.0 after tanh
     bool  psuFrozen    = false;
     double baseSampleRate = 44100.0;
+    int   cachedIRIndex = 0;              // detect IR parameter changes
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(TinyTerrorProcessor)
 };

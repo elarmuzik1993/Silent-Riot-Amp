@@ -45,3 +45,33 @@ target_compile_features(TinyTerrorTests PRIVATE cxx_std_17)
 include(CTest)
 include(Catch)
 catch_discover_tests(TinyTerrorTests)
+
+# ── JUCE-dependent tests (cabinet IR, convolution) ──
+add_executable(TinyTerrorJuceTests
+    cabinet_ir_tests.cpp
+
+    ${CMAKE_SOURCE_DIR}/src/dsp/cabinet/CabinetSim.cpp
+    ${CMAKE_SOURCE_DIR}/src/dsp/cabinet/SpeakerCoupling.cpp
+    ${CMAKE_SOURCE_DIR}/src/dsp/filters/FilterBank.cpp
+)
+
+target_link_libraries(TinyTerrorJuceTests PRIVATE
+    Catch2::Catch2WithMain
+    juce::juce_dsp
+    juce::juce_audio_formats
+    juce::juce_audio_basics
+)
+
+target_compile_definitions(TinyTerrorJuceTests PRIVATE
+    JUCE_WEB_BROWSER=0
+    JUCE_USE_CURL=0
+)
+
+target_include_directories(TinyTerrorJuceTests PRIVATE
+    ${CMAKE_SOURCE_DIR}/src
+    ${CMAKE_SOURCE_DIR}/tests
+)
+
+target_compile_features(TinyTerrorJuceTests PRIVATE cxx_std_17)
+
+catch_discover_tests(TinyTerrorJuceTests)

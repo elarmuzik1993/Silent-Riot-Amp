@@ -100,6 +100,9 @@ void TinyTerrorProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
     // Report oversampler latency to DAW
     setLatencySamples(static_cast<int>(oversampleSwitcher.active()->getLatencyInSamples()));
 
+    // Cabinet IR convolution engine (runs at base SR, after downsample)
+    cabSim.prepare(sampleRate, samplesPerBlock, getTotalNumOutputChannels());
+
     // Smoothers run at block rate (base SR / block size), NOT oversampled rate
     float controlRate = static_cast<float>(sampleRate) / static_cast<float>(samplesPerBlock);
     gainSmoother.init(5.0f, controlRate);
@@ -128,12 +131,23 @@ void TinyTerrorProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     bool  is7W      = apvts.getRawParameterValue(Params::IDs::HALF_POWER)->load() > 0.5f;
     bool  cabOn     = apvts.getRawParameterValue(Params::IDs::CAB_SIM)->load() > 0.5f;
     bool  powerOn   = apvts.getRawParameterValue(Params::IDs::POWER)->load() > 0.5f;
+    int   irIndex   = static_cast<int>(apvts.getRawParameterValue(Params::IDs::IR_INDEX)->load());
 
     // Master power bypass — pass audio through unprocessed
     if (!powerOn) return;
 
     el84BaseBias = is7W ? PENTODE_BIAS_7W_N : PENTODE_BIAS_15W_N;
     cabSim.setEnabled(cabOn);
+
+    // Detect IR parameter changes
+    if (irIndex != cachedIRIndex)
+    {
+        cabSim.setIRIndex(irIndex);
+        cachedIRIndex = irIndex;
+    }
+
+    // IR mode: cab on AND convolution active (IR_INDEX > 0)
+    bool irMode = cabOn && cabSim.useIR;
 
     // Smooth parameters
     gainSmoother.setTarget(gainParam);
@@ -237,17 +251,20 @@ void TinyTerrorProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
         float otSat = otSaturation.process(otIn);
         float otOut = filterBank.ot_leakageLP.process(otSat);
 
-        // ── Cabinet Sim ──
+        // ── Cabinet Sim (IIR path only — IR path runs after downsample) ──
         float cabOut = otOut;
-        if (cabSim.enabled) {
+        if (cabSim.enabled && !irMode) {
             cabOut = filterBank.cab_presence.process(cabOut);
             cabOut = filterBank.cab_rolloff.process(cabOut);
             cabOut = filterBank.cab_notch.process(cabOut);
         }
 
-        // ── Output: scale back to DAW ±1.0 (Spec §2.5 Output Scaling) ──
-        float finalOut = cabOut * outputGainCompensation;
-        finalOut = std::tanh(finalOut);  // gentle limiter
+        // ── Output: scale + limiter (skip in IR mode — applied after convolution) ──
+        float finalOut = cabOut;
+        if (!irMode) {
+            finalOut *= outputGainCompensation;
+            finalOut = std::tanh(finalOut);
+        }
 
         osBlock.setSample(0, static_cast<int>(i), finalOut);
         // Copy to stereo
@@ -257,6 +274,23 @@ void TinyTerrorProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
 
     juce::dsp::AudioBlock<float> outputBlock(buffer);
     oversampler->processSamplesDown(outputBlock);
+
+    // ── IR Convolution path (runs at base SR, after downsample) ──
+    if (irMode)
+    {
+        cabSim.processBlock(outputBlock);
+
+        // Apply output scaling + tanh limiter after convolution
+        for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
+        {
+            auto* samples = buffer.getWritePointer(ch);
+            for (int i = 0; i < buffer.getNumSamples(); ++i)
+            {
+                samples[i] *= outputGainCompensation;
+                samples[i] = std::tanh(samples[i]);
+            }
+        }
+    }
 }
 
 // ── Boilerplate ──
@@ -266,7 +300,7 @@ const juce::String TinyTerrorProcessor::getName() const { return JucePlugin_Name
 bool TinyTerrorProcessor::acceptsMidi() const { return false; }
 bool TinyTerrorProcessor::producesMidi() const { return false; }
 bool TinyTerrorProcessor::isMidiEffect() const { return false; }
-double TinyTerrorProcessor::getTailLengthSeconds() const { return 0.0; }
+double TinyTerrorProcessor::getTailLengthSeconds() const { return cabSim.getIRTailSeconds(); }
 int TinyTerrorProcessor::getNumPrograms() { return 1; }
 int TinyTerrorProcessor::getCurrentProgram() { return 0; }
 void TinyTerrorProcessor::setCurrentProgram(int) {}

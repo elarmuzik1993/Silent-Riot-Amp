@@ -81,6 +81,7 @@ target_sources(TinyTerror
         src/dsp/cabinet/SpeakerCoupling.cpp
         src/dsp/cabinet/CabinetSim.h
         src/dsp/cabinet/CabinetSim.cpp
+        src/dsp/cabinet/IRLibrary.h
 
         # Oversampling state machine
         src/dsp/OversampleSwitcher.h
@@ -116,6 +117,7 @@ target_link_libraries(TinyTerror
         TinyTerrorData
         juce::juce_audio_utils
         juce::juce_audio_processors
+        juce::juce_audio_formats
         juce::juce_dsp
         juce::juce_gui_basics
         juce::juce_gui_extra
