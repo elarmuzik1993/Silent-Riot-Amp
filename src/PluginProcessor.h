@@ -5,6 +5,7 @@
 
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_dsp/juce_dsp.h>
+#include <atomic>
 
 #include "utils/VoltageScale.h"
 #include "utils/Constants.h"
@@ -24,7 +25,8 @@
 #include "dsp/cabinet/CabinetSim.h"
 #include "dsp/OversampleSwitcher.h"
 
-class TinyTerrorProcessor : public juce::AudioProcessor
+class TinyTerrorProcessor : public juce::AudioProcessor,
+                            private juce::AsyncUpdater
 {
 public:
     TinyTerrorProcessor();
@@ -57,6 +59,7 @@ public:
 
 private:
     juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
+    void handleAsyncUpdate() override;  // deferred IR loading on message thread
 
     // ── DSP state (matches spec Section 6 hierarchy) ──
     tt::FilterBank          filterBank;
@@ -80,7 +83,8 @@ private:
     float outputGainCompensation = 2.0f;  // tuned so max cab output ≈ ±1.0 after tanh
     bool  psuFrozen    = false;
     double baseSampleRate = 44100.0;
-    int   cachedIRIndex = 0;              // detect IR parameter changes
+    int   cachedIRIndex = 0;              // last IR index seen by audio thread
+    std::atomic<int> pendingIRIndex { -1 }; // deferred IR load (message thread)
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(TinyTerrorProcessor)
 };

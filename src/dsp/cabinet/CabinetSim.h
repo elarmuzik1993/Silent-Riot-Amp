@@ -11,6 +11,7 @@
 
 #include <juce_dsp/juce_dsp.h>
 #include <juce_audio_formats/juce_audio_formats.h>
+#include <atomic>
 
 namespace tt {
 
@@ -61,16 +62,20 @@ inline constexpr int MAX_USER_IR_SAMPLES = 8192;
 
 struct CabinetSim
 {
-    bool enabled = true;
-    bool useIR   = false;
-    int  currentIRIndex = 0;
+    bool              enabled = true;
+    std::atomic<bool> useIR { false };   // atomic: written on message thread, read on audio thread
+    int               currentIRIndex = 0;
 
     void setEnabled(bool e) { enabled = e; }
 
+    // Called from prepareToPlay (not concurrent with processBlock)
     void prepare(double sampleRate, int maxBlockSize, int numChannels);
     void reset();
+
+    // Called from audio thread only
     void processBlock(juce::dsp::AudioBlock<float>& block);
 
+    // Called from message thread only (via AsyncUpdater)
     void setIRIndex(int newIndex);
     void loadStockIR(int stockIndex);
     void loadIRFromFile(const juce::File& file);
@@ -83,6 +88,7 @@ private:
     BufferTransfer bufferTransfer;
 
     double currentSampleRate = 44100.0;
+    double irNativeSampleRate = 48000.0;  // sample rate of the loaded IR
     int    currentIRLengthSamples = 0;
 };
 

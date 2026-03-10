@@ -33,7 +33,18 @@ TinyTerrorProcessor::TinyTerrorProcessor()
     v1b_miller.init(CGP_12AX7, CGK_12AX7, V1B_RSOURCE_BASE_REAL, StageGains::V1B_GAIN);
 }
 
-TinyTerrorProcessor::~TinyTerrorProcessor() {}
+TinyTerrorProcessor::~TinyTerrorProcessor()
+{
+    cancelPendingUpdate(); // prevent callback after destruction
+}
+
+void TinyTerrorProcessor::handleAsyncUpdate()
+{
+    // Runs on message thread — safe to allocate, do file I/O, acquire locks.
+    int idx = pendingIRIndex.exchange(-1);
+    if (idx >= 0)
+        cabSim.setIRIndex(idx);
+}
 
 juce::AudioProcessorValueTreeState::ParameterLayout TinyTerrorProcessor::createParameterLayout()
 {
@@ -139,15 +150,17 @@ void TinyTerrorProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     el84BaseBias = is7W ? PENTODE_BIAS_7W_N : PENTODE_BIAS_15W_N;
     cabSim.setEnabled(cabOn);
 
-    // Detect IR parameter changes
+    // Detect IR parameter changes — defer actual loading to message thread
     if (irIndex != cachedIRIndex)
     {
-        cabSim.setIRIndex(irIndex);
         cachedIRIndex = irIndex;
+        pendingIRIndex.store(irIndex);
+        triggerAsyncUpdate();  // handleAsyncUpdate() calls cabSim.setIRIndex() on message thread
     }
 
-    // IR mode: cab on AND convolution active (IR_INDEX > 0)
-    bool irMode = cabOn && cabSim.useIR;
+    // IR mode: cab on AND convolution has an active IR.
+    // useIR is atomic — set by message thread after IR is loaded into bufferTransfer.
+    bool irMode = cabOn && cabSim.useIR.load();
 
     // Smooth parameters
     gainSmoother.setTarget(gainParam);

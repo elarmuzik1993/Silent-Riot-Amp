@@ -14,13 +14,12 @@ void CabinetSim::prepare(double sampleRate, int maxBlockSize, int numChannels)
 
     convolution.prepare(spec);
 
-    // Reload current IR (if any) after prepare — convolution resets internal state
-    if (useIR && currentIRIndex > 0)
+    // Reload current IR (if any) after prepare — convolution resets internal state.
+    // prepare() is not concurrent with processBlock, so allocation here is safe.
+    if (useIR.load() && currentIRIndex > 0)
     {
         if (currentIRIndex <= NUM_STOCK_IRS)
             loadStockIR(currentIRIndex - 1);
-        // User IRs (index > NUM_STOCK_IRS) would need a stored file path to reload;
-        // for now they simply reset and the host must re-set the IR.
     }
 }
 
@@ -31,6 +30,10 @@ void CabinetSim::reset()
 
 void CabinetSim::processBlock(juce::dsp::AudioBlock<float>& block)
 {
+    // Guard: skip convolution if cab sim is disabled
+    if (!enabled)
+        return;
+
     // Pick up any pending IR from the message thread (never blocks)
     bufferTransfer.get([this](BufferWithSampleRate& buf)
     {
@@ -47,33 +50,42 @@ void CabinetSim::processBlock(juce::dsp::AudioBlock<float>& block)
 
 void CabinetSim::setIRIndex(int newIndex)
 {
+    // Called from message thread only (via AsyncUpdater).
+    // No allocation or lock acquisition happens on the audio thread.
     currentIRIndex = newIndex;
 
     if (newIndex <= 0)
     {
-        // IIR mode — disable convolution path
-        useIR = false;
+        // IIR mode — disable convolution path.
+        // Don't call convolution.reset() here; the convolution just sits idle
+        // when useIR is false. This avoids touching convolution state that could
+        // race with the audio thread's convolution.process() call.
+        useIR.store(false);
         currentIRLengthSamples = 0;
-        convolution.reset();
+        irNativeSampleRate = 0.0;
         return;
     }
-
-    useIR = true;
 
     if (newIndex <= NUM_STOCK_IRS)
     {
         loadStockIR(newIndex - 1); // stock indices are 0-based internally
     }
-    // Indices > NUM_STOCK_IRS are user slots — loadIRFromFile() must be called separately
+    // Indices > NUM_STOCK_IRS are user slots — loadIRFromFile() must be called separately.
+    // Set useIR after the IR is pushed to bufferTransfer, so the audio thread
+    // doesn't route through convolution before the IR is available.
+    useIR.store(true);
 }
 
 void CabinetSim::loadStockIR(int stockIndex)
 {
+    // Called from message thread (via setIRIndex) or from prepare().
+    // Heap allocation here is safe — never called from processBlock.
     jassert(stockIndex >= 0 && stockIndex < NUM_STOCK_IRS);
 
     const auto& desc = getStockIRDescriptor(stockIndex);
-    auto irBuffer = generateSyntheticIR(desc);
+    auto irBuffer = generateSyntheticIR(stockIndex, desc);
     currentIRLengthSamples = irBuffer.getNumSamples();
+    irNativeSampleRate = static_cast<double>(desc.sampleRate);
 
     bufferTransfer.set(BufferWithSampleRate(std::move(irBuffer),
                                            static_cast<double>(desc.sampleRate)));
@@ -81,6 +93,7 @@ void CabinetSim::loadStockIR(int stockIndex)
 
 void CabinetSim::loadIRFromFile(const juce::File& file)
 {
+    // Called from message thread only.
     juce::AudioFormatManager formatManager;
     formatManager.registerBasicFormats();
 
@@ -97,16 +110,19 @@ void CabinetSim::loadIRFromFile(const juce::File& file)
     reader->read(&irBuffer, 0, numSamples, 0, true, true);
 
     currentIRLengthSamples = numSamples;
+    irNativeSampleRate = reader->sampleRate;
     bufferTransfer.set(BufferWithSampleRate(std::move(irBuffer),
                                            reader->sampleRate));
 }
 
 double CabinetSim::getIRTailSeconds() const
 {
-    if (!useIR || currentIRLengthSamples <= 0 || currentSampleRate <= 0.0)
+    if (!useIR.load() || currentIRLengthSamples <= 0 || irNativeSampleRate <= 0.0)
         return 0.0;
 
-    return static_cast<double>(currentIRLengthSamples) / currentSampleRate;
+    // Use the IR's native sample rate (not the plugin's session rate) because
+    // currentIRLengthSamples is in the IR's native sample count.
+    return static_cast<double>(currentIRLengthSamples) / irNativeSampleRate;
 }
 
 } // namespace tt
