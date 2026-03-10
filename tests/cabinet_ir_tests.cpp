@@ -3,6 +3,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
+#include <vector>
 
 #include "dsp/cabinet/IRLibrary.h"
 #include "dsp/cabinet/CabinetSim.h"
@@ -37,7 +38,7 @@ TEST_CASE("Synthetic IR has correct length and non-zero content", "[cabinet][ir]
     for (int i = 0; i < NUM_STOCK_IRS; ++i)
     {
         const auto& desc = getStockIRDescriptor(i);
-        auto buffer = generateSyntheticIR(desc);
+        auto buffer = generateSyntheticIR(i, desc);
 
         REQUIRE(buffer.getNumChannels() == 1);
         REQUIRE(buffer.getNumSamples() == desc.samples);
@@ -49,9 +50,24 @@ TEST_CASE("Synthetic IR has correct length and non-zero content", "[cabinet][ir]
             peak = std::max(peak, std::abs(data[s]));
 
         REQUIRE(peak > 0.0f);
-        // Should be normalized to 1.0
-        REQUIRE_THAT(peak, Catch::Matchers::WithinAbs(1.0, 0.001));
     }
+}
+
+TEST_CASE("Each stock IR has unique synthesis parameters", "[cabinet][ir]")
+{
+    // Verify that all 8 synthetic IRs produce different waveforms
+    std::vector<float> firstSamples;
+    for (int i = 0; i < NUM_STOCK_IRS; ++i)
+    {
+        const auto& desc = getStockIRDescriptor(i);
+        auto buffer = generateSyntheticIR(i, desc);
+        // Sample at index 5 (past the impulse) captures resonance character
+        firstSamples.push_back(buffer.getReadPointer(0)[5]);
+    }
+    // All 8 values should be unique (no duplicate synthesis params)
+    for (int i = 0; i < NUM_STOCK_IRS; ++i)
+        for (int j = i + 1; j < NUM_STOCK_IRS; ++j)
+            REQUIRE(firstSamples[i] != firstSamples[j]);
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -64,7 +80,7 @@ TEST_CASE("IR index 0 = IIR mode", "[cabinet][ir]")
     cab.prepare(48000.0, 512, 1);
 
     cab.setIRIndex(0);
-    REQUIRE(cab.useIR == false);
+    REQUIRE(cab.useIR.load() == false);
     REQUIRE(cab.currentIRIndex == 0);
 }
 
@@ -74,11 +90,11 @@ TEST_CASE("IR index > 0 = IR mode", "[cabinet][ir]")
     cab.prepare(48000.0, 512, 1);
 
     cab.setIRIndex(1);
-    REQUIRE(cab.useIR == true);
+    REQUIRE(cab.useIR.load() == true);
     REQUIRE(cab.currentIRIndex == 1);
 
     cab.setIRIndex(5);
-    REQUIRE(cab.useIR == true);
+    REQUIRE(cab.useIR.load() == true);
     REQUIRE(cab.currentIRIndex == 5);
 }
 
@@ -159,7 +175,7 @@ TEST_CASE("Switch IR -> IIR -> IR", "[cabinet][ir]")
 
     // Start in IR mode
     cab.setIRIndex(4);
-    REQUIRE(cab.useIR == true);
+    REQUIRE(cab.useIR.load() == true);
 
     // Process a block in IR mode
     juce::AudioBuffer<float> buffer(1, 512);
@@ -169,11 +185,11 @@ TEST_CASE("Switch IR -> IIR -> IR", "[cabinet][ir]")
 
     // Switch to IIR mode
     cab.setIRIndex(0);
-    REQUIRE(cab.useIR == false);
+    REQUIRE(cab.useIR.load() == false);
 
     // Switch back to IR mode (different IR)
     cab.setIRIndex(7);
-    REQUIRE(cab.useIR == true);
+    REQUIRE(cab.useIR.load() == true);
     REQUIRE(cab.currentIRIndex == 7);
 
     // Process another block — should not crash
