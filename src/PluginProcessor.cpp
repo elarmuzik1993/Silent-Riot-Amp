@@ -304,6 +304,37 @@ void TinyTerrorProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
             }
         }
     }
+
+    // ── GUI level metering (RMS of channel 0) ──
+    {
+        const int n = buffer.getNumSamples();
+        if (n > 0)
+        {
+            const float* ch0 = buffer.getReadPointer(0);
+            float sumSq = 0.0f;
+            for (int i = 0; i < n; ++i)
+                sumSq += ch0[i] * ch0[i];
+            float rms = std::sqrt(sumSq / static_cast<float>(n));
+            outputLevelForGUI.store(rms, std::memory_order_relaxed);
+        }
+        // Input level approximated from gain parameter
+        inputLevelForGUI.store(gainParam * 0.8f + 0.1f, std::memory_order_relaxed);
+    }
+}
+
+TinyTerrorProcessor::DSPReadout TinyTerrorProcessor::getDSPReadout() const
+{
+    DSPReadout r;
+    r.vBPlus   = VS::toVolts(psu.vPower());
+    r.vScreen  = VS::toVolts(psu.vScreen());
+    r.vPi      = VS::toVolts(psu.vPi());
+    r.vPreamp  = VS::toVolts(psu.vPreamp());
+    r.sagPercent = sag.biasOffset() / 0.01f; // approximate %
+    r.biasV    = VS::toVolts(el84BaseBias + sag.biasOffset());
+    r.gridCurrentMA = 0.0f; // placeholder until wired
+    r.osFactor = oversampleSwitcher.activeFactor();
+    r.is7W     = std::abs(el84BaseBias - PENTODE_BIAS_7W_N) < 1e-6f;
+    return r;
 }
 
 // ── Boilerplate ──

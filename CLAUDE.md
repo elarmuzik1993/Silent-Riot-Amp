@@ -14,8 +14,9 @@
 
 All processing uses a **normalized voltage domain**: 300V B+ = 1.0. See `VoltageScale.h`. Ohm's law is preserved: V_n = I_n × R_n.
 
-### Signal Chain (per-sample, oversampled)
+### Signal Chain (dual-path)
 
+**IIR path** (IR_INDEX=0, per-sample oversampled):
 ```
 Input → Scale to guitar domain → HP 7Hz → Grid cond V1a → Triode V1a → Clamp
 → Cathode bypass LP → HP 72Hz → Miller LP V1a → Report PSU → Gain pot A
@@ -23,8 +24,14 @@ Input → Scale to guitar domain → HP 7Hz → Grid cond V1a → Triode V1a →
 → Miller LP V1b → Report PSU → Gain pot B → LP 5kHz → Grid cond PI
 → LTP solver → HP×2 16Hz → Report PSU → Tone (Vox cut) → Master volume
 → Grid cond EL84×2 → Soft conduction×2 → Pentode×2 → Push-pull sum
-→ Report PSU → Sag update → Speaker coupling → OT LP 7kHz → Cab sim
-→ Output scale → tanh limiter → Output
+→ Report PSU → Sag update → Speaker coupling → OT LP 7kHz
+→ IIR cab filters → Output scale → tanh limiter → Downsample → Output
+```
+
+**IR path** (IR_INDEX>0, convolution at base SR after downsample):
+```
+... → Speaker coupling → OT LP 7kHz → Downsample
+→ IR convolution → Output scale → tanh limiter → Output
 ```
 
 ### Source Layout
@@ -36,7 +43,7 @@ src/
 │   ├── filters/     OnePole.h, Biquad.h, FilterBank.h/.cpp, DynamicMillerLP.h
 │   ├── tubes/       TriodeWaveshaper, PentodeWaveshaper, GridConduction
 │   ├── power/       PowerSupplyModel, SagEnvelope, LTPSolver
-│   └── cabinet/     SpeakerCoupling, CabinetSim
+│   └── cabinet/     SpeakerCoupling, CabinetSim, IRLibrary, OTSaturation
 ├── gui/             LookAndFeel, AmpKnob
 ├── PluginProcessor  Full signal chain (§2.5 processBlock)
 └── PluginEditor     GUI shell
@@ -55,8 +62,8 @@ cmake -B build -DTT_BUILD_TESTS=ON # Build with tests
 
 - **Phase 1** (done): Preamp — VoltageScale, triode waveshaper, cascaded stages, gain, oversampling
 - **Phase 2** (done): Power section — LTP solver, tone, EL84 pentode, push-pull, 15W/7W mode
-- **Phase 3** (in progress): Dynamics — PSU droop ✓, sag envelope ✓, grid conduction ✓, speaker coupling ✓, OT saturation (optional, not yet)
-- **Phase 4**: Cabinet IR loader, GUI (see UI spec), presets, polish
+- **Phase 3** (done): Dynamics — PSU droop, sag envelope, grid conduction, speaker coupling, OT saturation
+- **Phase 4** (in progress): Cabinet IR loader ✓, GUI (see UI spec), presets, polish
 
 ## Conventions
 
@@ -66,7 +73,19 @@ cmake -B build -DTT_BUILD_TESTS=ON # Build with tests
 - `ANTI_DENORMAL` (1e-18f) injected in all IIR filter state
 - Parameter smoothing at block rate (base SR / block), NOT oversampled rate
 - CMake target is `TinyTerror`; product name is `Silent Riot`
-- Tests use Catch2 v3 — one test file per DSP module
+- Tests use Catch2 v3 — one test file per DSP module, two test targets:
+  - `TinyTerrorTests` — pure C++ tests (no JUCE dependency)
+  - `TinyTerrorJuceTests` — JUCE-dependent tests (cabinet IR, convolution)
+
+## Cabinet IR Loader Architecture
+
+- **CabinetSim** wraps `juce::dsp::Convolution` with the canonical `BufferTransfer` pattern (from JUCE ConvolutionDemo)
+- **IRLibrary.h** — stock IR metadata registry (8 IRs) + synthetic IR generator (placeholders until real WAVs arrive)
+- **Thread safety**: IR loading is deferred to the message thread via `juce::AsyncUpdater`. Audio thread only reads `useIR` (atomic) and calls `bufferTransfer.get()` (try-lock, never blocks). Zero allocation on audio thread.
+- **IR_INDEX param**: 0=IIR mode, 1–8=stock IRs, 9+=user slots (require `loadIRFromFile()`)
+- `useIR` is only set to `true` AFTER the IR buffer is pushed to `bufferTransfer`
+- Convolution runs at base SR (after downsample), not at oversampled rate
+- `getTailLengthSeconds()` reports IR tail using the IR's native sample rate
 
 ## Important Pitfalls (from spec)
 
@@ -76,3 +95,5 @@ cmake -B build -DTT_BUILD_TESTS=ON # Build with tests
 - ParamSmoother `controlRate` must use BASE sample rate, not oversampled
 - PSU droop impedance values (SOURCE_IMPEDANCE_N=0.08) produce aggressive sag with full pentode currents (~48mA/tube normalized to 48.0) — may need constant tuning after listening tests
 - `outputGainCompensation` hardcoded to 2.0 — needs tuning
+- IR loading must NEVER happen on the audio thread — always use `AsyncUpdater` to defer to message thread
+- `bufferTransfer.set()` (blocking SpinLock) is message-thread only; `bufferTransfer.get()` (try-lock) is audio-thread only
