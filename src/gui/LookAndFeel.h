@@ -1,10 +1,17 @@
 #pragma once
-// Orange-inspired dark GUI theme
 #include <juce_gui_basics/juce_gui_basics.h>
+
 namespace tt {
-struct OrangeLookAndFeel : public juce::LookAndFeel_V4 {
-    OrangeLookAndFeel();
+
+struct SilentRiotLookAndFeel : public juce::LookAndFeel_V4 {
+    SilentRiotLookAndFeel();
     void drawRotarySlider(juce::Graphics&, int x, int y, int w, int h,
                           float pos, float start, float end, juce::Slider&) override;
+    void drawToggleButton(juce::Graphics&, juce::ToggleButton&,
+                          bool highlighted, bool down) override;
 };
+
+// Keep alias for backward compat during transition
+using OrangeLookAndFeel = SilentRiotLookAndFeel;
+
 } // namespace tt

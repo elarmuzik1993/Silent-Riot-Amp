@@ -57,6 +57,15 @@ public:
 
     juce::AudioProcessorValueTreeState apvts;
 
+    // GUI readout — called from editor timer (message thread)
+    struct DSPReadout {
+        float vBPlus, vScreen, vPi, vPreamp;
+        float sagPercent, biasV, gridCurrentMA;
+        int osFactor;
+        bool is7W;
+    };
+    DSPReadout getDSPReadout() const;
+
 private:
     juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
     void handleAsyncUpdate() override;  // deferred IR loading on message thread
@@ -85,6 +94,13 @@ private:
     double baseSampleRate = 44100.0;
     int   cachedIRIndex = 0;              // last IR index seen by audio thread
     std::atomic<int> pendingIRIndex { -1 }; // deferred IR load (message thread)
+
+public:
+    // GUI level metering (atomic, updated per block from audio thread)
+    std::atomic<float> inputLevelForGUI  { 0.0f };
+    std::atomic<float> outputLevelForGUI { 0.0f };
+
+private:
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(TinyTerrorProcessor)
 };

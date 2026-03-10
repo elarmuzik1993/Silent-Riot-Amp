@@ -1,0 +1,107 @@
+#include "HeaderBar.h"
+#include "ColourPalette.h"
+#include "FontData.h"
+
+namespace tt {
+
+HeaderBar::HeaderBar()
+{
+    addAndMakeVisible(presetSelector);
+}
+
+void HeaderBar::paint(juce::Graphics& g)
+{
+    auto bounds = getLocalBounds().toFloat();
+
+    // Left: "SR" brand + divider + "SILENT RIOT"
+    float x = 16.0f;
+    g.setFont(Fonts::spaceMono(14.0f, true));
+    g.setColour(Colours::accent);
+    g.drawText("SR", juce::Rectangle<float>(x, 0.0f, 28.0f, bounds.getHeight()),
+               juce::Justification::centredLeft, false);
+    x += 30.0f;
+
+    g.setColour(Colours::border);
+    g.fillRect(x, 10.0f, 1.0f, bounds.getHeight() - 20.0f);
+    x += 8.0f;
+
+    g.setFont(Fonts::spaceMono(10.0f));
+    g.setColour(Colours::label);
+    g.drawText("SILENT RIOT", juce::Rectangle<float>(x, 0.0f, 100.0f, bounds.getHeight()),
+               juce::Justification::centredLeft, false);
+
+    // Right: "MONOLIT" + gear icon
+    g.setFont(Fonts::spaceMono(8.0f));
+    g.setColour(Colours::muted);
+    g.drawText("MONOLIT", juce::Rectangle<float>(bounds.getWidth() - 100.0f, 0.0f, 56.0f, bounds.getHeight()),
+               juce::Justification::centredRight, false);
+
+    // Gear icon
+    auto gearArea = juce::Rectangle<float>(bounds.getWidth() - 36.0f, 7.0f, 24.0f, 24.0f);
+    paintGearIcon(g, gearArea, gearActive);
+
+    // Bottom border
+    g.setColour(Colours::border);
+    g.fillRect(0.0f, bounds.getHeight() - 1.0f, bounds.getWidth(), 1.0f);
+}
+
+void HeaderBar::paintGearIcon(juce::Graphics& g, juce::Rectangle<float> area, bool active) const
+{
+    float cx = area.getCentreX();
+    float cy = area.getCentreY();
+    float outerR = 9.0f;
+    float innerR = 5.0f;
+    int numTeeth = 6;
+
+    if (active)
+    {
+        g.setColour(Colours::accent.withAlpha(0.18f));
+        g.fillEllipse(area.expanded(2.0f));
+    }
+
+    juce::Path gear;
+    for (int i = 0; i < numTeeth * 2; ++i)
+    {
+        float angle = static_cast<float>(i) * juce::MathConstants<float>::pi / static_cast<float>(numTeeth);
+        if (active)
+            angle += juce::MathConstants<float>::pi / 3.0f; // 60° rotation when active
+        float r = (i % 2 == 0) ? outerR : innerR;
+        float px = cx + std::cos(angle) * r;
+        float py = cy + std::sin(angle) * r;
+        if (i == 0) gear.startNewSubPath(px, py);
+        else gear.lineTo(px, py);
+    }
+    gear.closeSubPath();
+
+    g.setColour(active ? Colours::accent : Colours::dim);
+    g.strokePath(gear, juce::PathStrokeType(1.5f));
+
+    // Center hole
+    g.setColour(active ? Colours::accent : Colours::dim);
+    g.drawEllipse(cx - 2.5f, cy - 2.5f, 5.0f, 5.0f, 1.0f);
+}
+
+void HeaderBar::mouseDown(const juce::MouseEvent& e)
+{
+    // Check if click is on gear icon area
+    auto gearArea = juce::Rectangle<float>(getWidth() - 36.0f, 7.0f, 24.0f, 24.0f);
+    if (gearArea.contains(e.position))
+    {
+        gearActive = !gearActive;
+        repaint();
+        if (onGearClick) onGearClick();
+    }
+}
+
+void HeaderBar::resized()
+{
+    // Preset selector centered
+    float selectorW = 220.0f;
+    float selectorH = 26.0f;
+    float sx = (getWidth() - selectorW) * 0.5f;
+    float sy = (getHeight() - selectorH) * 0.5f;
+    presetSelector.setBounds(static_cast<int>(sx), static_cast<int>(sy),
+                             static_cast<int>(selectorW), static_cast<int>(selectorH));
+}
+
+} // namespace tt

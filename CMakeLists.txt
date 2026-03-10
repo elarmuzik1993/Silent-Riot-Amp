@@ -34,7 +34,7 @@ juce_add_plugin(TinyTerror
     NEEDS_MIDI_INPUT         FALSE
     NEEDS_MIDI_OUTPUT        FALSE
     IS_MIDI_EFFECT           FALSE
-    EDITOR_WANTS_KEYBOARD_FOCUS FALSE
+    EDITOR_WANTS_KEYBOARD_FOCUS TRUE
     COPY_PLUGIN_AFTER_BUILD  TRUE
     VST3_COPY_DIR            "${CMAKE_SOURCE_DIR}/build/install/VST3"
 )
@@ -88,18 +88,46 @@ target_sources(TinyTerror
         src/dsp/OversampleSwitcher.cpp
 
         # GUI
+        src/gui/ColourPalette.h
+        src/gui/FontData.h
+        src/gui/FontData.cpp
         src/gui/LookAndFeel.h
         src/gui/LookAndFeel.cpp
-        src/gui/AmpKnob.h
-        src/gui/AmpKnob.cpp
+        src/gui/NotchKnob.h
+        src/gui/NotchKnob.cpp
+        src/gui/VUMeter.h
+        src/gui/VUMeter.cpp
+        src/gui/ToggleSwitch.h
+        src/gui/ToggleSwitch.cpp
+        src/gui/HeaderBar.h
+        src/gui/HeaderBar.cpp
+        src/gui/FooterBar.h
+        src/gui/FooterBar.cpp
+        src/gui/SectionBar.h
+        src/gui/SectionBar.cpp
+        src/gui/AdvancedPanel.h
+        src/gui/AdvancedPanel.cpp
+        src/gui/PresetSelector.h
+        src/gui/PresetSelector.cpp
+        src/gui/SegmentedSelector.h
+        src/gui/SegmentedSelector.cpp
+        src/gui/SettingsPanel.h
+        src/gui/SettingsPanel.cpp
+        src/gui/IRWaveformDisplay.h
+        src/gui/IRWaveformDisplay.cpp
+        src/gui/IRLoaderPanel.h
+        src/gui/IRLoaderPanel.cpp
 )
 
 # ── Binary resources ────────────────────────────
-# Placeholder — replace with actual assets
-file(WRITE "${CMAKE_SOURCE_DIR}/resources/images/placeholder.txt" "Replace with actual background/knob assets")
 juce_add_binary_data(TinyTerrorData
     SOURCES
-        resources/images/placeholder.txt
+        resources/fonts/SpaceMono-Regular.ttf
+        resources/fonts/SpaceMono-Bold.ttf
+        resources/fonts/DMSans-Regular.ttf
+        resources/fonts/DMSans-Medium.ttf
+        resources/fonts/DMSans-SemiBold.ttf
+        resources/fonts/DMSans-Bold.ttf
 )
 
 # ── Compile definitions ─────────────────────────
