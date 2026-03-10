@@ -69,11 +69,12 @@ void CabinetSim::setIRIndex(int newIndex)
     if (newIndex <= NUM_STOCK_IRS)
     {
         loadStockIR(newIndex - 1); // stock indices are 0-based internally
+        // Set useIR after the IR is pushed to bufferTransfer, so the audio thread
+        // doesn't route through convolution before the IR is available.
+        useIR.store(true);
     }
-    // Indices > NUM_STOCK_IRS are user slots — loadIRFromFile() must be called separately.
-    // Set useIR after the IR is pushed to bufferTransfer, so the audio thread
-    // doesn't route through convolution before the IR is available.
-    useIR.store(true);
+    // Indices > NUM_STOCK_IRS are user slots — useIR stays false until
+    // loadIRFromFile() is called and actually loads an IR.
 }
 
 void CabinetSim::loadStockIR(int stockIndex)
@@ -113,6 +114,7 @@ void CabinetSim::loadIRFromFile(const juce::File& file)
     irNativeSampleRate = reader->sampleRate;
     bufferTransfer.set(BufferWithSampleRate(std::move(irBuffer),
                                            reader->sampleRate));
+    useIR.store(true);
 }
 
 double CabinetSim::getIRTailSeconds() const
