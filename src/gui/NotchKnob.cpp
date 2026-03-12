@@ -72,13 +72,14 @@ void NotchKnob::paint(juce::Graphics& g)
 
 void NotchKnob::drawSegmentedArc(juce::Graphics& g, float cx, float cy, float pos) const
 {
-    // 20 segments, each 13.5° span with 3° gaps
-    float activeSegments = pos * numSegments;
+    // 20 segments evenly distributed across the 270° sweep
+    float slotDeg = sweepDeg / static_cast<float>(numSegments); // 13.5° per slot
+    float activeSegments = pos * static_cast<float>(numSegments);
 
     for (int i = 0; i < numSegments; ++i)
     {
-        float segStartDeg = startAngle + i * (segSpanDeg + segGapDeg);
-        float segEndDeg   = segStartDeg + segSpanDeg;
+        float segStartDeg = startAngle + static_cast<float>(i) * slotDeg;
+        float segEndDeg   = segStartDeg + slotDeg - segGapDeg;
 
         float segStartRad = degToRad(segStartDeg - 90.0f); // JUCE arc coords: 0 is top
         float segEndRad   = degToRad(segEndDeg - 90.0f);

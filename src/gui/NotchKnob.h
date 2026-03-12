@@ -29,7 +29,7 @@ private:
     static constexpr float endAngle   =  135.0f;
     static constexpr float sweepDeg   = 270.0f;
     static constexpr int   numSegments = 20;
-    static constexpr float segSpanDeg  = 13.5f;
+    static constexpr float segSpanDeg  = 10.5f;  // sweepDeg/numSegments - segGapDeg
     static constexpr float segGapDeg   =  3.0f;
     static constexpr int   numLabels   = 11;
 
