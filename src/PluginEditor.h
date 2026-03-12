@@ -22,6 +22,8 @@ public:
 private:
     void timerCallback() override;
     void layoutContent();
+    void saveUIState();
+    void loadUIState();
 
     TinyTerrorProcessor& proc;
     tt::SilentRiotLookAndFeel lnf;
@@ -48,10 +50,12 @@ private:
     tt::SectionBar irSectionBar{"IR LOADER"};
     tt::IRLoaderPanel irLoaderPanel;
     bool irPanelOpen = false;
+    float irPanelAnimH = 0.0f;  // animated height (0 to panelHeight)
 
     tt::SectionBar advSectionBar{"ADVANCED"};
     tt::AdvancedPanel advancedPanel;
     bool advPanelOpen = false;
+    float advPanelAnimH = 0.0f; // animated height (0 to panelHeight)
 
     // Settings overlay
     tt::SettingsPanel settingsPanel;

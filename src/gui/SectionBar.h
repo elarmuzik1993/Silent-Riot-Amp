@@ -3,7 +3,7 @@
 
 namespace tt {
 
-class SectionBar : public juce::Component {
+class SectionBar : public juce::Component, private juce::Timer {
 public:
     explicit SectionBar(const juce::String& label);
     void paint(juce::Graphics&) override;
@@ -16,6 +16,8 @@ public:
     std::function<void(bool)> onToggle;
 
 private:
+    void timerCallback() override;
+
     juce::String label;
     juce::String hintText;
     bool open = false;

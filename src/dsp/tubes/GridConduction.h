@@ -13,6 +13,7 @@ struct GridConductionModel {
     float sourceResistance;
     float couplingCapCharge = 0.0f;
     float chargeDecay       = 0.999f;
+    float lastGridCurrent   = 0.0f;  // for GUI readout
 };
 
 float applyGridConduction(float vGrid, GridConductionModel& model);

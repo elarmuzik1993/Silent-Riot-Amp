@@ -171,6 +171,19 @@ void TinyTerrorProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     float toneFreq = TONE_MIN_FREQ + toneSmoother.current * (TONE_MAX_FREQ - TONE_MIN_FREQ);
     filterBank.updateModulated(toneFreq, GAIN_LOADING_LP_FREQ);
 
+    // ── Input level metering (RMS before processing) ──
+    {
+        const int n = buffer.getNumSamples();
+        if (n > 0)
+        {
+            const float* ch0 = buffer.getReadPointer(0);
+            float sumSq = 0.0f;
+            for (int i = 0; i < n; ++i)
+                sumSq += ch0[i] * ch0[i];
+            inputLevelForGUI.store(std::sqrt(sumSq / static_cast<float>(n)), std::memory_order_relaxed);
+        }
+    }
+
     // Oversampled processing (Spec §2.5 processBlock)
     auto* oversampler = oversampleSwitcher.active();
     auto osBlock = oversampler->processSamplesUp(juce::dsp::AudioBlock<float>(buffer));
@@ -317,8 +330,12 @@ void TinyTerrorProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
             float rms = std::sqrt(sumSq / static_cast<float>(n));
             outputLevelForGUI.store(rms, std::memory_order_relaxed);
         }
-        // Input level approximated from gain parameter
-        inputLevelForGUI.store(gainParam * 0.8f + 0.1f, std::memory_order_relaxed);
+    }
+
+    // ── Grid current readout (peak across EL84 stages) ──
+    {
+        float peakGridI = std::max(el84GridA.lastGridCurrent, el84GridB.lastGridCurrent);
+        gridCurrentForGUI.store(peakGridI, std::memory_order_relaxed);
     }
 }
 
@@ -331,7 +348,7 @@ TinyTerrorProcessor::DSPReadout TinyTerrorProcessor::getDSPReadout() const
     r.vPreamp  = VS::toVolts(psu.vPreamp());
     r.sagPercent = sag.biasOffset() / 0.01f; // approximate %
     r.biasV    = VS::toVolts(el84BaseBias + sag.biasOffset());
-    r.gridCurrentMA = 0.0f; // placeholder until wired
+    r.gridCurrentMA = VS::toAmps(gridCurrentForGUI.load(std::memory_order_relaxed)) * 1000.0f;
     r.osFactor = oversampleSwitcher.activeFactor();
     r.is7W     = std::abs(el84BaseBias - PENTODE_BIAS_7W_N) < 1e-6f;
     return r;

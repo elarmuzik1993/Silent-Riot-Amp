@@ -10,14 +10,27 @@ void SectionBar::setOpen(bool shouldOpen)
 {
     if (open == shouldOpen) return;
     open = shouldOpen;
-    chevronAngle = open ? 180.0f : 0.0f;
-    repaint();
+    startTimerHz(60); // animate chevron
     if (onToggle) onToggle(open);
 }
 
 void SectionBar::mouseDown(const juce::MouseEvent&)
 {
     setOpen(!open);
+}
+
+void SectionBar::timerCallback()
+{
+    float target = open ? 180.0f : 0.0f;
+    float diff = target - chevronAngle;
+    // ~300ms at 60Hz: lerp factor 0.18
+    chevronAngle += diff * 0.18f;
+    if (std::abs(diff) < 0.5f)
+    {
+        chevronAngle = target;
+        stopTimer();
+    }
+    repaint();
 }
 
 void SectionBar::paint(juce::Graphics& g)

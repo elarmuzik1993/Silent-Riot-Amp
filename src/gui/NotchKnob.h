@@ -16,7 +16,27 @@ private:
     void drawKnobBody(juce::Graphics&, float cx, float cy, float angle) const;
     void drawNotchPointer(juce::Graphics&, float cx, float cy, float angle) const;
 
-    juce::Slider slider;
+    // Custom slider with keyboard step overrides
+    // Arrow: ±0.01 internal (±0.1 on 0-10 display)
+    // PageUp/Down: ±0.1 internal (±1.0 on display)
+    class KnobSlider : public juce::Slider {
+    public:
+        using Slider::Slider;
+        bool keyPressed(const juce::KeyPress& key) override
+        {
+            if (key == juce::KeyPress::upKey || key == juce::KeyPress::rightKey)
+            { setValue(getValue() + 0.01, juce::sendNotificationSync); return true; }
+            if (key == juce::KeyPress::downKey || key == juce::KeyPress::leftKey)
+            { setValue(getValue() - 0.01, juce::sendNotificationSync); return true; }
+            if (key == juce::KeyPress::pageUpKey)
+            { setValue(getValue() + 0.1, juce::sendNotificationSync); return true; }
+            if (key == juce::KeyPress::pageDownKey)
+            { setValue(getValue() - 0.1, juce::sendNotificationSync); return true; }
+            return Slider::keyPressed(key);
+        }
+    };
+
+    KnobSlider slider;
     juce::String label;
     float defaultVal;
 

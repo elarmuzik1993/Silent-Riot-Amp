@@ -9,6 +9,20 @@ HeaderBar::HeaderBar()
     addAndMakeVisible(presetSelector);
 }
 
+void HeaderBar::timerCallback()
+{
+    float target = gearActive ? 60.0f : 0.0f;
+    float diff = target - gearRotation;
+    // ~400ms at 60Hz: lerp factor 0.14
+    gearRotation += diff * 0.14f;
+    if (std::abs(diff) < 0.3f)
+    {
+        gearRotation = target;
+        stopTimer();
+    }
+    repaint();
+}
+
 void HeaderBar::paint(juce::Graphics& g)
 {
     auto bounds = getLocalBounds().toFloat();
@@ -38,14 +52,14 @@ void HeaderBar::paint(juce::Graphics& g)
 
     // Gear icon
     auto gearArea = juce::Rectangle<float>(bounds.getWidth() - 36.0f, 7.0f, 24.0f, 24.0f);
-    paintGearIcon(g, gearArea, gearActive);
+    paintGearIcon(g, gearArea);
 
     // Bottom border
     g.setColour(Colours::border);
     g.fillRect(0.0f, bounds.getHeight() - 1.0f, bounds.getWidth(), 1.0f);
 }
 
-void HeaderBar::paintGearIcon(juce::Graphics& g, juce::Rectangle<float> area, bool active) const
+void HeaderBar::paintGearIcon(juce::Graphics& g, juce::Rectangle<float> area) const
 {
     float cx = area.getCentreX();
     float cy = area.getCentreY();
@@ -53,18 +67,19 @@ void HeaderBar::paintGearIcon(juce::Graphics& g, juce::Rectangle<float> area, bo
     float innerR = 5.0f;
     int numTeeth = 6;
 
-    if (active)
+    if (gearActive)
     {
         g.setColour(Colours::accent.withAlpha(0.18f));
         g.fillEllipse(area.expanded(2.0f));
     }
 
+    float rotRad = gearRotation * juce::MathConstants<float>::pi / 180.0f;
+
     juce::Path gear;
     for (int i = 0; i < numTeeth * 2; ++i)
     {
         float angle = static_cast<float>(i) * juce::MathConstants<float>::pi / static_cast<float>(numTeeth);
-        if (active)
-            angle += juce::MathConstants<float>::pi / 3.0f; // 60° rotation when active
+        angle += rotRad;
         float r = (i % 2 == 0) ? outerR : innerR;
         float px = cx + std::cos(angle) * r;
         float py = cy + std::sin(angle) * r;
@@ -73,11 +88,10 @@ void HeaderBar::paintGearIcon(juce::Graphics& g, juce::Rectangle<float> area, bo
     }
     gear.closeSubPath();
 
-    g.setColour(active ? Colours::accent : Colours::dim);
+    g.setColour(gearActive ? Colours::accent : Colours::dim);
     g.strokePath(gear, juce::PathStrokeType(1.5f));
 
     // Center hole
-    g.setColour(active ? Colours::accent : Colours::dim);
     g.drawEllipse(cx - 2.5f, cy - 2.5f, 5.0f, 5.0f, 1.0f);
 }
 
@@ -88,7 +102,7 @@ void HeaderBar::mouseDown(const juce::MouseEvent& e)
     if (gearArea.contains(e.position))
     {
         gearActive = !gearActive;
-        repaint();
+        startTimerHz(60); // animate gear rotation
         if (onGearClick) onGearClick();
     }
 }

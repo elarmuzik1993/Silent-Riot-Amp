@@ -63,7 +63,7 @@ cmake -B build -DTT_BUILD_TESTS=ON # Build with tests
 - **Phase 1** (done): Preamp — VoltageScale, triode waveshaper, cascaded stages, gain, oversampling
 - **Phase 2** (done): Power section — LTP solver, tone, EL84 pentode, push-pull, 15W/7W mode
 - **Phase 3** (done): Dynamics — PSU droop, sag envelope, grid conduction, speaker coupling, OT saturation
-- **Phase 4** (in progress): Cabinet IR loader ✓, GUI ✓, presets, polish
+- **Phase 4** (done): Cabinet IR loader, GUI (14 custom components), presets, polish (animations, live metering, keyboard nav, UI persistence)
 
 ## Conventions
 
@@ -109,7 +109,11 @@ cmake -B build -DTT_BUILD_TESTS=ON # Build with tests
 
 **Window strategy**: Fixed 700×900 window (`kWindowW`/`kWindowH`). Collapsible panels show/hide within a `contentArea` container — no runtime `setSize()` calls (avoids X11 compositor resize artifacts). Footer follows content, empty space below.
 
-**Editor timer** (30Hz): Polls atomic level meters, DSP readout for advanced panel, footer stats. No animation — panels expand/collapse instantly via `layoutContent()`.
+**Editor timer** (30Hz): Polls atomic level meters (real input/output RMS + grid current), DSP readout for advanced panel, footer stats. Drives animated section expand/collapse (350ms lerp). SectionBar chevrons animate at 300ms, gear icon at 400ms, toggle thumb at ~200ms.
+
+**Keyboard**: Arrow keys ±0.1 display (±0.01 internal), PageUp/Down ±1.0 display (±0.1 internal) via `NotchKnob::KnobSlider` override. Tab order: GAIN→TONE→VOLUME→7W→CAB→PWR.
+
+**UI state persistence**: Panel open states, theme, meter ballistics, knob mode, and UI scale stored as properties on `apvts.state` ValueTree — automatically saved/restored with plugin state.
 
 ## Important Pitfalls (from spec)
 
