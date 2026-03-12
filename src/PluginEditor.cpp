@@ -28,20 +28,22 @@ TinyTerrorEditor::TinyTerrorEditor(TinyTerrorProcessor& p)
 
     // Section bars
     contentArea.addAndMakeVisible(irSectionBar);
-    contentArea.addChildComponent(irLoaderPanel);
+    contentArea.addAndMakeVisible(irLoaderPanel);
+    irLoaderPanel.setVisible(false);
 
     contentArea.addAndMakeVisible(advSectionBar);
-    contentArea.addChildComponent(advancedPanel);
+    contentArea.addAndMakeVisible(advancedPanel);
+    advancedPanel.setVisible(false);
 
     irSectionBar.onToggle = [this](bool open) {
         irPanelOpen = open;
-        irLoaderPanel.setVisible(open);
-        layoutContent();
+        if (open) irLoaderPanel.setVisible(true);
+        // Height animation driven by timerCallback
     };
     advSectionBar.onToggle = [this](bool open) {
         advPanelOpen = open;
-        advancedPanel.setVisible(open);
-        layoutContent();
+        if (open) advancedPanel.setVisible(true);
+        // Height animation driven by timerCallback
     };
 
     irSectionBar.setHintText("IIR Mode");
@@ -76,6 +78,7 @@ TinyTerrorEditor::TinyTerrorEditor(TinyTerrorProcessor& p)
         static const float scales[] = { 0.75f, 1.0f, 1.25f, 1.5f };
         float s = scales[juce::jlimit(0, 3, scaleIdx)];
         setTransform(juce::AffineTransform::scale(s));
+        saveUIState();
     };
 
     // Preset selector wiring
@@ -112,14 +115,73 @@ TinyTerrorEditor::TinyTerrorEditor(TinyTerrorProcessor& p)
     cabSimToggle.getButton().setExplicitFocusOrder(5);
     powerToggle.getButton().setExplicitFocusOrder(6);
 
+    // Restore UI state from APVTS value tree
+    loadUIState();
+
     setSize(kWindowW, kWindowH);
     startTimerHz(30);
 }
 
 TinyTerrorEditor::~TinyTerrorEditor()
 {
+    saveUIState();
     stopTimer();
     setLookAndFeel(nullptr);
+}
+
+void TinyTerrorEditor::saveUIState()
+{
+    auto& state = proc.apvts.state;
+    state.setProperty("irPanelOpen",  irPanelOpen,  nullptr);
+    state.setProperty("advPanelOpen", advPanelOpen,  nullptr);
+    state.setProperty("uiScale",      settingsPanel.uiScale, nullptr);
+    state.setProperty("theme",        settingsPanel.themeIndex, nullptr);
+    state.setProperty("meterBallistics", settingsPanel.meterBallistics, nullptr);
+    state.setProperty("knobMode",     settingsPanel.knobMode, nullptr);
+}
+
+void TinyTerrorEditor::loadUIState()
+{
+    auto& state = proc.apvts.state;
+
+    if (state.hasProperty("irPanelOpen"))
+    {
+        bool irOpen = static_cast<bool>(state.getProperty("irPanelOpen"));
+        if (irOpen)
+        {
+            irPanelOpen = true;
+            irPanelAnimH = static_cast<float>(tt::IRLoaderPanel::panelHeight);
+            irLoaderPanel.setVisible(true);
+            irSectionBar.setOpen(true);
+        }
+    }
+
+    if (state.hasProperty("advPanelOpen"))
+    {
+        bool advOpen = static_cast<bool>(state.getProperty("advPanelOpen"));
+        if (advOpen)
+        {
+            advPanelOpen = true;
+            advPanelAnimH = static_cast<float>(tt::AdvancedPanel::panelHeight);
+            advancedPanel.setVisible(true);
+            advSectionBar.setOpen(true);
+        }
+    }
+
+    if (state.hasProperty("uiScale"))
+    {
+        int scaleIdx = static_cast<int>(state.getProperty("uiScale"));
+        settingsPanel.uiScale = scaleIdx;
+        static const float scales[] = { 0.75f, 1.0f, 1.25f, 1.5f };
+        setTransform(juce::AffineTransform::scale(scales[juce::jlimit(0, 3, scaleIdx)]));
+    }
+
+    if (state.hasProperty("theme"))
+        settingsPanel.themeIndex = static_cast<int>(state.getProperty("theme"));
+    if (state.hasProperty("meterBallistics"))
+        settingsPanel.meterBallistics = static_cast<int>(state.getProperty("meterBallistics"));
+    if (state.hasProperty("knobMode"))
+        settingsPanel.knobMode = static_cast<int>(state.getProperty("knobMode"));
 }
 
 void TinyTerrorEditor::timerCallback()
@@ -161,6 +223,43 @@ void TinyTerrorEditor::timerCallback()
         guiR.tempC = 420.0f;
         advancedPanel.setReadout(guiR);
     }
+
+    // ── Animate panel heights (350ms at 30Hz ≈ 10.5 frames, lerp 0.22) ──
+    bool needsLayout = false;
+
+    {
+        float irTarget = irPanelOpen ? static_cast<float>(tt::IRLoaderPanel::panelHeight) : 0.0f;
+        float irDiff = irTarget - irPanelAnimH;
+        if (std::abs(irDiff) > 0.5f)
+        {
+            irPanelAnimH += irDiff * 0.22f;
+            needsLayout = true;
+        }
+        else if (std::abs(irPanelAnimH - irTarget) > 0.01f)
+        {
+            irPanelAnimH = irTarget;
+            if (!irPanelOpen) irLoaderPanel.setVisible(false);
+            needsLayout = true;
+        }
+    }
+
+    {
+        float advTarget = advPanelOpen ? static_cast<float>(tt::AdvancedPanel::panelHeight) : 0.0f;
+        float advDiff = advTarget - advPanelAnimH;
+        if (std::abs(advDiff) > 0.5f)
+        {
+            advPanelAnimH += advDiff * 0.22f;
+            needsLayout = true;
+        }
+        else if (std::abs(advPanelAnimH - advTarget) > 0.01f)
+        {
+            advPanelAnimH = advTarget;
+            if (!advPanelOpen) advancedPanel.setVisible(false);
+            needsLayout = true;
+        }
+    }
+
+    if (needsLayout) layoutContent();
 }
 
 void TinyTerrorEditor::paint(juce::Graphics& g)
@@ -222,14 +321,16 @@ void TinyTerrorEditor::layoutContent()
     cabSimToggle.setBounds(toggleStartX + toggleW + toggleGap, toggleY, toggleW, toggleH);
     powerToggle.setBounds(toggleStartX + (toggleW + toggleGap) * 2, toggleY, toggleW, toggleH);
 
-    // Section bars + panels
+    // Section bars + animated panels
     irSectionBar.setBounds(area.removeFromTop(26));
-    if (irPanelOpen)
-        irLoaderPanel.setBounds(area.removeFromTop(tt::IRLoaderPanel::panelHeight));
+    int irH = static_cast<int>(irPanelAnimH);
+    if (irH > 0)
+        irLoaderPanel.setBounds(area.removeFromTop(irH));
 
     advSectionBar.setBounds(area.removeFromTop(26));
-    if (advPanelOpen)
-        advancedPanel.setBounds(area.removeFromTop(tt::AdvancedPanel::panelHeight));
+    int advH = static_cast<int>(advPanelAnimH);
+    if (advH > 0)
+        advancedPanel.setBounds(area.removeFromTop(advH));
 
     // Footer immediately after content
     footer.setBounds(area.removeFromTop(30));

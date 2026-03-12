@@ -99,6 +99,7 @@ public:
     // GUI level metering (atomic, updated per block from audio thread)
     std::atomic<float> inputLevelForGUI  { 0.0f };
     std::atomic<float> outputLevelForGUI { 0.0f };
+    std::atomic<float> gridCurrentForGUI { 0.0f };
 
 private:
 
