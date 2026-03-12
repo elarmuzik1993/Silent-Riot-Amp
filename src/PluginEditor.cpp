@@ -9,27 +9,40 @@ TinyTerrorEditor::TinyTerrorEditor(TinyTerrorProcessor& p)
 {
     tt::Fonts::init();
     setLookAndFeel(&lnf);
+    setOpaque(true);
 
-    addAndMakeVisible(header);
-    addAndMakeVisible(footer);
-    addAndMakeVisible(vuIn);
-    addAndMakeVisible(vuOut);
-    addAndMakeVisible(gainKnob);
-    addAndMakeVisible(toneKnob);
-    addAndMakeVisible(volumeKnob);
-    addAndMakeVisible(halfPowerToggle);
-    addAndMakeVisible(cabSimToggle);
-    addAndMakeVisible(powerToggle);
+    // Content container — children laid out inside, window never resizes
+    addAndMakeVisible(contentArea);
+    contentArea.setInterceptsMouseClicks(false, true);
+
+    contentArea.addAndMakeVisible(header);
+    contentArea.addAndMakeVisible(footer);
+    contentArea.addAndMakeVisible(vuIn);
+    contentArea.addAndMakeVisible(vuOut);
+    contentArea.addAndMakeVisible(gainKnob);
+    contentArea.addAndMakeVisible(toneKnob);
+    contentArea.addAndMakeVisible(volumeKnob);
+    contentArea.addAndMakeVisible(halfPowerToggle);
+    contentArea.addAndMakeVisible(cabSimToggle);
+    contentArea.addAndMakeVisible(powerToggle);
 
     // Section bars
-    addAndMakeVisible(irSectionBar);
-    addChildComponent(irLoaderPanel);
+    contentArea.addAndMakeVisible(irSectionBar);
+    contentArea.addChildComponent(irLoaderPanel);
 
-    addAndMakeVisible(advSectionBar);
-    addChildComponent(advancedPanel);
+    contentArea.addAndMakeVisible(advSectionBar);
+    contentArea.addChildComponent(advancedPanel);
 
-    irSectionBar.onToggle = [](bool) {};
-    advSectionBar.onToggle = [](bool) {};
+    irSectionBar.onToggle = [this](bool open) {
+        irPanelOpen = open;
+        irLoaderPanel.setVisible(open);
+        layoutContent();
+    };
+    advSectionBar.onToggle = [this](bool open) {
+        advPanelOpen = open;
+        advancedPanel.setVisible(open);
+        layoutContent();
+    };
 
     irSectionBar.setHintText("IIR Mode");
 
@@ -44,15 +57,13 @@ TinyTerrorEditor::TinyTerrorEditor(TinyTerrorProcessor& p)
             irSectionBar.setHintText("IIR Mode");
     };
 
-    // CAB toggle auto-opens IR panel
+    // CAB toggle auto-opens IR panel (setOpen fires onToggle which handles layout)
     cabSimToggle.getButton().onStateChange = [this] {
         if (cabSimToggle.getButton().getToggleState() && !irSectionBar.isOpen())
-        {
             irSectionBar.setOpen(true);
-        }
     };
 
-    // Settings overlay
+    // Settings overlay (added directly to editor, not contentArea, so it floats on top)
     addChildComponent(settingsPanel);
     header.onGearClick = [this] {
         settingsPanel.setVisible(!settingsPanel.isVisible());
@@ -93,7 +104,7 @@ TinyTerrorEditor::TinyTerrorEditor(TinyTerrorProcessor& p)
     cabSimToggle.getButton().setDescription("Cabinet simulation toggle");
     powerToggle.getButton().setDescription("Power on/off toggle");
 
-    // Tab order: GAIN → TONE → VOLUME → 7W → CAB → PWR
+    // Tab order: GAIN -> TONE -> VOLUME -> 7W -> CAB -> PWR
     gainKnob.getSlider().setExplicitFocusOrder(1);
     toneKnob.getSlider().setExplicitFocusOrder(2);
     volumeKnob.getSlider().setExplicitFocusOrder(3);
@@ -101,7 +112,7 @@ TinyTerrorEditor::TinyTerrorEditor(TinyTerrorProcessor& p)
     cabSimToggle.getButton().setExplicitFocusOrder(5);
     powerToggle.getButton().setExplicitFocusOrder(6);
 
-    setSize(700, calculateTotalHeight());
+    setSize(kWindowW, kWindowH);
     startTimerHz(30);
 }
 
@@ -111,61 +122,8 @@ TinyTerrorEditor::~TinyTerrorEditor()
     setLookAndFeel(nullptr);
 }
 
-int TinyTerrorEditor::calculateTotalHeight() const
-{
-    int h = 38;   // header
-    h += 232;     // main body (knobs + toggles)
-    h += 26;      // IR section bar
-    h += static_cast<int>(irPanelHeight);
-    h += 26;      // advanced section bar
-    h += static_cast<int>(advPanelHeight);
-    h += 30;      // footer
-    return h;
-}
-
 void TinyTerrorEditor::timerCallback()
 {
-    bool needsResize = false;
-
-    // Animate IR panel
-    {
-        float targetH = irSectionBar.isOpen() ? static_cast<float>(tt::IRLoaderPanel::panelHeight) : 0.0f;
-        float diff = targetH - irPanelHeight;
-        if (std::abs(diff) > 0.5f)
-        {
-            irPanelHeight += diff * 0.15f;
-            irLoaderPanel.setVisible(irPanelHeight > 1.0f);
-            needsResize = true;
-        }
-        else if (std::abs(diff) > 0.01f)
-        {
-            irPanelHeight = targetH;
-            irLoaderPanel.setVisible(irPanelHeight > 1.0f);
-            needsResize = true;
-        }
-    }
-
-    // Animate advanced panel
-    {
-        float targetH = advSectionBar.isOpen() ? static_cast<float>(tt::AdvancedPanel::panelHeight) : 0.0f;
-        float diff = targetH - advPanelHeight;
-        if (std::abs(diff) > 0.5f)
-        {
-            advPanelHeight += diff * 0.15f;
-            advancedPanel.setVisible(advPanelHeight > 1.0f);
-            needsResize = true;
-        }
-        else if (std::abs(diff) > 0.01f)
-        {
-            advPanelHeight = targetH;
-            advancedPanel.setVisible(advPanelHeight > 1.0f);
-            needsResize = true;
-        }
-    }
-
-    if (needsResize)
-        setSize(700, calculateTotalHeight());
-
     // Live VU meters from processor
     bool powerOn = proc.apvts.getRawParameterValue(tt::Params::IDs::POWER)->load() > 0.5f;
     if (powerOn)
@@ -223,13 +181,16 @@ void TinyTerrorEditor::paint(juce::Graphics& g)
 
 void TinyTerrorEditor::resized()
 {
-    auto area = getLocalBounds();
+    contentArea.setBounds(getLocalBounds());
+    layoutContent();
+}
+
+void TinyTerrorEditor::layoutContent()
+{
+    auto area = contentArea.getLocalBounds();
 
     // Header
     header.setBounds(area.removeFromTop(38));
-
-    // Footer (always at bottom)
-    footer.setBounds(area.removeFromBottom(30));
 
     // Main body area
     auto body = area.removeFromTop(232);
@@ -263,14 +224,17 @@ void TinyTerrorEditor::resized()
 
     // Section bars + panels
     irSectionBar.setBounds(area.removeFromTop(26));
-    if (irPanelHeight > 0.0f)
-        irLoaderPanel.setBounds(area.removeFromTop(static_cast<int>(irPanelHeight)));
+    if (irPanelOpen)
+        irLoaderPanel.setBounds(area.removeFromTop(tt::IRLoaderPanel::panelHeight));
 
     advSectionBar.setBounds(area.removeFromTop(26));
-    if (advPanelHeight > 0.0f)
-        advancedPanel.setBounds(area.removeFromTop(static_cast<int>(advPanelHeight)));
+    if (advPanelOpen)
+        advancedPanel.setBounds(area.removeFromTop(tt::AdvancedPanel::panelHeight));
 
-    // Settings overlay (absolute positioned)
+    // Footer immediately after content
+    footer.setBounds(area.removeFromTop(30));
+
+    // Settings overlay (absolute positioned on editor, not contentArea)
     if (settingsPanel.isVisible())
     {
         settingsPanel.setBounds(getWidth() - 340, 38, 340, 420);
