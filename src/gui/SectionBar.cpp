@@ -12,12 +12,12 @@ void SectionBar::setOpen(bool shouldOpen)
     open = shouldOpen;
     chevronAngle = open ? 180.0f : 0.0f;
     repaint();
+    if (onToggle) onToggle(open);
 }
 
 void SectionBar::mouseDown(const juce::MouseEvent&)
 {
     setOpen(!open);
-    if (onToggle) onToggle(open);
 }
 
 void SectionBar::paint(juce::Graphics& g)

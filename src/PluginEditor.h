@@ -21,10 +21,13 @@ public:
 
 private:
     void timerCallback() override;
-    int calculateTotalHeight() const;
+    void layoutContent();
 
     TinyTerrorProcessor& proc;
     tt::SilentRiotLookAndFeel lnf;
+
+    // Content container — all GUI children go here, clipped to the window
+    juce::Component contentArea;
 
     // Layout
     tt::HeaderBar header;
@@ -44,11 +47,11 @@ private:
     // Collapsible sections
     tt::SectionBar irSectionBar{"IR LOADER"};
     tt::IRLoaderPanel irLoaderPanel;
-    float irPanelHeight = 0.0f; // animated 0→400
+    bool irPanelOpen = false;
 
     tt::SectionBar advSectionBar{"ADVANCED"};
     tt::AdvancedPanel advancedPanel;
-    float advPanelHeight = 0.0f; // animated 0→180
+    bool advPanelOpen = false;
 
     // Settings overlay
     tt::SettingsPanel settingsPanel;
@@ -58,6 +61,10 @@ private:
     using ButtonA = juce::AudioProcessorValueTreeState::ButtonAttachment;
     std::unique_ptr<SliderA> gainA, toneA, volA;
     std::unique_ptr<ButtonA> halfPowerA, cabSimA, powerA;
+
+    // Fixed window height = max possible content
+    static constexpr int kWindowW = 700;
+    static constexpr int kWindowH = 900;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(TinyTerrorEditor)
 };
