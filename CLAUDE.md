@@ -44,9 +44,9 @@ src/
 │   ├── tubes/       TriodeWaveshaper, PentodeWaveshaper, GridConduction
 │   ├── power/       PowerSupplyModel, SagEnvelope, LTPSolver
 │   └── cabinet/     SpeakerCoupling, CabinetSim, IRLibrary, OTSaturation
-├── gui/             LookAndFeel, AmpKnob
+├── gui/             14 custom components (see GUI Architecture below)
 ├── PluginProcessor  Full signal chain (§2.5 processBlock)
-└── PluginEditor     GUI shell
+└── PluginEditor     GUI shell (fixed 700×900 window)
 ```
 
 ## Build
@@ -63,7 +63,7 @@ cmake -B build -DTT_BUILD_TESTS=ON # Build with tests
 - **Phase 1** (done): Preamp — VoltageScale, triode waveshaper, cascaded stages, gain, oversampling
 - **Phase 2** (done): Power section — LTP solver, tone, EL84 pentode, push-pull, 15W/7W mode
 - **Phase 3** (done): Dynamics — PSU droop, sag envelope, grid conduction, speaker coupling, OT saturation
-- **Phase 4** (in progress): Cabinet IR loader ✓, GUI (see UI spec), presets, polish
+- **Phase 4** (in progress): Cabinet IR loader ✓, GUI ✓, presets, polish
 
 ## Conventions
 
@@ -86,6 +86,30 @@ cmake -B build -DTT_BUILD_TESTS=ON # Build with tests
 - `useIR` is only set to `true` AFTER the IR buffer is pushed to `bufferTransfer`
 - Convolution runs at base SR (after downsample), not at oversampled rate
 - `getTailLengthSeconds()` reports IR tail using the IR's native sample rate
+
+## GUI Architecture
+
+14 custom components in `src/gui/`, all in `namespace tt`:
+
+- **ColourPalette.h** — 23 inline colour constants (dark theme)
+- **FontData.h/.cpp** — Embedded Space Mono + DM Sans fonts via BinaryData
+- **LookAndFeel.h/.cpp** — `SilentRiotLookAndFeel` (aliased as `OrangeLookAndFeel`)
+- **NotchKnob.h/.cpp** — Segmented-arc rotary knob (20 segments over 270° sweep, numbered 0–10, notch pointer)
+- **VUMeter.h/.cpp** — 24-segment LED bar, 60Hz timer, green/yellow/red zones
+- **ToggleSwitch.h/.cpp** — iOS-style toggle wrapping `juce::ToggleButton` for APVTS attachment
+- **HeaderBar.h/.cpp** — Brand + PresetSelector + gear icon
+- **FooterBar.h/.cpp** — OS factor, latency, sample rate, bit depth
+- **SectionBar.h/.cpp** — Clickable expand/collapse bar with chevron + hint text
+- **AdvancedPanel.h/.cpp** — PSU supply rails (teal gradient bars) + engine state readout
+- **PresetSelector.h/.cpp** — `[◂ | name | ▸]` cyclic preset browser
+- **SegmentedSelector.h/.cpp** — Row of mutually-exclusive buttons
+- **SettingsPanel.h/.cpp** — Overlay (340px) with UI preferences + About section
+- **IRLoaderPanel.h/.cpp** — Category tabs, scrollable IR list, waveform display, drag-and-drop
+- **IRWaveformDisplay.h/.cpp** — Waveform plot with envelope fill
+
+**Window strategy**: Fixed 700×900 window (`kWindowW`/`kWindowH`). Collapsible panels show/hide within a `contentArea` container — no runtime `setSize()` calls (avoids X11 compositor resize artifacts). Footer follows content, empty space below.
+
+**Editor timer** (30Hz): Polls atomic level meters, DSP readout for advanced panel, footer stats. No animation — panels expand/collapse instantly via `layoutContent()`.
 
 ## Important Pitfalls (from spec)
 
