@@ -72,20 +72,24 @@ void NotchKnob::paint(juce::Graphics& g)
 
 void NotchKnob::drawSegmentedArc(juce::Graphics& g, float cx, float cy, float pos) const
 {
-    // 20 segments evenly distributed across the 270° sweep
+    // 20 segments evenly distributed across the 270° sweep (CW from -135° to +135°)
     float slotDeg = sweepDeg / static_cast<float>(numSegments); // 13.5° per slot
     float activeSegments = pos * static_cast<float>(numSegments);
 
     for (int i = 0; i < numSegments; ++i)
     {
+        // Knob degrees: -135 (label "0") to +135 (label "10"), CW in screen space
         float segStartDeg = startAngle + static_cast<float>(i) * slotDeg;
         float segEndDeg   = segStartDeg + slotDeg - segGapDeg;
 
-        float segStartRad = degToRad(segStartDeg - 90.0f); // JUCE arc coords: 0 is top
-        float segEndRad   = degToRad(segEndDeg - 90.0f);
+        // JUCE addArc uses clockwise radians where 0 = top (12 o'clock).
+        // Our knob degrees already use 0 = top convention, so just convert to radians.
+        float segStartRad = degToRad(segStartDeg);
+        float segEndRad   = degToRad(segEndDeg);
 
         juce::Path seg;
-        seg.addCentredArc(cx, cy, arcR, arcR, 0.0f, segStartRad, segEndRad, true);
+        seg.addArc(cx - arcR, cy - arcR, arcR * 2.0f, arcR * 2.0f,
+                   segStartRad, segEndRad, true);
 
         bool active = (static_cast<float>(i) < activeSegments);
         if (active)
