@@ -24,11 +24,14 @@ private:
     void layoutContent();
     void saveUIState();
     void loadUIState();
+    int getContentHeight() const;
+    void applyWindowSize();
+    void disableCompositorEffects();
 
     TinyTerrorProcessor& proc;
     tt::SilentRiotLookAndFeel lnf;
 
-    // Content container — all GUI children go here, clipped to the window
+    // Content container
     juce::Component contentArea;
 
     // Layout
@@ -50,12 +53,12 @@ private:
     tt::SectionBar irSectionBar{"IR LOADER"};
     tt::IRLoaderPanel irLoaderPanel;
     bool irPanelOpen = false;
-    float irPanelAnimH = 0.0f;  // animated height (0 to panelHeight)
+    float irPanelAnimH = 0.0f;
 
     tt::SectionBar advSectionBar{"ADVANCED"};
     tt::AdvancedPanel advancedPanel;
     bool advPanelOpen = false;
-    float advPanelAnimH = 0.0f; // animated height (0 to panelHeight)
+    float advPanelAnimH = 0.0f;
 
     // Settings overlay
     tt::SettingsPanel settingsPanel;
@@ -66,9 +69,14 @@ private:
     std::unique_ptr<SliderA> gainA, toneA, volA;
     std::unique_ptr<ButtonA> halfPowerA, cabSimA, powerA;
 
-    // Fixed window height = max possible content
     static constexpr int kWindowW = 700;
-    static constexpr int kWindowH = 900;
+    static constexpr int kHeaderH   = 38;
+    static constexpr int kBodyH     = 232;
+    static constexpr int kSectionH  = 26;
+    static constexpr int kFooterH   = 30;
+    static constexpr int kBaseH     = kHeaderH + kBodyH + kSectionH * 2 + kFooterH;
+
+    bool compositorBypassed = false;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(TinyTerrorEditor)
 };

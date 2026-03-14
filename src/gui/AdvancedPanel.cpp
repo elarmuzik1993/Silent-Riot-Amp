@@ -25,6 +25,8 @@ void AdvancedPanel::timerCallback()
 void AdvancedPanel::paint(juce::Graphics& g)
 {
     auto bounds = getLocalBounds().toFloat();
+    if (bounds.getHeight() < 20.0f) return;  // too small during animation
+
     g.setColour(Colours::panel);
     g.fillRect(bounds);
 

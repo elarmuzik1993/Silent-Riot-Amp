@@ -112,6 +112,8 @@ void IRLoaderPanel::mouseDown(const juce::MouseEvent& e)
 void IRLoaderPanel::paint(juce::Graphics& g)
 {
     auto bounds = getLocalBounds().toFloat();
+    if (bounds.getHeight() < 20.0f) return;  // too small during animation
+
     g.setColour(Colours::panelLight);
     g.fillRect(bounds);
 

@@ -139,6 +139,11 @@ target_compile_definitions(TinyTerror
         JUCE_DISPLAY_SPLASH_SCREEN=0
 )
 
+# ── X11 (compositor bypass on Linux) ────────────
+if(UNIX AND NOT APPLE)
+    find_package(X11 REQUIRED)
+endif()
+
 # ── Link ────────────────────────────────────────
 target_link_libraries(TinyTerror
     PRIVATE
@@ -149,6 +154,8 @@ target_link_libraries(TinyTerror
         juce::juce_dsp
         juce::juce_gui_basics
         juce::juce_gui_extra
+        $<$<PLATFORM_ID:Linux>:X11::X11>
+        $<$<PLATFORM_ID:Linux>:X11::Xext>
     PUBLIC
         juce::juce_recommended_config_flags
         juce::juce_recommended_lto_flags
