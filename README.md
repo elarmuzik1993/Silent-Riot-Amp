@@ -1,10 +1,27 @@
-# Orange Tiny Terror — DSP Amp Model
+# Silent Riot — Amp Simulator Plugin
 
-**Monolit Beatz** amp sim plugin — full analog circuit model of the Orange AD5 Tiny Terror.
+[![Build & Test](https://github.com/elarmuzik1993/Silent-Riot-Amp/actions/workflows/build.yml/badge.svg)](https://github.com/elarmuzik1993/Silent-Riot-Amp/actions/workflows/build.yml)
 
-Built with [JUCE 7](https://juce.com/) + CMake on Ubuntu Linux.
+**Monolit Beatz** amp sim plugin — full analog circuit model of the Orange Tiny Terror (AD5).
 
-## Quick Start
+VST3 + Standalone for Linux and Windows. Built with [JUCE 7](https://juce.com/), C++17, CMake.
+
+## Features
+
+- Full tube signal chain: dual 12AX7 preamp, LTP phase inverter, push-pull EL84 power amp
+- Nonlinear DSP: triode/pentode waveshapers, grid conduction, output transformer saturation
+- Power supply droop with 4-node PSU model and sag envelope
+- Speaker coupling with 3-band dynamic impedance
+- Dual cabinet mode: IIR filters or convolution IR loader
+- 2x/4x/8x oversampling with crossfade state machine
+- 15W / 7W power mode (Class AB / Class A bias shift)
+- Drag-and-drop user IR loading (.wav)
+- 14 custom GUI components with animated collapsible panels
+- UI scaling (75% / 100% / 125% / 150%)
+
+## Build
+
+### Linux
 
 ```bash
 ./scripts/install-deps.sh    # Ubuntu packages (one-time)
@@ -12,56 +29,72 @@ Built with [JUCE 7](https://juce.com/) + CMake on Ubuntu Linux.
 ./scripts/build.sh release   # Release build
 ```
 
-## Architecture (Spec v2.6)
+### Windows
 
-The entire signal chain operates in a **normalized voltage domain** where 300V B+ = 1.0.
-Every component value traces back to real-world measurements through `VoltageScale`.
+```bash
+cmake -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build --config Release
+```
+
+### Tests
+
+```bash
+cmake -B build -G Ninja -DTT_BUILD_TESTS=ON
+cmake --build build
+cd build && ctest --output-on-failure
+```
+
+161 tests across two targets:
+- **TinyTerrorTests** — 148 pure C++ tests (DSP modules, signal chain)
+- **TinyTerrorJuceTests** — 13 JUCE-dependent tests (cabinet IR, convolution)
+
+## Signal Chain
+
+All processing uses a **normalized voltage domain** (300V B+ = 1.0).
+
+```
+Input -> HP 7Hz -> Grid Cond -> Triode V1a -> Miller LP -> Gain
+      -> Grid Cond -> Triode V1b -> Miller LP -> LP 5kHz
+      -> LTP Phase Inverter -> Tone (Vox Cut) -> Master Volume
+      -> Grid Cond -> EL84 x2 Push-Pull -> PSU Sag
+      -> Speaker Coupling -> OT LP 7kHz
+      -> Cabinet (IIR or IR Convolution) -> Soft Limiter -> Output
+```
+
+## Source Layout
 
 ```
 src/
-├── utils/
-│   ├── VoltageScale.h      # Normalized domain framework (§2.5)
-│   ├── Constants.h          # All DSP constants from spec §10
-│   ├── Parameters.h         # APVTS parameter IDs
-│   └── ParamSmoother.h      # Exponential parameter smoothing
+├── utils/           VoltageScale, Constants, Parameters, ParamSmoother
 ├── dsp/
-│   ├── filters/
-│   │   ├── OnePole.h        # BLT-correct 1st order LP/HP (§2.6.2)
-│   │   ├── Biquad.h         # TDF-II biquad, RBJ cookbook (§2.6.2)
-│   │   ├── FilterBank.h/cpp # Central filter management — 24 instances
-│   │   └── DynamicMillerLP.h # Gain-dependent Miller cap rolloff (§3.3)
-│   ├── tubes/
-│   │   ├── TriodeWaveshaper.h/cpp  # 12AX7 model + LTP current (§4.1)
-│   │   ├── PentodeWaveshaper.h/cpp # EL84 screen-aware model (§4.2)
-│   │   └── GridConduction.h/cpp    # Per-stage grid loading (§4.1.1)
-│   ├── power/
-│   │   ├── PowerSupplyModel.h/cpp  # 4-node multi-stage PSU droop (§3.11)
-│   │   ├── SagEnvelope.h           # Cathode bias sag (§3.8)
-│   │   └── LTPSolver.h/cpp        # Nodal LTP phase inverter (§3.5)
-│   ├── cabinet/
-│   │   ├── SpeakerCoupling.h/cpp   # Dynamic load-line interaction (§3.9)
-│   │   └── CabinetSim.h/cpp       # IIR cab + future IR loader (§3.10)
-│   └── OversampleSwitcher.h/cpp    # Crossfade state machine (§5.1)
-├── gui/
-│   ├── LookAndFeel.h/cpp   # Orange-inspired dark theme
-│   └── AmpKnob.h/cpp       # Rotary knob component
-├── PluginProcessor.h/cpp    # Full signal chain (§2.5 processBlock)
-└── PluginEditor.h/cpp       # 3-knob GUI: Gain, Tone, Volume
+│   ├── filters/     OnePole, Biquad, FilterBank (24 instances), DynamicMillerLP
+│   ├── tubes/       TriodeWaveshaper, PentodeWaveshaper, GridConduction
+│   ├── power/       PowerSupplyModel, SagEnvelope, LTPSolver
+│   └── cabinet/     SpeakerCoupling, CabinetSim, IRLibrary
+├── gui/             14 custom components (NotchKnob, VUMeter, ToggleSwitch,
+│                    HeaderBar, FooterBar, SectionBar, AdvancedPanel,
+│                    PresetSelector, SegmentedSelector, SettingsPanel,
+│                    IRLoaderPanel, IRWaveformDisplay, LookAndFeel, FontData)
+├── PluginProcessor  Full signal chain
+└── PluginEditor     GUI shell with shape-clipped dynamic window
 ```
 
-## Implementation Phases
+## Implementation Status
 
-- [x] **Phase 1:** Core preamp — VoltageScale, triode waveshaper, cascaded stages, gain control, basic OS
-- [ ] **Phase 2:** Power section — LTP nodal solver, tone control, EL84 pentode, push-pull
-- [ ] **Phase 3:** Dynamics — PSU multi-node droop, sag, grid conduction, speaker coupling
-- [ ] **Phase 4:** Cabinet & polish — IR loader, GUI, presets
+- [x] **Phase 1:** Preamp — VoltageScale, triode waveshaper, cascaded stages, gain, oversampling
+- [x] **Phase 2:** Power section — LTP solver, tone, EL84 pentode, push-pull, 15W/7W mode
+- [x] **Phase 3:** Dynamics — PSU droop, sag envelope, grid conduction, speaker coupling, OT saturation
+- [x] **Phase 4:** Cabinet IR loader, GUI (14 components), presets, polish
 
-## Git Workflow
+## CI
 
-```
-main ────────── stable releases
-  └─ develop ── active work
-       ├─ feature/phase-1-preamp
-       ├─ feature/phase-2-power
-       └─ fix/filter-coefficients
-```
+GitHub Actions builds on every push to `main`/`develop`:
+- Linux Release (VST3)
+- Windows Release (VST3 + Standalone)
+- Test suite (Debug, 161 tests)
+
+Download build artifacts from the [Actions tab](https://github.com/elarmuzik1993/Silent-Riot-Amp/actions).
+
+## License
+
+Copyright Monolit Beatz. All rights reserved.
