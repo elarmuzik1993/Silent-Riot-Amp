@@ -25,7 +25,9 @@ private:
     void saveUIState();
     void loadUIState();
     int getContentHeight() const;
+    int getTargetContentHeight() const;
     void applyWindowSize();
+    void setWindowBackground();
     void disableCompositorEffects();
 
     TinyTerrorProcessor& proc;

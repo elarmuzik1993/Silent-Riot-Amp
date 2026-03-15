@@ -27,7 +27,7 @@ public:
     std::function<void(int)> onIRSelected;
     std::function<void(const juce::File&)> onUserIRLoaded;
 
-    static constexpr int panelHeight = 400;
+    static constexpr int panelHeight = 240;
 
 private:
     void refreshWaveform();
@@ -47,8 +47,8 @@ private:
     int scrollOffset = 0;
     bool dragOver = false;
 
-    static constexpr int listRowH = 22;
-    static constexpr int listVisibleRows = 8;
+    static constexpr int listRowH = 20;
+    static constexpr int listVisibleRows = 6;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(IRLoaderPanel)
 };

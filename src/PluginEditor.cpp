@@ -7,7 +7,6 @@
 #if JUCE_LINUX
 #include <X11/Xlib.h>
 #include <X11/Xatom.h>
-#include <X11/extensions/shape.h>
 #endif
 
 TinyTerrorEditor::TinyTerrorEditor(TinyTerrorProcessor& p)
@@ -17,7 +16,7 @@ TinyTerrorEditor::TinyTerrorEditor(TinyTerrorProcessor& p)
     setLookAndFeel(&lnf);
     setOpaque(true);
 
-    // Content container — fixed max-size window, shape-clipped to content height
+    // Content container — window resizes at open/close boundaries, content animates within
     addAndMakeVisible(contentArea);
     contentArea.setInterceptsMouseClicks(false, true);
 
@@ -43,23 +42,25 @@ TinyTerrorEditor::TinyTerrorEditor(TinyTerrorProcessor& p)
 
     irSectionBar.onToggle = [this](bool open) {
         irPanelOpen = open;
-        irPanelAnimH = open ? static_cast<float>(tt::IRLoaderPanel::panelHeight) : 0.0f;
-        irLoaderPanel.setVisible(open);
+        if (open)
+        {
+            irLoaderPanel.setVisible(true);
+            setWindowBackground();
+            setSize(static_cast<int>(kWindowW * currentScale),
+                    static_cast<int>(getTargetContentHeight() * currentScale));
+        }
         layoutContent();
-        repaint();
-        if (auto* peer = getPeer())
-            peer->performAnyPendingRepaintsNow();
-        applyWindowSize();
     };
     advSectionBar.onToggle = [this](bool open) {
         advPanelOpen = open;
-        advPanelAnimH = open ? static_cast<float>(tt::AdvancedPanel::panelHeight) : 0.0f;
-        advancedPanel.setVisible(open);
+        if (open)
+        {
+            advancedPanel.setVisible(true);
+            setWindowBackground();
+            setSize(static_cast<int>(kWindowW * currentScale),
+                    static_cast<int>(getTargetContentHeight() * currentScale));
+        }
         layoutContent();
-        repaint();
-        if (auto* peer = getPeer())
-            peer->performAnyPendingRepaintsNow();
-        applyWindowSize();
     };
 
     irSectionBar.setHintText("IIR Mode");
@@ -68,20 +69,19 @@ TinyTerrorEditor::TinyTerrorEditor(TinyTerrorProcessor& p)
     irLoaderPanel.onIRSelected = [this](int irIdx) {
         if (auto* param = proc.apvts.getParameter(tt::Params::IDs::IR_INDEX))
             param->setValueNotifyingHost(param->convertTo0to1(static_cast<float>(irIdx)));
-        // Update hint text
         if (irIdx >= 1 && irIdx <= tt::NUM_STOCK_IRS)
             irSectionBar.setHintText(tt::getStockIRDescriptor(irIdx - 1).displayName);
         else
             irSectionBar.setHintText("IIR Mode");
     };
 
-    // CAB toggle auto-opens IR panel (setOpen fires onToggle which handles layout)
+    // CAB toggle auto-opens IR panel
     cabSimToggle.getButton().onStateChange = [this] {
         if (cabSimToggle.getButton().getToggleState() && !irSectionBar.isOpen())
             irSectionBar.setOpen(true);
     };
 
-    // Settings overlay (added directly to editor, not contentArea, so it floats on top)
+    // Settings overlay
     addChildComponent(settingsPanel);
     header.onGearClick = [this] {
         settingsPanel.setVisible(!settingsPanel.isVisible());
@@ -94,7 +94,9 @@ TinyTerrorEditor::TinyTerrorEditor(TinyTerrorProcessor& p)
         static const float scales[] = { 0.75f, 1.0f, 1.25f, 1.5f };
         currentScale = scales[juce::jlimit(0, 3, scaleIdx)];
         contentArea.setTransform(juce::AffineTransform::scale(currentScale));
-        applyWindowSize();
+        setWindowBackground();
+        setSize(static_cast<int>(kWindowW * currentScale),
+                static_cast<int>(getContentHeight() * currentScale));
         saveUIState();
     };
 
@@ -124,7 +126,7 @@ TinyTerrorEditor::TinyTerrorEditor(TinyTerrorProcessor& p)
     cabSimToggle.getButton().setDescription("Cabinet simulation toggle");
     powerToggle.getButton().setDescription("Power on/off toggle");
 
-    // Tab order: GAIN -> TONE -> VOLUME -> 7W -> CAB -> PWR
+    // Tab order
     gainKnob.getSlider().setExplicitFocusOrder(1);
     toneKnob.getSlider().setExplicitFocusOrder(2);
     volumeKnob.getSlider().setExplicitFocusOrder(3);
@@ -132,10 +134,9 @@ TinyTerrorEditor::TinyTerrorEditor(TinyTerrorProcessor& p)
     cabSimToggle.getButton().setExplicitFocusOrder(5);
     powerToggle.getButton().setExplicitFocusOrder(6);
 
-    // Restore UI state from APVTS value tree
+    // Restore UI state
     loadUIState();
 
-    // Window sized to actual content (shape-masked resize prevents compositor artifacts)
     setSize(static_cast<int>(kWindowW * currentScale),
             static_cast<int>(getContentHeight() * currentScale));
     startTimerHz(30);
@@ -163,17 +164,16 @@ void TinyTerrorEditor::loadUIState()
 {
     auto& state = proc.apvts.state;
 
-    // setOpen fires onToggle → sets panel state + layout + shape
-    if (state.hasProperty("irPanelOpen"))
+    // Snap panel heights on restore (no animation)
+    if (state.hasProperty("irPanelOpen") && static_cast<bool>(state.getProperty("irPanelOpen")))
     {
-        if (static_cast<bool>(state.getProperty("irPanelOpen")))
-            irSectionBar.setOpen(true);
+        irPanelAnimH = static_cast<float>(tt::IRLoaderPanel::panelHeight);
+        irSectionBar.setOpen(true);
     }
-
-    if (state.hasProperty("advPanelOpen"))
+    if (state.hasProperty("advPanelOpen") && static_cast<bool>(state.getProperty("advPanelOpen")))
     {
-        if (static_cast<bool>(state.getProperty("advPanelOpen")))
-            advSectionBar.setOpen(true);
+        advPanelAnimH = static_cast<float>(tt::AdvancedPanel::panelHeight);
+        advSectionBar.setOpen(true);
     }
 
     if (state.hasProperty("uiScale"))
@@ -200,47 +200,41 @@ int TinyTerrorEditor::getContentHeight() const
          + static_cast<int>(advPanelAnimH);
 }
 
+int TinyTerrorEditor::getTargetContentHeight() const
+{
+    return kBaseH
+         + (irPanelOpen  ? tt::IRLoaderPanel::panelHeight  : 0)
+         + (advPanelOpen ? tt::AdvancedPanel::panelHeight : 0);
+}
+
 void TinyTerrorEditor::applyWindowSize()
 {
     int w = static_cast<int>(kWindowW * currentScale);
     int h = static_cast<int>(getContentHeight() * currentScale);
 
-    if (getWidth() == w && getHeight() == h)
-        return;
-
-#if JUCE_LINUX
-    auto* peer = getPeer();
-    if (!peer) { setSize(w, h); return; }
-
-    auto wh = static_cast<::Window>(
-        reinterpret_cast<uintptr_t>(peer->getNativeHandle()));
-
-    if (auto* dpy = XOpenDisplay(nullptr))
+    if (getWidth() != w || getHeight() != h)
     {
-        // Shape + resize on SAME X connection so the compositor
-        // sees them atomically (no frame of stretched content)
-        int maskW = std::min(getWidth(), w);
-        int maskH = std::min(getHeight(), h);
-        XRectangle mask = { 0, 0,
-            static_cast<unsigned short>(maskW),
-            static_cast<unsigned short>(maskH) };
-        XShapeCombineRectangles(dpy, wh, ShapeBounding,
-                                0, 0, &mask, 1, ShapeSet, Unsorted);
-        XShapeCombineRectangles(dpy, wh, ShapeInput,
-                                0, 0, &mask, 1, ShapeSet, Unsorted);
-        XResizeWindow(dpy, wh, static_cast<unsigned int>(w),
-                                static_cast<unsigned int>(h));
-        XSync(dpy, False);
-        XCloseDisplay(dpy);
+        setWindowBackground();
+        setSize(w, h);
     }
+}
 
-    // Update JUCE internal state (X window already resized)
-    setSize(w, h);
-
-    // Defer shape removal so compositor renders with mask first
-    pendingShapeClear = true;
-#else
-    setSize(w, h);
+void TinyTerrorEditor::setWindowBackground()
+{
+#if JUCE_LINUX
+    // Set X11 window background to our bg colour so newly exposed area
+    // on resize shows dark bg instead of garbage pixels
+    if (auto* peer = getPeer())
+    {
+        auto wh = static_cast<::Window>(
+            reinterpret_cast<uintptr_t>(peer->getNativeHandle()));
+        if (auto* dpy = XOpenDisplay(nullptr))
+        {
+            XSetWindowBackground(dpy, wh, 0x1A1A2E);
+            XSync(dpy, False);
+            XCloseDisplay(dpy);
+        }
+    }
 #endif
 }
 
@@ -273,27 +267,45 @@ void TinyTerrorEditor::timerCallback()
     if (!compositorBypassed)
         disableCompositorEffects();
 
-    // Clear shape mask from previous resize (deferred by one frame)
-    if (pendingShapeClear)
+    // Animate collapsible sections within current window bounds
     {
-        pendingShapeClear = false;
-        if (auto* peer = getPeer())
+        constexpr float kStep = 28.0f;
+        float irTarget  = irPanelOpen  ? static_cast<float>(tt::IRLoaderPanel::panelHeight)  : 0.0f;
+        float advTarget = advPanelOpen ? static_cast<float>(tt::AdvancedPanel::panelHeight) : 0.0f;
+        bool animating = false;
+
+        if (irPanelAnimH != irTarget)
         {
-#if JUCE_LINUX
-            auto wh = static_cast<::Window>(
-                reinterpret_cast<uintptr_t>(peer->getNativeHandle()));
-            if (auto* dpy = XOpenDisplay(nullptr))
-            {
-                XShapeCombineMask(dpy, wh, ShapeBounding, 0, 0, (Pixmap)0, ShapeSet);
-                XShapeCombineMask(dpy, wh, ShapeInput, 0, 0, (Pixmap)0, ShapeSet);
-                XFlush(dpy);
-                XCloseDisplay(dpy);
-            }
-#endif
+            irPanelAnimH = (irPanelAnimH < irTarget)
+                ? std::min(irPanelAnimH + kStep, irTarget)
+                : std::max(irPanelAnimH - kStep, irTarget);
+            if (!irPanelOpen && irPanelAnimH < 1.0f)
+                irLoaderPanel.setVisible(false);
+            animating = true;
+        }
+
+        if (advPanelAnimH != advTarget)
+        {
+            advPanelAnimH = (advPanelAnimH < advTarget)
+                ? std::min(advPanelAnimH + kStep, advTarget)
+                : std::max(advPanelAnimH - kStep, advTarget);
+            if (!advPanelOpen && advPanelAnimH < 1.0f)
+                advancedPanel.setVisible(false);
+            animating = true;
+        }
+
+        if (animating)
+        {
+            layoutContent();
+            repaint();
+        }
+        else
+        {
+            applyWindowSize();
         }
     }
 
-    // Live VU meters from processor
+    // Live VU meters
     bool powerOn = proc.apvts.getRawParameterValue(tt::Params::IDs::POWER)->load() > 0.5f;
     if (powerOn)
     {
@@ -334,23 +346,21 @@ void TinyTerrorEditor::timerCallback()
 
 void TinyTerrorEditor::paint(juce::Graphics& g)
 {
-    auto bounds = getLocalBounds().toFloat();
-
-    // Gradient background
+    // Fixed gradient endpoint avoids background colour shifting during animation
+    float maxH = static_cast<float>(kBaseH + tt::IRLoaderPanel::panelHeight
+                                    + tt::AdvancedPanel::panelHeight) * currentScale;
     g.setGradientFill(juce::ColourGradient(
         tt::Colours::bg2, 0.0f, 0.0f,
-        tt::Colours::bg,  0.0f, bounds.getHeight(),
+        tt::Colours::bg,  0.0f, maxH,
         false));
     g.fillAll();
 
-    // 1px border with 6px radius
     g.setColour(tt::Colours::border);
-    g.drawRoundedRectangle(bounds.reduced(0.5f), 6.0f, 1.0f);
+    g.drawRoundedRectangle(getLocalBounds().toFloat().reduced(0.5f), 6.0f, 1.0f);
 }
 
 void TinyTerrorEditor::resized()
 {
-    // contentArea at logical max size — transform handles visual scaling
     static const int maxH = kBaseH + tt::IRLoaderPanel::panelHeight + tt::AdvancedPanel::panelHeight;
     contentArea.setBounds(0, 0, kWindowW, maxH);
     layoutContent();
@@ -360,20 +370,16 @@ void TinyTerrorEditor::layoutContent()
 {
     auto area = contentArea.getLocalBounds();
 
-    // Header
     header.setBounds(area.removeFromTop(kHeaderH));
 
-    // Main body area
     auto body = area.removeFromTop(kBodyH);
     int vuW = 40;
 
     vuIn.setBounds(body.removeFromLeft(vuW).reduced(8, 20));
     vuOut.setBounds(body.removeFromRight(vuW).reduced(8, 20));
 
-    // Center controls
     int cx = body.getCentreX();
 
-    // Knobs
     int knobW = 100, knobH = 120, knobGap = 36;
     int totalKnobW = knobW * 3 + knobGap * 2;
     int knobStartX = cx - totalKnobW / 2;
@@ -383,7 +389,6 @@ void TinyTerrorEditor::layoutContent()
     toneKnob.setBounds(knobStartX + knobW + knobGap, knobY, knobW, knobH);
     volumeKnob.setBounds(knobStartX + (knobW + knobGap) * 2, knobY, knobW, knobH);
 
-    // Toggles
     int toggleW = 50, toggleH = 36, toggleGap = 32;
     int totalToggleW = toggleW * 3 + toggleGap * 2;
     int toggleStartX = cx - totalToggleW / 2;
@@ -393,7 +398,6 @@ void TinyTerrorEditor::layoutContent()
     cabSimToggle.setBounds(toggleStartX + toggleW + toggleGap, toggleY, toggleW, toggleH);
     powerToggle.setBounds(toggleStartX + (toggleW + toggleGap) * 2, toggleY, toggleW, toggleH);
 
-    // Section bars + panels
     irSectionBar.setBounds(area.removeFromTop(kSectionH));
     int irH = static_cast<int>(irPanelAnimH);
     if (irH > 0)
@@ -404,10 +408,8 @@ void TinyTerrorEditor::layoutContent()
     if (advH > 0)
         advancedPanel.setBounds(area.removeFromTop(advH));
 
-    // Footer right after content
     footer.setBounds(area.removeFromTop(kFooterH));
 
-    // Settings overlay (absolute positioned on editor, not contentArea)
     if (settingsPanel.isVisible())
     {
         int sw = 340, sh = 420;
