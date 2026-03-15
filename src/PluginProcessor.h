@@ -66,6 +66,9 @@ public:
     };
     DSPReadout getDSPReadout() const;
 
+    // User IR loading — called from editor (message thread)
+    void loadUserIR(const juce::File& file) { cabSim.loadIRFromFile(file); }
+
 private:
     juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
     void handleAsyncUpdate() override;  // deferred IR loading on message thread

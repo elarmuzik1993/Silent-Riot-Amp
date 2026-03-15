@@ -74,8 +74,8 @@ cmake -B build -DTT_BUILD_TESTS=ON # Build with tests
 - Parameter smoothing at block rate (base SR / block), NOT oversampled rate
 - CMake target is `TinyTerror`; product name is `Silent Riot`
 - Tests use Catch2 v3 — one test file per DSP module, two test targets:
-  - `TinyTerrorTests` — pure C++ tests (no JUCE dependency)
-  - `TinyTerrorJuceTests` — JUCE-dependent tests (cabinet IR, convolution)
+  - `TinyTerrorTests` — 148 pure C++ tests (no JUCE dependency)
+  - `TinyTerrorJuceTests` — 13 JUCE-dependent tests (cabinet IR, convolution, user IR loading)
 
 ## Cabinet IR Loader Architecture
 
@@ -83,6 +83,7 @@ cmake -B build -DTT_BUILD_TESTS=ON # Build with tests
 - **IRLibrary.h** — stock IR metadata registry (8 IRs) + synthetic IR generator (placeholders until real WAVs arrive)
 - **Thread safety**: IR loading is deferred to the message thread via `juce::AsyncUpdater`. Audio thread only reads `useIR` (atomic) and calls `bufferTransfer.get()` (try-lock, never blocks). Zero allocation on audio thread.
 - **IR_INDEX param**: 0=IIR mode, 1–8=stock IRs, 9+=user slots (require `loadIRFromFile()`)
+- **User IR loading**: `TinyTerrorProcessor::loadUserIR(file)` delegates to `CabinetSim::loadIRFromFile()`. Wired from `IRLoaderPanel::onUserIRLoaded` (drag-and-drop + file browser)
 - `useIR` is only set to `true` AFTER the IR buffer is pushed to `bufferTransfer`
 - Convolution runs at base SR (after downsample), not at oversampled rate
 - `getTailLengthSeconds()` reports IR tail using the IR's native sample rate
