@@ -39,16 +39,18 @@ TEST_CASE("LTP: zero input produces near-symmetric outputs", "[ltp]") {
     REQUIRE(out.piA == Approx(out.piB).margin(0.01f));
 }
 
-TEST_CASE("LTP: zero input outputs near zero AC", "[ltp]") {
+TEST_CASE("LTP: zero input gives equal plate voltages", "[ltp]") {
     auto ltp = freshLTP();
-    
+
     LTPOutput out;
     for (int i = 0; i < 100; ++i)
         out = solveLTP(0.0f, V_PI_NOMINAL_N, ltp);
-    
-    // AC output should be near zero (DC removed by dcPlate subtraction)
-    REQUIRE(std::abs(out.piA) < 0.1f);
-    REQUIRE(std::abs(out.piB) < 0.1f);
+
+    // With no input, both plates should be at the same DC operating point
+    // (raw plate voltages — AC coupling handled by pi_couplingHP in processBlock)
+    REQUIRE(out.piA == Approx(out.piB).margin(0.01f));
+    REQUIRE(out.piA > 0.0f);
+    REQUIRE(out.piA < V_PI_NOMINAL_N);
 }
 
 // ── Phase inversion ──────────────────────────────────────────

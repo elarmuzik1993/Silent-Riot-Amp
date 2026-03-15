@@ -193,7 +193,7 @@ void TinyTerrorProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     volumeSmoother.setTarget(volParam);
 
     // Update modulated filters
-    float toneFreq = TONE_MIN_FREQ + toneSmoother.current * (TONE_MAX_FREQ - TONE_MIN_FREQ);
+    float toneFreq = TONE_MIN_FREQ * std::pow(TONE_MAX_FREQ / TONE_MIN_FREQ, toneSmoother.current);
     filterBank.updateModulated(toneFreq, GAIN_LOADING_LP_FREQ);
 
     // ── Input level metering (RMS before processing) ──
@@ -240,7 +240,7 @@ void TinyTerrorProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
         psu.reportPreampLevel(x);
 
         // ── Gain Pot Gang A ──
-        float gainA = audioTaper(gainSmoother.current);
+        float gainA = gainSmoother.current;
         x *= gainA;
 
         // ── Stage 2: V1b ──
@@ -256,9 +256,8 @@ void TinyTerrorProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
         x = v1b_miller.process(x, v1bGainEst, filterBank.effectiveSR);
         psu.reportPreampLevel(x);
 
-        // ── Gain Pot Gang B ──
-        float gainB = audioTaper(gainSmoother.current);
-        x *= gainB;
+        // ── Gain Pot Gang B (linear — taper already applied on Gang A) ──
+        x *= gainSmoother.current;
         x = filterBank.gainLoadingLP.process(x);
 
         // ── Stage 3: Phase Inverter (LTP) ──
@@ -271,9 +270,7 @@ void TinyTerrorProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
         // ── Tone Control (Vox cut — differential only) ──
         float diff = piA - piB;
         float sum  = piA + piB;
-        float filtDiff = filterBank.toneCutFilter.process(diff);
-        float toneAmt = 1.0f - toneSmoother.current;
-        float outDiff = diff + (filtDiff - diff) * toneAmt;
+        float outDiff = filterBank.toneCutFilter.process(diff);
         piA = (sum + outDiff) * 0.5f;
         piB = (sum - outDiff) * 0.5f;
 

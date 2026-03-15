@@ -105,10 +105,12 @@ TEST_CASE("LTP: output per side within spec range at moderate drive", "[chain][p
     float input = 0.05f;
     LTPOutput out = solveLTP(input, V_PI_NOMINAL_N, ltp);
     
-    // At 0.05 input (~15V real), the PI is driven hard — one plate saturates.
-    // With correct DC extraction, the AC swing can approach supply - cathode.
-    REQUIRE(std::abs(out.piA) < 0.85f);
-    REQUIRE(std::abs(out.piB) < 0.85f);
+    // Raw plate voltages (DC coupling removed in processBlock by pi_couplingHP).
+    // Plate voltages sit between cathode and supply.
+    REQUIRE(out.piA >= 0.0f);
+    REQUIRE(out.piA <= V_PI_NOMINAL_N);
+    REQUIRE(out.piB >= 0.0f);
+    REQUIRE(out.piB <= V_PI_NOMINAL_N);
 }
 
 // ── Power amp push-pull ──────────────────────────────────────

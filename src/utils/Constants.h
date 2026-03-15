@@ -36,7 +36,7 @@ constexpr float DROOP_PI            = 0.04f;
 constexpr float DROOP_PREAMP        = 0.02f;
 
 // ── Supply impedances ───────────────────────────────────────
-constexpr float SOURCE_IMPEDANCE_N  = VS::r(12000.0f);
+constexpr float SOURCE_IMPEDANCE_N  = VS::r(200.0f);
 constexpr float R_DROP1_N           = VS::r(4700.0f);
 constexpr float R_DROP2_N           = VS::r(22000.0f);
 
@@ -56,8 +56,8 @@ constexpr float PI_F = 3.14159265358979323846f;
 constexpr float ANTI_DENORMAL       = 1e-18f;
 
 // ── Tone control ────────────────────────────────────────────
-constexpr float TONE_MIN_FREQ       = 1500.0f;
-constexpr float TONE_MAX_FREQ       = 20000.0f;
+constexpr float TONE_MIN_FREQ       = 800.0f;
+constexpr float TONE_MAX_FREQ       = 5000.0f;
 
 // ── Triode model ────────────────────────────────────────────
 constexpr float TRIODE_BIAS_N       = VS::v(-1.5f);
@@ -100,7 +100,7 @@ constexpr float GRID_CHARGE_RATE            = 0.01f;
 constexpr float GRID_VT_N                   = VS::v(0.026f);
 constexpr float GRID_IS                     = 1e-6f;
 constexpr float BLOCKING_CHARGE_SCALE       = 0.001f;
-constexpr float MAX_BIAS_SHIFT_N            = VS::v(-45.0f);
+constexpr float MAX_BIAS_SHIFT_N            = VS::v(-5.0f);
 constexpr float COND_LP_MIN_FREQ            = 3000.0f;
 constexpr float GRID_I_SATURATION           = 0.01f;
 
