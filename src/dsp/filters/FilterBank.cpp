@@ -14,9 +14,9 @@ void FilterBank::recalcAll(float baseSampleRate, int oversampleFactor) {
     pi_couplingHP_B.setFreq(PI_COUPLING_HP, effectiveSR);
 
     ot_leakageLP.makeLowPass(OT_LP_FREQ, 0.707f, effectiveSR);
-    cab_presence.makePeakEQ(2500.0f, 1.5f, 3.0f, effectiveSR);
-    cab_rolloff.makeLowPass(7000.0f, 0.707f, effectiveSR);
-    cab_notch.makeNotch(400.0f, 2.0f, effectiveSR);
+    cab_presence.makePeakEQ(3500.0f, 1.5f, 4.0f, effectiveSR);
+    cab_rolloff.makeLowPass(8000.0f, 0.707f, effectiveSR);
+    cab_notch.makeNotch(350.0f, 1.5f, effectiveSR);
 
     // Initialize modulated filters with sensible defaults
     toneCutFilter.setFreq(TONE_MAX_FREQ, effectiveSR);      // fully bright

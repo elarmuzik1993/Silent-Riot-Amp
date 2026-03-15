@@ -155,14 +155,14 @@ TEST_CASE("Grid factories: V1a has input impedance source R", "[grid][factory]")
     REQUIRE(model.sourceResistance == Approx(VS::r(100.0f)));  // guitar pickup
 }
 
-TEST_CASE("Grid factories: V1b source R = V1a Zout", "[grid][factory]") {
+TEST_CASE("Grid factories: V1b source R = 1kΩ (reduced for musical loading)", "[grid][factory]") {
     auto model = makeV1bGrid();
-    REQUIRE(model.sourceResistance == VS::Z_OUT_V1A);
+    REQUIRE(model.sourceResistance == VS::r(1000.0f));
 }
 
-TEST_CASE("Grid factories: PI source R = V1b Zout", "[grid][factory]") {
+TEST_CASE("Grid factories: PI source R = 1kΩ (reduced for musical loading)", "[grid][factory]") {
     auto model = makePIGrid();
-    REQUIRE(model.sourceResistance == VS::Z_OUT_V1B);
+    REQUIRE(model.sourceResistance == VS::r(1000.0f));
 }
 
 TEST_CASE("Grid factories: EL84 has different threshold", "[grid][factory]") {
@@ -173,9 +173,9 @@ TEST_CASE("Grid factories: EL84 has different threshold", "[grid][factory]") {
     REQUIRE(pentode.conductionThreshold != triode.conductionThreshold);
 }
 
-TEST_CASE("Grid factories: EL84 source R = PI Zout", "[grid][factory]") {
+TEST_CASE("Grid factories: EL84 source R = 1kΩ (reduced for musical loading)", "[grid][factory]") {
     auto model = makeEL84Grid();
-    REQUIRE(model.sourceResistance == VS::Z_OUT_PI);
+    REQUIRE(model.sourceResistance == VS::r(1000.0f));
 }
 
 // ── recalcGridChargeDecay ────────────────────────────────────

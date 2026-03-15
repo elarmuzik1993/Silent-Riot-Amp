@@ -10,7 +10,7 @@ LTPOutput solveLTP(float vInput_n, float vSupply_n, LTPModel& ltp) {
     // normalized domain, so direct cathode update oscillates.
     // Use alpha=0.25 blending for stable convergence.
     constexpr float alpha = 0.25f;
-    constexpr int iterations = 4;
+    constexpr int iterations = 8;
 
     for (int i = 0; i < iterations; ++i) {
         float vgkA = vGridA - ltp.vCathode;
@@ -35,10 +35,10 @@ LTPOutput solveLTP(float vInput_n, float vSupply_n, LTPModel& ltp) {
     vPlateA = std::clamp(vPlateA, ltp.vCathode, vSupply_n);
     vPlateB = std::clamp(vPlateB, ltp.vCathode, vSupply_n);
 
-    // Track quiescent DC plate with slow filter (acts like coupling cap)
-    float avgPlate = (vPlateA + vPlateB) * 0.5f;
-    ltp.dcPlateRef += 0.1f * (avgPlate - ltp.dcPlateRef);
-    return { vPlateA - ltp.dcPlateRef, vPlateB - ltp.dcPlateRef, ltp.vCathode, ltp.dcPlateRef };
+    // Return raw plate voltages — DC blocking is handled by pi_couplingHP filters
+    // (the old 10%-per-sample dcPlateRef tracking was acting as an 18kHz HP,
+    // stripping out fundamentals instead of just removing DC)
+    return { vPlateA, vPlateB, ltp.vCathode, 0.0f };
 }
 
 } // namespace tt

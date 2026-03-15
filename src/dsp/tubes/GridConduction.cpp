@@ -34,10 +34,10 @@ float applyGridConduction(float vGrid, GridConductionModel& model) {
     return vLoaded - model.couplingCapCharge;
 }
 
-GridConductionModel makeV1aGrid()  { return { GRID_CONDUCT_THRESH_N,      GRID_R_TRIODE_N,  VS::r(100.0f),  0.0f, 0.999f }; }
-GridConductionModel makeV1bGrid()  { return { GRID_CONDUCT_THRESH_N,      GRID_R_TRIODE_N,  VS::Z_OUT_V1A,  0.0f, 0.999f }; }
-GridConductionModel makePIGrid()   { return { GRID_CONDUCT_THRESH_N,      GRID_R_TRIODE_N,  VS::Z_OUT_V1B,  0.0f, 0.999f }; }
-GridConductionModel makeEL84Grid() { return { GRID_CONDUCT_THRESH_EL84_N, GRID_R_PENTODE_N, VS::Z_OUT_PI,   0.0f, 0.999f }; }
+GridConductionModel makeV1aGrid()  { return { GRID_CONDUCT_THRESH_N,      GRID_R_TRIODE_N,  VS::r(100.0f),   0.0f, 0.999f }; }
+GridConductionModel makeV1bGrid()  { return { GRID_CONDUCT_THRESH_N,      GRID_R_TRIODE_N,  VS::r(1000.0f),  0.0f, 0.999f }; }
+GridConductionModel makePIGrid()   { return { GRID_CONDUCT_THRESH_N,      GRID_R_TRIODE_N,  VS::r(1000.0f),  0.0f, 0.999f }; }
+GridConductionModel makeEL84Grid() { return { GRID_CONDUCT_THRESH_EL84_N, GRID_R_PENTODE_N, VS::r(1000.0f),  0.0f, 0.999f }; }
 
 void recalcGridChargeDecay(GridConductionModel& m, float tauSec, float effectiveSR) {
     m.chargeDecay = std::exp(-1.0f / (tauSec * effectiveSR));
