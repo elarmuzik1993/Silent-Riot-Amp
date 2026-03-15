@@ -46,7 +46,7 @@ src/
 │   └── cabinet/     SpeakerCoupling, CabinetSim, IRLibrary, OTSaturation
 ├── gui/             14 custom components (see GUI Architecture below)
 ├── PluginProcessor  Full signal chain (§2.5 processBlock)
-└── PluginEditor     GUI shell (fixed 700×900 window)
+└── PluginEditor     GUI shell (shape-clipped dynamic window)
 ```
 
 ## Build
@@ -107,9 +107,9 @@ cmake -B build -DTT_BUILD_TESTS=ON # Build with tests
 - **IRLoaderPanel.h/.cpp** — Category tabs, scrollable IR list, waveform display, drag-and-drop
 - **IRWaveformDisplay.h/.cpp** — Waveform plot with envelope fill
 
-**Window strategy**: Fixed 700×900 window (`kWindowW`/`kWindowH`). Collapsible panels show/hide within a `contentArea` container — no runtime `setSize()` calls (avoids X11 compositor resize artifacts). Footer follows content, empty space below.
+**Window strategy**: Window set to max size (700×772 at 1× scale); X11 Shape Extension clips visible/input region to actual content height. Collapsible panels animate within the fixed-size window — `applyShapeMask()` updates the clip rect each frame. No `setSize()` during panel toggle = no compositor blink. Shape accounts for standalone wrapper title bar offset via `getTopLevelComponent()->getLocalPoint()`.
 
-**Editor timer** (30Hz): Polls atomic level meters (real input/output RMS + grid current), DSP readout for advanced panel, footer stats. Drives animated section expand/collapse (350ms lerp). SectionBar chevrons animate at 300ms, gear icon at 400ms, toggle thumb at ~200ms.
+**Editor timer** (30Hz): Polls atomic level meters (real input/output RMS + grid current), DSP readout for advanced panel, footer stats. Drives animated section expand/collapse (28px/frame linear steps). SectionBar chevrons animate at 300ms, gear icon at 400ms, toggle thumb at ~200ms.
 
 **Keyboard**: Arrow keys ±0.1 display (±0.01 internal), PageUp/Down ±1.0 display (±0.1 internal) via `NotchKnob::KnobSlider` override. Tab order: GAIN→TONE→VOLUME→7W→CAB→PWR.
 
@@ -125,3 +125,4 @@ cmake -B build -DTT_BUILD_TESTS=ON # Build with tests
 - `outputGainCompensation` hardcoded to 2.0 — needs tuning
 - IR loading must NEVER happen on the audio thread — always use `AsyncUpdater` to defer to message thread
 - `bufferTransfer.set()` (blocking SpinLock) is message-thread only; `bufferTransfer.get()` (try-lock) is audio-thread only
+- ToggleSwitch uses `onStateChange` internally for thumb animation — external callbacks must use `onClick` (not `onStateChange`) to avoid breaking the animation timer
