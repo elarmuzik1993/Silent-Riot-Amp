@@ -67,7 +67,7 @@ TinyTerrorEditor::TinyTerrorEditor(TinyTerrorProcessor& p)
     };
 
     // CAB toggle auto-opens IR panel
-    cabSimToggle.getButton().onStateChange = [this] {
+    cabSimToggle.getButton().onClick = [this] {
         if (cabSimToggle.getButton().getToggleState() && !irSectionBar.isOpen())
             irSectionBar.setOpen(true);
     };
