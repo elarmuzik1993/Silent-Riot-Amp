@@ -92,8 +92,12 @@ TinyTerrorEditor::TinyTerrorEditor(TinyTerrorProcessor& p)
     };
     settingsPanel.onScaleChanged = [this](int scaleIdx) {
         static const float scales[] = { 0.75f, 1.0f, 1.25f, 1.5f };
-        float s = scales[juce::jlimit(0, 3, scaleIdx)];
-        contentArea.setTransform(juce::AffineTransform::scale(s));
+        currentScale = scales[juce::jlimit(0, 3, scaleIdx)];
+        contentArea.setTransform(juce::AffineTransform::scale(currentScale));
+        int maxH = kBaseH + tt::IRLoaderPanel::panelHeight + tt::AdvancedPanel::panelHeight;
+        setSize(static_cast<int>(kWindowW * currentScale),
+                static_cast<int>(maxH * currentScale));
+        applyWindowSize();
         saveUIState();
     };
 
@@ -134,9 +138,10 @@ TinyTerrorEditor::TinyTerrorEditor(TinyTerrorProcessor& p)
     // Restore UI state from APVTS value tree
     loadUIState();
 
-    // Max-size window — shape clipping handles the visible height
+    // Max-size window at current scale — shape clipping handles the visible height
     int maxH = kBaseH + tt::IRLoaderPanel::panelHeight + tt::AdvancedPanel::panelHeight;
-    setSize(kWindowW, maxH);
+    setSize(static_cast<int>(kWindowW * currentScale),
+            static_cast<int>(maxH * currentScale));
     startTimerHz(30);
 }
 
@@ -180,7 +185,8 @@ void TinyTerrorEditor::loadUIState()
         int scaleIdx = static_cast<int>(state.getProperty("uiScale"));
         settingsPanel.uiScale = scaleIdx;
         static const float scales[] = { 0.75f, 1.0f, 1.25f, 1.5f };
-        contentArea.setTransform(juce::AffineTransform::scale(scales[juce::jlimit(0, 3, scaleIdx)]));
+        currentScale = scales[juce::jlimit(0, 3, scaleIdx)];
+        contentArea.setTransform(juce::AffineTransform::scale(currentScale));
     }
 
     if (state.hasProperty("theme"))
@@ -204,7 +210,8 @@ void TinyTerrorEditor::applyWindowSize()
     auto* peer = getPeer();
     if (!peer) return;
 
-    int h = getContentHeight();
+    int w = static_cast<int>(kWindowW * currentScale);
+    int h = static_cast<int>(getContentHeight() * currentScale);
     auto windowHandle = static_cast<::Window>(
         reinterpret_cast<uintptr_t>(peer->getNativeHandle()));
 
@@ -213,7 +220,7 @@ void TinyTerrorEditor::applyWindowSize()
         XRectangle rect;
         rect.x = 0;
         rect.y = 0;
-        rect.width  = static_cast<unsigned short>(kWindowW);
+        rect.width  = static_cast<unsigned short>(w);
         rect.height = static_cast<unsigned short>(h);
 
         XShapeCombineRectangles(dpy, windowHandle, ShapeBounding,
@@ -300,26 +307,28 @@ void TinyTerrorEditor::timerCallback()
 
 void TinyTerrorEditor::paint(juce::Graphics& g)
 {
-    float ch = static_cast<float>(getContentHeight());
+    float cw = kWindowW * currentScale;
+    float ch = getContentHeight() * currentScale;
 
-    // Gradient background matched to content height
+    // Gradient background matched to scaled content height
     g.setGradientFill(juce::ColourGradient(
         tt::Colours::bg2, 0.0f, 0.0f,
         tt::Colours::bg,  0.0f, ch,
         false));
     g.fillAll();
 
-    // 1px border with 6px radius at content height
+    // 1px border with 6px radius at scaled content bounds
     g.setColour(tt::Colours::border);
     g.drawRoundedRectangle(
-        juce::Rectangle<float>(0.5f, 0.5f,
-            static_cast<float>(kWindowW) - 1.0f, ch - 1.0f),
+        juce::Rectangle<float>(0.5f, 0.5f, cw - 1.0f, ch - 1.0f),
         6.0f, 1.0f);
 }
 
 void TinyTerrorEditor::resized()
 {
-    contentArea.setBounds(getLocalBounds());
+    // contentArea always at logical (unscaled) size — transform handles scaling
+    int maxH = kBaseH + tt::IRLoaderPanel::panelHeight + tt::AdvancedPanel::panelHeight;
+    contentArea.setBounds(0, 0, kWindowW, maxH);
     layoutContent();
 }
 
@@ -377,7 +386,9 @@ void TinyTerrorEditor::layoutContent()
     // Settings overlay (absolute positioned on editor, not contentArea)
     if (settingsPanel.isVisible())
     {
-        settingsPanel.setBounds(getWidth() - 340, 38, 340, 420);
+        int sw = 340, sh = 420;
+        int sy = static_cast<int>(kHeaderH * currentScale);
+        settingsPanel.setBounds(getWidth() - sw, sy, sw, sh);
         settingsPanel.toFront(false);
     }
 }
