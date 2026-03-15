@@ -212,40 +212,33 @@ void TinyTerrorEditor::applyWindowSize()
     auto* peer = getPeer();
     if (!peer) { setSize(w, h); return; }
 
-    auto windowHandle = static_cast<::Window>(
+    auto wh = static_cast<::Window>(
         reinterpret_cast<uintptr_t>(peer->getNativeHandle()));
 
     if (auto* dpy = XOpenDisplay(nullptr))
     {
-        // Step 1: Clip shape to intersection of old/new bounds
-        // This hides the compositor's stretched-content artifact during resize
+        // Shape + resize on SAME X connection so the compositor
+        // sees them atomically (no frame of stretched content)
         int maskW = std::min(getWidth(), w);
         int maskH = std::min(getHeight(), h);
         XRectangle mask = { 0, 0,
             static_cast<unsigned short>(maskW),
             static_cast<unsigned short>(maskH) };
-        XShapeCombineRectangles(dpy, windowHandle, ShapeBounding,
+        XShapeCombineRectangles(dpy, wh, ShapeBounding,
                                 0, 0, &mask, 1, ShapeSet, Unsorted);
-        XShapeCombineRectangles(dpy, windowHandle, ShapeInput,
+        XShapeCombineRectangles(dpy, wh, ShapeInput,
                                 0, 0, &mask, 1, ShapeSet, Unsorted);
+        XResizeWindow(dpy, wh, static_cast<unsigned int>(w),
+                                static_cast<unsigned int>(h));
         XSync(dpy, False);
-
-        // Step 2: Resize window (compositor artifact hidden by shape mask)
-        setSize(w, h);
-        if (auto* p = getPeer())
-            p->performAnyPendingRepaintsNow();
-
-        // Step 3: Remove shape — window is now at correct size with correct content
-        XShapeCombineMask(dpy, windowHandle, ShapeBounding, 0, 0, (Pixmap)0, ShapeSet);
-        XShapeCombineMask(dpy, windowHandle, ShapeInput, 0, 0, (Pixmap)0, ShapeSet);
-        XFlush(dpy);
-
         XCloseDisplay(dpy);
     }
-    else
-    {
-        setSize(w, h);
-    }
+
+    // Update JUCE internal state (X window already resized)
+    setSize(w, h);
+
+    // Defer shape removal so compositor renders with mask first
+    pendingShapeClear = true;
 #else
     setSize(w, h);
 #endif
@@ -279,6 +272,26 @@ void TinyTerrorEditor::timerCallback()
 {
     if (!compositorBypassed)
         disableCompositorEffects();
+
+    // Clear shape mask from previous resize (deferred by one frame)
+    if (pendingShapeClear)
+    {
+        pendingShapeClear = false;
+        if (auto* peer = getPeer())
+        {
+#if JUCE_LINUX
+            auto wh = static_cast<::Window>(
+                reinterpret_cast<uintptr_t>(peer->getNativeHandle()));
+            if (auto* dpy = XOpenDisplay(nullptr))
+            {
+                XShapeCombineMask(dpy, wh, ShapeBounding, 0, 0, (Pixmap)0, ShapeSet);
+                XShapeCombineMask(dpy, wh, ShapeInput, 0, 0, (Pixmap)0, ShapeSet);
+                XFlush(dpy);
+                XCloseDisplay(dpy);
+            }
+#endif
+        }
+    }
 
     // Live VU meters from processor
     bool powerOn = proc.apvts.getRawParameterValue(tt::Params::IDs::POWER)->load() > 0.5f;
