@@ -79,6 +79,7 @@ struct CabinetSim
     void setIRIndex(int newIndex);
     void loadStockIR(int stockIndex);
     void loadIRFromFile(const juce::File& file);
+    void loadIRFromBuffer(juce::AudioBuffer<float>&& buffer, double sampleRate);
 
     // IR tail length in seconds (for getTailLengthSeconds)
     double getIRTailSeconds() const;

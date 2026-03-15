@@ -14,13 +14,7 @@ void CabinetSim::prepare(double sampleRate, int maxBlockSize, int numChannels)
 
     convolution.prepare(spec);
 
-    // Reload current IR (if any) after prepare — convolution resets internal state.
-    // prepare() is not concurrent with processBlock, so allocation here is safe.
-    if (useIR.load() && currentIRIndex > 0)
-    {
-        if (currentIRIndex <= NUM_STOCK_IRS)
-            loadStockIR(currentIRIndex - 1);
-    }
+    // IR reload after prepare is handled by the processor (it holds user IR data).
 }
 
 void CabinetSim::reset()
@@ -114,6 +108,15 @@ void CabinetSim::loadIRFromFile(const juce::File& file)
     irNativeSampleRate = reader->sampleRate;
     bufferTransfer.set(BufferWithSampleRate(std::move(irBuffer),
                                            reader->sampleRate));
+    useIR.store(true);
+}
+
+void CabinetSim::loadIRFromBuffer(juce::AudioBuffer<float>&& buffer, double sampleRate)
+{
+    // Called from message thread only.
+    currentIRLengthSamples = buffer.getNumSamples();
+    irNativeSampleRate = sampleRate;
+    bufferTransfer.set(BufferWithSampleRate(std::move(buffer), sampleRate));
     useIR.store(true);
 }
 

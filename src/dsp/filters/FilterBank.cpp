@@ -15,7 +15,7 @@ void FilterBank::recalcAll(float baseSampleRate, int oversampleFactor) {
 
     ot_leakageLP.makeLowPass(OT_LP_FREQ, 0.707f, effectiveSR);
     cab_presence.makePeakEQ(2500.0f, 1.5f, 3.0f, effectiveSR);
-    cab_rolloff.makeLowPass(5500.0f, 0.5f, effectiveSR);
+    cab_rolloff.makeLowPass(7000.0f, 0.707f, effectiveSR);
     cab_notch.makeNotch(400.0f, 2.0f, effectiveSR);
 
     // Initialize modulated filters with sensible defaults

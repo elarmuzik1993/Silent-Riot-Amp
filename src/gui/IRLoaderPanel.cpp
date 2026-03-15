@@ -1,28 +1,29 @@
 #include "IRLoaderPanel.h"
 #include "ColourPalette.h"
 #include "FontData.h"
-#include "../dsp/cabinet/IRLibrary.h"
 
 namespace tt {
 
 IRLoaderPanel::IRLoaderPanel()
 {
-    addAndMakeVisible(categoryTabs);
     addAndMakeVisible(waveformDisplay);
-
-    categoryTabs.onChange = [this](int) { repaint(); };
-
-    populateIRList();
 }
 
-void IRLoaderPanel::populateIRList()
+void IRLoaderPanel::addUserIR(const juce::String& name, int samples, double sampleRate,
+                              int irIndex, const juce::AudioBuffer<float>& audioData)
+{
+    irList.push_back({ name, samples, sampleRate, irIndex,
+                       juce::AudioBuffer<float>(audioData) });
+    repaint();
+}
+
+void IRLoaderPanel::clearIRList()
 {
     irList.clear();
-    for (int i = 0; i < NUM_STOCK_IRS; ++i)
-    {
-        const auto& desc = getStockIRDescriptor(i);
-        irList.push_back({ desc.displayName, desc.mic, desc.samples, i + 1 });
-    }
+    selectedIRIndex = 0;
+    scrollOffset = 0;
+    waveformDisplay.clear();
+    repaint();
 }
 
 void IRLoaderPanel::setSelectedIR(int index)
@@ -34,19 +35,18 @@ void IRLoaderPanel::setSelectedIR(int index)
 
 void IRLoaderPanel::refreshWaveform()
 {
-    if (selectedIRIndex >= 1 && selectedIRIndex <= NUM_STOCK_IRS)
+    for (auto& entry : irList)
     {
-        int stockIdx = selectedIRIndex - 1;
-        const auto& desc = getStockIRDescriptor(stockIdx);
-        auto buf = generateSyntheticIR(stockIdx, desc);
-        waveformDisplay.setIRData(buf, desc.sampleRate);
-        waveformDisplay.setIRInfo(desc.displayName,
-            static_cast<float>(desc.samples) / static_cast<float>(desc.sampleRate) * 1000.0f);
+        if (entry.irIndex == selectedIRIndex)
+        {
+            waveformDisplay.setIRData(entry.waveformData, entry.sampleRate);
+            float durationMs = static_cast<float>(entry.samples)
+                             / static_cast<float>(entry.sampleRate) * 1000.0f;
+            waveformDisplay.setIRInfo(entry.name, durationMs);
+            return;
+        }
     }
-    else
-    {
-        waveformDisplay.clear();
-    }
+    waveformDisplay.clear();
 }
 
 bool IRLoaderPanel::isInterestedInFileDrag(const juce::StringArray& files)
@@ -74,12 +74,12 @@ void IRLoaderPanel::filesDropped(const juce::StringArray& files, int, int)
 
 void IRLoaderPanel::mouseDown(const juce::MouseEvent& e)
 {
-    // Check if click is in the IR list area
     auto bounds = getLocalBounds();
     float leftW = bounds.getWidth() * 0.45f;
-    float listY = 46.0f; // below category tabs + header
+    float listY = 34.0f;
     float listH = static_cast<float>(listVisibleRows * listRowH);
 
+    // Check IR list click
     auto listArea = juce::Rectangle<float>(0.0f, listY, leftW, listH);
     if (listArea.contains(e.position))
     {
@@ -91,6 +91,7 @@ void IRLoaderPanel::mouseDown(const juce::MouseEvent& e)
             repaint();
             if (onIRSelected) onIRSelected(selectedIRIndex);
         }
+        return;
     }
 
     // Check drop zone click (browse)
@@ -109,10 +110,17 @@ void IRLoaderPanel::mouseDown(const juce::MouseEvent& e)
     }
 }
 
+void IRLoaderPanel::mouseWheelMove(const juce::MouseEvent&, const juce::MouseWheelDetails& wheel)
+{
+    int maxScroll = std::max(0, static_cast<int>(irList.size()) - listVisibleRows);
+    scrollOffset = juce::jlimit(0, maxScroll, scrollOffset - static_cast<int>(wheel.deltaY * 3.0f));
+    repaint();
+}
+
 void IRLoaderPanel::paint(juce::Graphics& g)
 {
     auto bounds = getLocalBounds().toFloat();
-    if (bounds.getHeight() < 20.0f) return;  // too small during animation
+    if (bounds.getHeight() < 20.0f) return;
 
     g.setColour(Colours::panelLight);
     g.fillRect(bounds);
@@ -120,46 +128,65 @@ void IRLoaderPanel::paint(juce::Graphics& g)
     float leftW = bounds.getWidth() * 0.45f;
 
     // ── Left column: IR list ──
-    float y = 46.0f;
+    float y = 34.0f;
     float listH = static_cast<float>(listVisibleRows * listRowH);
 
-    // Header row
+    // Header
     g.setFont(Fonts::spaceMono(7.0f, true));
     g.setColour(Colours::dim);
-    g.drawText("NAME", juce::Rectangle<float>(8.0f, y - 14.0f, leftW * 0.5f, 12.0f),
+    g.drawText("USER IMPULSE RESPONSES", juce::Rectangle<float>(8.0f, 6.0f, leftW - 16.0f, 14.0f),
                juce::Justification::centredLeft, false);
-    g.drawText("MIC", juce::Rectangle<float>(leftW * 0.55f, y - 14.0f, 50.0f, 12.0f),
+
+    // Column headers
+    g.drawText("NAME", juce::Rectangle<float>(8.0f, y - 14.0f, leftW * 0.55f, 12.0f),
                juce::Justification::centredLeft, false);
-    g.drawText("SMP", juce::Rectangle<float>(leftW * 0.78f, y - 14.0f, 50.0f, 12.0f),
+    g.drawText("RATE", juce::Rectangle<float>(leftW * 0.58f, y - 14.0f, 50.0f, 12.0f),
+               juce::Justification::centredLeft, false);
+    g.drawText("SMP", juce::Rectangle<float>(leftW * 0.80f, y - 14.0f, 50.0f, 12.0f),
                juce::Justification::centredLeft, false);
 
     // IR rows
-    for (int i = 0; i < listVisibleRows && (i + scrollOffset) < static_cast<int>(irList.size()); ++i)
+    if (irList.empty())
     {
-        int idx = i + scrollOffset;
-        auto& entry = irList[static_cast<size_t>(idx)];
-        float rowY = y + i * listRowH;
-        bool selected = (entry.irIndex == selectedIRIndex);
-
-        if (selected)
-        {
-            g.setColour(Colours::accent.withAlpha(0.12f));
-            g.fillRect(0.0f, rowY, leftW, static_cast<float>(listRowH));
-        }
-
+        // Empty state
         g.setFont(Fonts::spaceMono(8.0f));
-        g.setColour(selected ? Colours::bright : Colours::text);
-        g.drawText(entry.name, juce::Rectangle<float>(8.0f, rowY, leftW * 0.5f, static_cast<float>(listRowH)),
-                   juce::Justification::centredLeft, false);
-        g.setColour(Colours::label);
-        g.drawText(entry.mic, juce::Rectangle<float>(leftW * 0.55f, rowY, 50.0f, static_cast<float>(listRowH)),
-                   juce::Justification::centredLeft, false);
-        g.drawText(juce::String(entry.samples), juce::Rectangle<float>(leftW * 0.78f, rowY, 50.0f, static_cast<float>(listRowH)),
-                   juce::Justification::centredLeft, false);
+        g.setColour(Colours::dim);
+        g.drawText("No IRs loaded", juce::Rectangle<float>(8.0f, y, leftW - 16.0f, listH),
+                   juce::Justification::centred, false);
+    }
+    else
+    {
+        for (int i = 0; i < listVisibleRows && (i + scrollOffset) < static_cast<int>(irList.size()); ++i)
+        {
+            int idx = i + scrollOffset;
+            auto& entry = irList[static_cast<size_t>(idx)];
+            float rowY = y + i * listRowH;
+            bool selected = (entry.irIndex == selectedIRIndex);
 
-        // Row separator
-        g.setColour(Colours::border.withAlpha(0.3f));
-        g.fillRect(8.0f, rowY + listRowH - 1.0f, leftW - 16.0f, 0.5f);
+            if (selected)
+            {
+                g.setColour(Colours::accent.withAlpha(0.12f));
+                g.fillRect(0.0f, rowY, leftW, static_cast<float>(listRowH));
+            }
+
+            g.setFont(Fonts::spaceMono(8.0f));
+            g.setColour(selected ? Colours::bright : Colours::text);
+            g.drawText(entry.name, juce::Rectangle<float>(8.0f, rowY, leftW * 0.52f, static_cast<float>(listRowH)),
+                       juce::Justification::centredLeft, true);
+
+            g.setColour(Colours::label);
+            int rateKHz = static_cast<int>(entry.sampleRate / 1000.0);
+            g.drawText(juce::String(rateKHz) + "k",
+                       juce::Rectangle<float>(leftW * 0.58f, rowY, 50.0f, static_cast<float>(listRowH)),
+                       juce::Justification::centredLeft, false);
+            g.drawText(juce::String(entry.samples),
+                       juce::Rectangle<float>(leftW * 0.80f, rowY, 50.0f, static_cast<float>(listRowH)),
+                       juce::Justification::centredLeft, false);
+
+            // Row separator
+            g.setColour(Colours::border.withAlpha(0.3f));
+            g.fillRect(8.0f, rowY + listRowH - 1.0f, leftW - 16.0f, 0.5f);
+        }
     }
 
     // Drop zone
@@ -187,22 +214,25 @@ void IRLoaderPanel::paint(juce::Graphics& g)
 
     // ── Right column: Detail grid ──
     float rx = leftW + 12.0f;
-    float ry = 84.0f; // below waveform display
+    float ry = 84.0f;
     float rw = bounds.getWidth() - leftW - 24.0f;
 
-    if (selectedIRIndex >= 1 && selectedIRIndex <= NUM_STOCK_IRS)
-    {
-        int stockIdx = selectedIRIndex - 1;
-        const auto& desc = getStockIRDescriptor(stockIdx);
+    // Find selected entry
+    const IREntry* selectedEntry = nullptr;
+    for (auto& entry : irList)
+        if (entry.irIndex == selectedIRIndex)
+            selectedEntry = &entry;
 
+    if (selectedEntry != nullptr)
+    {
         struct Detail { const char* key; juce::String val; };
+        float durationMs = static_cast<float>(selectedEntry->samples)
+                         / static_cast<float>(selectedEntry->sampleRate) * 1000.0f;
         Detail details[] = {
-            { "FILE",     desc.id },
-            { "CATEGORY", "STOCK" },
-            { "MIC",      desc.mic },
-            { "LENGTH",   juce::String(desc.samples) + " smp" },
-            { "RATE",     juce::String(desc.sampleRate / 1000) + " kHz" },
-            { "LATENCY",  juce::String(static_cast<float>(desc.samples) / desc.sampleRate * 1000.0f, 1) + "ms" },
+            { "FILE",    selectedEntry->name },
+            { "LENGTH",  juce::String(selectedEntry->samples) + " smp" },
+            { "RATE",    juce::String(static_cast<int>(selectedEntry->sampleRate / 1000)) + " kHz" },
+            { "LATENCY", juce::String(durationMs, 1) + " ms" },
         };
 
         for (auto& d : details)
@@ -216,33 +246,20 @@ void IRLoaderPanel::paint(juce::Graphics& g)
                        juce::Justification::centredLeft, false);
             ry += 15.0f;
         }
-
-        // Action buttons
-        ry += 6.0f;
-        auto drawBtn = [&](const juce::String& text, float bx, float bw) {
-            g.setColour(Colours::surface);
-            g.fillRoundedRectangle(bx, ry, bw, 20.0f, 3.0f);
-            g.setColour(Colours::border);
-            g.drawRoundedRectangle(bx, ry, bw, 20.0f, 3.0f, 1.0f);
-            g.setFont(Fonts::spaceMono(7.0f, true));
-            g.setColour(Colours::label);
-            g.drawText(text, juce::Rectangle<float>(bx, ry, bw, 20.0f),
-                       juce::Justification::centred, false);
-        };
-
-        float btnW = (rw - 12.0f) / 3.0f;
-        drawBtn("PHASE INV", rx, btnW);
-        drawBtn("NORMALIZE", rx + btnW + 6.0f, btnW);
-        drawBtn("TRIM", rx + (btnW + 6.0f) * 2.0f, btnW);
+    }
+    else if (irList.empty())
+    {
+        g.setFont(Fonts::spaceMono(8.0f));
+        g.setColour(Colours::dim);
+        g.drawText("Drop a .wav impulse response\nto get started",
+                   juce::Rectangle<float>(rx, ry, rw, 60.0f),
+                   juce::Justification::centred, true);
     }
 }
 
 void IRLoaderPanel::resized()
 {
     float leftW = getWidth() * 0.45f;
-
-    // Category tabs at top of left column
-    categoryTabs.setBounds(6, 6, static_cast<int>(leftW) - 12, 22);
 
     // Waveform display at top of right column
     float rx = leftW + 8.0f;

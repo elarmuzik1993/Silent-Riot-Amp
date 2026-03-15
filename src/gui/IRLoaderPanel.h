@@ -2,7 +2,6 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 #include <juce_audio_formats/juce_audio_formats.h>
 #include "IRWaveformDisplay.h"
-#include "SegmentedSelector.h"
 
 namespace tt {
 
@@ -20,9 +19,15 @@ public:
     void fileDragExit(const juce::StringArray&) override { dragOver = false; repaint(); }
 
     void mouseDown(const juce::MouseEvent&) override;
+    void mouseWheelMove(const juce::MouseEvent&, const juce::MouseWheelDetails&) override;
 
     void setSelectedIR(int index);
     int getSelectedIR() const { return selectedIRIndex; }
+
+    // User IR list management
+    void addUserIR(const juce::String& name, int samples, double sampleRate,
+                   int irIndex, const juce::AudioBuffer<float>& audioData);
+    void clearIRList();
 
     std::function<void(int)> onIRSelected;
     std::function<void(const juce::File&)> onUserIRLoaded;
@@ -31,16 +36,15 @@ public:
 
 private:
     void refreshWaveform();
-    void populateIRList();
 
-    SegmentedSelector categoryTabs { {"ALL", "STOCK", "ORANGE", "3RD", "USER"}, 0 };
     IRWaveformDisplay waveformDisplay;
 
     struct IREntry {
         juce::String name;
-        juce::String mic;
         int samples;
-        int irIndex; // maps to IR_INDEX param
+        double sampleRate;
+        int irIndex; // maps to IR_INDEX param (1-based)
+        juce::AudioBuffer<float> waveformData;
     };
     std::vector<IREntry> irList;
     int selectedIRIndex = 0;
@@ -48,7 +52,7 @@ private:
     bool dragOver = false;
 
     static constexpr int listRowH = 20;
-    static constexpr int listVisibleRows = 6;
+    static constexpr int listVisibleRows = 8;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(IRLoaderPanel)
 };
