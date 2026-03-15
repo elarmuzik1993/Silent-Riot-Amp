@@ -206,7 +206,12 @@ void TinyTerrorEditor::applyShapeMask()
     if (!peer) return;
 
     lastShapeH = h;
-    int w = static_cast<int>(kWindowW * currentScale);
+
+    // Editor is offset within the native window (title bar above it)
+    auto* topLevel = getTopLevelComponent();
+    auto editorOrigin = topLevel->getLocalPoint(this, juce::Point<int>(0, 0));
+    int totalW = topLevel->getWidth();
+    int totalH = editorOrigin.y + h;
 
     auto windowHandle = static_cast<::Window>(
         reinterpret_cast<uintptr_t>(peer->getNativeHandle()));
@@ -214,8 +219,8 @@ void TinyTerrorEditor::applyShapeMask()
     if (auto* dpy = XOpenDisplay(nullptr))
     {
         XRectangle rect = { 0, 0,
-            static_cast<unsigned short>(w),
-            static_cast<unsigned short>(h) };
+            static_cast<unsigned short>(totalW),
+            static_cast<unsigned short>(totalH) };
 
         XShapeCombineRectangles(dpy, windowHandle, ShapeBounding,
                                 0, 0, &rect, 1, ShapeSet, Unsorted);
