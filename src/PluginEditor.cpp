@@ -91,11 +91,16 @@ TinyTerrorEditor::TinyTerrorEditor(TinyTerrorProcessor& p)
         currentScale = scales[juce::jlimit(0, 3, scaleIdx)];
         contentArea.setTransform(juce::AffineTransform::scale(currentScale));
         setWindowBackground();
+#if JUCE_LINUX
         static const int maxH = kBaseH + tt::IRLoaderPanel::panelHeight + tt::AdvancedPanel::panelHeight;
         setSize(static_cast<int>(kWindowW * currentScale),
                 static_cast<int>(maxH * currentScale));
-        lastShapeH = 0; // force shape re-apply
+        lastShapeH = 0;
         applyShapeMask();
+#else
+        setSize(static_cast<int>(kWindowW * currentScale),
+                static_cast<int>(getContentHeight() * currentScale));
+#endif
         saveUIState();
     };
 
@@ -136,10 +141,16 @@ TinyTerrorEditor::TinyTerrorEditor(TinyTerrorProcessor& p)
     // Restore UI state
     loadUIState();
 
-    // Window always at max size — shape extension clips to visible content
+#if JUCE_LINUX
+    // Linux: max-size window, X11 Shape Extension clips to visible content
     static const int maxH = kBaseH + tt::IRLoaderPanel::panelHeight + tt::AdvancedPanel::panelHeight;
     setSize(static_cast<int>(kWindowW * currentScale),
             static_cast<int>(maxH * currentScale));
+#else
+    // Windows/macOS: resize normally (no compositor blink issue)
+    setSize(static_cast<int>(kWindowW * currentScale),
+            static_cast<int>(getContentHeight() * currentScale));
+#endif
     startTimerHz(30);
 }
 
@@ -235,7 +246,11 @@ void TinyTerrorEditor::applyShapeMask()
         XCloseDisplay(dpy);
     }
 #else
-    (void)lastShapeH;
+    // Windows/macOS: resize window to match content (no compositor blink)
+    int w = static_cast<int>(kWindowW * currentScale);
+    int h = static_cast<int>(getContentHeight() * currentScale);
+    if (getWidth() != w || getHeight() != h)
+        setSize(w, h);
 #endif
 }
 
