@@ -76,6 +76,7 @@ private:
     static constexpr int kFooterH   = 30;
     static constexpr int kBaseH     = kHeaderH + kBodyH + kSectionH * 2 + kFooterH;
 
+    float currentScale = 1.0f;
     bool compositorBypassed = false;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(TinyTerrorEditor)
