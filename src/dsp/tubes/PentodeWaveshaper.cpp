@@ -23,8 +23,8 @@ PentodeOutput pentodeWaveshaper(float vGrid_n, float vBias_n, float vPlate_n, fl
     else
         ip = 0.0f;
 
-    // Clamp to EL84 max plate current (power law is unbounded)
-    ip = std::min(ip, EL84_IP_MAX_N);
+    // Soft-clamp to EL84 max plate current (tanh knee avoids harsh flat-top)
+    ip = EL84_IP_MAX_N * std::tanh(ip / EL84_IP_MAX_N);
 
     // Plate saturation: spec uses (1 - exp(-Vp/Vp_knee)), not tanh
     float plateLimit = 1.0f - std::exp(-vPlate_n / V_PLATE_KNEE_N);
