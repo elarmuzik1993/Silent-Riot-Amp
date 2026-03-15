@@ -42,8 +42,23 @@ void TinyTerrorProcessor::handleAsyncUpdate()
 {
     // Runs on message thread — safe to allocate, do file I/O, acquire locks.
     int idx = pendingIRIndex.exchange(-1);
-    if (idx >= 0)
-        cabSim.setIRIndex(idx);
+    if (idx < 0) return;
+
+    if (idx == 0)
+    {
+        // IIR mode — disable convolution
+        cabSim.setIRIndex(0);
+        return;
+    }
+
+    // User IR (1-based index → 0-based into userIRs)
+    int userIdx = idx - 1;
+    if (userIdx >= 0 && userIdx < static_cast<int>(userIRs.size()))
+    {
+        auto& ir = userIRs[static_cast<size_t>(userIdx)];
+        juce::AudioBuffer<float> bufCopy(ir.audioData);
+        cabSim.loadIRFromBuffer(std::move(bufCopy), ir.sampleRate);
+    }
 }
 
 juce::AudioProcessorValueTreeState::ParameterLayout TinyTerrorProcessor::createParameterLayout()
@@ -113,6 +128,16 @@ void TinyTerrorProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 
     // Cabinet IR convolution engine (runs at base SR, after downsample)
     cabSim.prepare(sampleRate, samplesPerBlock, getTotalNumOutputChannels());
+
+    // Reload active user IR after prepare (convolution state was reset)
+    int irIdx = static_cast<int>(apvts.getRawParameterValue(tt::Params::IDs::IR_INDEX)->load());
+    if (irIdx > 0 && irIdx <= static_cast<int>(userIRs.size()))
+    {
+        auto& ir = userIRs[static_cast<size_t>(irIdx - 1)];
+        juce::AudioBuffer<float> bufCopy(ir.audioData);
+        cabSim.loadIRFromBuffer(std::move(bufCopy), ir.sampleRate);
+        cachedIRIndex = irIdx;
+    }
 
     // Smoothers run at block rate (base SR / block size), NOT oversampled rate
     float controlRate = static_cast<float>(sampleRate) / static_cast<float>(samplesPerBlock);
@@ -226,7 +251,7 @@ void TinyTerrorProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
         x = filterBank.v1b_cathodeBypass.process(x);
         x = filterBank.v1b_couplingHP.process(x);
         float gainPotR = (1.0f - gainA) * GAIN_POT_R_REAL;
-        v1b_miller.rSource_real = V1B_RSOURCE_BASE_REAL + gainPotR;
+        v1b_miller.rSource_real = std::min(V1B_RSOURCE_BASE_REAL + gainPotR, V1B_RSOURCE_MAX_REAL);
         float v1bGainEst = (std::abs(v1b_in) > 1e-8f) ? std::abs(x) / std::abs(v1b_in) : StageGains::V1B_GAIN;
         x = v1b_miller.process(x, v1bGainEst, filterBank.effectiveSR);
         psu.reportPreampLevel(x);
@@ -368,7 +393,131 @@ void TinyTerrorProcessor::setCurrentProgram(int) {}
 const juce::String TinyTerrorProcessor::getProgramName(int) { return {}; }
 void TinyTerrorProcessor::changeProgramName(int, const juce::String&) {}
 
+// ── User IR Management ──
+
+void TinyTerrorProcessor::loadUserIR(const juce::File& file)
+{
+    // Called from message thread (editor).
+    juce::AudioFormatManager mgr;
+    mgr.registerBasicFormats();
+    std::unique_ptr<juce::AudioFormatReader> reader(mgr.createReaderFor(file));
+    if (!reader) return;
+
+    int numSamples = static_cast<int>(
+        std::min(reader->lengthInSamples, static_cast<juce::int64>(tt::MAX_USER_IR_SAMPLES)));
+    int numChannels = static_cast<int>(reader->numChannels);
+
+    UserIREntry entry;
+    entry.name = file.getFileNameWithoutExtension();
+    entry.sampleRate = reader->sampleRate;
+    entry.numChannels = numChannels;
+    entry.numSamples = numSamples;
+    entry.audioData.setSize(numChannels, numSamples);
+    reader->read(&entry.audioData, 0, numSamples, 0, true, true);
+
+    // Load into convolution immediately
+    juce::AudioBuffer<float> bufCopy(entry.audioData);
+    cabSim.loadIRFromBuffer(std::move(bufCopy), entry.sampleRate);
+
+    userIRs.push_back(std::move(entry));
+
+    // Set IR_INDEX to the new IR (1-based)
+    int newIndex = static_cast<int>(userIRs.size());
+    cachedIRIndex = newIndex;  // prevent audio thread from re-triggering async load
+    if (auto* param = apvts.getParameter(tt::Params::IDs::IR_INDEX))
+        param->setValueNotifyingHost(param->convertTo0to1(static_cast<float>(newIndex)));
+}
+
+void TinyTerrorProcessor::selectUserIR(int userIndex)
+{
+    // 0-based index into userIRs
+    if (userIndex < 0 || userIndex >= static_cast<int>(userIRs.size())) return;
+
+    auto& ir = userIRs[static_cast<size_t>(userIndex)];
+    juce::AudioBuffer<float> bufCopy(ir.audioData);
+    cabSim.loadIRFromBuffer(std::move(bufCopy), ir.sampleRate);
+
+    int paramIndex = userIndex + 1; // 1-based
+    cachedIRIndex = paramIndex;
+    if (auto* param = apvts.getParameter(tt::Params::IDs::IR_INDEX))
+        param->setValueNotifyingHost(param->convertTo0to1(static_cast<float>(paramIndex)));
+}
+
+void TinyTerrorProcessor::saveUserIRsToState()
+{
+    // Remove any existing UserIRs node
+    auto existing = apvts.state.getChildWithName("UserIRs");
+    if (existing.isValid())
+        apvts.state.removeChild(existing, nullptr);
+
+    if (userIRs.empty()) return;
+
+    juce::ValueTree irsNode("UserIRs");
+    for (auto& ir : userIRs)
+    {
+        juce::ValueTree irNode("IR");
+        irNode.setProperty("name", ir.name, nullptr);
+        irNode.setProperty("sampleRate", ir.sampleRate, nullptr);
+        irNode.setProperty("numChannels", ir.numChannels, nullptr);
+        irNode.setProperty("numSamples", ir.numSamples, nullptr);
+
+        // Store audio data as raw floats per channel
+        juce::MemoryBlock audioBlock;
+        for (int ch = 0; ch < ir.numChannels; ++ch)
+            audioBlock.append(ir.audioData.getReadPointer(ch),
+                              static_cast<size_t>(ir.numSamples) * sizeof(float));
+
+        irNode.setProperty("audioData", juce::var(audioBlock), nullptr);
+        irsNode.addChild(irNode, -1, nullptr);
+    }
+    apvts.state.addChild(irsNode, -1, nullptr);
+}
+
+void TinyTerrorProcessor::loadUserIRsFromState()
+{
+    userIRs.clear();
+
+    auto irsNode = apvts.state.getChildWithName("UserIRs");
+    if (!irsNode.isValid()) return;
+
+    for (int i = 0; i < irsNode.getNumChildren(); ++i)
+    {
+        auto irNode = irsNode.getChild(i);
+        if (!irNode.hasType("IR")) continue;
+
+        UserIREntry entry;
+        entry.name = irNode.getProperty("name").toString();
+        entry.sampleRate = static_cast<double>(irNode.getProperty("sampleRate"));
+        entry.numChannels = static_cast<int>(irNode.getProperty("numChannels"));
+        entry.numSamples = static_cast<int>(irNode.getProperty("numSamples"));
+
+        auto* audioBlob = irNode.getProperty("audioData").getBinaryData();
+        if (audioBlob && audioBlob->getSize() > 0)
+        {
+            entry.audioData.setSize(entry.numChannels, entry.numSamples);
+            const auto* rawData = static_cast<const float*>(audioBlob->getData());
+            for (int ch = 0; ch < entry.numChannels; ++ch)
+                entry.audioData.copyFrom(ch, 0, rawData + ch * entry.numSamples, entry.numSamples);
+        }
+
+        userIRs.push_back(std::move(entry));
+    }
+
+    // Reload active IR if saved
+    int irIndex = static_cast<int>(apvts.getRawParameterValue(tt::Params::IDs::IR_INDEX)->load());
+    if (irIndex > 0 && irIndex <= static_cast<int>(userIRs.size()))
+    {
+        auto& ir = userIRs[static_cast<size_t>(irIndex - 1)];
+        juce::AudioBuffer<float> bufCopy(ir.audioData);
+        cabSim.loadIRFromBuffer(std::move(bufCopy), ir.sampleRate);
+        cachedIRIndex = irIndex;
+    }
+}
+
+// ── State Persistence ──
+
 void TinyTerrorProcessor::getStateInformation(juce::MemoryBlock& destData) {
+    saveUserIRsToState();
     auto state = apvts.copyState();
     std::unique_ptr<juce::XmlElement> xml(state.createXml());
     copyXmlToBinary(*xml, destData);
@@ -377,7 +526,10 @@ void TinyTerrorProcessor::getStateInformation(juce::MemoryBlock& destData) {
 void TinyTerrorProcessor::setStateInformation(const void* data, int sizeInBytes) {
     auto xml = getXmlFromBinary(data, sizeInBytes);
     if (xml && xml->hasTagName(apvts.state.getType()))
+    {
         apvts.replaceState(juce::ValueTree::fromXml(*xml));
+        loadUserIRsFromState();
+    }
 }
 
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter() { return new TinyTerrorProcessor(); }

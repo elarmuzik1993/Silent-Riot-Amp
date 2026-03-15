@@ -66,12 +66,28 @@ public:
     };
     DSPReadout getDSPReadout() const;
 
-    // User IR loading — called from editor (message thread)
-    void loadUserIR(const juce::File& file) { cabSim.loadIRFromFile(file); }
+    // ── User IR management (message thread only) ──
+    struct UserIREntry {
+        juce::String name;
+        double sampleRate = 0;
+        int numChannels = 0;
+        int numSamples = 0;
+        juce::AudioBuffer<float> audioData;
+    };
+
+    void loadUserIR(const juce::File& file);
+    void selectUserIR(int userIndex);  // 0-based index into userIRs
+    int getNumUserIRs() const { return static_cast<int>(userIRs.size()); }
+    const UserIREntry& getUserIR(int index) const { return userIRs[static_cast<size_t>(index)]; }
 
 private:
     juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
     void handleAsyncUpdate() override;  // deferred IR loading on message thread
+
+    // User IR persistence
+    std::vector<UserIREntry> userIRs;
+    void saveUserIRsToState();
+    void loadUserIRsFromState();
 
     // ── DSP state (matches spec Section 6 hierarchy) ──
     tt::FilterBank          filterBank;

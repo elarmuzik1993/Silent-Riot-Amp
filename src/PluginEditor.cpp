@@ -2,7 +2,6 @@
 #include "gui/ColourPalette.h"
 #include "gui/FontData.h"
 #include "utils/Parameters.h"
-#include "dsp/cabinet/IRLibrary.h"
 
 #if JUCE_LINUX
 #include <X11/Xlib.h>
@@ -54,21 +53,41 @@ TinyTerrorEditor::TinyTerrorEditor(TinyTerrorProcessor& p)
         layoutContent();
     };
 
-    irSectionBar.setHintText("IIR Mode");
+    // Populate IR list from saved state
+    for (int i = 0; i < proc.getNumUserIRs(); ++i)
+    {
+        const auto& ir = proc.getUserIR(i);
+        irLoaderPanel.addUserIR(ir.name, ir.numSamples, ir.sampleRate,
+                                i + 1, ir.audioData);
+    }
+
+    // Set selected IR and hint text from parameter
+    {
+        int irIdx = static_cast<int>(proc.apvts.getRawParameterValue(tt::Params::IDs::IR_INDEX)->load());
+        irLoaderPanel.setSelectedIR(irIdx);
+        if (irIdx >= 1 && irIdx <= proc.getNumUserIRs())
+            irSectionBar.setHintText(proc.getUserIR(irIdx - 1).name);
+        else
+            irSectionBar.setHintText("IIR Mode");
+    }
 
     // IR loader panel wiring
     irLoaderPanel.onIRSelected = [this](int irIdx) {
-        if (auto* param = proc.apvts.getParameter(tt::Params::IDs::IR_INDEX))
-            param->setValueNotifyingHost(param->convertTo0to1(static_cast<float>(irIdx)));
-        if (irIdx >= 1 && irIdx <= tt::NUM_STOCK_IRS)
-            irSectionBar.setHintText(tt::getStockIRDescriptor(irIdx - 1).displayName);
+        proc.selectUserIR(irIdx - 1);  // convert 1-based to 0-based
+        if (irIdx >= 1 && irIdx <= proc.getNumUserIRs())
+            irSectionBar.setHintText(proc.getUserIR(irIdx - 1).name);
         else
             irSectionBar.setHintText("IIR Mode");
     };
 
     irLoaderPanel.onUserIRLoaded = [this](const juce::File& file) {
         proc.loadUserIR(file);
-        irSectionBar.setHintText(file.getFileNameWithoutExtension());
+        int newIdx = proc.getNumUserIRs();
+        const auto& ir = proc.getUserIR(newIdx - 1);
+        irLoaderPanel.addUserIR(ir.name, ir.numSamples, ir.sampleRate,
+                                newIdx, ir.audioData);
+        irLoaderPanel.setSelectedIR(newIdx);
+        irSectionBar.setHintText(ir.name);
     };
 
     // CAB toggle auto-opens IR panel
