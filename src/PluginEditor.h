@@ -25,8 +25,7 @@ private:
     void saveUIState();
     void loadUIState();
     int getContentHeight() const;
-    int getTargetContentHeight() const;
-    void applyWindowSize();
+    void applyShapeMask();
     void setWindowBackground();
     void disableCompositorEffects();
 
@@ -80,6 +79,7 @@ private:
 
     float currentScale = 1.0f;
     bool compositorBypassed = false;
+    int lastShapeH = 0;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(TinyTerrorEditor)
 };

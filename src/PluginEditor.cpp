@@ -7,6 +7,7 @@
 #if JUCE_LINUX
 #include <X11/Xlib.h>
 #include <X11/Xatom.h>
+#include <X11/extensions/shape.h>
 #endif
 
 TinyTerrorEditor::TinyTerrorEditor(TinyTerrorProcessor& p)
@@ -43,23 +44,13 @@ TinyTerrorEditor::TinyTerrorEditor(TinyTerrorProcessor& p)
     irSectionBar.onToggle = [this](bool open) {
         irPanelOpen = open;
         if (open)
-        {
             irLoaderPanel.setVisible(true);
-            setWindowBackground();
-            setSize(static_cast<int>(kWindowW * currentScale),
-                    static_cast<int>(getTargetContentHeight() * currentScale));
-        }
         layoutContent();
     };
     advSectionBar.onToggle = [this](bool open) {
         advPanelOpen = open;
         if (open)
-        {
             advancedPanel.setVisible(true);
-            setWindowBackground();
-            setSize(static_cast<int>(kWindowW * currentScale),
-                    static_cast<int>(getTargetContentHeight() * currentScale));
-        }
         layoutContent();
     };
 
@@ -95,8 +86,11 @@ TinyTerrorEditor::TinyTerrorEditor(TinyTerrorProcessor& p)
         currentScale = scales[juce::jlimit(0, 3, scaleIdx)];
         contentArea.setTransform(juce::AffineTransform::scale(currentScale));
         setWindowBackground();
+        static const int maxH = kBaseH + tt::IRLoaderPanel::panelHeight + tt::AdvancedPanel::panelHeight;
         setSize(static_cast<int>(kWindowW * currentScale),
-                static_cast<int>(getContentHeight() * currentScale));
+                static_cast<int>(maxH * currentScale));
+        lastShapeH = 0; // force shape re-apply
+        applyShapeMask();
         saveUIState();
     };
 
@@ -137,8 +131,10 @@ TinyTerrorEditor::TinyTerrorEditor(TinyTerrorProcessor& p)
     // Restore UI state
     loadUIState();
 
+    // Window always at max size — shape extension clips to visible content
+    static const int maxH = kBaseH + tt::IRLoaderPanel::panelHeight + tt::AdvancedPanel::panelHeight;
     setSize(static_cast<int>(kWindowW * currentScale),
-            static_cast<int>(getContentHeight() * currentScale));
+            static_cast<int>(maxH * currentScale));
     startTimerHz(30);
 }
 
@@ -200,23 +196,37 @@ int TinyTerrorEditor::getContentHeight() const
          + static_cast<int>(advPanelAnimH);
 }
 
-int TinyTerrorEditor::getTargetContentHeight() const
+void TinyTerrorEditor::applyShapeMask()
 {
-    return kBaseH
-         + (irPanelOpen  ? tt::IRLoaderPanel::panelHeight  : 0)
-         + (advPanelOpen ? tt::AdvancedPanel::panelHeight : 0);
-}
-
-void TinyTerrorEditor::applyWindowSize()
-{
-    int w = static_cast<int>(kWindowW * currentScale);
+#if JUCE_LINUX
     int h = static_cast<int>(getContentHeight() * currentScale);
+    if (h == lastShapeH) return;
 
-    if (getWidth() != w || getHeight() != h)
+    auto* peer = getPeer();
+    if (!peer) return;
+
+    lastShapeH = h;
+    int w = static_cast<int>(kWindowW * currentScale);
+
+    auto windowHandle = static_cast<::Window>(
+        reinterpret_cast<uintptr_t>(peer->getNativeHandle()));
+
+    if (auto* dpy = XOpenDisplay(nullptr))
     {
-        setWindowBackground();
-        setSize(w, h);
+        XRectangle rect = { 0, 0,
+            static_cast<unsigned short>(w),
+            static_cast<unsigned short>(h) };
+
+        XShapeCombineRectangles(dpy, windowHandle, ShapeBounding,
+                                0, 0, &rect, 1, ShapeSet, Unsorted);
+        XShapeCombineRectangles(dpy, windowHandle, ShapeInput,
+                                0, 0, &rect, 1, ShapeSet, Unsorted);
+        XFlush(dpy);
+        XCloseDisplay(dpy);
     }
+#else
+    (void)lastShapeH;
+#endif
 }
 
 void TinyTerrorEditor::setWindowBackground()
@@ -299,10 +309,8 @@ void TinyTerrorEditor::timerCallback()
             layoutContent();
             repaint();
         }
-        else
-        {
-            applyWindowSize();
-        }
+
+        applyShapeMask();
     }
 
     // Live VU meters
@@ -355,8 +363,13 @@ void TinyTerrorEditor::paint(juce::Graphics& g)
         false));
     g.fillAll();
 
+    // Border at visible content height (shape clips everything below)
+    float cw = kWindowW * currentScale;
+    float ch = getContentHeight() * currentScale;
     g.setColour(tt::Colours::border);
-    g.drawRoundedRectangle(getLocalBounds().toFloat().reduced(0.5f), 6.0f, 1.0f);
+    g.drawRoundedRectangle(
+        juce::Rectangle<float>(0.5f, 0.5f, cw - 1.0f, ch - 1.0f),
+        6.0f, 1.0f);
 }
 
 void TinyTerrorEditor::resized()

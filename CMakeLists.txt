@@ -155,6 +155,7 @@ target_link_libraries(TinyTerror
         juce::juce_gui_basics
         juce::juce_gui_extra
         $<$<PLATFORM_ID:Linux>:X11::X11>
+        $<$<PLATFORM_ID:Linux>:X11::Xext>
     PUBLIC
         juce::juce_recommended_config_flags
         juce::juce_recommended_lto_flags
