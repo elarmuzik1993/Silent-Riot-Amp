@@ -20,7 +20,7 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: SilentRiot-Linux-VST3
-        path: "build/**/*.vst3"
+        path: "build/TinyTerror_artefacts/Release/VST3/"
         if-no-files-found: warn
 
   build-windows:
@@ -35,13 +35,13 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: SilentRiot-Windows-VST3
-        path: "build/**/*.vst3"
+        path: "build/TinyTerror_artefacts/Release/VST3/"
         if-no-files-found: warn
     - name: Upload Standalone
       uses: actions/upload-artifact@v4
       with:
         name: SilentRiot-Windows-Standalone
-        path: "build/**/Standalone/**/*.exe"
+        path: "build/TinyTerror_artefacts/Release/Standalone/"
         if-no-files-found: warn
 
   test:
