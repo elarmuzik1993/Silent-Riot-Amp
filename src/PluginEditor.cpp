@@ -66,6 +66,11 @@ TinyTerrorEditor::TinyTerrorEditor(TinyTerrorProcessor& p)
             irSectionBar.setHintText("IIR Mode");
     };
 
+    irLoaderPanel.onUserIRLoaded = [this](const juce::File& file) {
+        proc.loadUserIR(file);
+        irSectionBar.setHintText(file.getFileNameWithoutExtension());
+    };
+
     // CAB toggle auto-opens IR panel
     cabSimToggle.getButton().onClick = [this] {
         if (cabSimToggle.getButton().getToggleState() && !irSectionBar.isOpen())

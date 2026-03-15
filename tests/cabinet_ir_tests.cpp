@@ -197,6 +197,108 @@ TEST_CASE("Switch IR -> IIR -> IR", "[cabinet][ir]")
     REQUIRE_NOTHROW(cab.processBlock(block));
 }
 
+// ═══════════════════════════════════════════════════════════════
+// User IR File Loading
+// ═══════════════════════════════════════════════════════════════
+
+TEST_CASE("loadIRFromFile loads a WAV and enables IR mode", "[cabinet][ir]")
+{
+    // Create a temporary WAV file with a short impulse
+    auto tempFile = juce::File::getSpecialLocation(
+        juce::File::tempDirectory).getChildFile("test_ir.wav");
+
+    {
+        juce::WavAudioFormat wav;
+        std::unique_ptr<juce::AudioFormatWriter> writer(
+            wav.createWriterFor(new juce::FileOutputStream(tempFile),
+                                48000.0, 1, 16, {}, 0));
+        REQUIRE(writer != nullptr);
+
+        juce::AudioBuffer<float> impulse(1, 512);
+        impulse.clear();
+        impulse.setSample(0, 0, 1.0f); // unit impulse
+        writer->writeFromAudioSampleBuffer(impulse, 0, 512);
+    }
+
+    CabinetSim cab;
+    cab.prepare(48000.0, 512, 1);
+
+    REQUIRE(cab.useIR.load() == false);
+
+    cab.loadIRFromFile(tempFile);
+    REQUIRE(cab.useIR.load() == true);
+    REQUIRE(cab.getIRTailSeconds() > 0.0);
+
+    // Process a block — should not crash
+    juce::AudioBuffer<float> buffer(1, 512);
+    buffer.clear();
+    auto* data = buffer.getWritePointer(0);
+    for (int i = 0; i < 512; ++i)
+        data[i] = std::sin(2.0f * juce::MathConstants<float>::pi * 440.0f * i / 48000.0f) * 0.5f;
+
+    juce::dsp::AudioBlock<float> block(buffer);
+    REQUIRE_NOTHROW(cab.processBlock(block));
+
+    // Output should have valid samples
+    const auto* out = buffer.getReadPointer(0);
+    for (int i = 0; i < 512; ++i)
+        REQUIRE(std::isfinite(out[i]));
+
+    tempFile.deleteFile();
+}
+
+TEST_CASE("loadIRFromFile with nonexistent file keeps IR disabled", "[cabinet][ir]")
+{
+    CabinetSim cab;
+    cab.prepare(48000.0, 512, 1);
+
+    juce::File bogus("/tmp/nonexistent_ir_file_12345.wav");
+    cab.loadIRFromFile(bogus);
+    REQUIRE(cab.useIR.load() == false);
+}
+
+TEST_CASE("User IR -> stock IR transition", "[cabinet][ir]")
+{
+    // Create temp WAV
+    auto tempFile = juce::File::getSpecialLocation(
+        juce::File::tempDirectory).getChildFile("test_ir2.wav");
+    {
+        juce::WavAudioFormat wav;
+        std::unique_ptr<juce::AudioFormatWriter> writer(
+            wav.createWriterFor(new juce::FileOutputStream(tempFile),
+                                44100.0, 1, 16, {}, 0));
+        REQUIRE(writer != nullptr);
+        juce::AudioBuffer<float> impulse(1, 256);
+        impulse.clear();
+        impulse.setSample(0, 0, 1.0f);
+        writer->writeFromAudioSampleBuffer(impulse, 0, 256);
+    }
+
+    CabinetSim cab;
+    cab.prepare(44100.0, 512, 1);
+
+    // Load user IR
+    cab.loadIRFromFile(tempFile);
+    REQUIRE(cab.useIR.load() == true);
+
+    // Switch to stock IR
+    cab.setIRIndex(3);
+    REQUIRE(cab.useIR.load() == true);
+    REQUIRE(cab.currentIRIndex == 3);
+
+    // Switch to IIR
+    cab.setIRIndex(0);
+    REQUIRE(cab.useIR.load() == false);
+
+    // Process — no crash
+    juce::AudioBuffer<float> buffer(1, 512);
+    buffer.clear();
+    juce::dsp::AudioBlock<float> block(buffer);
+    REQUIRE_NOTHROW(cab.processBlock(block));
+
+    tempFile.deleteFile();
+}
+
 TEST_CASE("IR tail length is positive when IR active", "[cabinet][ir]")
 {
     CabinetSim cab;
