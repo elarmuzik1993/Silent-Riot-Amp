@@ -354,20 +354,20 @@ TEST_CASE("PSU droop: recovery to nominal after load removed", "[psu][droop]") {
     REQUIRE(psu.vPreamp() == Approx(V_PREAMP_NOMINAL_N).margin(0.001f));
 }
 
-TEST_CASE("PSU droop: screen responds faster than power", "[psu][droop]") {
+TEST_CASE("PSU droop: screen responds slower than power (tightened for modern gain)", "[psu][droop]") {
     PowerSupplyModel psu;
     psu.init();
     psu.recalcDecayCoeffs(TEST_SR);
 
-    // Screen tau (6ms) < power tau (10ms) → screen decay coefficient is smaller
-    // (lower decay = faster exponential tracking toward target)
-    REQUIRE(psu.screenNode.decay < psu.powerNode.decay);
+    // Screen tau (60ms) > power tau (10ms) → screen decay coefficient is larger
+    // (higher decay = slower exponential tracking, preventing within-cycle modulation)
+    REQUIRE(psu.screenNode.decay > psu.powerNode.decay);
 
     // Verify with a step-response test: apply a step to both in isolation
-    // Screen should close more of the gap in 5ms than power does
+    // Power should close more of the gap in 5ms than screen does
     SupplyNode fast, slow;
-    fast.init(1.0f, TAU_SCREEN_MS);   // 6ms (screen)
-    slow.init(1.0f, TAU_POWER_MS);    // 10ms (power)
+    fast.init(1.0f, TAU_POWER_MS);    // 10ms (power)
+    slow.init(1.0f, TAU_SCREEN_MS);   // 60ms (screen)
     fast.recalcDecay(TEST_SR);
     slow.recalcDecay(TEST_SR);
 

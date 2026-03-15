@@ -18,11 +18,11 @@ All processing uses a **normalized voltage domain**: 300V B+ = 1.0. See `Voltage
 
 **IIR path** (IR_INDEX=0, per-sample oversampled):
 ```
-Input → Scale to guitar domain → HP 7Hz → Grid cond V1a → Triode V1a → Clamp
+Input → Scale to guitar domain → HP 80Hz → Grid cond V1a → Triode V1a → Clamp
 → Cathode bypass LP → HP 72Hz → Miller LP V1a → Report PSU → Gain pot A
-→ Grid cond V1b → Triode V1b → Clamp → Cathode bypass LP → HP 7Hz
+→ Grid cond V1b → Triode V1b → Clamp → Cathode bypass LP → HP 80Hz
 → Miller LP V1b → Report PSU → Gain pot B → LP 5kHz → Grid cond PI
-→ LTP solver → HP×2 16Hz → Report PSU → Tone (Vox cut) → Master volume
+→ LTP solver → HP×2 50Hz → Report PSU → Tone (Vox cut) → Master volume
 → Grid cond EL84×2 → Soft conduction×2 → Pentode×2 → Push-pull sum
 → Report PSU → Sag update → Speaker coupling → OT LP 7kHz
 → IIR cab filters → Output scale → tanh limiter → Downsample → Output
@@ -122,7 +122,7 @@ cmake -B build -DTT_BUILD_TESTS=ON # Build with tests
 - `triodeWaveshaper` gain is on INPUT only — do NOT scale output by stageGain
 - `reportPreampLevel()` takes SIGNAL level, NOT current
 - ParamSmoother `controlRate` must use BASE sample rate, not oversampled
-- PSU droop impedance values (SOURCE_IMPEDANCE_N=0.08) produce aggressive sag with full pentode currents (~48mA/tube normalized to 48.0) — may need constant tuning after listening tests
+- PSU droop tuned for transparent power section: low droop depths (DROOP_POWER=0.06, DROOP_SCREEN=0.12), slow screen tau (60ms), halved source impedance (SOURCE_IMPEDANCE_N=0.04), soft tanh EL84 IP clamp, capped grid coupling charge — modern metal voicing, not vintage sag
 - `outputGainCompensation` hardcoded to 2.0 — needs tuning
 - IR loading must NEVER happen on the audio thread — always use `AsyncUpdater` to defer to message thread
 - `bufferTransfer.set()` (blocking SpinLock) is message-thread only; `bufferTransfer.get()` (try-lock) is audio-thread only

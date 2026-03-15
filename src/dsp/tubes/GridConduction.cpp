@@ -24,6 +24,9 @@ float applyGridConduction(float vGrid, GridConductionModel& model) {
     float gridCurrent = vAbove * (1.0f - loadingFactor);
     model.lastGridCurrent = gridCurrent;
     model.couplingCapCharge += gridCurrent * GRID_CHARGE_RATE;
+    float maxCharge = std::abs(MAX_BIAS_SHIFT_N);
+    if (model.couplingCapCharge > maxCharge)
+        model.couplingCapCharge = maxCharge;
     model.couplingCapCharge *= model.chargeDecay;
     if (std::abs(model.couplingCapCharge) < 1e-10f)
         model.couplingCapCharge = 0.0f;

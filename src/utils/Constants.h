@@ -11,8 +11,8 @@ namespace tt {
 
 // ── Stage gains (dimensionless) ─────────────────────────────
 namespace StageGains {
-    constexpr float V1A_GAIN        = 70.0f;
-    constexpr float V1B_GAIN        = 70.0f;
+    constexpr float V1A_GAIN        = 60.0f;
+    constexpr float V1B_GAIN        = 60.0f;
     constexpr float EL84_GAIN_BASE  = 17.0f;
     constexpr float EL84_THRESH_BASE = 0.5f;
 }
@@ -25,29 +25,29 @@ constexpr float V_PREAMP_NOMINAL_N  = VS::v(250.0f);
 
 // ── Supply droop time constants (ms) ────────────────────────
 constexpr float TAU_POWER_MS        = 10.0f;
-constexpr float TAU_SCREEN_MS       = 6.0f;
+constexpr float TAU_SCREEN_MS       = 60.0f;
 constexpr float TAU_PI_MS           = 35.0f;
 constexpr float TAU_PREAMP_MS       = 80.0f;
 
 // ── Supply droop sensitivity ────────────────────────────────
-constexpr float DROOP_POWER         = 0.20f;
-constexpr float DROOP_SCREEN        = 0.25f;
-constexpr float DROOP_PI            = 0.10f;
-constexpr float DROOP_PREAMP        = 0.05f;
+constexpr float DROOP_POWER         = 0.06f;
+constexpr float DROOP_SCREEN        = 0.12f;
+constexpr float DROOP_PI            = 0.04f;
+constexpr float DROOP_PREAMP        = 0.02f;
 
 // ── Supply impedances ───────────────────────────────────────
-constexpr float SOURCE_IMPEDANCE_N  = VS::r(24000.0f);
+constexpr float SOURCE_IMPEDANCE_N  = VS::r(12000.0f);
 constexpr float R_DROP1_N           = VS::r(4700.0f);
 constexpr float R_DROP2_N           = VS::r(22000.0f);
 
 // ── Filter frequencies (Hz) ─────────────────────────────────
-constexpr float INPUT_HP_FREQ       = 7.0f;
+constexpr float INPUT_HP_FREQ       = 80.0f;
 constexpr float CATHODE_BYPASS_FREQ = 4.2f;
 constexpr float STAGE1_COUPLING_HP  = 72.0f;
-constexpr float STAGE2_COUPLING_HP  = 7.0f;
-constexpr float PI_COUPLING_HP      = 16.0f;
+constexpr float STAGE2_COUPLING_HP  = 80.0f;
+constexpr float PI_COUPLING_HP      = 50.0f;
 constexpr float OT_LP_FREQ          = 7000.0f;
-constexpr float GAIN_LOADING_LP_FREQ = 5000.0f;
+constexpr float GAIN_LOADING_LP_FREQ = 8000.0f;
 
 // ── Math constant ────────────────────────────────────────────
 constexpr float PI_F = 3.14159265358979323846f;
@@ -107,7 +107,7 @@ constexpr float GRID_I_SATURATION           = 0.01f;
 // ── Sag envelope ────────────────────────────────────────────
 constexpr float SAG_ATTACK_MS       = 10.0f;
 constexpr float SAG_RELEASE_MS      = 100.0f;
-constexpr float SAG_DEPTH           = 0.15f;
+constexpr float SAG_DEPTH           = 0.08f;
 
 // ── Phase inverter ──────────────────────────────────────────
 constexpr float PI_TAIL_R_N         = VS::R_1K2;
@@ -134,6 +134,7 @@ constexpr float CGK_12AX7           = 1.6e-12f;
 constexpr float V1A_RSOURCE_REAL    = 10000.0f;
 constexpr float V1B_RSOURCE_BASE_REAL = 38500.0f;
 constexpr float GAIN_POT_R_REAL     = 500000.0f;
+constexpr float V1B_RSOURCE_MAX_REAL = 150000.0f;  // cap Miller rSource to keep fc ≥ ~7kHz
 constexpr float MILLER_FC_SMOOTH_MS = 1.0f;
 
 // ── Speaker coupling ────────────────────────────────────────
