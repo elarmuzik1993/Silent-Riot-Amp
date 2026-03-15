@@ -94,9 +94,6 @@ TinyTerrorEditor::TinyTerrorEditor(TinyTerrorProcessor& p)
         static const float scales[] = { 0.75f, 1.0f, 1.25f, 1.5f };
         currentScale = scales[juce::jlimit(0, 3, scaleIdx)];
         contentArea.setTransform(juce::AffineTransform::scale(currentScale));
-        int maxH = kBaseH + tt::IRLoaderPanel::panelHeight + tt::AdvancedPanel::panelHeight;
-        setSize(static_cast<int>(kWindowW * currentScale),
-                static_cast<int>(maxH * currentScale));
         applyWindowSize();
         saveUIState();
     };
@@ -138,10 +135,9 @@ TinyTerrorEditor::TinyTerrorEditor(TinyTerrorProcessor& p)
     // Restore UI state from APVTS value tree
     loadUIState();
 
-    // Max-size window at current scale — shape clipping handles the visible height
-    int maxH = kBaseH + tt::IRLoaderPanel::panelHeight + tt::AdvancedPanel::panelHeight;
+    // Window sized to actual content (shape-masked resize prevents compositor artifacts)
     setSize(static_cast<int>(kWindowW * currentScale),
-            static_cast<int>(maxH * currentScale));
+            static_cast<int>(getContentHeight() * currentScale));
     startTimerHz(30);
 }
 
@@ -206,30 +202,52 @@ int TinyTerrorEditor::getContentHeight() const
 
 void TinyTerrorEditor::applyWindowSize()
 {
-#if JUCE_LINUX
-    auto* peer = getPeer();
-    if (!peer) return;
-
     int w = static_cast<int>(kWindowW * currentScale);
     int h = static_cast<int>(getContentHeight() * currentScale);
+
+    if (getWidth() == w && getHeight() == h)
+        return;
+
+#if JUCE_LINUX
+    auto* peer = getPeer();
+    if (!peer) { setSize(w, h); return; }
+
     auto windowHandle = static_cast<::Window>(
         reinterpret_cast<uintptr_t>(peer->getNativeHandle()));
 
     if (auto* dpy = XOpenDisplay(nullptr))
     {
-        XRectangle rect;
-        rect.x = 0;
-        rect.y = 0;
-        rect.width  = static_cast<unsigned short>(w);
-        rect.height = static_cast<unsigned short>(h);
-
+        // Step 1: Clip shape to intersection of old/new bounds
+        // This hides the compositor's stretched-content artifact during resize
+        int maskW = std::min(getWidth(), w);
+        int maskH = std::min(getHeight(), h);
+        XRectangle mask = { 0, 0,
+            static_cast<unsigned short>(maskW),
+            static_cast<unsigned short>(maskH) };
         XShapeCombineRectangles(dpy, windowHandle, ShapeBounding,
-                                0, 0, &rect, 1, ShapeSet, Unsorted);
+                                0, 0, &mask, 1, ShapeSet, Unsorted);
         XShapeCombineRectangles(dpy, windowHandle, ShapeInput,
-                                0, 0, &rect, 1, ShapeSet, Unsorted);
+                                0, 0, &mask, 1, ShapeSet, Unsorted);
+        XSync(dpy, False);
+
+        // Step 2: Resize window (compositor artifact hidden by shape mask)
+        setSize(w, h);
+        if (auto* p = getPeer())
+            p->performAnyPendingRepaintsNow();
+
+        // Step 3: Remove shape — window is now at correct size with correct content
+        XShapeCombineMask(dpy, windowHandle, ShapeBounding, 0, 0, (Pixmap)0, ShapeSet);
+        XShapeCombineMask(dpy, windowHandle, ShapeInput, 0, 0, (Pixmap)0, ShapeSet);
         XFlush(dpy);
+
         XCloseDisplay(dpy);
     }
+    else
+    {
+        setSize(w, h);
+    }
+#else
+    setSize(w, h);
 #endif
 }
 
@@ -259,12 +277,8 @@ void TinyTerrorEditor::disableCompositorEffects()
 
 void TinyTerrorEditor::timerCallback()
 {
-    // First tick: apply compositor bypass + initial shape clip
     if (!compositorBypassed)
-    {
         disableCompositorEffects();
-        applyWindowSize();
-    }
 
     // Live VU meters from processor
     bool powerOn = proc.apvts.getRawParameterValue(tt::Params::IDs::POWER)->load() > 0.5f;
@@ -307,27 +321,24 @@ void TinyTerrorEditor::timerCallback()
 
 void TinyTerrorEditor::paint(juce::Graphics& g)
 {
-    float cw = kWindowW * currentScale;
-    float ch = getContentHeight() * currentScale;
+    auto bounds = getLocalBounds().toFloat();
 
-    // Gradient background matched to scaled content height
+    // Gradient background
     g.setGradientFill(juce::ColourGradient(
         tt::Colours::bg2, 0.0f, 0.0f,
-        tt::Colours::bg,  0.0f, ch,
+        tt::Colours::bg,  0.0f, bounds.getHeight(),
         false));
     g.fillAll();
 
-    // 1px border with 6px radius at scaled content bounds
+    // 1px border with 6px radius
     g.setColour(tt::Colours::border);
-    g.drawRoundedRectangle(
-        juce::Rectangle<float>(0.5f, 0.5f, cw - 1.0f, ch - 1.0f),
-        6.0f, 1.0f);
+    g.drawRoundedRectangle(bounds.reduced(0.5f), 6.0f, 1.0f);
 }
 
 void TinyTerrorEditor::resized()
 {
-    // contentArea always at logical (unscaled) size — transform handles scaling
-    int maxH = kBaseH + tt::IRLoaderPanel::panelHeight + tt::AdvancedPanel::panelHeight;
+    // contentArea at logical max size — transform handles visual scaling
+    static const int maxH = kBaseH + tt::IRLoaderPanel::panelHeight + tt::AdvancedPanel::panelHeight;
     contentArea.setBounds(0, 0, kWindowW, maxH);
     layoutContent();
 }
