@@ -77,7 +77,7 @@ void IRLoaderPanel::mouseDown(const juce::MouseEvent& e)
     // Check if click is in the IR list area
     auto bounds = getLocalBounds();
     float leftW = bounds.getWidth() * 0.45f;
-    float listY = 56.0f; // below category tabs
+    float listY = 46.0f; // below category tabs + header
     float listH = static_cast<float>(listVisibleRows * listRowH);
 
     auto listArea = juce::Rectangle<float>(0.0f, listY, leftW, listH);
@@ -94,8 +94,8 @@ void IRLoaderPanel::mouseDown(const juce::MouseEvent& e)
     }
 
     // Check drop zone click (browse)
-    float dropY = listY + listH + 8.0f;
-    auto dropArea = juce::Rectangle<float>(8.0f, dropY, leftW - 16.0f, 48.0f);
+    float dropY = listY + listH + 6.0f;
+    auto dropArea = juce::Rectangle<float>(8.0f, dropY, leftW - 16.0f, 30.0f);
     if (dropArea.contains(e.position))
     {
         auto chooser = std::make_shared<juce::FileChooser>("Load IR",
@@ -120,17 +120,17 @@ void IRLoaderPanel::paint(juce::Graphics& g)
     float leftW = bounds.getWidth() * 0.45f;
 
     // ── Left column: IR list ──
-    float y = 56.0f;
+    float y = 46.0f;
     float listH = static_cast<float>(listVisibleRows * listRowH);
 
     // Header row
     g.setFont(Fonts::spaceMono(7.0f, true));
     g.setColour(Colours::dim);
-    g.drawText("NAME", juce::Rectangle<float>(8.0f, y - 16.0f, leftW * 0.5f, 14.0f),
+    g.drawText("NAME", juce::Rectangle<float>(8.0f, y - 14.0f, leftW * 0.5f, 12.0f),
                juce::Justification::centredLeft, false);
-    g.drawText("MIC", juce::Rectangle<float>(leftW * 0.55f, y - 16.0f, 50.0f, 14.0f),
+    g.drawText("MIC", juce::Rectangle<float>(leftW * 0.55f, y - 14.0f, 50.0f, 12.0f),
                juce::Justification::centredLeft, false);
-    g.drawText("SMP", juce::Rectangle<float>(leftW * 0.78f, y - 16.0f, 50.0f, 14.0f),
+    g.drawText("SMP", juce::Rectangle<float>(leftW * 0.78f, y - 14.0f, 50.0f, 12.0f),
                juce::Justification::centredLeft, false);
 
     // IR rows
@@ -163,8 +163,8 @@ void IRLoaderPanel::paint(juce::Graphics& g)
     }
 
     // Drop zone
-    float dropY = y + listH + 8.0f;
-    auto dropArea = juce::Rectangle<float>(8.0f, dropY, leftW - 16.0f, 48.0f);
+    float dropY = y + listH + 6.0f;
+    auto dropArea = juce::Rectangle<float>(8.0f, dropY, leftW - 16.0f, 30.0f);
     g.setColour(dragOver ? Colours::accent.withAlpha(0.2f) : Colours::surface);
     g.fillRoundedRectangle(dropArea, 4.0f);
     g.setColour(dragOver ? Colours::accent : Colours::borderHi);
@@ -183,12 +183,12 @@ void IRLoaderPanel::paint(juce::Graphics& g)
 
     // ── Divider ──
     g.setColour(Colours::border);
-    g.fillRect(leftW, 8.0f, 1.0f, bounds.getHeight() - 16.0f);
+    g.fillRect(leftW, 6.0f, 1.0f, bounds.getHeight() - 12.0f);
 
     // ── Right column: Detail grid ──
-    float rx = leftW + 16.0f;
-    float ry = 110.0f; // below waveform display
-    float rw = bounds.getWidth() - leftW - 32.0f;
+    float rx = leftW + 12.0f;
+    float ry = 84.0f; // below waveform display
+    float rw = bounds.getWidth() - leftW - 24.0f;
 
     if (selectedIRIndex >= 1 && selectedIRIndex <= NUM_STOCK_IRS)
     {
@@ -209,24 +209,24 @@ void IRLoaderPanel::paint(juce::Graphics& g)
         {
             g.setFont(Fonts::spaceMono(7.0f));
             g.setColour(Colours::label);
-            g.drawText(d.key, juce::Rectangle<float>(rx, ry, 60.0f, 14.0f),
+            g.drawText(d.key, juce::Rectangle<float>(rx, ry, 56.0f, 13.0f),
                        juce::Justification::centredLeft, false);
             g.setColour(Colours::text);
-            g.drawText(d.val, juce::Rectangle<float>(rx + 64.0f, ry, rw - 64.0f, 14.0f),
+            g.drawText(d.val, juce::Rectangle<float>(rx + 56.0f, ry, rw - 56.0f, 13.0f),
                        juce::Justification::centredLeft, false);
-            ry += 18.0f;
+            ry += 15.0f;
         }
 
         // Action buttons
-        ry += 12.0f;
+        ry += 6.0f;
         auto drawBtn = [&](const juce::String& text, float bx, float bw) {
             g.setColour(Colours::surface);
-            g.fillRoundedRectangle(bx, ry, bw, 22.0f, 3.0f);
+            g.fillRoundedRectangle(bx, ry, bw, 20.0f, 3.0f);
             g.setColour(Colours::border);
-            g.drawRoundedRectangle(bx, ry, bw, 22.0f, 3.0f, 1.0f);
+            g.drawRoundedRectangle(bx, ry, bw, 20.0f, 3.0f, 1.0f);
             g.setFont(Fonts::spaceMono(7.0f, true));
             g.setColour(Colours::label);
-            g.drawText(text, juce::Rectangle<float>(bx, ry, bw, 22.0f),
+            g.drawText(text, juce::Rectangle<float>(bx, ry, bw, 20.0f),
                        juce::Justification::centred, false);
         };
 
@@ -242,12 +242,12 @@ void IRLoaderPanel::resized()
     float leftW = getWidth() * 0.45f;
 
     // Category tabs at top of left column
-    categoryTabs.setBounds(8, 8, static_cast<int>(leftW) - 16, 24);
+    categoryTabs.setBounds(6, 6, static_cast<int>(leftW) - 12, 22);
 
     // Waveform display at top of right column
     float rx = leftW + 8.0f;
-    waveformDisplay.setBounds(static_cast<int>(rx), 8,
-                              static_cast<int>(getWidth() - rx - 8.0f), 90);
+    waveformDisplay.setBounds(static_cast<int>(rx), 6,
+                              static_cast<int>(getWidth() - rx - 8.0f), 72);
 }
 
 } // namespace tt
