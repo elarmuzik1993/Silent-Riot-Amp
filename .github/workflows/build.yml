@@ -3,7 +3,7 @@ on:
   push: { branches: [main, develop] }
   pull_request: { branches: [main] }
 jobs:
-  build:
+  build-linux:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
@@ -13,12 +13,37 @@ jobs:
           build-essential cmake ninja-build \
           libasound2-dev libjack-jackd2-dev libfreetype6-dev \
           libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev \
-          libgl1-mesa-dev libwebkit2gtk-4.1-dev libcurl4-openssl-dev
+          libxext-dev libgl1-mesa-dev libwebkit2gtk-4.1-dev libcurl4-openssl-dev
     - name: Build Release
       run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release && cmake --build build
     - name: Upload VST3
       uses: actions/upload-artifact@v4
-      with: { name: TinyTerror-VST3, path: "build/**/*.vst3", if-no-files-found: warn }
+      with:
+        name: SilentRiot-Linux-VST3
+        path: "build/**/*.vst3"
+        if-no-files-found: warn
+
+  build-windows:
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Build Release
+      run: |
+        cmake -B build -DCMAKE_BUILD_TYPE=Release
+        cmake --build build --config Release
+    - name: Upload VST3
+      uses: actions/upload-artifact@v4
+      with:
+        name: SilentRiot-Windows-VST3
+        path: "build/**/*.vst3"
+        if-no-files-found: warn
+    - name: Upload Standalone
+      uses: actions/upload-artifact@v4
+      with:
+        name: SilentRiot-Windows-Standalone
+        path: "build/**/Standalone/**/*.exe"
+        if-no-files-found: warn
+
   test:
     runs-on: ubuntu-latest
     steps:
@@ -29,7 +54,7 @@ jobs:
           build-essential cmake ninja-build \
           libasound2-dev libjack-jackd2-dev libfreetype6-dev \
           libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev \
-          libgl1-mesa-dev libwebkit2gtk-4.1-dev libcurl4-openssl-dev
+          libxext-dev libgl1-mesa-dev libwebkit2gtk-4.1-dev libcurl4-openssl-dev
     - name: Build + Test
       run: |
         cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug -DTT_BUILD_TESTS=ON
