@@ -160,3 +160,14 @@ TEST_CASE("Conduction curve: monotonically increases", "[pentode][conduction]") 
         prev = cond;
     }
 }
+
+TEST_CASE("Conduction curve: 7W has wider overlap than 15W", "[pentode][conduction]") {
+    // Just below cutoff: 7W's wider overlap retains more residual conduction
+    // (more Class A — tube doesn't cut off as sharply on negative grid swings)
+    float vGridBelowCutoff = EL84_CUTOFF_N - 0.005f;
+    float cond15W = softConductionCurve(vGridBelowCutoff, PENTODE_BIAS_15W_N);
+    float cond7W  = softConductionCurve(vGridBelowCutoff, PENTODE_BIAS_7W_N);
+
+    // 7W (wider overlap, more Class A) retains more conduction below cutoff
+    REQUIRE(cond7W > cond15W);
+}

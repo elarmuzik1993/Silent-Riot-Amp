@@ -18,13 +18,15 @@ All processing uses a **normalized voltage domain**: 300V B+ = 1.0. See `Voltage
 
 **IIR path** (IR_INDEX=0, per-sample oversampled):
 ```
-Input → Scale to guitar domain → HP 80Hz → Grid cond V1a → Triode V1a → Clamp
+Input → Scale to guitar domain → HP 7Hz → Grid cond V1a → Triode V1a → Clamp
 → Cathode bypass LP → HP 72Hz → Miller LP V1a → Report PSU → Gain pot A
 → Grid cond V1b → Triode V1b → Clamp → Cathode bypass LP → HP 80Hz
 → Miller LP V1b → Report PSU → Gain pot B → LP 5kHz → Grid cond PI
-→ LTP solver → HP×2 50Hz → Report PSU → Tone (Vox cut) → Master volume
-→ Grid cond EL84×2 → Soft conduction×2 → Pentode×2 → Push-pull sum
-→ Report PSU → Sag update → Speaker coupling → OT LP 7kHz
+→ LTP solver (100K/82K asymmetric plate loads) → HP×2 50Hz → Report PSU
+→ Tone (Vox cut) → Master volume → Grid cond EL84×2
+→ Soft conduction×2 (bias-dependent Class A/AB) → Pentode×2 → Push-pull sum
+→ Report PSU → Sag update (raw plate current) → OT current scale
+→ Speaker coupling (bandpass extraction) → OT saturation → OT LP 7kHz
 → IIR cab filters → Output scale → tanh limiter → Downsample → Output
 ```
 
@@ -71,10 +73,10 @@ cmake -B build -DTT_BUILD_TESTS=ON # Build with tests
 - `namespace tt` for all DSP code; `using VS = VoltageScale` shorthand
 - No dynamic allocation in `processBlock`; all buffers pre-allocated
 - `ANTI_DENORMAL` (1e-18f) injected in all IIR filter state
-- Parameter smoothing at block rate (base SR / block), NOT oversampled rate
+- Parameter smoothing per-sample at oversampled rate (target/tick model in ParamSmoother)
 - CMake target is `TinyTerror`; product name is `Silent Riot`
 - Tests use Catch2 v3 — one test file per DSP module, two test targets:
-  - `TinyTerrorTests` — 148 pure C++ tests (no JUCE dependency)
+  - `TinyTerrorTests` — 154 pure C++ tests (no JUCE dependency)
   - `TinyTerrorJuceTests` — 13 JUCE-dependent tests (cabinet IR, convolution, user IR loading)
 
 ## Cabinet IR Loader Architecture
@@ -121,9 +123,14 @@ cmake -B build -DTT_BUILD_TESTS=ON # Build with tests
 - Bias values are NEGATIVE — use `+` not `-` when applying (e.g. `vGrid + vBias`)
 - `triodeWaveshaper` gain is on INPUT only — do NOT scale output by stageGain
 - `reportPreampLevel()` takes SIGNAL level, NOT current
-- ParamSmoother `controlRate` must use BASE sample rate, not oversampled
+- ParamSmoother runs per-sample at oversampled rate (NOT block rate) — init with effectiveSR
+- `sag.update()` must be called with raw plate current BEFORE `OT_CURRENT_SCALE` multiplication
+- OT saturation: `OT_SAT_DRIVE=400`, `OT_SAT_DC_FREQ=20Hz` — DC block prevents integrator blowup from asymmetric tube DC
+- LTP plate loads are asymmetric: `PI_RPLATE_A_N` (100K) / `PI_RPLATE_B_N` (82K)
+- Speaker coupling uses `makeBandPass` (NOT `makePeakEQ` with 0dB gain — that's a flat passthrough)
+- `softConductionCurve` biasFactor: `PENTODE_BIAS_15W_N / vBias_n` (NOT the inverse — 7W must get wider overlap)
 - PSU droop tuned for transparent power section: low droop depths (DROOP_POWER=0.06, DROOP_SCREEN=0.12), slow screen tau (60ms), halved source impedance (SOURCE_IMPEDANCE_N=0.04), soft tanh EL84 IP clamp, capped grid coupling charge — modern metal voicing, not vintage sag
-- `outputGainCompensation` hardcoded to 2.0 — needs tuning
+- `outputGainCompensation` hardcoded to 1.0 — needs tuning
 - IR loading must NEVER happen on the audio thread — always use `AsyncUpdater` to defer to message thread
 - `bufferTransfer.set()` (blocking SpinLock) is message-thread only; `bufferTransfer.get()` (try-lock) is audio-thread only
 - ToggleSwitch uses `onStateChange` internally for thumb animation — external callbacks must use `onClick` (not `onStateChange`) to avoid breaking the animation timer

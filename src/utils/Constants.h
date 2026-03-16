@@ -41,7 +41,7 @@ constexpr float R_DROP1_N           = VS::r(4700.0f);
 constexpr float R_DROP2_N           = VS::r(22000.0f);
 
 // ── Filter frequencies (Hz) ─────────────────────────────────
-constexpr float INPUT_HP_FREQ       = 80.0f;
+constexpr float INPUT_HP_FREQ       = 7.0f;
 constexpr float CATHODE_BYPASS_FREQ = 4.2f;
 constexpr float STAGE1_COUPLING_HP  = 72.0f;
 constexpr float STAGE2_COUPLING_HP  = 80.0f;
@@ -58,6 +58,9 @@ constexpr float ANTI_DENORMAL       = 1e-18f;
 // ── Tone control ────────────────────────────────────────────
 constexpr float TONE_MIN_FREQ       = 800.0f;
 constexpr float TONE_MAX_FREQ       = 5000.0f;
+
+// ── Preamp plate load ────────────────────────────────────────
+constexpr float PREAMP_RPLATE_N     = VS::R_100K;  // 100kΩ plate load for V1a/V1b
 
 // ── Triode model ────────────────────────────────────────────
 constexpr float TRIODE_BIAS_N       = VS::v(-1.5f);
@@ -112,7 +115,8 @@ constexpr float SAG_DEPTH           = 0.003f;
 
 // ── Phase inverter ──────────────────────────────────────────
 constexpr float PI_TAIL_R_N         = VS::R_1K2;
-constexpr float PI_RPLATE_N         = VS::R_100K;
+constexpr float PI_RPLATE_A_N       = VS::R_100K;          // non-inv plate load
+constexpr float PI_RPLATE_B_N       = VS::r(82000.0f);     // inv plate load (lower → less gain on B side)
 constexpr float PI_BIAS_REF_N       = VS::v(-1.5f);
 constexpr float PI_RP_N             = VS::r(62500.0f);
 constexpr float PI_MU               = 100.0f;
@@ -156,8 +160,8 @@ constexpr float SPK_GAINMOD_RANGE   = 0.5f;
 
 // ── OT core saturation ─────────────────────────────────────
 constexpr float OT_CURRENT_SCALE    = 0.015f;  // plate current → OT primary voltage (~4.5 kΩ eff.)
-constexpr float OT_SAT_DRIVE        = 12.0f;   // saturation onset (higher = earlier)
-constexpr float OT_SAT_DC_FREQ      = 1.5f;    // integrator DC-block frequency (Hz)
+constexpr float OT_SAT_DRIVE        = 400.0f;  // saturation onset (higher = earlier)
+constexpr float OT_SAT_DC_FREQ      = 20.0f;   // integrator DC-block frequency (Hz)
 
 // ── Gain taper ──────────────────────────────────────────────
 constexpr float GAIN_TAPER_EXPONENT = 2.0f;

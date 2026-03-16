@@ -60,11 +60,10 @@ TEST_CASE("OT saturation: high-level signal is compressed", "[ot_sat]") {
     OTSaturation sat;
     sat.recalcCoeffs(TEST_SR);
 
-    // Use a large-amplitude 100Hz sine — should be compressed
-    // powerOut in the plugin ranges ±10–50; flux ≈ amp/(2π*f), so
-    // amp=30 at 100Hz → flux ≈ 0.048, drive*flux ≈ 0.58 → real compression
+    // Full-power speaker output is ~1.5 (normalized domain).
+    // At 100Hz: flux ≈ 1.5/(2π*100) ≈ 0.0024, drive*flux ≈ 16.7 → real compression
     float freq = 100.0f;
-    float amp = 30.0f;
+    float amp = 1.5f;
     int warmup = static_cast<int>(TEST_SR * 0.1f);
     int measure = static_cast<int>(TEST_SR * 0.1f);
 
@@ -105,7 +104,7 @@ TEST_CASE("OT saturation: bass saturates more than treble", "[ot_sat]") {
         return outPeak / inPeak;
     };
 
-    float amp = 30.0f;  // realistic powerOut level to engage saturation
+    float amp = 1.5f;  // realistic speaker coupling output level
     float bassGain = measureGain(80.0f, amp);
     float trebleGain = measureGain(2000.0f, amp);
 

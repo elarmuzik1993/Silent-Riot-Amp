@@ -139,11 +139,10 @@ void TinyTerrorProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
         cachedIRIndex = irIdx;
     }
 
-    // Smoothers run at block rate (base SR / block size), NOT oversampled rate
-    float controlRate = static_cast<float>(sampleRate) / static_cast<float>(samplesPerBlock);
-    gainSmoother.init(5.0f, controlRate);
-    toneSmoother.init(5.0f, controlRate);
-    volumeSmoother.init(5.0f, controlRate);
+    // Smoothers run per-sample at the oversampled rate
+    gainSmoother.init(5.0f, effectiveSR);
+    toneSmoother.init(5.0f, effectiveSR);
+    volumeSmoother.init(5.0f, effectiveSR);
 }
 
 void TinyTerrorProcessor::releaseResources() {}
@@ -187,15 +186,10 @@ void TinyTerrorProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     // useIR is atomic — set by message thread after IR is loaded into bufferTransfer.
     bool irMode = cabOn && cabSim.useIR.load();
 
-    // Smooth parameters
+    // Set smoother targets (per-sample tick happens inside the loop)
     gainSmoother.setTarget(gainParam);
     toneSmoother.setTarget(toneParam);
     volumeSmoother.setTarget(volParam);
-
-    // Update modulated filters
-    constexpr float toneFreqRatio = TONE_MAX_FREQ / TONE_MIN_FREQ;
-    float toneFreq = TONE_MIN_FREQ * std::pow(toneFreqRatio, toneSmoother.current);
-    filterBank.updateModulated(toneFreq, GAIN_LOADING_LP_FREQ);
 
     // ── Input level metering (RMS before processing) ──
     {
@@ -210,15 +204,53 @@ void TinyTerrorProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
         }
     }
 
+    // ── Oversample mode switching ──
+    {
+        int osParam = static_cast<int>(apvts.getRawParameterValue(Params::IDs::OVERSAMPLE)->load());
+        if (osParam != oversampleSwitcher.currentMode) {
+            oversampleSwitcher.currentMode = osParam;
+            oversampleSwitcher.oversamplers[static_cast<size_t>(osParam)]->reset();
+
+            int osFactor = oversampleSwitcher.activeFactor();
+            float effectiveSR = static_cast<float>(baseSampleRate) * osFactor;
+
+            filterBank.recalcAll(static_cast<float>(baseSampleRate), osFactor);
+            v1a_miller.recalc(effectiveSR);
+            v1b_miller.recalc(effectiveSR);
+            speakerCoupling.recalcFilters(effectiveSR);
+            psu.recalcDecayCoeffs(effectiveSR);
+            sag.recalcCoeffs(effectiveSR);
+            otSaturation.recalcCoeffs(effectiveSR);
+
+            recalcGridChargeDecay(v1aGrid,  0.022f, effectiveSR);
+            recalcGridChargeDecay(v1bGrid,  0.022f, effectiveSR);
+            recalcGridChargeDecay(piGrid,   0.047f, effectiveSR);
+            recalcGridChargeDecay(el84GridA, 0.100f, effectiveSR);
+            recalcGridChargeDecay(el84GridB, 0.100f, effectiveSR);
+
+            gainSmoother.init(5.0f, effectiveSR);
+            toneSmoother.init(5.0f, effectiveSR);
+            volumeSmoother.init(5.0f, effectiveSR);
+
+            setLatencySamples(static_cast<int>(oversampleSwitcher.active()->getLatencyInSamples()));
+        }
+    }
+
     // Oversampled processing (Spec §2.5 processBlock)
     auto* oversampler = oversampleSwitcher.active();
     auto osBlock = oversampler->processSamplesUp(juce::dsp::AudioBlock<float>(buffer));
 
-    const float gainVal = gainSmoother.current;
-    const float volVal  = volumeSmoother.current;
-
     for (size_t i = 0; i < osBlock.getNumSamples(); ++i)
     {
+        // Per-sample parameter smoothing
+        float gainVal = gainSmoother.tick();
+        float volVal  = volumeSmoother.tick();
+        float toneVal = toneSmoother.tick();
+
+        // Update modulated filters from smoothed tone
+        constexpr float toneFreqRatio = TONE_MAX_FREQ / TONE_MIN_FREQ;
+        float toneFreq = TONE_MIN_FREQ * std::pow(toneFreqRatio, toneVal);
+        filterBank.updateModulated(toneFreq, GAIN_LOADING_LP_FREQ);
         if (!psuFrozen) psu.update();
         psu.resetCurrentDraw();
 
@@ -235,8 +267,7 @@ void TinyTerrorProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
         x = filterBank.inputHP.process(x);
         x = applyGridConduction(x, v1aGrid);
         float v1a_in = x;
-        x = triodeWaveshaper(x, VS::V_BIAS_12AX7, vPreamp, StageGains::V1A_GAIN);
-        x = std::clamp(x, -vPreamp * HEADROOM_FACTOR, vPreamp * HEADROOM_FACTOR);
+        x = triodeWaveshaper(x, VS::V_BIAS_12AX7, vPreamp, PREAMP_RPLATE_N);
         x = filterBank.v1a_couplingHP.process(x);
         float v1aGainEst = (std::abs(v1a_in) > 1e-8f) ? std::abs(x) / std::abs(v1a_in) : StageGains::V1A_GAIN;
         x = v1a_miller.process(x, v1aGainEst, filterBank.effectiveSR);
@@ -249,8 +280,7 @@ void TinyTerrorProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
         // ── Stage 2: V1b ──
         x = applyGridConduction(x, v1bGrid);
         float v1b_in = x;
-        x = triodeWaveshaper(x, VS::V_BIAS_12AX7, vPreamp, StageGains::V1B_GAIN);
-        x = std::clamp(x, -vPreamp * HEADROOM_FACTOR, vPreamp * HEADROOM_FACTOR);
+        x = triodeWaveshaper(x, VS::V_BIAS_12AX7, vPreamp, PREAMP_RPLATE_N);
         x = filterBank.v1b_couplingHP.process(x);
         float gainPotR = (1.0f - gainA) * GAIN_POT_R_REAL;
         v1b_miller.rSource_real = std::min(V1B_RSOURCE_BASE_REAL + gainPotR, V1B_RSOURCE_MAX_REAL);
@@ -295,9 +325,11 @@ void TinyTerrorProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
             std::abs(ppA.plateCurrent) + std::abs(ppB.plateCurrent),
             ppA.screenCurrent + ppB.screenCurrent);
 
+        // Sag tracks raw plate current before OT scaling
+        sag.update(powerOut);
+
         // Convert plate current to OT primary voltage
         powerOut *= OT_CURRENT_SCALE;
-        sag.update(powerOut);
 
         // ── Speaker coupling + OT ──
         float otIn = speakerCoupling.process(powerOut);

@@ -51,6 +51,19 @@ struct Biquad {
         a2 = (1.0f - alpha) * a0_inv;
     }
 
+    void makeBandPass(float newFc, float newQ, float sr) {
+        fc = newFc; Q = newQ;
+        float w0 = 2.0f * PI_F * fc / sr;
+        float sinW0 = std::sin(w0), cosW0 = std::cos(w0);
+        float alpha = sinW0 / (2.0f * Q);
+        float a0_inv = 1.0f / (1.0f + alpha);
+        b0 = alpha * a0_inv;
+        b1 = 0.0f;
+        b2 = -alpha * a0_inv;
+        a1 = (-2.0f * cosW0) * a0_inv;
+        a2 = (1.0f - alpha) * a0_inv;
+    }
+
     void makePeakEQ(float newFc, float newQ, float newGainDb, float sr) {
         fc = newFc; Q = newQ; gainDb = newGainDb;
         float A = std::pow(10.0f, gainDb / 40.0f);

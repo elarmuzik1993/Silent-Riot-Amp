@@ -5,8 +5,8 @@ namespace tt {
 void SpeakerCoupling::init() {}
 
 void SpeakerCoupling::recalcFilters(float effectiveSR) {
-    bassExtract.makePeakEQ(SPK_FS, 2.0f, 0.0f, effectiveSR);
-    midExtract.makePeakEQ(500.0f, 1.0f, 0.0f, effectiveSR);
+    bassExtract.makeBandPass(SPK_FS, 2.0f, effectiveSR);
+    midExtract.makeBandPass(500.0f, 1.0f, effectiveSR);
     hfEnvelope.setFreq(3000.0f, effectiveSR);
     envDecay = std::exp(-1.0f / (SPK_ENV_TAU_MS * 0.001f * effectiveSR));
 }
