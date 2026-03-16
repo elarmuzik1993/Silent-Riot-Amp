@@ -35,6 +35,11 @@ void FooterBar::paint(juce::Graphics& g)
     g.drawText(latText, juce::Rectangle<float>(padding + 118.0f, y, 50.0f, h),
                juce::Justification::centredLeft, false);
 
+    // Centre — version
+    g.setColour(Colours::dim);
+    g.drawText("v" JucePlugin_VersionString,
+               bounds.toNearestInt(), juce::Justification::centred, false);
+
     // Right side
     float rx = bounds.getWidth() - padding;
 

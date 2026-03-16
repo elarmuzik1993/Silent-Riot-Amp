@@ -193,7 +193,8 @@ void TinyTerrorProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     volumeSmoother.setTarget(volParam);
 
     // Update modulated filters
-    float toneFreq = TONE_MIN_FREQ * std::pow(TONE_MAX_FREQ / TONE_MIN_FREQ, toneSmoother.current);
+    constexpr float toneFreqRatio = TONE_MAX_FREQ / TONE_MIN_FREQ;
+    float toneFreq = TONE_MIN_FREQ * std::pow(toneFreqRatio, toneSmoother.current);
     filterBank.updateModulated(toneFreq, GAIN_LOADING_LP_FREQ);
 
     // ── Input level metering (RMS before processing) ──
@@ -212,6 +213,9 @@ void TinyTerrorProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     // Oversampled processing (Spec §2.5 processBlock)
     auto* oversampler = oversampleSwitcher.active();
     auto osBlock = oversampler->processSamplesUp(juce::dsp::AudioBlock<float>(buffer));
+
+    const float gainVal = gainSmoother.current;
+    const float volVal  = volumeSmoother.current;
 
     for (size_t i = 0; i < osBlock.getNumSamples(); ++i)
     {
@@ -233,14 +237,13 @@ void TinyTerrorProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
         float v1a_in = x;
         x = triodeWaveshaper(x, VS::V_BIAS_12AX7, vPreamp, StageGains::V1A_GAIN);
         x = std::clamp(x, -vPreamp * HEADROOM_FACTOR, vPreamp * HEADROOM_FACTOR);
-        x = filterBank.v1a_cathodeBypass.process(x);
         x = filterBank.v1a_couplingHP.process(x);
         float v1aGainEst = (std::abs(v1a_in) > 1e-8f) ? std::abs(x) / std::abs(v1a_in) : StageGains::V1A_GAIN;
         x = v1a_miller.process(x, v1aGainEst, filterBank.effectiveSR);
         psu.reportPreampLevel(x);
 
         // ── Gain Pot Gang A ──
-        float gainA = gainSmoother.current;
+        float gainA = gainVal;
         x *= gainA;
 
         // ── Stage 2: V1b ──
@@ -248,7 +251,6 @@ void TinyTerrorProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
         float v1b_in = x;
         x = triodeWaveshaper(x, VS::V_BIAS_12AX7, vPreamp, StageGains::V1B_GAIN);
         x = std::clamp(x, -vPreamp * HEADROOM_FACTOR, vPreamp * HEADROOM_FACTOR);
-        x = filterBank.v1b_cathodeBypass.process(x);
         x = filterBank.v1b_couplingHP.process(x);
         float gainPotR = (1.0f - gainA) * GAIN_POT_R_REAL;
         v1b_miller.rSource_real = std::min(V1B_RSOURCE_BASE_REAL + gainPotR, V1B_RSOURCE_MAX_REAL);
@@ -257,7 +259,7 @@ void TinyTerrorProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
         psu.reportPreampLevel(x);
 
         // ── Gain Pot Gang B (linear — taper already applied on Gang A) ──
-        x *= gainSmoother.current;
+        x *= gainVal;
         x = filterBank.gainLoadingLP.process(x);
 
         // ── Stage 3: Phase Inverter (LTP) ──
@@ -275,7 +277,7 @@ void TinyTerrorProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
         piB = (sum - outDiff) * 0.5f;
 
         // ── Master Volume ──
-        float vol = audioTaper(volumeSmoother.current);
+        float vol = audioTaper(volVal);
         piA *= vol;
         piB *= vol;
 
