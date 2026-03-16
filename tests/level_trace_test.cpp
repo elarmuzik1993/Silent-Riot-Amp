@@ -134,6 +134,9 @@ static LevelTrace traceChain(float digitalPeak, float gain, float volume,
 
         if (i > settleEnd) peak.powerOut = std::max(peak.powerOut, std::abs(pOut));
 
+        // Convert plate current to OT primary voltage
+        pOut *= OT_CURRENT_SCALE;
+
         // Speaker coupling + OT
         float otIn = spk.process(pOut);
         if (i > settleEnd) peak.speakerOut = std::max(peak.speakerOut, std::abs(otIn));
@@ -149,7 +152,7 @@ static LevelTrace traceChain(float digitalPeak, float gain, float volume,
         if (i > settleEnd) peak.cabOut = std::max(peak.cabOut, std::abs(cabOut));
 
         // Output
-        float finalOut = cabOut * 0.02f;
+        float finalOut = cabOut * 1.0f;
         finalOut = std::tanh(finalOut);
         if (i > settleEnd) peak.finalOut = std::max(peak.finalOut, std::abs(finalOut));
     }
@@ -172,7 +175,7 @@ TEST_CASE("Level trace: max gain, typical guitar input", "[levels]") {
     printf("  Speaker out:  %.4f\n", t.speakerOut);
     printf("  OT out:       %.4f\n", t.otOut);
     printf("  Cab out:      %.4f\n", t.cabOut);
-    printf("  Final (0.02): %.4f\n", t.finalOut);
+    printf("  Final (1.0):  %.4f\n", t.finalOut);
     printf("  Needed comp for tanh(2): %.4f\n", 2.0f / t.cabOut);
     printf("  Needed comp for tanh(1): %.4f\n", 1.0f / t.cabOut);
 
@@ -194,7 +197,7 @@ TEST_CASE("Level trace: moderate gain", "[levels]") {
     printf("  Speaker out:  %.4f\n", t.speakerOut);
     printf("  OT out:       %.4f\n", t.otOut);
     printf("  Cab out:      %.4f\n", t.cabOut);
-    printf("  Final (0.02): %.4f\n", t.finalOut);
+    printf("  Final (1.0):  %.4f\n", t.finalOut);
 
     REQUIRE(t.finalOut > 0.0f);
 }
@@ -213,7 +216,7 @@ TEST_CASE("Level trace: clean tone", "[levels]") {
     printf("  Speaker out:  %.4f\n", t.speakerOut);
     printf("  OT out:       %.4f\n", t.otOut);
     printf("  Cab out:      %.4f\n", t.cabOut);
-    printf("  Final (0.02): %.4f\n", t.finalOut);
+    printf("  Final (1.0):  %.4f\n", t.finalOut);
 
     REQUIRE(t.finalOut > 0.0f);
 }

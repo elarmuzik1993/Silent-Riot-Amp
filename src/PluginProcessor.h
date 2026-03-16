@@ -108,7 +108,7 @@ private:
 
     // State
     float el84BaseBias = tt::PENTODE_BIAS_15W_N;
-    float outputGainCompensation = 0.02f;  // scales power section output into tanh soft-clip range
+    float outputGainCompensation = 1.0f;   // scales cab output into tanh soft-clip range
     bool  psuFrozen    = false;
     double baseSampleRate = 44100.0;
     int   cachedIRIndex = 0;              // last IR index seen by audio thread

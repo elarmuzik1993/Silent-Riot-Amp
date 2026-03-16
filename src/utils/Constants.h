@@ -108,7 +108,7 @@ constexpr float GRID_I_SATURATION           = 0.01f;
 // ── Sag envelope ────────────────────────────────────────────
 constexpr float SAG_ATTACK_MS       = 10.0f;
 constexpr float SAG_RELEASE_MS      = 100.0f;
-constexpr float SAG_DEPTH           = 0.08f;
+constexpr float SAG_DEPTH           = 0.003f;
 
 // ── Phase inverter ──────────────────────────────────────────
 constexpr float PI_TAIL_R_N         = VS::R_1K2;
@@ -155,6 +155,7 @@ constexpr float SPK_GAINMOD_DEPTH   = 2.0f;
 constexpr float SPK_GAINMOD_RANGE   = 0.5f;
 
 // ── OT core saturation ─────────────────────────────────────
+constexpr float OT_CURRENT_SCALE    = 0.015f;  // plate current → OT primary voltage (~4.5 kΩ eff.)
 constexpr float OT_SAT_DRIVE        = 12.0f;   // saturation onset (higher = earlier)
 constexpr float OT_SAT_DC_FREQ      = 1.5f;    // integrator DC-block frequency (Hz)
 
