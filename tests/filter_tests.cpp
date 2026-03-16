@@ -83,20 +83,28 @@ TEST_CASE("OnePoleHP: -3dB near cutoff frequency", "[filter][onepole]") {
 
 // ── Circuit-specific filter checks ───────────────────────────
 
-TEST_CASE("Input HP (80Hz): passes 1kHz guitar signal", "[filter][circuit]") {
+TEST_CASE("Input HP (7Hz): passes 1kHz guitar signal", "[filter][circuit]") {
     OnePoleHP hp;
-    hp.setFreq(INPUT_HP_FREQ, TEST_SR);  // 80Hz — tight bass filtering for modern metal
+    hp.setFreq(INPUT_HP_FREQ, TEST_SR);  // 7Hz — coupling cap DC block
 
     float mag = measureMagnitude(hp, 1000.0f, TEST_SR);
     REQUIRE(mag > 0.99f);  // essentially unity at 1kHz
 }
 
-TEST_CASE("Input HP (80Hz): blocks bass at 20Hz", "[filter][circuit]") {
+TEST_CASE("Input HP (7Hz): passes 20Hz bass", "[filter][circuit]") {
     OnePoleHP hp;
     hp.setFreq(INPUT_HP_FREQ, TEST_SR);
 
     float mag = measureMagnitude(hp, 20.0f, TEST_SR, 30);
-    REQUIRE(mag < 0.3f);
+    REQUIRE(mag > 0.9f);  // 20Hz is well above 7Hz cutoff
+}
+
+TEST_CASE("Input HP (7Hz): attenuates sub-bass at 2Hz", "[filter][circuit]") {
+    OnePoleHP hp;
+    hp.setFreq(INPUT_HP_FREQ, TEST_SR);
+
+    float mag = measureMagnitude(hp, 2.0f, TEST_SR, 60);
+    REQUIRE(mag < 0.35f);
 }
 
 TEST_CASE("Cathode bypass LP (4.2Hz): passes audio band", "[filter][circuit]") {

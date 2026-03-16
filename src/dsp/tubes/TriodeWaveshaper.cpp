@@ -2,24 +2,11 @@
 
 namespace tt {
 
-float triodeWaveshaper(float vGrid_n, float vBias_n, float vSupply_n, float stageGain) {
-    // Spec §4.1 Option A: x = vGrid_n * drive + vBias_n
-    // stageGain acts as the drive multiplier (replaces generic TRIODE_DRIVE)
-    float x = vGrid_n * stageGain + vBias_n;
-
-    // Asymmetric clipping: softer positive (cutoff), harder negative (conduction)
-    float shaped;
-    if (x >= 0.0f)
-        shaped = std::tanh(x);
-    else
-        shaped = std::tanh(x * TRIODE_ASYM_FACTOR) / TRIODE_ASYM_FACTOR;
-
-    // Output swing proportional to available supply
-    shaped *= vSupply_n;
-
-    // Clip against supply ceiling
-    float ceiling = vSupply_n * HEADROOM_FACTOR;
-    return std::clamp(shaped, -ceiling, ceiling);
+float triodeWaveshaper(float vGrid_n, float vBias_n, float vSupply_n, float rPlate_n) {
+    float vgk = vGrid_n + vBias_n;
+    float ip = triodeCurrentModel(vgk, TRIODE_MU, TRIODE_RP_N);
+    float vPlate = vSupply_n - ip * rPlate_n;
+    return std::clamp(vPlate, 0.0f, vSupply_n);
 }
 
 float triodeCurrentModel(float vgk_n, float, float) {

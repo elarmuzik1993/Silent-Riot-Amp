@@ -52,7 +52,7 @@ float softConductionCurve(float vGrid_n, float vBias_n) {
     // and modulated by the bias ratio so 7W is wider than 15W.
     // bias_factor: -0.9/(-0.9) = 1.0 for 15W, -0.96/(-0.9) = 1.067 for 7W
     float cutoffMargin = vGrid_n - EL84_CUTOFF_N;
-    float biasFactor = vBias_n / PENTODE_BIAS_15W_N;  // >1.0 for 7W (hotter)
+    float biasFactor = PENTODE_BIAS_15W_N / vBias_n;  // >1.0 for 7W (hotter)
     float overlapWidth = std::abs(EL84_CUTOFF_N) * 0.5f * biasFactor;
     if (overlapWidth < 1e-10f) overlapWidth = 1e-10f;
     return 0.5f * (1.0f + std::tanh(cutoffMargin / overlapWidth));

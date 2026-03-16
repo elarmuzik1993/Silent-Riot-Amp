@@ -77,8 +77,7 @@ static LevelTrace traceChain(float digitalPeak, float gain, float volume,
         // V1a
         x = fb.inputHP.process(x);
         x = applyGridConduction(x, v1aGrid);
-        x = triodeWaveshaper(x, VS::V_BIAS_12AX7, vPreamp, StageGains::V1A_GAIN);
-        x = std::clamp(x, -vPreamp * HEADROOM_FACTOR, vPreamp * HEADROOM_FACTOR);
+        x = triodeWaveshaper(x, VS::V_BIAS_12AX7, vPreamp, PREAMP_RPLATE_N);
         x = fb.v1a_couplingHP.process(x);
 
         if (i > settleEnd) peak.v1aOut = std::max(peak.v1aOut, std::abs(x));
@@ -90,8 +89,7 @@ static LevelTrace traceChain(float digitalPeak, float gain, float volume,
 
         // V1b
         x = applyGridConduction(x, v1bGrid);
-        x = triodeWaveshaper(x, VS::V_BIAS_12AX7, vPreamp, StageGains::V1B_GAIN);
-        x = std::clamp(x, -vPreamp * HEADROOM_FACTOR, vPreamp * HEADROOM_FACTOR);
+        x = triodeWaveshaper(x, VS::V_BIAS_12AX7, vPreamp, PREAMP_RPLATE_N);
         x = fb.v1b_couplingHP.process(x);
 
         if (i > settleEnd) peak.v1bOut = std::max(peak.v1bOut, std::abs(x));

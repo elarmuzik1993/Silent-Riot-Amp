@@ -69,6 +69,25 @@ TEST_CASE("Speaker coupling: gain modulation range", "[speaker]") {
     }
 }
 
+TEST_CASE("Speaker coupling: bass signal gets higher gain than mid signal", "[speaker]") {
+    // Bass at 75Hz (near resonance -> high impedance -> high gain)
+    SpeakerCoupling spkBass;
+    spkBass.recalcFilters(TEST_SR);
+    for (int i = 0; i < 4000; ++i)
+        spkBass.process(0.3f * std::sin(2.0f * PI_F * 75.0f * i / TEST_SR));
+    float bassGainMod = std::abs(spkBass.process(0.3f)) / 0.3f;
+
+    // Mid at 500Hz (near impedance minimum -> low impedance -> nominal gain)
+    SpeakerCoupling spkMid;
+    spkMid.recalcFilters(TEST_SR);
+    for (int i = 0; i < 4000; ++i)
+        spkMid.process(0.3f * std::sin(2.0f * PI_F * 500.0f * i / TEST_SR));
+    float midGainMod = std::abs(spkMid.process(0.3f)) / 0.3f;
+
+    // Bass should get higher gain (higher impedance at resonance)
+    REQUIRE(bassGainMod > midGainMod);
+}
+
 TEST_CASE("Speaker coupling: reset clears state", "[speaker]") {
     SpeakerCoupling spk;
     spk.recalcFilters(TEST_SR);

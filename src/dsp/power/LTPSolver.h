@@ -10,7 +10,7 @@ namespace tt {
 struct LTPModel {
     float tailR_n, rPlateA_n, rPlateB_n, vBiasRef, vCathode, mu, rp;
     void init() {
-        tailR_n = PI_TAIL_R_N; rPlateA_n = PI_RPLATE_N; rPlateB_n = PI_RPLATE_N;
+        tailR_n = PI_TAIL_R_N; rPlateA_n = PI_RPLATE_A_N; rPlateB_n = PI_RPLATE_B_N;
         vBiasRef = PI_BIAS_REF_N; vCathode = PI_CATHODE_INIT_N;
         mu = PI_MU; rp = PI_RP_N;
     }

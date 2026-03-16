@@ -27,30 +27,23 @@ static LTPModel freshLTP() {
 
 // ── Zero input: near-symmetric ───────────────────────────────
 
-TEST_CASE("LTP: zero input produces near-symmetric outputs", "[ltp]") {
+TEST_CASE("LTP: zero input produces quiescent plate voltages", "[ltp]") {
     auto ltp = freshLTP();
-    
+
     // Run a few iterations to let cathode settle
     LTPOutput out;
     for (int i = 0; i < 100; ++i)
         out = solveLTP(0.0f, V_PI_NOMINAL_N, ltp);
-    
-    // Both outputs should be nearly equal (small difference from solver settling)
-    REQUIRE(out.piA == Approx(out.piB).margin(0.01f));
-}
 
-TEST_CASE("LTP: zero input gives equal plate voltages", "[ltp]") {
-    auto ltp = freshLTP();
-
-    LTPOutput out;
-    for (int i = 0; i < 100; ++i)
-        out = solveLTP(0.0f, V_PI_NOMINAL_N, ltp);
-
-    // With no input, both plates should be at the same DC operating point
-    // (raw plate voltages — AC coupling handled by pi_couplingHP in processBlock)
-    REQUIRE(out.piA == Approx(out.piB).margin(0.01f));
+    // Both plates should be within the supply range
     REQUIRE(out.piA > 0.0f);
     REQUIRE(out.piA < V_PI_NOMINAL_N);
+    REQUIRE(out.piB > 0.0f);
+    REQUIRE(out.piB < V_PI_NOMINAL_N);
+
+    // Plate B (82K load) has less voltage drop than A (100K) at equal current,
+    // so piB > piA at quiescence
+    REQUIRE(out.piB > out.piA);
 }
 
 // ── Phase inversion ──────────────────────────────────────────
@@ -84,8 +77,8 @@ TEST_CASE("LTP: inverted output for inverted input", "[ltp]") {
     LTPOutput outNeg = solveLTP(-0.001f, V_PI_NOMINAL_N, ltpNeg);
 
     // piA with positive input ≈ piB with negative input (approximately)
-    // Margin accounts for inherent asymmetry of the triode 3/2 power law
-    REQUIRE(outPos.piA == Approx(outNeg.piB).margin(0.04f));
+    // Margin accounts for triode 3/2 power law asymmetry + plate load asymmetry (100K vs 82K)
+    REQUIRE(outPos.piA == Approx(outNeg.piB).margin(0.07f));
 }
 
 // ── Cathode coupling (current steering) ──────────────────────
@@ -192,10 +185,28 @@ TEST_CASE("LTP: gain imbalance emerges at high drive", "[ltp]") {
 
 TEST_CASE("LTP model: init sets correct constants from spec", "[ltp]") {
     auto ltp = freshLTP();
-    
+
     REQUIRE(ltp.tailR_n == PI_TAIL_R_N);
-    REQUIRE(ltp.rPlateA_n == PI_RPLATE_N);
-    REQUIRE(ltp.rPlateB_n == PI_RPLATE_N);
+    REQUIRE(ltp.rPlateA_n == PI_RPLATE_A_N);
+    REQUIRE(ltp.rPlateB_n == PI_RPLATE_B_N);
+    REQUIRE(ltp.rPlateA_n > ltp.rPlateB_n);  // A=100K > B=82K
     REQUIRE(ltp.vBiasRef == PI_BIAS_REF_N);
     REQUIRE(ltp.vCathode == PI_CATHODE_INIT_N);
+}
+
+TEST_CASE("LTP: plate load asymmetry creates AC gain difference", "[ltp]") {
+    auto ltp = freshLTP();
+
+    // Settle at zero
+    LTPOutput outQ;
+    for (int i = 0; i < 100; ++i)
+        outQ = solveLTP(0.0f, V_PI_NOMINAL_N, ltp);
+
+    // Small positive signal — measure AC swing from quiescent
+    LTPOutput out = solveLTP(0.005f, V_PI_NOMINAL_N, ltp);
+    float swingA = std::abs(out.piA - outQ.piA);
+    float swingB = std::abs(out.piB - outQ.piB);
+
+    // Side A (100K plate load) should have larger AC swing than side B (82K)
+    REQUIRE(swingA > swingB);
 }

@@ -10,62 +10,77 @@ using namespace tt::test;
 using Catch::Approx;
 
 // ═══════════════════════════════════════════════════════════════
-// Spec §4.1 Option A — Triode waveshaper properties
+// Spec §4.1 — Triode waveshaper (Child-Langmuir circuit model)
+// Output is plate voltage: 0 to vSupply
 // ═══════════════════════════════════════════════════════════════
 
-TEST_CASE("Triode: output bounded by supply * HEADROOM_FACTOR", "[triode]") {
+TEST_CASE("Triode: output bounded within [0, vSupply]", "[triode]") {
     float supply = VS::V_PREAMP;  // 0.833
-    float ceiling = supply * HEADROOM_FACTOR;
     // Sweep grid voltage from large negative to large positive
     for (float vg = -0.05f; vg <= 0.05f; vg += 0.002f) {
-        float out = triodeWaveshaper(vg, VS::V_BIAS_12AX7, supply, StageGains::V1A_GAIN);
-        REQUIRE(out >= -ceiling - 1e-6f);
-        REQUIRE(out <= ceiling + 1e-6f);
+        float out = triodeWaveshaper(vg, VS::V_BIAS_12AX7, supply, PREAMP_RPLATE_N);
+        REQUIRE(out >= -1e-6f);
+        REQUIRE(out <= supply + 1e-6f);
     }
 }
 
-TEST_CASE("Triode: zero input near bias produces near-zero output", "[triode]") {
-    // At quiescent point: vGrid ≈ 0, drive * 0 + bias → tanh(bias) ≈ bias
-    float out = triodeWaveshaper(0.0f, VS::V_BIAS_12AX7, VS::V_PREAMP, StageGains::V1A_GAIN);
-    // bias = -0.005, drive = 70 → x = 0 * 70 + (-0.005) = -0.005
-    // tanh(-0.005) ≈ -0.005, * 0.833 ≈ -0.004
-    REQUIRE(std::abs(out) < 0.01f);
+TEST_CASE("Triode: zero input at bias produces quiescent plate voltage", "[triode]") {
+    // At quiescent point: vGrid=0, vgk = 0 + bias = -0.005
+    // triodeCurrentModel produces plate current, vPlate = vSupply - ip * rPlate
+    // Quiescent plate voltage is well above zero (tube is partially conducting)
+    float out = triodeWaveshaper(0.0f, VS::V_BIAS_12AX7, VS::V_PREAMP, PREAMP_RPLATE_N);
+    // Expect plate voltage around 0.3–0.6 of supply (typical idle point)
+    REQUIRE(out > 0.1f);
+    REQUIRE(out < VS::V_PREAMP);
 }
 
-TEST_CASE("Triode: asymmetric clipping — negative clips harder", "[triode]") {
+TEST_CASE("Triode: asymmetric clipping — positive grid clips harder (plate to floor)", "[triode]") {
     float supply = VS::V_PREAMP;
-    // Positive excursion
-    float outPos = triodeWaveshaper(0.01f, 0.0f, supply, StageGains::V1A_GAIN);
-    // Negative excursion of same magnitude
-    float outNeg = triodeWaveshaper(-0.01f, 0.0f, supply, StageGains::V1A_GAIN);
-    // Negative should be more compressed (harder clip / ASYM_FACTOR)
-    REQUIRE(std::abs(outNeg) < std::abs(outPos));
+    float bias = VS::V_BIAS_12AX7;  // -0.005 normalized
+    float quiescent = triodeWaveshaper(0.0f, bias, supply, PREAMP_RPLATE_N);
+    // Positive grid swing → more plate current → plate voltage drops
+    float outPos = triodeWaveshaper(0.005f, bias, supply, PREAMP_RPLATE_N);
+    // Negative grid swing → less plate current → plate voltage rises toward supply
+    float outNeg = triodeWaveshaper(-0.005f, bias, supply, PREAMP_RPLATE_N);
+    // Distance from quiescent
+    float dropPos = quiescent - outPos;   // plate drops (positive value)
+    float riseNeg = outNeg - quiescent;   // plate rises (positive value)
+    // With 3/2 power law, positive grid clips harder (hits plate floor)
+    REQUIRE(dropPos > 0.0f);
+    REQUIRE(riseNeg > 0.0f);
+    // Asymmetry: the drop should be larger than the rise for same swing magnitude
+    // (3/2 power law compresses more on the cutoff side)
+    REQUIRE(dropPos > riseNeg);
 }
 
-TEST_CASE("Triode: V1a guitar input produces spec output range", "[triode]") {
-    // Spec §2.5: V1a input ±0.00167, output ±0.05 to ±0.15
+TEST_CASE("Triode: V1a guitar input produces plate voltage within supply", "[triode]") {
     float guitar = VS::V_GUITAR;
-    float outPos = triodeWaveshaper(guitar, VS::V_BIAS_12AX7, VS::V_PREAMP, StageGains::V1A_GAIN);
-    float outNeg = triodeWaveshaper(-guitar, VS::V_BIAS_12AX7, VS::V_PREAMP, StageGains::V1A_GAIN);
-    float swing = std::max(std::abs(outPos), std::abs(outNeg));
-    // Should be in the ±0.01 to ±0.20 range (relaxed bounds for MVP waveshaper)
-    REQUIRE(swing > 0.001f);    // not silent
-    REQUIRE(swing < 0.25f);     // not clipping rail
+    float outPos = triodeWaveshaper(guitar, VS::V_BIAS_12AX7, VS::V_PREAMP, PREAMP_RPLATE_N);
+    float outNeg = triodeWaveshaper(-guitar, VS::V_BIAS_12AX7, VS::V_PREAMP, PREAMP_RPLATE_N);
+    // Both outputs should be valid plate voltages within [0, vSupply]
+    REQUIRE(outPos >= 0.0f);
+    REQUIRE(outPos <= VS::V_PREAMP);
+    REQUIRE(outNeg >= 0.0f);
+    REQUIRE(outNeg <= VS::V_PREAMP);
+    // They should differ (tube is amplifying)
+    REQUIRE(std::abs(outPos - outNeg) > 0.001f);
 }
 
-TEST_CASE("Triode: lower supply voltage reduces output swing", "[triode]") {
+TEST_CASE("Triode: lower supply reduces max plate voltage", "[triode]") {
     float input = VS::V_GUITAR;
-    float outFull = triodeWaveshaper(input, VS::V_BIAS_12AX7, VS::V_PREAMP, StageGains::V1A_GAIN);
+    float outFull = triodeWaveshaper(input, VS::V_BIAS_12AX7, VS::V_PREAMP, PREAMP_RPLATE_N);
     // 10% supply droop
-    float outDroop = triodeWaveshaper(input, VS::V_BIAS_12AX7, VS::V_PREAMP * 0.9f, StageGains::V1A_GAIN);
-    REQUIRE(std::abs(outDroop) < std::abs(outFull));
+    float outDroop = triodeWaveshaper(input, VS::V_BIAS_12AX7, VS::V_PREAMP * 0.9f, PREAMP_RPLATE_N);
+    // Lower supply means lower plate voltage ceiling
+    REQUIRE(outDroop < outFull);
 }
 
-TEST_CASE("Triode: monotonic — more input produces more output", "[triode]") {
-    float prev = 0.0f;
-    for (float vg = 0.0f; vg <= 0.01f; vg += 0.001f) {
-        float out = std::abs(triodeWaveshaper(vg, VS::V_BIAS_12AX7, VS::V_PREAMP, StageGains::V1A_GAIN));
-        REQUIRE(out >= prev - 1e-6f);
+TEST_CASE("Triode: monotonic — increasing grid voltage decreases plate voltage (inverting)", "[triode]") {
+    float prev = triodeWaveshaper(0.0f, VS::V_BIAS_12AX7, VS::V_PREAMP, PREAMP_RPLATE_N);
+    for (float vg = 0.001f; vg <= 0.01f; vg += 0.001f) {
+        float out = triodeWaveshaper(vg, VS::V_BIAS_12AX7, VS::V_PREAMP, PREAMP_RPLATE_N);
+        // Plate voltage should decrease as grid goes more positive (inverting amp)
+        REQUIRE(out <= prev + 1e-6f);
         prev = out;
     }
 }
