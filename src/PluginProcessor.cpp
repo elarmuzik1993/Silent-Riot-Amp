@@ -294,6 +294,9 @@ void TinyTerrorProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
         psu.reportPowerDirect(
             std::abs(ppA.plateCurrent) + std::abs(ppB.plateCurrent),
             ppA.screenCurrent + ppB.screenCurrent);
+
+        // Convert plate current to OT primary voltage
+        powerOut *= OT_CURRENT_SCALE;
         sag.update(powerOut);
 
         // ── Speaker coupling + OT ──
