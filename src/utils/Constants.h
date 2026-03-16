@@ -96,6 +96,7 @@ constexpr float GRID_CONDUCT_THRESH_N       = VS::v(0.5f);
 constexpr float GRID_CONDUCT_THRESH_EL84_N  = VS::v(0.0f);
 constexpr float GRID_R_TRIODE_N             = VS::R_300;
 constexpr float GRID_R_PENTODE_N            = VS::R_500;
+constexpr float GRID_SOURCE_R_MUSICAL_N      = VS::r(1000.0f);  // reduced source R for musical loading
 constexpr float GRID_CHARGE_RATE            = 0.01f;
 constexpr float GRID_VT_N                   = VS::v(0.026f);
 constexpr float GRID_IS                     = 1e-6f;
@@ -160,10 +161,6 @@ constexpr float OT_SAT_DC_FREQ      = 1.5f;    // integrator DC-block frequency 
 // ── Gain taper ──────────────────────────────────────────────
 constexpr float GAIN_TAPER_EXPONENT = 2.0f;
 
-// ── Output impedances ───────────────────────────────────────
-constexpr float Z_OUT_V1A_N         = VS::Z_OUT_V1A;
-constexpr float Z_OUT_V1B_N         = VS::Z_OUT_V1B;
-constexpr float Z_OUT_PI_N          = VS::Z_OUT_PI;
 
 // ── LUT waveshaper ──────────────────────────────────────────
 constexpr int TABLE_SIZE            = 2048;

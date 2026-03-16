@@ -35,10 +35,8 @@ LTPOutput solveLTP(float vInput_n, float vSupply_n, LTPModel& ltp) {
     vPlateA = std::clamp(vPlateA, ltp.vCathode, vSupply_n);
     vPlateB = std::clamp(vPlateB, ltp.vCathode, vSupply_n);
 
-    // Return raw plate voltages — DC blocking is handled by pi_couplingHP filters
-    // (the old 10%-per-sample dcPlateRef tracking was acting as an 18kHz HP,
-    // stripping out fundamentals instead of just removing DC)
-    return { vPlateA, vPlateB, ltp.vCathode, 0.0f };
+    // Raw plate voltages — DC blocking handled by pi_couplingHP filters in processBlock
+    return { vPlateA, vPlateB, ltp.vCathode };
 }
 
 } // namespace tt

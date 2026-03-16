@@ -128,7 +128,7 @@ TEST_CASE("LTP: plate voltages clamped within [cathode, supply]", "[ltp]") {
     auto ltp = freshLTP();
     float supply = V_PI_NOMINAL_N;
 
-    // Settle first so dcPlate tracks to quiescent point
+    // Settle cathode
     for (int i = 0; i < 100; ++i)
         solveLTP(0.0f, supply, ltp);
 
@@ -136,14 +136,10 @@ TEST_CASE("LTP: plate voltages clamped within [cathode, supply]", "[ltp]") {
     for (float vin = -0.2f; vin <= 0.2f; vin += 0.01f) {
         LTPOutput out = solveLTP(vin, supply, ltp);
 
-        // Reconstruct raw plate voltage from AC output + tracked DC reference
-        float rawPlateA = out.piA + out.dcPlate;
-        float rawPlateB = out.piB + out.dcPlate;
-
-        REQUIRE(rawPlateA >= out.vCathode - 0.001f);
-        REQUIRE(rawPlateA <= supply + 0.001f);
-        REQUIRE(rawPlateB >= out.vCathode - 0.001f);
-        REQUIRE(rawPlateB <= supply + 0.001f);
+        REQUIRE(out.piA >= out.vCathode - 0.001f);
+        REQUIRE(out.piA <= supply + 0.001f);
+        REQUIRE(out.piB >= out.vCathode - 0.001f);
+        REQUIRE(out.piB <= supply + 0.001f);
     }
 }
 

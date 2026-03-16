@@ -157,12 +157,12 @@ TEST_CASE("Grid factories: V1a has input impedance source R", "[grid][factory]")
 
 TEST_CASE("Grid factories: V1b source R = 1kΩ (reduced for musical loading)", "[grid][factory]") {
     auto model = makeV1bGrid();
-    REQUIRE(model.sourceResistance == VS::r(1000.0f));
+    REQUIRE(model.sourceResistance == GRID_SOURCE_R_MUSICAL_N);
 }
 
 TEST_CASE("Grid factories: PI source R = 1kΩ (reduced for musical loading)", "[grid][factory]") {
     auto model = makePIGrid();
-    REQUIRE(model.sourceResistance == VS::r(1000.0f));
+    REQUIRE(model.sourceResistance == GRID_SOURCE_R_MUSICAL_N);
 }
 
 TEST_CASE("Grid factories: EL84 has different threshold", "[grid][factory]") {
@@ -175,7 +175,7 @@ TEST_CASE("Grid factories: EL84 has different threshold", "[grid][factory]") {
 
 TEST_CASE("Grid factories: EL84 source R = 1kΩ (reduced for musical loading)", "[grid][factory]") {
     auto model = makeEL84Grid();
-    REQUIRE(model.sourceResistance == VS::r(1000.0f));
+    REQUIRE(model.sourceResistance == GRID_SOURCE_R_MUSICAL_N);
 }
 
 // ── recalcGridChargeDecay ────────────────────────────────────
