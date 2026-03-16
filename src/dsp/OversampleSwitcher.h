@@ -23,6 +23,9 @@ struct OversampleSwitcher {
     int activeFactor() const;
     void requestModeChange(int newMode);
     bool isTransitioning() const { return state != OversampleTransition::Idle; }
+    bool readyToSwitch() const { return state == OversampleTransition::Reconfiguring; }
+    void commitSwitch();
+    void applyTransitionFade(juce::AudioBuffer<float>& buffer);
 };
 
 } // namespace tt

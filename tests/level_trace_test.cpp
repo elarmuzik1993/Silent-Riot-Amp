@@ -78,6 +78,7 @@ static LevelTrace traceChain(float digitalPeak, float gain, float volume,
         x = fb.inputHP.process(x);
         x = applyGridConduction(x, v1aGrid);
         x = triodeWaveshaper(x, VS::V_BIAS_12AX7, vPreamp, PREAMP_RPLATE_N);
+        x = fb.v1a_cathodeBypass.process(x);
         x = fb.v1a_couplingHP.process(x);
 
         if (i > settleEnd) peak.v1aOut = std::max(peak.v1aOut, std::abs(x));
@@ -90,6 +91,7 @@ static LevelTrace traceChain(float digitalPeak, float gain, float volume,
         // V1b
         x = applyGridConduction(x, v1bGrid);
         x = triodeWaveshaper(x, VS::V_BIAS_12AX7, vPreamp, PREAMP_RPLATE_N);
+        x = fb.v1b_cathodeBypass.process(x);
         x = fb.v1b_couplingHP.process(x);
 
         if (i > settleEnd) peak.v1bOut = std::max(peak.v1bOut, std::abs(x));
@@ -149,8 +151,8 @@ static LevelTrace traceChain(float digitalPeak, float gain, float volume,
         cabOut = fb.cab_notch.process(cabOut);
         if (i > settleEnd) peak.cabOut = std::max(peak.cabOut, std::abs(cabOut));
 
-        // Output
-        float finalOut = cabOut * 1.0f;
+        // Output (comp=1.5 matches PluginProcessor.h outputGainCompensation)
+        float finalOut = cabOut * 1.5f;
         finalOut = std::tanh(finalOut);
         if (i > settleEnd) peak.finalOut = std::max(peak.finalOut, std::abs(finalOut));
     }
@@ -217,4 +219,47 @@ TEST_CASE("Level trace: clean tone", "[levels]") {
     printf("  Final (1.0):  %.4f\n", t.finalOut);
 
     REQUIRE(t.finalOut > 0.0f);
+}
+
+TEST_CASE("Level trace: hot pickups max gain", "[levels]") {
+    auto t = traceChain(0.30f, 1.0f, 1.0f);
+
+    printf("\n=== Level Trace: digital=0.30, gain=1.0, vol=1.0 (hot pickups) ===\n");
+    printf("  Cab out:      %.4f\n", t.cabOut);
+    printf("  Final (1.0):  %.4f\n", t.finalOut);
+
+    REQUIRE(t.finalOut > 0.0f);
+}
+
+TEST_CASE("Gain compensation sweep", "[levels]") {
+    // Test compensation at different settings to find the sweet spot
+    struct Scenario { float digital; float gain; float vol; const char* name; };
+    Scenario scenarios[] = {
+        { 0.15f, 1.0f, 1.0f, "typical, max" },
+        { 0.30f, 1.0f, 1.0f, "hot, max" },
+        { 0.15f, 0.7f, 0.7f, "typical, crunch" },
+        { 0.15f, 0.5f, 0.5f, "typical, moderate" },
+        { 0.15f, 0.2f, 0.3f, "typical, clean" },
+    };
+
+    float compValues[] = { 1.5f, 2.0f, 2.5f };
+    for (float comp : compValues) {
+        printf("\n=== Compensation sweep (comp=%.1f) ===\n", comp);
+        for (auto& s : scenarios) {
+            auto t = traceChain(s.digital, s.gain, s.vol);
+            float driven = t.cabOut * comp;
+            float out = std::tanh(driven);
+            printf("  %-20s cabOut=%.4f  driven=%.3f  tanh=%.3f  dBFS=%.1f\n",
+                   s.name, t.cabOut, driven, out, 20.0f * std::log10(out + 1e-10f));
+        }
+    }
+
+    // Verify with chosen comp=1.5: max hits tanh nonlinear zone, clean stays linear
+    float comp = 1.5f;
+    auto tMax = traceChain(0.15f, 1.0f, 1.0f);
+    REQUIRE(tMax.cabOut * comp > 1.0f);
+
+    auto tClean = traceChain(0.15f, 0.2f, 0.3f);
+    float cleanDriven = tClean.cabOut * comp;
+    REQUIRE(cleanDriven < 0.3f);
 }

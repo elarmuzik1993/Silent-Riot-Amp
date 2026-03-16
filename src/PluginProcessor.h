@@ -100,6 +100,9 @@ private:
     tt::CabinetSim          cabSim;
     tt::OversampleSwitcher  oversampleSwitcher;
 
+    // Triode plate voltage cache (inter-sample)
+    tt::TriodeState v1aTriode, v1bTriode;
+
     // Grid conduction per stage
     tt::GridConductionModel v1aGrid, v1bGrid, piGrid, el84GridA, el84GridB;
 
@@ -108,7 +111,8 @@ private:
 
     // State
     float el84BaseBias = tt::PENTODE_BIAS_15W_N;
-    float outputGainCompensation = 1.0f;   // scales cab output into tanh soft-clip range
+    float lastToneCoeffVal = -1.0f;            // tone coeff update threshold tracker
+    float outputGainCompensation = 1.5f;   // scales cab output into tanh soft-clip range
     bool  psuFrozen    = false;
     double baseSampleRate = 44100.0;
     int   cachedIRIndex = 0;              // last IR index seen by audio thread

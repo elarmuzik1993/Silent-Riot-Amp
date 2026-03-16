@@ -54,7 +54,7 @@ TEST_CASE("Audio taper: monotonically increasing", "[chain]") {
 // ── V1a stage operating level ────────────────────────────────
 
 TEST_CASE("V1a: guitar input produces plate voltage within supply", "[chain][v1a]") {
-    // Child-Langmuir model: output is plate voltage [0, vSupply]
+    // Koren model: output is plate voltage [0, vSupply]
     float input = VS::V_GUITAR;
     float supply = VS::V_PREAMP;
 
@@ -146,16 +146,16 @@ TEST_CASE("Power amp: zero input produces near-zero output", "[chain][power]") {
 TEST_CASE("Sag modifies effective bias correctly", "[chain][sag]") {
     SagEnvelope sag;
     sag.recalcCoeffs(TEST_SR);
-    
-    // No load: bias should be base bias
+
+    // At quiescent: bias should be base bias (sag offset ≈ 0)
     float baseBias = PENTODE_BIAS_15W_N;
     float effectiveBias = baseBias + sag.biasOffset();
-    REQUIRE(effectiveBias == Approx(baseBias));
-    
-    // Under load: bias should shift more negative
+    REQUIRE(effectiveBias == Approx(baseBias).margin(1e-6f));
+
+    // Under heavy drive: total plate current exceeds quiescent → bias shifts colder
     for (int i = 0; i < 5000; ++i)
-        sag.update(0.5f);
-    
+        sag.update(130.0f);  // 2×65mA drive
+
     effectiveBias = baseBias + sag.biasOffset();
     REQUIRE(effectiveBias < baseBias);  // more negative = colder
 }

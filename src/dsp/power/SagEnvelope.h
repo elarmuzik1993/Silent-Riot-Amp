@@ -1,5 +1,10 @@
 #pragma once
 // Cathode Bias Sag (Spec §3.8)
+//
+// Models the shared cathode resistor/capacitor on the EL84 pair.
+// Under drive, total cathode current rises → cathode voltage rises →
+// Vgk becomes more negative → bias shifts colder → less gain.
+// When signal drops, cap discharges → bias recovers → "bloom."
 #include "../../utils/Constants.h"
 #include <cmath>
 #include <algorithm>
@@ -7,7 +12,7 @@
 namespace tt {
 
 struct SagEnvelope {
-    float envelope     = 0.0f;
+    float envelope     = SAG_QUIESCENT_I_N;  // init at idle cathode current
     float attackDecay  = 0.999f;
     float releaseDecay = 0.999f;
 
@@ -16,16 +21,22 @@ struct SagEnvelope {
         releaseDecay = std::exp(-1.0f / (SAG_RELEASE_MS * 0.001f * effectiveSR));
     }
 
-    void update(float powerOut) {
-        float level = std::abs(powerOut);
+    // Feed with TOTAL plate current: |ipA| + |ipB| (both tubes through shared cathode R)
+    void update(float totalPlateCurrent) {
+        float level = std::abs(totalPlateCurrent);
         float d = (level > envelope) ? attackDecay : releaseDecay;
         envelope = level + (envelope - level) * d;
         if (envelope < 1e-10f) envelope = 0.0f;
     }
 
-    // Returns NEGATIVE bias offset (shifts bias colder under load)
+    // Bias offset from cathode voltage change: ΔVk = (Itotal - Iquiescent) × R_cathode
+    // Positive excess → cathode rises → Vgk more negative → NEGATIVE offset
+    // At idle (envelope ≈ quiescent): offset ≈ 0
+    // Under drive (envelope > quiescent): offset < 0 (colder)
     float biasOffset() const {
-        return -envelope * SAG_DEPTH;
+        float excessI = envelope - SAG_QUIESCENT_I_N;
+        float shift = -excessI * SAG_R_CATHODE_N;
+        return std::clamp(shift, -0.02f, 0.005f);  // safety: ±6V cold, +1.5V warm
     }
 };
 

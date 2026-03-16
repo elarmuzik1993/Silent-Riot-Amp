@@ -20,7 +20,7 @@ All processing uses a **normalized voltage domain**: 300V B+ = 1.0. See `Voltage
 ```
 Input → Scale to guitar domain → HP 7Hz → Grid cond V1a → Triode V1a → Clamp
 → Cathode bypass LP → HP 72Hz → Miller LP V1a → Report PSU → Gain pot A
-→ Grid cond V1b → Triode V1b → Clamp → Cathode bypass LP → HP 80Hz
+→ Grid cond V1b → Triode V1b → Clamp → Cathode bypass LP → HP 7Hz
 → Miller LP V1b → Report PSU → Gain pot B → LP 5kHz → Grid cond PI
 → LTP solver (100K/82K asymmetric plate loads) → HP×2 50Hz → Report PSU
 → Tone (Vox cut) → Master volume → Grid cond EL84×2
@@ -76,7 +76,7 @@ cmake -B build -DTT_BUILD_TESTS=ON # Build with tests
 - Parameter smoothing per-sample at oversampled rate (target/tick model in ParamSmoother)
 - CMake target is `TinyTerror`; product name is `Silent Riot`
 - Tests use Catch2 v3 — one test file per DSP module, two test targets:
-  - `TinyTerrorTests` — 154 pure C++ tests (no JUCE dependency)
+  - `TinyTerrorTests` — 160 pure C++ tests (no JUCE dependency)
   - `TinyTerrorJuceTests` — 13 JUCE-dependent tests (cabinet IR, convolution, user IR loading)
 
 ## Cabinet IR Loader Architecture
@@ -118,6 +118,14 @@ cmake -B build -DTT_BUILD_TESTS=ON # Build with tests
 
 **UI state persistence**: Panel open states, theme, meter ballistics, knob mode, and UI scale stored as properties on `apvts.state` ValueTree — automatically saved/restored with plugin state.
 
+## DSP Implementation Details
+
+- **Triode model**: Koren (Option B) with iterative load-line solve. `TriodeState` caches converged plate voltage between samples → 4 iterations sufficient (was 8). Stateless overload available for tests.
+- **LTP solver**: Also caches plate voltages A/B between samples (vCathode was already cached). 4 iterations (was 8). Total Koren evals per sample: 16 (was 32).
+- **Oversample switching**: Crossfade state machine (FadingOut → Reconfiguring → FadingIn), 128-sample fade at base SR. PSU frozen during transition to prevent voltage recovery pop.
+- **Sag model**: Cathode resistor physics — `biasOffset = -(Itotal - Iquiescent) × R_cathode`. Fed with raw `|ipA| + |ipB|` before OT scaling.
+- **Tone coefficient threshold**: Skip `std::pow` + filter recalc when smoothed tone value hasn't changed by >0.001 (~99% of samples).
+
 ## Important Pitfalls (from spec)
 
 - Bias values are NEGATIVE — use `+` not `-` when applying (e.g. `vGrid + vBias`)
@@ -130,7 +138,7 @@ cmake -B build -DTT_BUILD_TESTS=ON # Build with tests
 - Speaker coupling uses `makeBandPass` (NOT `makePeakEQ` with 0dB gain — that's a flat passthrough)
 - `softConductionCurve` biasFactor: `PENTODE_BIAS_15W_N / vBias_n` (NOT the inverse — 7W must get wider overlap)
 - PSU droop tuned for transparent power section: low droop depths (DROOP_POWER=0.06, DROOP_SCREEN=0.12), slow screen tau (60ms), halved source impedance (SOURCE_IMPEDANCE_N=0.04), soft tanh EL84 IP clamp, capped grid coupling charge — modern metal voicing, not vintage sag
-- `outputGainCompensation` hardcoded to 1.0 — needs tuning
+- `outputGainCompensation` calibrated to 1.5 — drives max gain to tanh(1.28)≈0.86 (-1.3 dBFS), clean stays linear
 - IR loading must NEVER happen on the audio thread — always use `AsyncUpdater` to defer to message thread
 - `bufferTransfer.set()` (blocking SpinLock) is message-thread only; `bufferTransfer.get()` (try-lock) is audio-thread only
 - ToggleSwitch uses `onStateChange` internally for thumb animation — external callbacks must use `onClick` (not `onStateChange`) to avoid breaking the animation timer

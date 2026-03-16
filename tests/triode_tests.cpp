@@ -10,7 +10,7 @@ using namespace tt::test;
 using Catch::Approx;
 
 // ═══════════════════════════════════════════════════════════════
-// Spec §4.1 — Triode waveshaper (Child-Langmuir circuit model)
+// Spec §4.1 — Triode waveshaper (Koren model, iterative load-line solve)
 // Output is plate voltage: 0 to vSupply
 // ═══════════════════════════════════════════════════════════════
 
@@ -26,10 +26,10 @@ TEST_CASE("Triode: output bounded within [0, vSupply]", "[triode]") {
 
 TEST_CASE("Triode: zero input at bias produces quiescent plate voltage", "[triode]") {
     // At quiescent point: vGrid=0, vgk = 0 + bias = -0.005
-    // triodeCurrentModel produces plate current, vPlate = vSupply - ip * rPlate
+    // Koren model produces plate current via iterative solve
     // Quiescent plate voltage is well above zero (tube is partially conducting)
     float out = triodeWaveshaper(0.0f, VS::V_BIAS_12AX7, VS::V_PREAMP, PREAMP_RPLATE_N);
-    // Expect plate voltage around 0.3–0.6 of supply (typical idle point)
+    // Expect plate voltage around 0.5–0.8 of supply (typical idle point for Koren ECC83)
     REQUIRE(out > 0.1f);
     REQUIRE(out < VS::V_PREAMP);
 }
@@ -45,11 +45,9 @@ TEST_CASE("Triode: asymmetric clipping — positive grid clips harder (plate to 
     // Distance from quiescent
     float dropPos = quiescent - outPos;   // plate drops (positive value)
     float riseNeg = outNeg - quiescent;   // plate rises (positive value)
-    // With 3/2 power law, positive grid clips harder (hits plate floor)
+    // With Koren model, positive grid clips harder (more current into load)
     REQUIRE(dropPos > 0.0f);
     REQUIRE(riseNeg > 0.0f);
-    // Asymmetry: the drop should be larger than the rise for same swing magnitude
-    // (3/2 power law compresses more on the cutoff side)
     REQUIRE(dropPos > riseNeg);
 }
 
@@ -86,34 +84,85 @@ TEST_CASE("Triode: monotonic — increasing grid voltage decreases plate voltage
 }
 
 // ═══════════════════════════════════════════════════════════════
-// Spec §3.5 — triodeCurrentModel calibration
-// "At Vgk = -1.5V, Vp = 250V → Ip ≈ 1.2mA"
+// Spec §4.1 — Koren triode current model
 // ═══════════════════════════════════════════════════════════════
 
-TEST_CASE("TriodeCurrent: deep cutoff produces near-zero", "[triode_current]") {
-    float ip = triodeCurrentModel(VS::v(-5.0f), PI_MU, PI_RP_N);
+TEST_CASE("Koren: deep cutoff produces near-zero current", "[koren]") {
+    auto p = makeECC83Params();
+    float ip = korenTriode(VS::v(-5.0f), VS::V_PREAMP, p);
     REQUIRE(ip < 0.01f);
 }
 
-TEST_CASE("TriodeCurrent: positive Vgk produces positive current", "[triode_current]") {
-    float ip = triodeCurrentModel(VS::v(0.5f), PI_MU, PI_RP_N);
+TEST_CASE("Koren: positive Vgk produces positive current", "[koren]") {
+    auto p = makeECC83Params();
+    float ip = korenTriode(VS::v(0.5f), VS::V_PREAMP, p);
     REQUIRE(ip > 0.0f);
 }
 
-TEST_CASE("TriodeCurrent: monotonically increasing with Vgk", "[triode_current]") {
+TEST_CASE("Koren: monotonically increasing with Vgk", "[koren]") {
+    auto p = makeECC83Params();
     float prev = 0.0f;
     for (float vgk = -0.02f; vgk <= 0.02f; vgk += 0.002f) {
-        float ip = triodeCurrentModel(vgk, PI_MU, PI_RP_N);
+        float ip = korenTriode(vgk, VS::V_PREAMP, p);
         REQUIRE(ip >= prev - 1e-8f);
         prev = ip;
     }
 }
 
-TEST_CASE("TriodeCurrent: never returns negative", "[triode_current]") {
+TEST_CASE("Koren: never returns negative", "[koren]") {
+    auto p = makeECC83Params();
     for (float vgk = -0.1f; vgk <= 0.1f; vgk += 0.005f) {
-        float ip = triodeCurrentModel(vgk, PI_MU, PI_RP_N);
+        float ip = korenTriode(vgk, VS::V_PREAMP, p);
         REQUIRE(ip >= 0.0f);
     }
+}
+
+TEST_CASE("Koren: plate voltage dependence — higher plate gives more current", "[koren]") {
+    auto p = makeECC83Params();
+    float vgk = VS::v(-1.5f);  // typical operating point
+    float ipLow  = korenTriode(vgk, VS::v(100.0f), p);
+    float ipHigh = korenTriode(vgk, VS::v(250.0f), p);
+    // Koren model: higher plate voltage → more current (unlike simple Child-Langmuir)
+    REQUIRE(ipHigh > ipLow);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Spec §4.1 VERIFY: normalized Koren matches real-domain Koren
+// "Feed known Vg=-1.5V, Vp=200V through both real Koren and
+//  normalized Koren. Confirm Ip matches to 3+ sig figs."
+// ═══════════════════════════════════════════════════════════════
+
+TEST_CASE("Koren: normalized matches real domain (Vg=-1.5V, Vp=200V)", "[koren]") {
+    // Real-domain Koren equation for ECC83/12AX7
+    float Vg = -1.5f, Vp = 200.0f;
+    float mu = 100.0f, ex = 1.4f, Kg = 1060.0f, Kp = 600.0f, Kvb = 300.0f;
+
+    float E1_real = (Vp / Kp) * std::log(1.0f + std::exp(
+        Kp * (1.0f / mu + Vg / std::sqrt(Kvb + Vp * Vp))));
+    float Ip_real = std::pow(std::max(E1_real, 0.0f), ex) / Kg;  // amps
+
+    // Normalized-domain Koren
+    auto p = makeECC83Params();
+    float ip_n = korenTriode(VS::v(Vg), VS::v(Vp), p);
+    float Ip_from_norm = ip_n * VS::N_TO_I;  // convert back to amps
+
+    // Must match to 3+ significant figures (0.1% tolerance)
+    REQUIRE(Ip_from_norm == Approx(Ip_real).epsilon(0.001f));
+}
+
+TEST_CASE("Koren: normalized matches real domain (Vg=-1.0V, Vp=250V)", "[koren]") {
+    float Vg = -1.0f, Vp = 250.0f;
+    float mu = 100.0f, ex = 1.4f, Kg = 1060.0f, Kp = 600.0f, Kvb = 300.0f;
+
+    float E1_real = (Vp / Kp) * std::log(1.0f + std::exp(
+        Kp * (1.0f / mu + Vg / std::sqrt(Kvb + Vp * Vp))));
+    float Ip_real = std::pow(std::max(E1_real, 0.0f), ex) / Kg;
+
+    auto p = makeECC83Params();
+    float ip_n = korenTriode(VS::v(Vg), VS::v(Vp), p);
+    float Ip_from_norm = ip_n * VS::N_TO_I;
+
+    REQUIRE(Ip_from_norm == Approx(Ip_real).epsilon(0.001f));
 }
 
 // ═══════════════════════════════════════════════════════════════
