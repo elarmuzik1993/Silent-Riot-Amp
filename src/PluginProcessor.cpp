@@ -168,8 +168,8 @@ void TinyTerrorProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     bool  powerOn   = apvts.getRawParameterValue(Params::IDs::POWER)->load() > 0.5f;
     int   irIndex   = static_cast<int>(apvts.getRawParameterValue(Params::IDs::IR_INDEX)->load());
 
-    // Master power bypass — pass audio through unprocessed
-    if (!powerOn) return;
+    // Master power off — silence output
+    if (!powerOn) { buffer.clear(); return; }
 
     el84BaseBias = is7W ? PENTODE_BIAS_7W_N : PENTODE_BIAS_15W_N;
     cabSim.setEnabled(cabOn);
@@ -204,12 +204,11 @@ void TinyTerrorProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
         }
     }
 
-    // ── Oversample mode switching ──
+    // ── Oversample mode switching (crossfade state machine) ──
     {
-        int osParam = static_cast<int>(apvts.getRawParameterValue(Params::IDs::OVERSAMPLE)->load());
-        if (osParam != oversampleSwitcher.currentMode) {
-            oversampleSwitcher.currentMode = osParam;
-            oversampleSwitcher.oversamplers[static_cast<size_t>(osParam)]->reset();
+        // Complete pending switch at block boundary (after fade-out finished last block)
+        if (oversampleSwitcher.readyToSwitch()) {
+            oversampleSwitcher.commitSwitch();
 
             int osFactor = oversampleSwitcher.activeFactor();
             float effectiveSR = static_cast<float>(baseSampleRate) * osFactor;
@@ -234,6 +233,16 @@ void TinyTerrorProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
 
             setLatencySamples(static_cast<int>(oversampleSwitcher.active()->getLatencyInSamples()));
         }
+
+        // Request mode change → starts fade-out (actual switch deferred to next block)
+        int osParam = static_cast<int>(apvts.getRawParameterValue(Params::IDs::OVERSAMPLE)->load());
+        if (osParam != oversampleSwitcher.currentMode && !oversampleSwitcher.isTransitioning()) {
+            oversampleSwitcher.requestModeChange(osParam);
+        }
+
+        // Freeze PSU during transition — prevents supply recovering to nominal
+        // during the silent gap, which would cause a voltage pop on fade-in
+        psuFrozen = oversampleSwitcher.isTransitioning();
     }
 
     // Oversampled processing (Spec §2.5 processBlock)
@@ -247,10 +256,14 @@ void TinyTerrorProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
         float volVal  = volumeSmoother.tick();
         float toneVal = toneSmoother.tick();
 
-        // Update modulated filters from smoothed tone
-        constexpr float toneFreqRatio = TONE_MAX_FREQ / TONE_MIN_FREQ;
-        float toneFreq = TONE_MIN_FREQ * std::pow(toneFreqRatio, toneVal);
-        filterBank.updateModulated(toneFreq, GAIN_LOADING_LP_FREQ);
+        // Update tone filter only when value has changed enough to matter
+        // (saves std::pow + coefficient recalc on ~99% of samples)
+        if (std::abs(toneVal - lastToneCoeffVal) > 0.001f) {
+            constexpr float toneFreqRatio = TONE_MAX_FREQ / TONE_MIN_FREQ;
+            float toneFreq = TONE_MIN_FREQ * std::pow(toneFreqRatio, toneVal);
+            filterBank.toneCutFilter.setFreqFast(toneFreq, filterBank.effectiveSR);
+            lastToneCoeffVal = toneVal;
+        }
         if (!psuFrozen) psu.update();
         psu.resetCurrentDraw();
 
@@ -267,7 +280,8 @@ void TinyTerrorProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
         x = filterBank.inputHP.process(x);
         x = applyGridConduction(x, v1aGrid);
         float v1a_in = x;
-        x = triodeWaveshaper(x, VS::V_BIAS_12AX7, vPreamp, PREAMP_RPLATE_N);
+        x = triodeWaveshaper(x, VS::V_BIAS_12AX7, vPreamp, PREAMP_RPLATE_N, v1aTriode);
+        x = filterBank.v1a_cathodeBypass.process(x);
         x = filterBank.v1a_couplingHP.process(x);
         float v1aGainEst = (std::abs(v1a_in) > 1e-8f) ? std::abs(x) / std::abs(v1a_in) : StageGains::V1A_GAIN;
         x = v1a_miller.process(x, v1aGainEst, filterBank.effectiveSR);
@@ -280,7 +294,8 @@ void TinyTerrorProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
         // ── Stage 2: V1b ──
         x = applyGridConduction(x, v1bGrid);
         float v1b_in = x;
-        x = triodeWaveshaper(x, VS::V_BIAS_12AX7, vPreamp, PREAMP_RPLATE_N);
+        x = triodeWaveshaper(x, VS::V_BIAS_12AX7, vPreamp, PREAMP_RPLATE_N, v1bTriode);
+        x = filterBank.v1b_cathodeBypass.process(x);
         x = filterBank.v1b_couplingHP.process(x);
         float gainPotR = (1.0f - gainA) * GAIN_POT_R_REAL;
         v1b_miller.rSource_real = std::min(V1B_RSOURCE_BASE_REAL + gainPotR, V1B_RSOURCE_MAX_REAL);
@@ -321,12 +336,11 @@ void TinyTerrorProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
         PentodeOutput ppB = pentodeWaveshaper(piB, effectiveBias, vPlate, vScreen);
         float powerOut = ppA.plateCurrent * condA - ppB.plateCurrent * condB;
 
-        psu.reportPowerDirect(
-            std::abs(ppA.plateCurrent) + std::abs(ppB.plateCurrent),
-            ppA.screenCurrent + ppB.screenCurrent);
+        float totalPlate = std::abs(ppA.plateCurrent) + std::abs(ppB.plateCurrent);
+        psu.reportPowerDirect(totalPlate, ppA.screenCurrent + ppB.screenCurrent);
 
-        // Sag tracks raw plate current before OT scaling
-        sag.update(powerOut);
+        // Sag tracks total cathode current (both tubes through shared R)
+        sag.update(totalPlate);
 
         // Convert plate current to OT primary voltage
         powerOut *= OT_CURRENT_SCALE;
@@ -359,6 +373,9 @@ void TinyTerrorProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
 
     juce::dsp::AudioBlock<float> outputBlock(buffer);
     oversampler->processSamplesDown(outputBlock);
+
+    // ── Crossfade envelope for oversample transitions ──
+    oversampleSwitcher.applyTransitionFade(buffer);
 
     // ── IR Convolution path (runs at base SR, after downsample) ──
     if (irMode)
