@@ -2,26 +2,26 @@
 
 namespace tt {
 
+static const KorenPentodeParams el84 = makeEL84Params();
+
+// Koren pentode cathode current — screen grid as virtual anode
+// Mirrors korenTriode() from TriodeWaveshaper.cpp but with Vg2 replacing Vp
+static float korenPentodeCurrent(float vg1_n, float vScreen_n, const KorenPentodeParams& p) {
+    float vg2Safe = std::max(vScreen_n, 1e-6f);
+    float arg = p.kp * (1.0f / p.mu + vg1_n
+                        / std::sqrt(p.kvb_n + vg2Safe * vg2Safe));
+    // Numerically stable softplus: log(1 + exp(x)) ≈ x for x >> 1
+    float logTerm = arg > 20.0f ? arg : std::log(1.0f + std::exp(arg));
+    float e1 = (vg2Safe / p.kp) * logTerm;
+    return std::pow(std::max(e1, 0.0f), p.ex) / p.kg1_n;
+}
+
 PentodeOutput pentodeWaveshaper(float vGrid_n, float vBias_n, float vPlate_n, float vScreen_n) {
     // Spec §4.2: vg1 = vGrid + vBias (bias is negative, so this subtracts correctly)
     float vg1 = vGrid_n + vBias_n;
 
-    // Screen contribution to cathode current (mu_g2 ≈ 12 for EL84)
-    float screenInfluence = vScreen_n / MU_SCREEN;
-
-    // Effective drive: grid voltage boosted by screen contribution
-    float vEffective = vg1 + screenInfluence;
-
-    // Screen voltage scales the gain coefficient
-    float screenGainFactor = vScreen_n / V_SCREEN_NOMINAL_N;
-    float driveScaled = vEffective * screenGainFactor;
-
-    // Core nonlinearity — power law with cutoff
-    float ip;
-    if (driveScaled > 0.0f)
-        ip = std::pow(driveScaled, EL84_EXPONENT) / EL84_KG;
-    else
-        ip = 0.0f;
+    // Core nonlinearity — Koren pentode with screen as virtual anode
+    float ip = korenPentodeCurrent(vg1, vScreen_n, el84);
 
     // Soft-clamp to EL84 max plate current (tanh knee avoids harsh flat-top)
     ip = EL84_IP_MAX_N * std::tanh(ip / EL84_IP_MAX_N);

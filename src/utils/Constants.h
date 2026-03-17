@@ -64,9 +64,6 @@ constexpr float TRIODE_BIAS_N       = VS::v(-1.5f);
 // ── Pentode model (EL84) ───────────────────────────────────
 constexpr float PENTODE_BIAS_15W_N  = VS::v(-9.6f);    // -0.032 normalized
 constexpr float PENTODE_BIAS_7W_N   = VS::v(-7.0f);    // -0.023 normalized
-constexpr float MU_SCREEN           = 12.0f;
-constexpr float EL84_EXPONENT       = 1.35f;
-constexpr float EL84_KG             = 0.000324f;
 constexpr float V_PLATE_KNEE_N      = VS::v(40.0f);
 constexpr float SCREEN_CURRENT_RATIO = 0.25f;
 constexpr float SCREEN_REDIST_FACTOR = 0.15f;
