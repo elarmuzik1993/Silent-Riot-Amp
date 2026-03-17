@@ -171,3 +171,45 @@ TEST_CASE("Conduction curve: 7W has wider overlap than 15W", "[pentode][conducti
     // 7W (wider overlap, more Class A) retains more conduction below cutoff
     REQUIRE(cond7W > cond15W);
 }
+
+// ── Koren softplus smoothness ───────────────────────────────
+
+TEST_CASE("Pentode: Koren softplus provides smooth cutoff near bias point", "[pentode]") {
+    // Sweep grid voltage through the cutoff region and verify the numerical
+    // derivative (finite difference) changes gradually — no discontinuous jump.
+    float vPlate = V_POWER_NOMINAL_N;
+    float vScreen = V_SCREEN_NOMINAL_N;
+
+    // Sweep around the bias point where cutoff occurs
+    float prevIp = 0.0f;
+    float prevSlope = 0.0f;
+    bool first = true;
+    bool secondSlope = true;
+    constexpr float step = 0.001f;  // fine step for derivative check
+
+    for (float vg = -0.06f; vg <= 0.02f; vg += step) {
+        PentodeOutput out = pentodeWaveshaper(vg, PENTODE_BIAS_15W_N, vPlate, vScreen);
+        float ip = out.plateCurrent;
+
+        if (first) {
+            prevIp = ip;
+            first = false;
+            continue;
+        }
+
+        float slope = (ip - prevIp) / step;
+
+        if (secondSlope) {
+            prevSlope = slope;
+            secondSlope = false;
+        } else {
+            // Second derivative (slope change) should be bounded — no hard kink
+            float slopeChange = std::abs(slope - prevSlope);
+            // Allow generous margin but catch hard discontinuities
+            REQUIRE(slopeChange < 500.0f);
+            prevSlope = slope;
+        }
+
+        prevIp = ip;
+    }
+}
