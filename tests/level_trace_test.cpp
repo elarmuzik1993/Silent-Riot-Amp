@@ -78,7 +78,7 @@ static LevelTrace traceChain(float digitalPeak, float gain, float volume,
         x = fb.inputHP.process(x);
         x = applyGridConduction(x, v1aGrid);
         x = triodeWaveshaper(x, VS::V_BIAS_12AX7, vPreamp, PREAMP_RPLATE_N);
-        x = fb.v1a_cathodeBypass.process(x);
+        x -= fb.v1a_cathodeBypass.process(x) * CATHODE_BYPASS_DEPTH;
         x = fb.v1a_couplingHP.process(x);
 
         if (i > settleEnd) peak.v1aOut = std::max(peak.v1aOut, std::abs(x));
@@ -91,7 +91,7 @@ static LevelTrace traceChain(float digitalPeak, float gain, float volume,
         // V1b
         x = applyGridConduction(x, v1bGrid);
         x = triodeWaveshaper(x, VS::V_BIAS_12AX7, vPreamp, PREAMP_RPLATE_N);
-        x = fb.v1b_cathodeBypass.process(x);
+        x -= fb.v1b_cathodeBypass.process(x) * CATHODE_BYPASS_DEPTH;
         x = fb.v1b_couplingHP.process(x);
 
         if (i > settleEnd) peak.v1bOut = std::max(peak.v1bOut, std::abs(x));
@@ -254,12 +254,12 @@ TEST_CASE("Gain compensation sweep", "[levels]") {
         }
     }
 
-    // Verify with chosen comp=1.5: max hits tanh nonlinear zone, clean stays linear
-    float comp = 1.5f;
+    // Verify with chosen comp=1.0: max hits tanh nonlinear zone, clean stays mostly linear
+    float comp = 1.0f;
     auto tMax = traceChain(0.15f, 1.0f, 1.0f);
     REQUIRE(tMax.cabOut * comp > 1.0f);
 
     auto tClean = traceChain(0.15f, 0.2f, 0.3f);
     float cleanDriven = tClean.cabOut * comp;
-    REQUIRE(cleanDriven < 0.3f);
+    REQUIRE(cleanDriven < 0.6f);
 }

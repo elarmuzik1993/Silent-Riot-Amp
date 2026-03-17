@@ -36,6 +36,9 @@ constexpr float R_DROP2_N           = VS::r(22000.0f);
 // ── Filter frequencies (Hz) ─────────────────────────────────
 constexpr float INPUT_HP_FREQ       = 7.0f;
 constexpr float CATHODE_BYPASS_FREQ = 4.2f;
+constexpr float CATHODE_GM_12AX7     = 0.0016f;    // transconductance 1.6 mA/V
+constexpr float CATHODE_RK_12AX7     = 1500.0f;    // cathode resistor 1.5kΩ
+constexpr float CATHODE_BYPASS_DEPTH = 1.0f - 1.0f / (1.0f + CATHODE_GM_12AX7 * CATHODE_RK_12AX7);  // ≈ 0.706
 constexpr float STAGE1_COUPLING_HP  = 72.0f;
 constexpr float STAGE2_COUPLING_HP  = 7.0f;      // 0.047µF × 500KΩ gain pot
 constexpr float PI_COUPLING_HP      = 16.0f;      // 47nF × ~220K grid leak
