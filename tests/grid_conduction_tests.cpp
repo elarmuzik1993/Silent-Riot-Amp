@@ -151,18 +151,20 @@ TEST_CASE("Grid conduction: charge snaps to zero when tiny", "[grid]") {
 TEST_CASE("Grid factories: V1a has input impedance source R", "[grid][factory]") {
     auto model = makeV1aGrid();
     REQUIRE(model.conductionThreshold == GRID_CONDUCT_THRESH_N);
-    REQUIRE(model.gridResistance == GRID_R_TRIODE_N);
+    REQUIRE(model.gridResistance == GRID_R_V1A_N);
     REQUIRE(model.sourceResistance == Approx(VS::r(100.0f)));  // guitar pickup
 }
 
-TEST_CASE("Grid factories: V1b source R = 1kΩ (reduced for musical loading)", "[grid][factory]") {
+TEST_CASE("Grid factories: V1b has real stage impedances", "[grid][factory]") {
     auto model = makeV1bGrid();
-    REQUIRE(model.sourceResistance == GRID_SOURCE_R_MUSICAL_N);
+    REQUIRE(model.gridResistance == GRID_R_V1B_N);
+    REQUIRE(model.sourceResistance == GRID_SOURCE_R_V1B_N);
 }
 
-TEST_CASE("Grid factories: PI source R = 1kΩ (reduced for musical loading)", "[grid][factory]") {
+TEST_CASE("Grid factories: PI has real stage impedances", "[grid][factory]") {
     auto model = makePIGrid();
-    REQUIRE(model.sourceResistance == GRID_SOURCE_R_MUSICAL_N);
+    REQUIRE(model.gridResistance == GRID_R_PI_N);
+    REQUIRE(model.sourceResistance == GRID_SOURCE_R_PI_N);
 }
 
 TEST_CASE("Grid factories: EL84 has different threshold", "[grid][factory]") {
@@ -173,9 +175,10 @@ TEST_CASE("Grid factories: EL84 has different threshold", "[grid][factory]") {
     REQUIRE(pentode.conductionThreshold != triode.conductionThreshold);
 }
 
-TEST_CASE("Grid factories: EL84 source R = 1kΩ (reduced for musical loading)", "[grid][factory]") {
+TEST_CASE("Grid factories: EL84 has real stage impedances", "[grid][factory]") {
     auto model = makeEL84Grid();
-    REQUIRE(model.sourceResistance == GRID_SOURCE_R_MUSICAL_N);
+    REQUIRE(model.gridResistance == GRID_R_EL84_N);
+    REQUIRE(model.sourceResistance == GRID_SOURCE_R_EL84_N);
 }
 
 // ── recalcGridChargeDecay ────────────────────────────────────
