@@ -93,4 +93,24 @@ float measureMagnitude(FilterT& filter, float freqHz, float sr, int cycles = 20)
     return outPeak / inPeak;
 }
 
+// Measure magnitude using a callable (lambda) instead of a filter object
+template<typename ProcessFn>
+float measureMagnitudeCustom(ProcessFn processFn, float freqHz, float sr, int cycles = 20) {
+    int samplesPerCycle = static_cast<int>(sr / freqHz);
+    int totalSamples = samplesPerCycle * cycles;
+    int measureFrom = samplesPerCycle * (cycles / 2); // skip transient
+
+    float inPeak = 1.0f;
+    float outPeak = 0.0f;
+
+    for (int i = 0; i < totalSamples; ++i) {
+        float in = inPeak * std::sin(2.0f * PI_F * freqHz * i / sr);
+        float out = processFn(in);
+        if (i >= measureFrom)
+            outPeak = std::max(outPeak, std::abs(out));
+    }
+
+    return outPeak / inPeak;
+}
+
 } // namespace tt::test

@@ -107,13 +107,24 @@ TEST_CASE("Input HP (7Hz): attenuates sub-bass at 2Hz", "[filter][circuit]") {
     REQUIRE(mag < 0.35f);
 }
 
-TEST_CASE("Cathode bypass LP (4.2Hz): passes audio band", "[filter][circuit]") {
+TEST_CASE("Cathode bypass shelf: reduces LF gain, passes audio band", "[filter][circuit]") {
     OnePoleLP lp;
-    lp.setFreq(CATHODE_BYPASS_FREQ, TEST_SR);  // 4.2Hz
-    
-    // This is a very low cutoff — at 100Hz it should be attenuating
-    float mag100 = measureMagnitude(lp, 100.0f, TEST_SR);
-    REQUIRE(mag100 < 0.1f);
+    lp.setFreq(CATHODE_BYPASS_FREQ, TEST_SR);
+
+    auto shelfProcess = [&](float x) {
+        return x - lp.process(x) * CATHODE_BYPASS_DEPTH;
+    };
+
+    // Audio freq (100Hz) — should pass near unity
+    lp.reset();
+    float audioMag = measureMagnitudeCustom(shelfProcess, 100.0f, TEST_SR);
+    REQUIRE(audioMag > 0.95f);
+
+    // Sub-bass (0.5Hz) — should be attenuated to ~0.29
+    lp.reset();
+    float lfMag = measureMagnitudeCustom(shelfProcess, 0.5f, TEST_SR, 5);
+    REQUIRE(lfMag < 0.35f);
+    REQUIRE(lfMag > 0.25f);
 }
 
 TEST_CASE("Stage 1 coupling HP (72Hz): attenuates 20Hz bass", "[filter][circuit]") {

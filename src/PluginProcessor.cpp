@@ -281,7 +281,7 @@ void TinyTerrorProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
         x = applyGridConduction(x, v1aGrid);
         float v1a_in = x;
         x = triodeWaveshaper(x, VS::V_BIAS_12AX7, vPreamp, PREAMP_RPLATE_N, v1aTriode);
-        x = filterBank.v1a_cathodeBypass.process(x);
+        x -= filterBank.v1a_cathodeBypass.process(x) * CATHODE_BYPASS_DEPTH;
         x = filterBank.v1a_couplingHP.process(x);
         float v1aGainEst = (std::abs(v1a_in) > 1e-8f) ? std::abs(x) / std::abs(v1a_in) : StageGains::V1A_GAIN;
         x = v1a_miller.process(x, v1aGainEst, filterBank.effectiveSR);
@@ -295,7 +295,7 @@ void TinyTerrorProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
         x = applyGridConduction(x, v1bGrid);
         float v1b_in = x;
         x = triodeWaveshaper(x, VS::V_BIAS_12AX7, vPreamp, PREAMP_RPLATE_N, v1bTriode);
-        x = filterBank.v1b_cathodeBypass.process(x);
+        x -= filterBank.v1b_cathodeBypass.process(x) * CATHODE_BYPASS_DEPTH;
         x = filterBank.v1b_couplingHP.process(x);
         float gainPotR = (1.0f - gainA) * GAIN_POT_R_REAL;
         v1b_miller.rSource_real = std::min(V1B_RSOURCE_BASE_REAL + gainPotR, V1B_RSOURCE_MAX_REAL);
