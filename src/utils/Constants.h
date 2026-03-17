@@ -38,7 +38,7 @@ constexpr float INPUT_HP_FREQ       = 7.0f;
 constexpr float CATHODE_BYPASS_FREQ = 4.2f;
 constexpr float STAGE1_COUPLING_HP  = 72.0f;
 constexpr float STAGE2_COUPLING_HP  = 7.0f;      // 0.047µF × 500KΩ gain pot
-constexpr float PI_COUPLING_HP      = 50.0f;
+constexpr float PI_COUPLING_HP      = 16.0f;      // 47nF × ~220K grid leak
 constexpr float OT_LP_FREQ          = 7000.0f;
 constexpr float GAIN_LOADING_LP_FREQ = 8000.0f;
 
@@ -74,9 +74,16 @@ constexpr float EL84_IP_MAX_N       = VS::i(0.065f);   // 65.0 normalized
 // ── Grid conduction ─────────────────────────────────────────
 constexpr float GRID_CONDUCT_THRESH_N       = VS::v(0.5f);
 constexpr float GRID_CONDUCT_THRESH_EL84_N  = VS::v(0.0f);
-constexpr float GRID_R_TRIODE_N             = VS::R_300;
-constexpr float GRID_R_PENTODE_N            = VS::R_500;
-constexpr float GRID_SOURCE_R_MUSICAL_N      = VS::r(1000.0f);
+// Per-stage source impedances (real stage output Z)
+constexpr float GRID_SOURCE_R_V1B_N         = VS::Z_OUT_V1A;  // V1a Zout: 100K||62.5K ≈ 38.5KΩ
+constexpr float GRID_SOURCE_R_PI_N          = VS::Z_OUT_V1B;  // V1b Zout: (100K+68K)||62.5K ≈ 47KΩ
+constexpr float GRID_SOURCE_R_EL84_N        = VS::Z_OUT_PI;   // PI Zout: 100K||62.5K ≈ 38.5KΩ per side
+// Per-stage grid conduction impedance — scaled to preserve loading ratio (gridR/sourceR)
+// from the original calibration (triode 300Ω/1KΩ = 0.3, pentode 500Ω/1KΩ = 0.5)
+constexpr float GRID_R_V1A_N               = VS::R_300;              // 300Ω  (source=100Ω, ratio=3.0)
+constexpr float GRID_R_V1B_N               = VS::r(11538.0f);        // ~11.5KΩ (source=38.5KΩ, ratio=0.3)
+constexpr float GRID_R_PI_N                = VS::r(14151.0f);        // ~14.2KΩ (source=47KΩ, ratio=0.3)
+constexpr float GRID_R_EL84_N              = VS::r(19231.0f);        // ~19.2KΩ (source=38.5KΩ, ratio=0.5)
 constexpr float GRID_CHARGE_RATE            = 0.01f;
 constexpr float MAX_BIAS_SHIFT_N            = VS::v(-5.0f);
 
