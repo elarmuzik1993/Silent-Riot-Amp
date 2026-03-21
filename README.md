@@ -11,7 +11,7 @@ VST3 + Standalone for Linux and Windows. Built with [JUCE 7](https://juce.com/),
 - Full tube signal chain: dual 12AX7 preamp, LTP phase inverter, push-pull EL84 power amp
 - Nonlinear DSP: Koren triode/pentode waveshapers (softplus cutoff), grid conduction, output transformer saturation
 - Power supply droop with 4-node PSU model and sag envelope
-- Speaker coupling with 3-band dynamic impedance
+- Speaker coupling with 3-band dynamic impedance and excursion-based amplitude scaling
 - Dual cabinet mode: IIR filters or convolution IR loader
 - 2x/4x/8x oversampling with crossfade state machine
 - 15W / 7W power mode (Class AB / Class A bias shift)
@@ -44,8 +44,8 @@ cmake --build build
 cd build && ctest --output-on-failure
 ```
 
-174 tests across two targets:
-- **TinyTerrorTests** — 161 pure C++ tests (DSP modules, signal chain)
+177 tests across two targets:
+- **TinyTerrorTests** — 164 pure C++ tests (DSP modules, signal chain)
 - **TinyTerrorJuceTests** — 13 JUCE-dependent tests (cabinet IR, convolution)
 
 ## Signal Chain
@@ -90,6 +90,7 @@ src/
 
 ## Version History
 
+- **v0.3.1** — Excursion-based speaker coupling: impedance deviation now scales with cone excursion (amplitude-dependent, bass-weighted). Palm mutes and heavy bass passages drive more coupling than lead lines.
 - **v0.3.0** — DSP audit complete: all filter frequencies aligned with spec (tone 1.5k-20kHz, cab presence 2.5kHz, cab rolloff 5.5kHz, cab notch 400Hz, gain loading 5kHz). Ready for listening test and tuning.
 - **v0.2.0** — Phase 4 complete: GUI, IR loader, presets, polish
 - **v0.1.0** — Phase 1-3 complete: full DSP signal chain
@@ -99,7 +100,7 @@ src/
 GitHub Actions builds on every push to `main`/`develop`:
 - Linux Release (VST3)
 - Windows Release (VST3 + Standalone)
-- Test suite (Debug, 174 tests)
+- Test suite (Debug, 177 tests)
 
 Download build artifacts from the [Actions tab](https://github.com/elarmuzik1993/Silent-Riot-Amp/actions).
 
