@@ -25,12 +25,16 @@ float SpeakerCoupling::process(float powerOut) {
     midEnv  = std::max(std::abs(mid),  midEnv  * envDecay);
     hfEnv   = std::max(std::abs(hf),   hfEnv   * envDecay);
 
-    float total = bassEnv + midEnv + hfEnv + 1e-10f;
-    float zReflected = (bassEnv / total) * Z_REFLECTED_BASS_N
-                     + (midEnv  / total) * Z_REFLECTED_MID_N
-                     + (hfEnv   / total) * Z_REFLECTED_HF_N;
+    float envTotal = bassEnv + midEnv + hfEnv;
+    if (envTotal < 1e-10f) return powerOut;
 
-    float gainMod = 1.0f + std::tanh((zReflected / OT_NOMINAL_LOAD_N - 1.0f) * SPK_GAINMOD_DEPTH) * SPK_GAINMOD_RANGE;
+    float zReflected = (bassEnv / envTotal) * Z_REFLECTED_BASS_N
+                     + (midEnv  / envTotal) * Z_REFLECTED_MID_N
+                     + (hfEnv   / envTotal) * Z_REFLECTED_HF_N;
+
+    float rawMod = std::tanh((zReflected / OT_NOMINAL_LOAD_N - 1.0f) * SPK_GAINMOD_DEPTH) * SPK_GAINMOD_RANGE;
+    float modBlend = std::min(envTotal / SPK_MOD_THRESHOLD, 1.0f);
+    float gainMod = 1.0f + rawMod * modBlend;
     return powerOut * gainMod;
 }
 

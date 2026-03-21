@@ -119,6 +119,7 @@ constexpr float Z_REFLECTED_HF_N    = VS::r(20000.0f);
 constexpr float SPK_ENV_TAU_MS      = 2.0f;
 constexpr float SPK_GAINMOD_DEPTH   = 2.0f;
 constexpr float SPK_GAINMOD_RANGE   = 0.5f;
+constexpr float SPK_MOD_THRESHOLD   = 0.001f;  // envelope level for full coupling engagement
 
 // ── OT core saturation ─────────────────────────────────────
 constexpr float OT_CURRENT_SCALE    = 0.015f;
