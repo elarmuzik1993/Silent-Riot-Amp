@@ -1,6 +1,5 @@
 #pragma once
 // Dynamic Speaker-Amp Coupling (Spec §3.9)
-#include "../filters/Biquad.h"
 #include "../filters/OnePole.h"
 #include "../../utils/Constants.h"
 #include <cmath>
@@ -9,8 +8,7 @@
 namespace tt {
 
 struct SpeakerCoupling {
-    Biquad bassExtract, midExtract;
-    OnePoleLP hfEnvelope;
+    OnePoleLP xoverLow, xoverHigh;  // complementary 3-way crossover
     float bassEnv = 0.0f, midEnv = 0.0f, hfEnv = 0.0f;
     float envDecay = 0.999f;
 

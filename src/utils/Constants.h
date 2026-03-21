@@ -112,6 +112,8 @@ constexpr float MILLER_FC_SMOOTH_MS = 1.0f;
 // ── Speaker coupling ────────────────────────────────────────
 constexpr float SPK_RE_N            = VS::r(6.0f);
 constexpr float SPK_FS              = 75.0f;
+constexpr float SPK_XOVER_LOW       = 200.0f;   // bass/mid crossover (above Fs resonance)
+constexpr float SPK_XOVER_HIGH      = 2000.0f;  // mid/HF crossover (before voice coil rise)
 constexpr float OT_NOMINAL_LOAD_N   = VS::r(8000.0f);
 constexpr float Z_REFLECTED_BASS_N  = VS::r(35000.0f);
 constexpr float Z_REFLECTED_MID_N   = VS::r(8000.0f);
