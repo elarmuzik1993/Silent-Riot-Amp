@@ -123,6 +123,10 @@ constexpr float SPK_GAINMOD_DEPTH   = 0.5f;    // keep tanh in useful region (wa
 constexpr float SPK_GAINMOD_RANGE   = 0.5f;
 constexpr float SPK_MOD_THRESHOLD   = 0.001f;  // envelope level for full coupling engagement
 constexpr float SPK_GAINMOD_TAU_MS  = 2.0f;    // gainMod smoothing (speaker cone inertia)
+constexpr float XCUR_WEIGHT_BASS    = 4.0f;     // (200/100)^2 — bass excursion dominance
+constexpr float XCUR_WEIGHT_MID     = 0.10f;    // (200/632)^2 — mid excursion contribution
+constexpr float XCUR_WEIGHT_HF      = 0.0025f;  // (200/4000)^2 — HF excursion negligible
+constexpr float XCUR_SENSITIVITY    = 2.0f;     // excursion-to-tanh scaling (ear-tune)
 
 // ── OT core saturation ─────────────────────────────────────
 constexpr float OT_CURRENT_SCALE    = 0.015f;

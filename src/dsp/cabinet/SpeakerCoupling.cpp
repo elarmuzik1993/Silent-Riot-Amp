@@ -39,7 +39,18 @@ float SpeakerCoupling::process(float powerOut) {
                      + (midEnv  / envTotal) * Z_REFLECTED_MID_N
                      + (hfEnv   / envTotal) * Z_REFLECTED_HF_N;
 
-    float rawMod = std::tanh((zReflected / OT_NOMINAL_LOAD_N - 1.0f) * SPK_GAINMOD_DEPTH) * SPK_GAINMOD_RANGE;
+    // Excursion estimate — bass-weighted (X ∝ V/f²)
+    float excursion = bassEnv * XCUR_WEIGHT_BASS
+                    + midEnv  * XCUR_WEIGHT_MID
+                    + hfEnv   * XCUR_WEIGHT_HF;
+
+    // Xmax saturation — tanh models suspension stiffening
+    float xNorm = std::tanh(excursion * XCUR_SENSITIVITY);
+
+    // Blend impedance: low excursion → nominal, high excursion → full deviation
+    float zEffective = OT_NOMINAL_LOAD_N + (zReflected - OT_NOMINAL_LOAD_N) * xNorm;
+
+    float rawMod = std::tanh((zEffective / OT_NOMINAL_LOAD_N - 1.0f) * SPK_GAINMOD_DEPTH) * SPK_GAINMOD_RANGE;
     float modBlend = std::min(envTotal / SPK_MOD_THRESHOLD, 1.0f);
     float targetGainMod = 1.0f + rawMod * modBlend;
 

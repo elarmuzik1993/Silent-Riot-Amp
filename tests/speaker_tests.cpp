@@ -88,6 +88,66 @@ TEST_CASE("Speaker coupling: bass signal gets higher gain than mid signal", "[sp
     REQUIRE(bassGainMod > midGainMod);
 }
 
+TEST_CASE("Speaker coupling: loud bass > quiet bass (excursion)", "[speaker]") {
+    // Same frequency (75Hz), different amplitudes — louder should deviate more
+    auto measureGainMod = [](float amplitude) {
+        SpeakerCoupling spk;
+        spk.recalcFilters(TEST_SR);
+        for (int i = 0; i < 8000; ++i)
+            spk.process(amplitude * std::sin(2.0f * PI_F * 75.0f * i / TEST_SR));
+        float in = amplitude;
+        float out = spk.process(in);
+        return std::abs(out) / std::abs(in);
+    };
+
+    float quietGain = measureGainMod(0.05f);
+    float loudGain  = measureGainMod(0.3f);
+
+    // Louder bass signal should produce larger gainMod deviation from 1.0
+    REQUIRE(std::abs(loudGain - 1.0f) > std::abs(quietGain - 1.0f));
+}
+
+TEST_CASE("Speaker coupling: loud HF stays near unity (low excursion)", "[speaker]") {
+    SpeakerCoupling spk;
+    spk.recalcFilters(TEST_SR);
+
+    // High-amplitude 5kHz signal — excursion weight is negligible
+    for (int i = 0; i < 8000; ++i)
+        spk.process(0.4f * std::sin(2.0f * PI_F * 5000.0f * i / TEST_SR));
+
+    float in = 0.4f;
+    float out = spk.process(in);
+    float gainMod = std::abs(out) / std::abs(in);
+
+    // HF excursion weight is 0.0025 — gainMod should stay close to 1.0
+    REQUIRE(gainMod == Approx(1.0f).margin(0.15f));
+}
+
+TEST_CASE("Speaker coupling: excursion saturation (diminishing returns)", "[speaker]") {
+    auto measureDeviation = [](float amplitude) {
+        SpeakerCoupling spk;
+        spk.recalcFilters(TEST_SR);
+        for (int i = 0; i < 8000; ++i)
+            spk.process(amplitude * std::sin(2.0f * PI_F * 75.0f * i / TEST_SR));
+        float in = amplitude;
+        float out = spk.process(in);
+        return std::abs(std::abs(out) / std::abs(in) - 1.0f);
+    };
+
+    float dev1 = measureDeviation(0.1f);
+    float dev2 = measureDeviation(0.2f);
+    float dev3 = measureDeviation(0.3f);
+
+    // All should increase
+    REQUIRE(dev2 > dev1);
+    REQUIRE(dev3 > dev2);
+
+    // Diminishing returns — increments should decrease (tanh concavity)
+    float delta1 = dev2 - dev1;
+    float delta2 = dev3 - dev2;
+    REQUIRE(delta2 < delta1);
+}
+
 TEST_CASE("Speaker coupling: reset clears state", "[speaker]") {
     SpeakerCoupling spk;
     spk.recalcFilters(TEST_SR);
