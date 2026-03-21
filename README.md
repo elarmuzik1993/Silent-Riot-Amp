@@ -57,7 +57,7 @@ Input -> HP 7Hz -> Grid Cond -> Triode V1a -> Cathode Shelf -> Miller LP -> Gain
       -> Grid Cond -> Triode V1b -> Cathode Shelf -> Miller LP -> LP 5kHz
       -> LTP Phase Inverter -> Tone (Vox Cut) -> Master Volume
       -> Grid Cond -> EL84 x2 Push-Pull -> PSU Sag
-      -> Speaker Coupling -> OT LP 7kHz
+      -> Speaker Coupling -> OT Saturation -> OT LP 7kHz
       -> Cabinet (IIR or IR Convolution) -> Soft Limiter -> Output
 ```
 
@@ -70,7 +70,7 @@ src/
 │   ├── filters/     OnePole, Biquad, FilterBank (24 instances), DynamicMillerLP
 │   ├── tubes/       TriodeWaveshaper, PentodeWaveshaper, GridConduction
 │   ├── power/       PowerSupplyModel, SagEnvelope, LTPSolver
-│   └── cabinet/     SpeakerCoupling, CabinetSim, IRLibrary
+│   └── cabinet/     SpeakerCoupling, CabinetSim, IRLibrary, OTSaturation
 ├── gui/             14 custom components (NotchKnob, VUMeter, ToggleSwitch,
 │                    HeaderBar, FooterBar, SectionBar, AdvancedPanel,
 │                    PresetSelector, SegmentedSelector, SettingsPanel,
@@ -85,6 +85,14 @@ src/
 - [x] **Phase 2:** Power section — LTP solver, tone, EL84 pentode, push-pull, 15W/7W mode
 - [x] **Phase 3:** Dynamics — PSU droop, sag envelope, grid conduction, speaker coupling, OT saturation
 - [x] **Phase 4:** Cabinet IR loader, GUI (14 components), presets, polish
+- [x] **DSP Audit:** All filter frequencies, Koren tube params, and signal chain verified against spec v2.13
+- [ ] **Listening Test & Tuning:** A/B against real Tiny Terror captures, ear-tune output gain and dynamics
+
+## Version History
+
+- **v0.3.0** — DSP audit complete: all filter frequencies aligned with spec (tone 1.5k-20kHz, cab presence 2.5kHz, cab rolloff 5.5kHz, cab notch 400Hz, gain loading 5kHz). Ready for listening test and tuning.
+- **v0.2.0** — Phase 4 complete: GUI, IR loader, presets, polish
+- **v0.1.0** — Phase 1-3 complete: full DSP signal chain
 
 ## CI
 
