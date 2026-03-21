@@ -8,11 +8,13 @@ void SpeakerCoupling::recalcFilters(float effectiveSR) {
     xoverLow.setFreq(SPK_XOVER_LOW, effectiveSR);
     xoverHigh.setFreq(SPK_XOVER_HIGH, effectiveSR);
     envDecay = std::exp(-1.0f / (SPK_ENV_TAU_MS * 0.001f * effectiveSR));
+    gainModDecay = std::exp(-1.0f / (SPK_GAINMOD_TAU_MS * 0.001f * effectiveSR));
 }
 
 void SpeakerCoupling::reset() {
     xoverLow.reset(); xoverHigh.reset();
     bassEnv = midEnv = hfEnv = 0.0f;
+    gainModSmooth = 1.0f;
 }
 
 float SpeakerCoupling::process(float powerOut) {
@@ -28,7 +30,10 @@ float SpeakerCoupling::process(float powerOut) {
     hfEnv   = std::max(std::abs(hf),   hfEnv   * envDecay);
 
     float envTotal = bassEnv + midEnv + hfEnv;
-    if (envTotal < 1e-10f) return powerOut;
+    if (envTotal < 1e-10f) {
+        gainModSmooth = 1.0f + (gainModSmooth - 1.0f) * gainModDecay;
+        return powerOut * gainModSmooth;
+    }
 
     float zReflected = (bassEnv / envTotal) * Z_REFLECTED_BASS_N
                      + (midEnv  / envTotal) * Z_REFLECTED_MID_N
@@ -36,8 +41,10 @@ float SpeakerCoupling::process(float powerOut) {
 
     float rawMod = std::tanh((zReflected / OT_NOMINAL_LOAD_N - 1.0f) * SPK_GAINMOD_DEPTH) * SPK_GAINMOD_RANGE;
     float modBlend = std::min(envTotal / SPK_MOD_THRESHOLD, 1.0f);
-    float gainMod = 1.0f + rawMod * modBlend;
-    return powerOut * gainMod;
+    float targetGainMod = 1.0f + rawMod * modBlend;
+
+    gainModSmooth = targetGainMod + (gainModSmooth - targetGainMod) * gainModDecay;
+    return powerOut * gainModSmooth;
 }
 
 } // namespace tt

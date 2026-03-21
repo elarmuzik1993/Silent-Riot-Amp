@@ -122,6 +122,7 @@ constexpr float SPK_ENV_TAU_MS      = 20.0f;   // smooth over several bass cycle
 constexpr float SPK_GAINMOD_DEPTH   = 2.0f;
 constexpr float SPK_GAINMOD_RANGE   = 0.5f;
 constexpr float SPK_MOD_THRESHOLD   = 0.001f;  // envelope level for full coupling engagement
+constexpr float SPK_GAINMOD_TAU_MS  = 2.0f;    // gainMod smoothing (speaker cone inertia)
 
 // ── OT core saturation ─────────────────────────────────────
 constexpr float OT_CURRENT_SCALE    = 0.015f;
