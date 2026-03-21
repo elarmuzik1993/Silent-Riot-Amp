@@ -43,7 +43,7 @@ constexpr float STAGE1_COUPLING_HP  = 72.0f;
 constexpr float STAGE2_COUPLING_HP  = 7.0f;      // 0.047µF × 500KΩ gain pot
 constexpr float PI_COUPLING_HP      = 16.0f;      // 47nF × ~220K grid leak
 constexpr float OT_LP_FREQ          = 7000.0f;
-constexpr float GAIN_LOADING_LP_FREQ = 8000.0f;
+constexpr float GAIN_LOADING_LP_FREQ = 5000.0f;
 
 // ── Math constant ────────────────────────────────────────────
 constexpr float PI_F = 3.14159265358979323846f;
@@ -52,8 +52,8 @@ constexpr float PI_F = 3.14159265358979323846f;
 constexpr float ANTI_DENORMAL       = 1e-18f;
 
 // ── Tone control ────────────────────────────────────────────
-constexpr float TONE_MIN_FREQ       = 800.0f;
-constexpr float TONE_MAX_FREQ       = 5000.0f;
+constexpr float TONE_MIN_FREQ       = 1500.0f;
+constexpr float TONE_MAX_FREQ       = 20000.0f;
 
 // ── Preamp plate load ────────────────────────────────────────
 constexpr float PREAMP_RPLATE_N     = VS::R_100K;  // 100kΩ plate load for V1a/V1b

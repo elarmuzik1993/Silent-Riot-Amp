@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-**Silent Riot** is a JUCE 7 amp simulator plugin (VST3/Standalone) by Monolit Beatz, modelling the Orange Tiny Terror (AD5). The internal codename is `TinyTerror`. Built with C++17, CMake, and Ninja on Ubuntu Linux.
+**Silent Riot** (v0.3.0) is a JUCE 7 amp simulator plugin (VST3/Standalone) by Monolit Beatz, modelling the Orange Tiny Terror (AD5). The internal codename is `TinyTerror`. Built with C++17, CMake, and Ninja on Ubuntu Linux.
 
 ## Key Specs
 
@@ -22,7 +22,7 @@ Input → Scale to guitar domain → HP 7Hz → Grid cond V1a → Triode V1a →
 → Cathode bypass shelf → HP 72Hz → Miller LP V1a → Report PSU → Gain pot A
 → Grid cond V1b → Triode V1b → Clamp → Cathode bypass shelf → HP 7Hz
 → Miller LP V1b → Report PSU → Gain pot B → LP 5kHz → Grid cond PI
-→ LTP solver (100K/82K asymmetric plate loads) → HP×2 50Hz → Report PSU
+→ LTP solver (100K/82K asymmetric plate loads) → HP×2 16Hz → Report PSU
 → Tone (Vox cut) → Master volume → Grid cond EL84×2
 → Soft conduction×2 (bias-dependent Class A/AB) → Pentode×2 → Push-pull sum
 → Report PSU → Sag update (raw plate current) → OT current scale
@@ -32,7 +32,7 @@ Input → Scale to guitar domain → HP 7Hz → Grid cond V1a → Triode V1a →
 
 **IR path** (IR_INDEX>0, convolution at base SR after downsample):
 ```
-... → Speaker coupling → OT LP 7kHz → Downsample
+... → Speaker coupling → OT saturation → OT LP 7kHz → Downsample
 → IR convolution → Output scale → tanh limiter → Output
 ```
 
@@ -66,6 +66,8 @@ cmake -B build -DTT_BUILD_TESTS=ON # Build with tests
 - **Phase 2** (done): Power section — LTP solver, tone, EL84 pentode, push-pull, 15W/7W mode
 - **Phase 3** (done): Dynamics — PSU droop, sag envelope, grid conduction, speaker coupling, OT saturation
 - **Phase 4** (done): Cabinet IR loader, GUI (14 custom components), presets, polish (animations, live metering, keyboard nav, UI persistence)
+- **DSP Audit** (done): All filter frequencies, Koren tube parameters, and signal chain order verified against spec v2.13 and open-source reference implementations (Guitarix, SwankyAmp, ChowDSP)
+- **Next**: Listening test and ear-tuning (outputGainCompensation, V1B_RSOURCE_MAX_REAL, dynamics feel)
 
 ## Conventions
 
@@ -120,17 +122,35 @@ cmake -B build -DTT_BUILD_TESTS=ON # Build with tests
 
 ## DSP Implementation Details
 
-- **Triode model**: Koren (Option B) with iterative load-line solve. `TriodeState` caches converged plate voltage between samples → 4 iterations sufficient (was 8). Stateless overload available for tests.
-- **Pentode model**: Koren pentode equations — screen grid acts as virtual anode in the Koren formula. `KorenPentodeParams` / `makeEL84Params()` mirror the triode pattern. Softplus (`log(1+exp(x))`) provides smooth cutoff; no iterative solve needed (pentode plate current is plate-voltage-independent, handled by saturation knee). Plate saturation knee, screen redistribution, and tanh clamp are downstream of the Koren core.
-- **LTP solver**: Also caches plate voltages A/B between samples (vCathode was already cached). 4 iterations (was 8). Total Koren evals per sample: 16 (was 32).
+- **Triode model**: Koren with iterative load-line solve. Standard 12AX7 parameters (mu=100, ex=1.4, Kg1=1060, Kp=600, Kvb=300 — matches Guitarix/industry reference). `TriodeState` caches converged plate voltage between samples → 4 iterations sufficient (was 8). Stateless overload available for tests.
+- **Pentode model**: Koren pentode equations (mu=19.5, ex=1.35, Kg1=820, Kp=84, Kvb=300) — screen grid acts as virtual anode in the Koren formula. Softplus cutoff, tanh IP clamp, plate saturation knee, screen redistribution.
+- **LTP solver**: Asymmetric plate loads (100K/82K). Caches plate voltages A/B between samples. 4 iterations with alpha=0.25 damping.
 - **Oversample switching**: Crossfade state machine (FadingOut → Reconfiguring → FadingIn), 128-sample fade at base SR. PSU frozen during transition to prevent voltage recovery pop.
 - **Sag model**: Cathode resistor physics — `biasOffset = -(Itotal - Iquiescent) × R_cathode`. Fed with raw `|ipA| + |ipB|` before OT scaling.
+- **Tone control**: Vox cut on differential signal only (preserves common-mode). Exponential frequency mapping (1.5kHz–20kHz) for perceptually linear knob response.
 - **Tone coefficient threshold**: Skip `std::pow` + filter recalc when smoothed tone value hasn't changed by >0.001 (~99% of samples).
+
+## DSP Audit Status (v0.3.0)
+
+All filter frequencies now match spec v2.13:
+- Tone: 1.5kHz (dark) to 20kHz (bright)
+- Gain loading LP: 5kHz
+- Cab presence: 2.5kHz peak, Q=1.5, +3dB
+- Cab rolloff: 5.5kHz LP, Q=0.5
+- Cab notch: 400Hz, Q=2.0
+- PI coupling HP: 16Hz (was already correct)
+- All preamp filters verified correct
+
+Koren tube parameters verified against Guitarix and standard datasheets.
+
+**Tuning items for listening test:**
+- `outputGainCompensation = 1.0` — ear-tune for optimal headroom (clean: -3.9 dBFS, driven: -0.1 dBFS at comp=1.0)
+- `V1B_RSOURCE_MAX_REAL = 150KΩ` — code-only clamp not in spec; may limit Miller darkening at low gain (consider removing if low-gain tones sound too bright)
 
 ## Important Pitfalls (from spec)
 
 - Bias values are NEGATIVE — use `+` not `-` when applying (e.g. `vGrid + vBias`)
-- `triodeWaveshaper` gain is on INPUT only — do NOT scale output by stageGain
+- `triodeWaveshaper` gain emerges from Koren model (mu, Rp, rp) — do NOT scale output by stageGain
 - `reportPreampLevel()` takes SIGNAL level, NOT current
 - ParamSmoother runs per-sample at oversampled rate (NOT block rate) — init with effectiveSR
 - `sag.update()` must be called with raw plate current BEFORE `OT_CURRENT_SCALE` multiplication
@@ -138,9 +158,8 @@ cmake -B build -DTT_BUILD_TESTS=ON # Build with tests
 - LTP plate loads are asymmetric: `PI_RPLATE_A_N` (100K) / `PI_RPLATE_B_N` (82K)
 - Speaker coupling uses `makeBandPass` (NOT `makePeakEQ` with 0dB gain — that's a flat passthrough)
 - `softConductionCurve` biasFactor: `PENTODE_BIAS_15W_N / vBias_n` (NOT the inverse — 7W must get wider overlap)
-- PSU droop tuned for transparent power section: low droop depths (DROOP_POWER=0.06, DROOP_SCREEN=0.12), slow screen tau (60ms), halved source impedance (SOURCE_IMPEDANCE_N=0.04), soft tanh EL84 IP clamp, capped grid coupling charge — modern metal voicing, not vintage sag
-- `outputGainCompensation` calibrated to 1.0 — drives max gain to tanh(1.37)≈0.88 (-1.1 dBFS), clean at tanh(0.51)≈0.47 (-6.6 dBFS)
-- Cathode bypass is a **high-pass gain shelf** (not a lowpass): `x -= lp.process(x) * CATHODE_BYPASS_DEPTH`. Full gain above 4.2 Hz, reduced gain (~0.29×) below. Constants: `CATHODE_GM_12AX7`, `CATHODE_RK_12AX7`, `CATHODE_BYPASS_DEPTH` (≈0.706)
+- PSU droop uses impedance-based model (I×R voltage drops through SOURCE_IMPEDANCE_N, R_DROP1_N, R_DROP2_N) — droop depth emerges from physics, not from percentage constants
+- Cathode bypass is a **high-pass gain shelf** (not a lowpass): `x -= lp.process(x) * CATHODE_BYPASS_DEPTH`. Full gain above 4.2 Hz, reduced gain (~0.29×) below.
 - IR loading must NEVER happen on the audio thread — always use `AsyncUpdater` to defer to message thread
 - `bufferTransfer.set()` (blocking SpinLock) is message-thread only; `bufferTransfer.get()` (try-lock) is audio-thread only
 - ToggleSwitch uses `onStateChange` internally for thumb animation — external callbacks must use `onClick` (not `onStateChange`) to avoid breaking the animation timer
