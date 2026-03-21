@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-**Silent Riot** (v0.3.0) is a JUCE 7 amp simulator plugin (VST3/Standalone) by Monolit Beatz, modelling the Orange Tiny Terror (AD5). The internal codename is `TinyTerror`. Built with C++17, CMake, and Ninja on Ubuntu Linux.
+**Silent Riot** (v0.3.1) is a JUCE 7 amp simulator plugin (VST3/Standalone) by Monolit Beatz, modelling the Orange Tiny Terror (AD5). The internal codename is `TinyTerror`. Built with C++17, CMake, and Ninja on Ubuntu Linux.
 
 ## Key Specs
 
@@ -78,7 +78,7 @@ cmake -B build -DTT_BUILD_TESTS=ON # Build with tests
 - Parameter smoothing per-sample at oversampled rate (target/tick model in ParamSmoother)
 - CMake target is `TinyTerror`; product name is `Silent Riot`
 - Tests use Catch2 v3 — one test file per DSP module, two test targets:
-  - `TinyTerrorTests` — 161 pure C++ tests (no JUCE dependency)
+  - `TinyTerrorTests` — 164 pure C++ tests (no JUCE dependency)
   - `TinyTerrorJuceTests` — 13 JUCE-dependent tests (cabinet IR, convolution, user IR loading)
 
 ## Cabinet IR Loader Architecture
@@ -129,8 +129,9 @@ cmake -B build -DTT_BUILD_TESTS=ON # Build with tests
 - **Sag model**: Cathode resistor physics — `biasOffset = -(Itotal - Iquiescent) × R_cathode`. Fed with raw `|ipA| + |ipB|` before OT scaling.
 - **Tone control**: Vox cut on differential signal only (preserves common-mode). Exponential frequency mapping (1.5kHz–20kHz) for perceptually linear knob response.
 - **Tone coefficient threshold**: Skip `std::pow` + filter recalc when smoothed tone value hasn't changed by >0.001 (~99% of samples).
+- **Speaker coupling excursion**: Impedance deviation scales with bass-weighted cone excursion (X ∝ V/f²). `tanh(excursion * XCUR_SENSITIVITY)` models Xmax suspension stiffening — low excursion keeps impedance nominal, high excursion allows full deviation. Double-gated with existing `modBlend` for clean off-ramp at silence.
 
-## DSP Audit Status (v0.3.0)
+## DSP Audit Status (v0.3.1)
 
 All filter frequencies now match spec v2.13:
 - Tone: 1.5kHz (dark) to 20kHz (bright)
