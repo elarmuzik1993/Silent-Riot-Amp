@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-**Silent Riot** (v0.3.1) is a JUCE 7 amp simulator plugin (VST3/Standalone) by Monolit Beatz, modelling the Orange Tiny Terror (AD5). The internal codename is `TinyTerror`. Built with C++17, CMake, and Ninja on Ubuntu Linux.
+**Silent Riot** (v0.3.2) is a JUCE 7 amp simulator plugin (VST3/Standalone) by Monolit Beatz, modelling the Orange Tiny Terror (AD5). The internal codename is `TinyTerror`. Built with C++17, CMake, and Ninja on Ubuntu Linux.
 
 ## Key Specs
 
@@ -67,7 +67,8 @@ cmake -B build -DTT_BUILD_TESTS=ON # Build with tests
 - **Phase 3** (done): Dynamics — PSU droop, sag envelope, grid conduction, speaker coupling, OT saturation
 - **Phase 4** (done): Cabinet IR loader, GUI (14 custom components), presets, polish (animations, live metering, keyboard nav, UI persistence)
 - **DSP Audit** (done): All filter frequencies, Koren tube parameters, and signal chain order verified against spec v2.13 and open-source reference implementations (Guitarix, SwankyAmp, ChowDSP)
-- **Next**: Listening test and ear-tuning (outputGainCompensation, V1B_RSOURCE_MAX_REAL, dynamics feel)
+- **Listening Test Round 1** (done): DI chain trace analysis, audio taper fix on gain pots, speaker coupling smoothing
+- **Next**: Continued listening test and ear-tuning (outputGainCompensation, V1B_RSOURCE_MAX_REAL, dynamics feel)
 
 ## Conventions
 
@@ -78,7 +79,7 @@ cmake -B build -DTT_BUILD_TESTS=ON # Build with tests
 - Parameter smoothing per-sample at oversampled rate (target/tick model in ParamSmoother)
 - CMake target is `TinyTerror`; product name is `Silent Riot`
 - Tests use Catch2 v3 — one test file per DSP module, two test targets:
-  - `TinyTerrorTests` — 164 pure C++ tests (no JUCE dependency)
+  - `TinyTerrorTests` — 176 pure C++ tests (no JUCE dependency)
   - `TinyTerrorJuceTests` — 13 JUCE-dependent tests (cabinet IR, convolution, user IR loading)
 
 ## Cabinet IR Loader Architecture
@@ -131,7 +132,7 @@ cmake -B build -DTT_BUILD_TESTS=ON # Build with tests
 - **Tone coefficient threshold**: Skip `std::pow` + filter recalc when smoothed tone value hasn't changed by >0.001 (~99% of samples).
 - **Speaker coupling excursion**: Impedance deviation scales with bass-weighted cone excursion (X ∝ V/f²). `tanh(excursion * XCUR_SENSITIVITY)` models Xmax suspension stiffening — low excursion keeps impedance nominal, high excursion allows full deviation. Double-gated with existing `modBlend` for clean off-ramp at silence.
 
-## DSP Audit Status (v0.3.1)
+## DSP Audit Status (v0.3.2)
 
 All filter frequencies now match spec v2.13:
 - Tone: 1.5kHz (dark) to 20kHz (bright)
@@ -164,3 +165,5 @@ Koren tube parameters verified against Guitarix and standard datasheets.
 - IR loading must NEVER happen on the audio thread — always use `AsyncUpdater` to defer to message thread
 - `bufferTransfer.set()` (blocking SpinLock) is message-thread only; `bufferTransfer.get()` (try-lock) is audio-thread only
 - ToggleSwitch uses `onStateChange` internally for thumb animation — external callbacks must use `onClick` (not `onStateChange`) to avoid breaking the animation timer
+- Gain pot gangs MUST use `audioTaper()` (Spec §3.3) — without it, signal at the LTP is 4× too hot at noon, causing gain collapse on attack and artificial dip/bloom dynamics
+- Speaker coupling `SPK_GAINMOD_TAU_MS` must be ≥15ms — shorter values cause per-cycle AM modulation (audible as LFO-like filtering)
