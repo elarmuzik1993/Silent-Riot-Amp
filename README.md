@@ -44,8 +44,8 @@ cmake --build build
 cd build && ctest --output-on-failure
 ```
 
-189 tests across two targets:
-- **TinyTerrorTests** — 176 pure C++ tests (DSP modules, signal chain, dynamics diagnostics)
+190 tests across two targets:
+- **TinyTerrorTests** — 177 pure C++ tests (DSP modules, signal chain, dynamics diagnostics)
 - **TinyTerrorJuceTests** — 13 JUCE-dependent tests (cabinet IR, convolution)
 
 ## Signal Chain
@@ -87,10 +87,12 @@ src/
 - [x] **Phase 4:** Cabinet IR loader, GUI (14 components), presets, polish
 - [x] **DSP Audit:** All filter frequencies, Koren tube params, and signal chain verified against spec v2.13
 - [x] **Listening Test Round 1:** DI chain trace analysis, audio taper fix, speaker coupling smoothing
+- [x] **Listening Test Round 2:** Fix PI grid conduction pumping at gain≥5
 - [ ] **Listening Test & Tuning:** A/B against real Tiny Terror captures, ear-tune output gain and dynamics
 
 ## Version History
 
+- **v0.3.3** — Listening test round 2: fix PI grid conduction pumping at gain≥5 — reduce charge rate (0.01→0.003) and max bias shift (-5V→-1.5V) to prevent coupling cap charge saturation that caused 23 dB output swing.
 - **v0.3.2** — Listening test round 1: apply audio taper to both gain pot gangs (Spec §3.3), fixing 11 dB dip/bloom at medium dynamics. Increase speaker coupling gainMod smoothing (2ms → 15ms) to eliminate per-cycle AM artifact.
 - **v0.3.1** — Excursion-based speaker coupling: impedance deviation now scales with cone excursion (amplitude-dependent, bass-weighted). Palm mutes and heavy bass passages drive more coupling than lead lines.
 - **v0.3.0** — DSP audit complete: all filter frequencies aligned with spec (tone 1.5k-20kHz, cab presence 2.5kHz, cab rolloff 5.5kHz, cab notch 400Hz, gain loading 5kHz). Ready for listening test and tuning.
@@ -102,7 +104,7 @@ src/
 GitHub Actions builds on every push to `main`/`develop`:
 - Linux Release (VST3)
 - Windows Release (VST3 + Standalone)
-- Test suite (Debug, 189 tests)
+- Test suite (Debug, 190 tests)
 
 Download build artifacts from the [Actions tab](https://github.com/elarmuzik1993/Silent-Riot-Amp/actions).
 
