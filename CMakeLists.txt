@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.22)
 
 project(TinyTerror
-    VERSION 0.3.1
+    VERSION 0.3.2
     LANGUAGES CXX
     DESCRIPTION "Monolit Beatz — Silent Riot Amp Sim (Orange Tiny Terror DSP Model)"
 )

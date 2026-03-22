@@ -287,8 +287,8 @@ void TinyTerrorProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
         x = v1a_miller.process(x, v1aGainEst, filterBank.effectiveSR);
         psu.reportPreampLevel(x);
 
-        // ── Gain Pot Gang A ──
-        float gainA = gainVal;
+        // ── Gain Pot Gang A (audio taper: Spec §3.3) ──
+        float gainA = audioTaper(gainVal);
         x *= gainA;
 
         // ── Stage 2: V1b ──
@@ -303,8 +303,8 @@ void TinyTerrorProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
         x = v1b_miller.process(x, v1bGainEst, filterBank.effectiveSR);
         psu.reportPreampLevel(x);
 
-        // ── Gain Pot Gang B (linear — taper already applied on Gang A) ──
-        x *= gainVal;
+        // ── Gain Pot Gang B (audio taper: Spec §3.3) ──
+        x *= audioTaper(gainVal);
         x = filterBank.gainLoadingLP.process(x);
 
         // ── Stage 3: Phase Inverter (LTP) ──
