@@ -84,8 +84,8 @@ constexpr float GRID_R_V1A_N               = VS::R_300;              // 300Ω  (
 constexpr float GRID_R_V1B_N               = VS::r(11538.0f);        // ~11.5KΩ (source=38.5KΩ, ratio=0.3)
 constexpr float GRID_R_PI_N                = VS::r(14151.0f);        // ~14.2KΩ (source=47KΩ, ratio=0.3)
 constexpr float GRID_R_EL84_N              = VS::r(19231.0f);        // ~19.2KΩ (source=38.5KΩ, ratio=0.5)
-constexpr float GRID_CHARGE_RATE            = 0.01f;
-constexpr float MAX_BIAS_SHIFT_N            = VS::v(-5.0f);
+constexpr float GRID_CHARGE_RATE            = 0.003f;   // was 0.01 → caused PI grid charge saturation at gain≥5 (pumping)
+constexpr float MAX_BIAS_SHIFT_N            = VS::v(-1.5f); // was -5V → excessive for 12AX7 (clips at ~-1.5V grid)
 
 // ── Sag envelope (cathode bias sag) ─────────────────────────
 constexpr float SAG_ATTACK_MS       = 10.0f;

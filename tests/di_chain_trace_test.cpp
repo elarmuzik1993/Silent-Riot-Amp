@@ -463,3 +463,193 @@ TEST_CASE("DI chain trace: envelope at tap points", "[di_trace]") {
     // Sag should not add significant dip beyond natural signal dynamics
     REQUIRE(std::abs(sagContrib) < 3.0f);
 }
+
+// ═══════════════════════════════════════════════════════════════
+// Hard-playing dynamics diagnostic: traces PSU voltages, sag,
+// and OT saturation at gain=0.5 with 3x louder input
+// ═══════════════════════════════════════════════════════════════
+
+TEST_CASE("DI dynamics: PSU + sag at hard playing", "[di_dynamics]") {
+    auto diSamples = loadRawFloat("tests/di_sample_82hz.raw");
+    REQUIRE(diSamples.size() > 10000);
+
+    constexpr float baseSR = 48000.0f;
+    constexpr int osFactor = 4;
+    constexpr float effectiveSR = baseSR * osFactor;
+    const int diLen = static_cast<int>(diSamples.size());
+    const int osLen = diLen * osFactor;
+
+    // Scale DI 3x to simulate hard picking
+    constexpr float inputScale = 3.0f;
+
+    std::vector<float> diOS(osLen);
+    for (int i = 0; i < diLen; ++i)
+        for (int j = 0; j < osFactor; ++j)
+            diOS[i * osFactor + j] = diSamples[i] * inputScale;
+
+    // ── Compare gain=0.4 vs gain=0.5 ──────────────────────────
+    float gainSettings[] = {0.4f, 0.5f, 0.6f};
+
+    for (float gainVal : gainSettings) {
+        FilterBank fb;
+        fb.recalcAll(baseSR, osFactor);
+        constexpr float toneVal = 0.5f;
+        constexpr float volVal = 0.5f;
+        constexpr float toneFreqRatio = TONE_MAX_FREQ / TONE_MIN_FREQ;
+        float toneFreq = TONE_MIN_FREQ * std::pow(toneFreqRatio, toneVal);
+        fb.toneCutFilter.setFreqFast(toneFreq, effectiveSR);
+
+        TriodeState v1aT, v1bT;
+        DynamicMillerLP v1a_m, v1b_m;
+        v1a_m.init(CGP_12AX7, CGK_12AX7, 38500.0f, StageGains::V1A_GAIN);
+        v1b_m.init(CGP_12AX7, CGK_12AX7, 38500.0f, StageGains::V1B_GAIN);
+        v1a_m.recalc(effectiveSR);
+        v1b_m.recalc(effectiveSR);
+        float gainPotR = (1.0f - tt::audioTaper(gainVal)) * GAIN_POT_R_REAL;
+        v1b_m.rSource_real = std::min(V1B_RSOURCE_BASE_REAL + gainPotR, V1B_RSOURCE_MAX_REAL);
+
+        auto v1aG = makeV1aGrid(); auto v1bG = makeV1bGrid();
+        auto piG = makePIGrid();
+        auto elA = makeEL84Grid(); auto elB = makeEL84Grid();
+        recalcGridChargeDecay(v1aG, 0.022f, effectiveSR);
+        recalcGridChargeDecay(v1bG, 0.022f, effectiveSR);
+        recalcGridChargeDecay(piG, 0.047f, effectiveSR);
+        recalcGridChargeDecay(elA, 0.022f, effectiveSR);
+        recalcGridChargeDecay(elB, 0.022f, effectiveSR);
+
+        LTPModel ltp; ltp.init();
+        PowerSupplyModel psu; psu.init(); psu.recalcDecayCoeffs(effectiveSR);
+        SagEnvelope sag; sag.recalcCoeffs(effectiveSR);
+        SpeakerCoupling spk; spk.recalcFilters(effectiveSR);
+        OTSaturation otSat; otSat.recalcCoeffs(effectiveSR);
+
+        float el84BaseBias = PENTODE_BIAS_7W_N;
+
+        // Tap buffers for PSU voltage and key levels
+        int envWin = static_cast<int>(baseSR * 0.05f) * osFactor;
+        int nWins = osLen / envWin;
+        std::vector<float> vPreampTrace(nWins), vPiTrace(nWins), vPowerTrace(nWins);
+        std::vector<float> biasTrace(nWins), plateITrace(nWins);
+        std::vector<float> piGridChargeTrace(nWins);
+        std::vector<float> finalBuf(osLen), ltpBuf(osLen), preampBuf(osLen);
+
+        for (int i = 0; i < osLen; ++i) {
+            psu.update();
+            psu.resetCurrentDraw();
+            float vPreamp = psu.vPreamp();
+            float vPi = psu.vPi();
+            float vPlate = psu.vPower();
+            float vScreen = psu.vScreen();
+
+            float x = diOS[i] * VS::V_GUITAR;
+            x = fb.inputHP.process(x);
+            x = applyGridConduction(x, v1aG);
+            float v1a_in = x;
+            x = triodeWaveshaper(x, VS::V_BIAS_12AX7, vPreamp, PREAMP_RPLATE_N, v1aT);
+            x -= fb.v1a_cathodeBypass.process(x) * CATHODE_BYPASS_DEPTH;
+            x = fb.v1a_couplingHP.process(x);
+            float g1 = (std::abs(v1a_in) > 1e-8f) ? std::abs(x) / std::abs(v1a_in) : StageGains::V1A_GAIN;
+            x = v1a_m.process(x, g1, effectiveSR);
+            psu.reportPreampLevel(x);
+            x *= tt::audioTaper(gainVal);
+            x = applyGridConduction(x, v1bG);
+            float v1b_in = x;
+            x = triodeWaveshaper(x, VS::V_BIAS_12AX7, vPreamp, PREAMP_RPLATE_N, v1bT);
+            x -= fb.v1b_cathodeBypass.process(x) * CATHODE_BYPASS_DEPTH;
+            x = fb.v1b_couplingHP.process(x);
+            float g2 = (std::abs(v1b_in) > 1e-8f) ? std::abs(x) / std::abs(v1b_in) : StageGains::V1B_GAIN;
+            x = v1b_m.process(x, g2, effectiveSR);
+            psu.reportPreampLevel(x);
+            x *= tt::audioTaper(gainVal);
+            x = fb.gainLoadingLP.process(x);
+            preampBuf[i] = x;
+
+            x = applyGridConduction(x, piG);
+            LTPOutput l = solveLTP(x, vPi, ltp);
+            float pA = fb.pi_couplingHP_A.process(l.piA);
+            float pB = fb.pi_couplingHP_B.process(l.piB);
+            psu.reportPiLevel(std::max(std::abs(pA), std::abs(pB)));
+            float d = pA - pB, s = pA + pB;
+            float od = fb.toneCutFilter.process(d);
+            pA = (s + od) * 0.5f; pB = (s - od) * 0.5f;
+            ltpBuf[i] = pA;
+            float v = tt::audioTaper(volVal);
+            pA *= v; pB *= v;
+
+            float effectiveBias = el84BaseBias + sag.biasOffset();
+            pA = applyGridConduction(pA, elA);
+            pB = applyGridConduction(pB, elB);
+            float cA = softConductionCurve(pA, effectiveBias);
+            float cB = softConductionCurve(pB, effectiveBias);
+            PentodeOutput ppA = pentodeWaveshaper(pA, effectiveBias, vPlate, vScreen);
+            PentodeOutput ppB = pentodeWaveshaper(pB, effectiveBias, vPlate, vScreen);
+            float pw = ppA.plateCurrent * cA - ppB.plateCurrent * cB;
+            float tp = std::abs(ppA.plateCurrent) + std::abs(ppB.plateCurrent);
+            psu.reportPowerDirect(tp, ppA.screenCurrent + ppB.screenCurrent);
+            sag.update(tp);
+
+            pw *= OT_CURRENT_SCALE;
+            float oi = spk.process(pw);
+            float os2 = otSat.process(oi);
+            float oo = fb.ot_leakageLP.process(os2);
+            float co = fb.cab_presence.process(oo);
+            co = fb.cab_rolloff.process(co);
+            co = fb.cab_notch.process(co);
+            co = std::tanh(co);
+            finalBuf[i] = co;
+
+            // Record PSU state per-window
+            int w = i / envWin;
+            if (w < nWins && (i % envWin == envWin - 1)) {
+                vPreampTrace[w] = psu.vPreamp();
+                vPiTrace[w] = psu.vPi();
+                vPowerTrace[w] = psu.vPower();
+                biasTrace[w] = sag.biasOffset();
+                plateITrace[w] = sag.envelope;
+                piGridChargeTrace[w] = piG.couplingCapCharge;
+            }
+        }
+
+        auto envFinal  = rmsEnvelope(finalBuf, envWin);
+        auto envLTP    = rmsEnvelope(ltpBuf, envWin);
+        auto envPreamp = rmsEnvelope(preampBuf, envWin);
+
+        printf("\n=== DYNAMICS @ GAIN=%.1f, INPUT x%.0f ===\n", gainVal * 10.0f, inputScale);
+        printf("%-5s  %-7s  %-7s  %-7s  %-8s  %-8s  %-9s  %-10s\n",
+               "Time", "Preamp", "LTP", "Final",
+               "vPreamp", "vPi", "BiasOff", "PI_GridQ");
+        int show = std::min(nWins, 30);
+        for (int i = 0; i < show; ++i) {
+            float t = i * 0.05f;
+            printf("%4.2f  %6.1f  %6.1f  %6.1f  %7.1f  %7.1f  %+8.5f  %9.6f\n",
+                   t,
+                   toDB(envPreamp[i]),
+                   toDB(envLTP[i]),
+                   toDB(envFinal[i]),
+                   VS::toVolts(vPreampTrace[i]),
+                   VS::toVolts(vPiTrace[i]),
+                   biasTrace[i],
+                   VS::toVolts(piGridChargeTrace[i]));
+        }
+
+        // Summary
+        float peakFinal = -200.0f, dipFinal = 200.0f;
+        for (int i = 0; i < show; ++i) {
+            float db = toDB(envFinal[i]);
+            if (db > peakFinal) peakFinal = db;
+            if (db < dipFinal && i > 1) dipFinal = db;
+        }
+        float vPreampMin = 999.0f, vPreampMax = -999.0f;
+        for (int i = 0; i < show; ++i) {
+            float v = VS::toVolts(vPreampTrace[i]);
+            vPreampMin = std::min(vPreampMin, v);
+            vPreampMax = std::max(vPreampMax, v);
+        }
+        printf("  Final swing: %.1f dB (peak %.1f, dip %.1f)\n",
+               peakFinal - dipFinal, peakFinal, dipFinal);
+        printf("  vPreamp range: %.1f – %.1f V (droop: %.1f V)\n",
+               vPreampMin, vPreampMax, vPreampMax - vPreampMin);
+    }
+
+    REQUIRE(true);  // diagnostic only
+}
