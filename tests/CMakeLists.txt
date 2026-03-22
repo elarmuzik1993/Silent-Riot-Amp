@@ -20,6 +20,7 @@ add_executable(TinyTerrorTests
     signal_chain_tests.cpp
     speaker_tests.cpp
     ot_saturation_tests.cpp
+    dynamics_diagnostic_tests.cpp
     level_trace_test.cpp
 
     # DSP source files (tests call functions defined in these)
