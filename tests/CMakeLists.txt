@@ -8,7 +8,7 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(Catch2)
 
 # ── Test executable — all test files ──
-add_executable(TinyTerrorTests
+add_executable(SilentRiotTests
     # Test files
     voltage_scale_tests.cpp
     triode_tests.cpp
@@ -36,21 +36,21 @@ add_executable(TinyTerrorTests
     # JUCE headers and no test file exercises them directly.
 )
 
-target_link_libraries(TinyTerrorTests PRIVATE Catch2::Catch2WithMain)
-target_include_directories(TinyTerrorTests PRIVATE
+target_link_libraries(SilentRiotTests PRIVATE Catch2::Catch2WithMain)
+target_include_directories(SilentRiotTests PRIVATE
     ${CMAKE_SOURCE_DIR}/src
     ${CMAKE_SOURCE_DIR}/tests
 )
 
 # C++17 to match main project
-target_compile_features(TinyTerrorTests PRIVATE cxx_std_17)
+target_compile_features(SilentRiotTests PRIVATE cxx_std_17)
 
 include(CTest)
 include(Catch)
-catch_discover_tests(TinyTerrorTests)
+catch_discover_tests(SilentRiotTests)
 
 # ── JUCE-dependent tests (cabinet IR, convolution) ──
-add_executable(TinyTerrorJuceTests
+add_executable(SilentRiotJuceTests
     cabinet_ir_tests.cpp
 
     ${CMAKE_SOURCE_DIR}/src/dsp/cabinet/CabinetSim.cpp
@@ -58,23 +58,23 @@ add_executable(TinyTerrorJuceTests
     ${CMAKE_SOURCE_DIR}/src/dsp/filters/FilterBank.cpp
 )
 
-target_link_libraries(TinyTerrorJuceTests PRIVATE
+target_link_libraries(SilentRiotJuceTests PRIVATE
     Catch2::Catch2WithMain
     juce::juce_dsp
     juce::juce_audio_formats
     juce::juce_audio_basics
 )
 
-target_compile_definitions(TinyTerrorJuceTests PRIVATE
+target_compile_definitions(SilentRiotJuceTests PRIVATE
     JUCE_WEB_BROWSER=0
     JUCE_USE_CURL=0
 )
 
-target_include_directories(TinyTerrorJuceTests PRIVATE
+target_include_directories(SilentRiotJuceTests PRIVATE
     ${CMAKE_SOURCE_DIR}/src
     ${CMAKE_SOURCE_DIR}/tests
 )
 
-target_compile_features(TinyTerrorJuceTests PRIVATE cxx_std_17)
+target_compile_features(SilentRiotJuceTests PRIVATE cxx_std_17)
 
-catch_discover_tests(TinyTerrorJuceTests)
+catch_discover_tests(SilentRiotJuceTests)

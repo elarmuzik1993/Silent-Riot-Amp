@@ -1,9 +1,9 @@
 cmake_minimum_required(VERSION 3.22)
 
-project(TinyTerror
+project(SilentRiot
     VERSION 0.3.3
     LANGUAGES CXX
-    DESCRIPTION "Monolit Beatz — Silent Riot Amp Sim (Orange Tiny Terror DSP Model)"
+    DESCRIPTION "Monolit Beatz — Silent Riot Amp Sim"
 )
 
 set(CMAKE_CXX_STANDARD 17)
@@ -11,7 +11,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # ── Options ─────────────────────────────────────
-option(TT_BUILD_TESTS   "Build unit tests"   OFF)
+option(SR_BUILD_TESTS   "Build unit tests"   OFF)
 
 # ── JUCE via FetchContent ───────────────────────
 include(FetchContent)
@@ -24,10 +24,10 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(JUCE)
 
 # ── Plugin target ───────────────────────────────
-juce_add_plugin(TinyTerror
+juce_add_plugin(SilentRiot
     COMPANY_NAME            "Monolit Beatz"
     PLUGIN_MANUFACTURER_CODE Mnlt
-    PLUGIN_CODE              Mtt1
+    PLUGIN_CODE              SiRi
     FORMATS                  VST3 Standalone    # add AU LV2 as needed
     PRODUCT_NAME             "Silent Riot"
     IS_SYNTH                 FALSE
@@ -40,7 +40,7 @@ juce_add_plugin(TinyTerror
 )
 
 # ── Source files (mirrors spec Section 6 class hierarchy) ──
-target_sources(TinyTerror
+target_sources(SilentRiot
     PRIVATE
         # Core processor + editor
         src/PluginProcessor.cpp
@@ -120,7 +120,7 @@ target_sources(TinyTerror
 )
 
 # ── Binary resources ────────────────────────────
-juce_add_binary_data(TinyTerrorData
+juce_add_binary_data(SilentRiotData
     SOURCES
         resources/fonts/SpaceMono-Regular.ttf
         resources/fonts/SpaceMono-Bold.ttf
@@ -131,7 +131,7 @@ juce_add_binary_data(TinyTerrorData
 )
 
 # ── Compile definitions ─────────────────────────
-target_compile_definitions(TinyTerror
+target_compile_definitions(SilentRiot
     PUBLIC
         JUCE_WEB_BROWSER=0
         JUCE_USE_CURL=0
@@ -145,9 +145,9 @@ if(UNIX AND NOT APPLE)
 endif()
 
 # ── Link ────────────────────────────────────────
-target_link_libraries(TinyTerror
+target_link_libraries(SilentRiot
     PRIVATE
-        TinyTerrorData
+        SilentRiotData
         juce::juce_audio_utils
         juce::juce_audio_processors
         juce::juce_audio_formats
@@ -162,10 +162,10 @@ target_link_libraries(TinyTerror
         juce::juce_recommended_warning_flags
 )
 
-target_include_directories(TinyTerror PRIVATE ${CMAKE_SOURCE_DIR}/src)
+target_include_directories(SilentRiot PRIVATE ${CMAKE_SOURCE_DIR}/src)
 
 # ── Tests ───────────────────────────────────────
-if(TT_BUILD_TESTS)
+if(SR_BUILD_TESTS)
     enable_testing()
     add_subdirectory(tests)
 endif()
