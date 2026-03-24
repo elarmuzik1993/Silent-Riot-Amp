@@ -2,7 +2,7 @@
 #include "ColourPalette.h"
 #include "FontData.h"
 
-namespace tt {
+namespace sr {
 
 IRWaveformDisplay::IRWaveformDisplay() {}
 
@@ -132,4 +132,4 @@ void IRWaveformDisplay::paint(juce::Graphics& g)
     }
 }
 
-} // namespace tt
+} // namespace sr

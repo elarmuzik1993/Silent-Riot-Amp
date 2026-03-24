@@ -1,6 +1,6 @@
 #include "TriodeWaveshaper.h"
 
-namespace tt {
+namespace sr {
 
 static const KorenTriodeParams ecc83 = makeECC83Params();
 
@@ -33,4 +33,4 @@ float triodeWaveshaper(float vGrid_n, float vBias_n, float vSupply_n, float rPla
     return vPlate;
 }
 
-} // namespace tt
+} // namespace sr

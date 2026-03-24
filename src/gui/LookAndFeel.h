@@ -1,7 +1,7 @@
 #pragma once
 #include <juce_gui_basics/juce_gui_basics.h>
 
-namespace tt {
+namespace sr {
 
 struct SilentRiotLookAndFeel : public juce::LookAndFeel_V4 {
     SilentRiotLookAndFeel();
@@ -14,4 +14,4 @@ struct SilentRiotLookAndFeel : public juce::LookAndFeel_V4 {
 // Keep alias for backward compat during transition
 using OrangeLookAndFeel = SilentRiotLookAndFeel;
 
-} // namespace tt
+} // namespace sr

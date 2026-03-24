@@ -1,7 +1,7 @@
 #pragma once
 #include <cmath>
 
-namespace tt {
+namespace sr {
 
 struct ParamSmoother {
     float current = 0.0f;
@@ -22,4 +22,4 @@ struct ParamSmoother {
     void setImmediate(float value) { current = target = value; }
 };
 
-} // namespace tt
+} // namespace sr

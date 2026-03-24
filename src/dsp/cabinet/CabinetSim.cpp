@@ -1,7 +1,7 @@
 #include "CabinetSim.h"
 #include "IRLibrary.h"
 
-namespace tt {
+namespace sr {
 
 void CabinetSim::prepare(double sampleRate, int maxBlockSize, int numChannels)
 {
@@ -130,4 +130,4 @@ double CabinetSim::getIRTailSeconds() const
     return static_cast<double>(currentIRLengthSamples) / irNativeSampleRate;
 }
 
-} // namespace tt
+} // namespace sr

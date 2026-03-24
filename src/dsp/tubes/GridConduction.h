@@ -5,7 +5,7 @@
 #include "../../utils/Constants.h"
 #include <cmath>
 
-namespace tt {
+namespace sr {
 
 struct GridConductionModel {
     float conductionThreshold;
@@ -26,4 +26,4 @@ GridConductionModel makeEL84Grid();
 
 void recalcGridChargeDecay(GridConductionModel& m, float tauSec, float effectiveSR);
 
-} // namespace tt
+} // namespace sr

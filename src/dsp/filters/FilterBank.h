@@ -6,7 +6,7 @@
 #include "Biquad.h"
 #include "../../utils/Constants.h"
 
-namespace tt {
+namespace sr {
 
 struct FilterBank {
     float effectiveSR = 44100.0f;
@@ -36,4 +36,4 @@ struct FilterBank {
     void resetAll();
 };
 
-} // namespace tt
+} // namespace sr

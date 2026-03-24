@@ -9,7 +9,7 @@
 #include <algorithm>
 #include "../../utils/Constants.h"
 
-namespace tt {
+namespace sr {
 
 struct Biquad {
     float b0 = 1.0f, b1 = 0.0f, b2 = 0.0f, a1 = 0.0f, a2 = 0.0f;
@@ -92,4 +92,4 @@ struct Biquad {
     }
 };
 
-} // namespace tt
+} // namespace sr

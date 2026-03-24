@@ -4,7 +4,7 @@
 #include "../../utils/Constants.h"
 #include <algorithm>
 
-namespace tt {
+namespace sr {
 
 struct LTPModel {
     float tailR_n, rPlateA_n, rPlateB_n, vBiasRef, vCathode;
@@ -22,4 +22,4 @@ struct LTPOutput {
 
 LTPOutput solveLTP(float vInput_n, float vSupply_n, LTPModel& ltp);
 
-} // namespace tt
+} // namespace sr

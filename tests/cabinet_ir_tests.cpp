@@ -8,7 +8,7 @@
 #include "dsp/cabinet/IRLibrary.h"
 #include "dsp/cabinet/CabinetSim.h"
 
-using namespace tt;
+using namespace sr;
 
 // ═══════════════════════════════════════════════════════════════
 // Stock IR Registry

@@ -7,7 +7,7 @@
 #include <cmath>
 #include "../../utils/Constants.h"
 
-namespace tt {
+namespace sr {
 
 struct OnePoleLP {
     float b0 = 0.0f, b1 = 0.0f, a1 = 0.0f;
@@ -71,4 +71,4 @@ struct OnePoleHP {
     void reset() { z1 = 0.0f; }
 };
 
-} // namespace tt
+} // namespace sr

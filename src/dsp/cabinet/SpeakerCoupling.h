@@ -5,7 +5,7 @@
 #include <cmath>
 #include <algorithm>
 
-namespace tt {
+namespace sr {
 
 struct SpeakerCoupling {
     OnePoleLP xoverLow, xoverHigh;  // complementary 3-way crossover
@@ -20,4 +20,4 @@ struct SpeakerCoupling {
     float process(float powerOut);
 };
 
-} // namespace tt
+} // namespace sr

@@ -12,7 +12,7 @@
 TinyTerrorEditor::TinyTerrorEditor(TinyTerrorProcessor& p)
     : AudioProcessorEditor(&p), proc(p)
 {
-    tt::Fonts::init();
+    sr::Fonts::init();
     setLookAndFeel(&lnf);
     setOpaque(true);
 
@@ -63,7 +63,7 @@ TinyTerrorEditor::TinyTerrorEditor(TinyTerrorProcessor& p)
 
     // Set selected IR and hint text from parameter
     {
-        int irIdx = static_cast<int>(proc.apvts.getRawParameterValue(tt::Params::IDs::IR_INDEX)->load());
+        int irIdx = static_cast<int>(proc.apvts.getRawParameterValue(sr::Params::IDs::IR_INDEX)->load());
         irLoaderPanel.setSelectedIR(irIdx);
         if (irIdx >= 1 && irIdx <= proc.getNumUserIRs())
             irSectionBar.setHintText(proc.getUserIR(irIdx - 1).name);
@@ -111,7 +111,7 @@ TinyTerrorEditor::TinyTerrorEditor(TinyTerrorProcessor& p)
         contentArea.setTransform(juce::AffineTransform::scale(currentScale));
         setWindowBackground();
 #if JUCE_LINUX
-        static const int maxH = kBaseH + tt::IRLoaderPanel::panelHeight + tt::AdvancedPanel::panelHeight;
+        static const int maxH = kBaseH + sr::IRLoaderPanel::panelHeight + sr::AdvancedPanel::panelHeight;
         setSize(static_cast<int>(kWindowW * currentScale),
                 static_cast<int>(maxH * currentScale));
         lastShapeH = 0;
@@ -125,12 +125,12 @@ TinyTerrorEditor::TinyTerrorEditor(TinyTerrorProcessor& p)
 
     // Preset selector wiring
     header.getPresetSelector().onPresetChanged = [this](int idx) {
-        if (auto* param = proc.apvts.getParameter(tt::Params::IDs::PRESET_IDX))
+        if (auto* param = proc.apvts.getParameter(sr::Params::IDs::PRESET_IDX))
             param->setValueNotifyingHost(param->convertTo0to1(static_cast<float>(idx)));
     };
 
     // APVTS attachments
-    using namespace tt::Params;
+    using namespace sr::Params;
     gainA = std::make_unique<SliderA>(proc.apvts, IDs::GAIN,   gainKnob.getSlider());
     toneA = std::make_unique<SliderA>(proc.apvts, IDs::TONE,   toneKnob.getSlider());
     volA  = std::make_unique<SliderA>(proc.apvts, IDs::VOLUME, volumeKnob.getSlider());
@@ -162,7 +162,7 @@ TinyTerrorEditor::TinyTerrorEditor(TinyTerrorProcessor& p)
 
 #if JUCE_LINUX
     // Linux: max-size window, X11 Shape Extension clips to visible content
-    static const int maxH = kBaseH + tt::IRLoaderPanel::panelHeight + tt::AdvancedPanel::panelHeight;
+    static const int maxH = kBaseH + sr::IRLoaderPanel::panelHeight + sr::AdvancedPanel::panelHeight;
     setSize(static_cast<int>(kWindowW * currentScale),
             static_cast<int>(maxH * currentScale));
 #else
@@ -198,12 +198,12 @@ void TinyTerrorEditor::loadUIState()
     // Snap panel heights on restore (no animation)
     if (state.hasProperty("irPanelOpen") && static_cast<bool>(state.getProperty("irPanelOpen")))
     {
-        irPanelAnimH = static_cast<float>(tt::IRLoaderPanel::panelHeight);
+        irPanelAnimH = static_cast<float>(sr::IRLoaderPanel::panelHeight);
         irSectionBar.setOpen(true);
     }
     if (state.hasProperty("advPanelOpen") && static_cast<bool>(state.getProperty("advPanelOpen")))
     {
-        advPanelAnimH = static_cast<float>(tt::AdvancedPanel::panelHeight);
+        advPanelAnimH = static_cast<float>(sr::AdvancedPanel::panelHeight);
         advSectionBar.setOpen(true);
     }
 
@@ -324,8 +324,8 @@ void TinyTerrorEditor::timerCallback()
     // Animate collapsible sections within current window bounds
     {
         constexpr float kStep = 28.0f;
-        float irTarget  = irPanelOpen  ? static_cast<float>(tt::IRLoaderPanel::panelHeight)  : 0.0f;
-        float advTarget = advPanelOpen ? static_cast<float>(tt::AdvancedPanel::panelHeight) : 0.0f;
+        float irTarget  = irPanelOpen  ? static_cast<float>(sr::IRLoaderPanel::panelHeight)  : 0.0f;
+        float advTarget = advPanelOpen ? static_cast<float>(sr::AdvancedPanel::panelHeight) : 0.0f;
         bool animating = false;
 
         if (irPanelAnimH != irTarget)
@@ -358,7 +358,7 @@ void TinyTerrorEditor::timerCallback()
     }
 
     // Live VU meters
-    bool powerOn = proc.apvts.getRawParameterValue(tt::Params::IDs::POWER)->load() > 0.5f;
+    bool powerOn = proc.apvts.getRawParameterValue(sr::Params::IDs::POWER)->load() > 0.5f;
     if (powerOn)
     {
         vuIn.setLevel(proc.inputLevelForGUI.load(std::memory_order_relaxed));
@@ -381,7 +381,7 @@ void TinyTerrorEditor::timerCallback()
     if (advancedPanel.isVisible())
     {
         auto dspR = proc.getDSPReadout();
-        tt::DSPReadout guiR;
+        sr::DSPReadout guiR;
         guiR.vBPlus = dspR.vBPlus;
         guiR.vScreen = dspR.vScreen;
         guiR.vPi = dspR.vPi;
@@ -399,18 +399,18 @@ void TinyTerrorEditor::timerCallback()
 void TinyTerrorEditor::paint(juce::Graphics& g)
 {
     // Fixed gradient endpoint avoids background colour shifting during animation
-    float maxH = static_cast<float>(kBaseH + tt::IRLoaderPanel::panelHeight
-                                    + tt::AdvancedPanel::panelHeight) * currentScale;
+    float maxH = static_cast<float>(kBaseH + sr::IRLoaderPanel::panelHeight
+                                    + sr::AdvancedPanel::panelHeight) * currentScale;
     g.setGradientFill(juce::ColourGradient(
-        tt::Colours::bg2, 0.0f, 0.0f,
-        tt::Colours::bg,  0.0f, maxH,
+        sr::Colours::bg2, 0.0f, 0.0f,
+        sr::Colours::bg,  0.0f, maxH,
         false));
     g.fillAll();
 
     // Border at visible content height (shape clips everything below)
     float cw = kWindowW * currentScale;
     float ch = getContentHeight() * currentScale;
-    g.setColour(tt::Colours::border);
+    g.setColour(sr::Colours::border);
     g.drawRoundedRectangle(
         juce::Rectangle<float>(0.5f, 0.5f, cw - 1.0f, ch - 1.0f),
         6.0f, 1.0f);
@@ -418,7 +418,7 @@ void TinyTerrorEditor::paint(juce::Graphics& g)
 
 void TinyTerrorEditor::resized()
 {
-    static const int maxH = kBaseH + tt::IRLoaderPanel::panelHeight + tt::AdvancedPanel::panelHeight;
+    static const int maxH = kBaseH + sr::IRLoaderPanel::panelHeight + sr::AdvancedPanel::panelHeight;
     contentArea.setBounds(0, 0, kWindowW, maxH);
     layoutContent();
 }

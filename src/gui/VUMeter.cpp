@@ -2,7 +2,7 @@
 #include "ColourPalette.h"
 #include "FontData.h"
 
-namespace tt {
+namespace sr {
 
 VUMeter::VUMeter(const juce::String& l) : label(l)
 {
@@ -62,4 +62,4 @@ void VUMeter::paint(juce::Graphics& g)
     g.drawText(label, labelBox, juce::Justification::centredTop, false);
 }
 
-} // namespace tt
+} // namespace sr

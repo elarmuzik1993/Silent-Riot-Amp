@@ -2,7 +2,7 @@
 #include "ColourPalette.h"
 #include "FontData.h"
 
-namespace tt {
+namespace sr {
 
 PresetSelector::PresetSelector() {}
 
@@ -69,4 +69,4 @@ void PresetSelector::paint(juce::Graphics& g)
                juce::Justification::centred, false);
 }
 
-} // namespace tt
+} // namespace sr

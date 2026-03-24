@@ -90,27 +90,27 @@ private:
     void loadUserIRsFromState();
 
     // ── DSP state (matches spec Section 6 hierarchy) ──
-    tt::FilterBank          filterBank;
-    tt::DynamicMillerLP     v1a_miller, v1b_miller;
-    tt::SpeakerCoupling     speakerCoupling;
-    tt::OTSaturation        otSaturation;
-    tt::PowerSupplyModel    psu;
-    tt::SagEnvelope         sag;
-    tt::LTPModel            ltpModel;
-    tt::CabinetSim          cabSim;
-    tt::OversampleSwitcher  oversampleSwitcher;
+    sr::FilterBank          filterBank;
+    sr::DynamicMillerLP     v1a_miller, v1b_miller;
+    sr::SpeakerCoupling     speakerCoupling;
+    sr::OTSaturation        otSaturation;
+    sr::PowerSupplyModel    psu;
+    sr::SagEnvelope         sag;
+    sr::LTPModel            ltpModel;
+    sr::CabinetSim          cabSim;
+    sr::OversampleSwitcher  oversampleSwitcher;
 
     // Triode plate voltage cache (inter-sample)
-    tt::TriodeState v1aTriode, v1bTriode;
+    sr::TriodeState v1aTriode, v1bTriode;
 
     // Grid conduction per stage
-    tt::GridConductionModel v1aGrid, v1bGrid, piGrid, el84GridA, el84GridB;
+    sr::GridConductionModel v1aGrid, v1bGrid, piGrid, el84GridA, el84GridB;
 
     // Parameter smoothers
-    tt::ParamSmoother gainSmoother, toneSmoother, volumeSmoother;
+    sr::ParamSmoother gainSmoother, toneSmoother, volumeSmoother;
 
     // State
-    float el84BaseBias = tt::PENTODE_BIAS_15W_N;
+    float el84BaseBias = sr::PENTODE_BIAS_15W_N;
     float lastToneCoeffVal = -1.0f;            // tone coeff update threshold tracker
     float outputGainCompensation = 1.0f;   // scales cab output into tanh soft-clip range
     bool  psuFrozen    = false;

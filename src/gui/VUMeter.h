@@ -1,7 +1,7 @@
 #pragma once
 #include <juce_gui_basics/juce_gui_basics.h>
 
-namespace tt {
+namespace sr {
 
 class VUMeter : public juce::Component, private juce::Timer {
 public:
@@ -24,4 +24,4 @@ private:
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(VUMeter)
 };
 
-} // namespace tt
+} // namespace sr

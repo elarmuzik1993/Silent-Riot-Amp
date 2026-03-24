@@ -2,7 +2,7 @@
 #include "ColourPalette.h"
 #include "FontData.h"
 
-namespace tt {
+namespace sr {
 
 FooterBar::FooterBar() {}
 
@@ -60,4 +60,4 @@ void FooterBar::setStats(int os, float lat, double sr, int bd)
     repaint();
 }
 
-} // namespace tt
+} // namespace sr

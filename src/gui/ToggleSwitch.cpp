@@ -2,7 +2,7 @@
 #include "ColourPalette.h"
 #include "FontData.h"
 
-namespace tt {
+namespace sr {
 
 ToggleSwitch::ToggleSwitch(const juce::String& l, juce::Colour color)
     : label(l), activeColor(color)
@@ -70,4 +70,4 @@ void ToggleSwitch::paint(juce::Graphics& g)
     g.fillEllipse(thumbX, thumbY, thumbD, thumbD);
 }
 
-} // namespace tt
+} // namespace sr

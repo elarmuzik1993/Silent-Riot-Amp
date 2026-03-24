@@ -1,7 +1,7 @@
 #include "LookAndFeel.h"
 #include "ColourPalette.h"
 
-namespace tt {
+namespace sr {
 
 SilentRiotLookAndFeel::SilentRiotLookAndFeel()
 {
@@ -70,4 +70,4 @@ void SilentRiotLookAndFeel::drawToggleButton(juce::Graphics& g, juce::ToggleButt
     g.drawText(btn.getButtonText(), bounds, juce::Justification::centred);
 }
 
-} // namespace tt
+} // namespace sr

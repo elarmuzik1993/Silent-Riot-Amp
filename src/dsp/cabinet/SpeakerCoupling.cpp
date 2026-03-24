@@ -1,6 +1,6 @@
 #include "SpeakerCoupling.h"
 
-namespace tt {
+namespace sr {
 
 void SpeakerCoupling::init() {}
 
@@ -58,4 +58,4 @@ float SpeakerCoupling::process(float powerOut) {
     return powerOut * gainModSmooth;
 }
 
-} // namespace tt
+} // namespace sr

@@ -24,28 +24,28 @@
 #include "dsp/power/SagEnvelope.h"
 #include "dsp/filters/OnePole.h"
 
-using namespace tt;
-using namespace tt::test;
+using namespace sr;
+using namespace sr::test;
 using Catch::Approx;
 
 // ── Audio taper ──────────────────────────────────────────────
 
 TEST_CASE("Audio taper: 0 maps to 0", "[chain]") {
-    REQUIRE(tt::audioTaper(0.0f) == Approx(0.0f));
+    REQUIRE(sr::audioTaper(0.0f) == Approx(0.0f));
 }
 
 TEST_CASE("Audio taper: 1 maps to 1", "[chain]") {
-    REQUIRE(tt::audioTaper(1.0f) == Approx(1.0f));
+    REQUIRE(sr::audioTaper(1.0f) == Approx(1.0f));
 }
 
 TEST_CASE("Audio taper: 0.5 maps to 0.25 (squared)", "[chain]") {
-    REQUIRE(tt::audioTaper(0.5f) == Approx(0.25f));
+    REQUIRE(sr::audioTaper(0.5f) == Approx(0.25f));
 }
 
 TEST_CASE("Audio taper: monotonically increasing", "[chain]") {
     float prev = 0.0f;
     for (float x = 0.0f; x <= 1.0f; x += 0.01f) {
-        float y = tt::audioTaper(x);
+        float y = sr::audioTaper(x);
         REQUIRE(y >= prev - 1e-6f);
         prev = y;
     }
@@ -71,7 +71,7 @@ TEST_CASE("V1b: gain=1.0 drives plate toward floor", "[chain][v1b]") {
     // V1a output → Gain A (1.0) → V1b
     // With circuit model, large positive input drives plate voltage low
     float v1aOut = 0.1f;  // typical V1a AC output after coupling HP
-    float gainA = tt::audioTaper(1.0f);  // full gain
+    float gainA = sr::audioTaper(1.0f);  // full gain
     float v1bIn = v1aOut * gainA;
 
     float output = triodeWaveshaper(v1bIn, VS::V_BIAS_12AX7, VS::V_PREAMP, PREAMP_RPLATE_N);
@@ -83,7 +83,7 @@ TEST_CASE("V1b: gain=1.0 drives plate toward floor", "[chain][v1b]") {
 
 TEST_CASE("V1b: gain=0.0 produces zero output", "[chain][v1b]") {
     float v1aOut = 0.1f;
-    float gainA = tt::audioTaper(0.0f);  // gain pot at zero
+    float gainA = sr::audioTaper(0.0f);  // gain pot at zero
     float v1bIn = v1aOut * gainA;
     
     REQUIRE(v1bIn == Approx(0.0f));
@@ -190,7 +190,7 @@ TEST_CASE("Full preamp chain: guitar → V1a → gain → V1b produces sound", "
 
     // Gain pot at 50% (AC coupling would remove DC in real chain, but
     // for this test we just verify the chain produces non-zero output)
-    x *= tt::audioTaper(0.5f);
+    x *= sr::audioTaper(0.5f);
 
     // V1b
     x = triodeWaveshaper(x, VS::V_BIAS_12AX7, supply, PREAMP_RPLATE_N);

@@ -10,7 +10,7 @@
 
 #include <cmath>
 
-namespace tt {
+namespace sr {
 
 struct VoltageScale {
     // ── Primary references ──
@@ -66,4 +66,4 @@ struct VoltageScale {
 
 using VS = VoltageScale;
 
-} // namespace tt
+} // namespace sr

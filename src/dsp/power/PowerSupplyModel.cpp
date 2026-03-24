@@ -1,6 +1,6 @@
 #include "PowerSupplyModel.h"
 
-namespace tt {
+namespace sr {
 
 void PowerSupplyModel::init() {
     powerNode.init(V_POWER_NOMINAL_N,  TAU_POWER_MS);
@@ -63,4 +63,4 @@ void PowerSupplyModel::reportPowerDirect(float totalPlate, float totalScreen) {
     screenCurrent = totalScreen;
 }
 
-} // namespace tt
+} // namespace sr

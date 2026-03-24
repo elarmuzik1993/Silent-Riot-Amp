@@ -7,7 +7,7 @@
 #include "../../utils/Constants.h"
 #include <cmath>
 
-namespace tt {
+namespace sr {
 
 struct DynamicMillerLP {
     OnePoleLP filter;
@@ -37,4 +37,4 @@ struct DynamicMillerLP {
     void reset() { filter.reset(); fcSmooth = 20000.0f; }
 };
 
-} // namespace tt
+} // namespace sr

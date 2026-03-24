@@ -2,7 +2,7 @@
 #include "ColourPalette.h"
 #include "FontData.h"
 
-namespace tt {
+namespace sr {
 
 SettingsPanel::SettingsPanel()
 {
@@ -163,4 +163,4 @@ void SettingsPanel::resized()
                             static_cast<int>(selectorW), 22);
 }
 
-} // namespace tt
+} // namespace sr

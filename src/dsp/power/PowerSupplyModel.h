@@ -5,7 +5,7 @@
 #include <cmath>
 #include <algorithm>
 
-namespace tt {
+namespace sr {
 
 struct SupplyNode {
     float voltage, nominalVoltage, decay, tauMs;
@@ -47,4 +47,4 @@ struct PowerSupplyModel {
     float vPreamp() const { return preampNode.voltage; }
 };
 
-} // namespace tt
+} // namespace sr

@@ -8,7 +8,7 @@
 #include <juce_audio_basics/juce_audio_basics.h>
 #include <cmath>
 
-namespace tt {
+namespace sr {
 
 struct IRDescriptor {
     const char* id;            // e.g. "tt_1x12_v30"
@@ -89,4 +89,4 @@ inline juce::AudioBuffer<float> generateSyntheticIR(int stockIndex, const IRDesc
     return buffer;
 }
 
-} // namespace tt
+} // namespace sr

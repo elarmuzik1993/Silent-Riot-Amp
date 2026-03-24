@@ -1,7 +1,7 @@
 #pragma once
 #include <juce_gui_basics/juce_gui_basics.h>
 
-namespace tt {
+namespace sr {
 
 // Data struct for processor readout
 struct DSPReadout {
@@ -38,4 +38,4 @@ private:
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(AdvancedPanel)
 };
 
-} // namespace tt
+} // namespace sr
