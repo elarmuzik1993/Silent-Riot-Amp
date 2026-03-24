@@ -44,6 +44,9 @@ target_include_directories(SilentRiotTests PRIVATE
 
 # C++17 to match main project
 target_compile_features(SilentRiotTests PRIVATE cxx_std_17)
+target_compile_definitions(SilentRiotTests PRIVATE
+    SOURCE_DIR="${CMAKE_SOURCE_DIR}"
+)
 
 include(CTest)
 include(Catch)
