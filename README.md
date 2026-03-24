@@ -1,33 +1,20 @@
 # Silent Riot Amp
 
-This project is a guitar amplifier simulator.
+## Licensing
+
+This project is licensed under the GNU General Public License v3.0.
 
 ## Copyright
 
-Copyright (c) 2026 elarmuzik1993
+Copyright © 2026 Boris Miscenco. All rights reserved.
 
-## License
+## Architecture
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+The architecture of the Silent Riot Amp consists of:
+- A power amplifier circuit
+- A preamplifier stage
+- Tone control circuitry
+- Output stage
 
-## Installation
+All components are neatly arranged in a chassis for optimal performance and reliability.
 
-Clone the repo and run the setup script to install dependencies. 
-
-```bash
-git clone https://github.com/elarmuzik1993/Silent-Riot-Amp.git
-cd Silent-Riot-Amp
-bash setup.sh
-```
-
-## Usage
-
-To run the application use the command:
-
-```bash
-python main.py
-```
-
-## Contribution
-
-Feel free to create issues or pull requests. Contributions are welcome!
