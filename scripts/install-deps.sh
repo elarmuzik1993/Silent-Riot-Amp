@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-echo "Installing Ubuntu build deps for TinyTerror..."
+echo "Installing Ubuntu build deps for SilentRiot..."
 sudo apt-get update && sudo apt-get install -y \
   build-essential cmake ninja-build git pkg-config \
   libasound2-dev libjack-jackd2-dev libfreetype6-dev \

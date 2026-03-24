@@ -20,7 +20,7 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: SilentRiot-Linux-VST3
-        path: "build/TinyTerror_artefacts/Release/VST3/"
+        path: "build/SilentRiot_artefacts/Release/VST3/"
         if-no-files-found: warn
 
   build-windows:
@@ -35,13 +35,13 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: SilentRiot-Windows-VST3
-        path: "build/TinyTerror_artefacts/Release/VST3/"
+        path: "build/SilentRiot_artefacts/Release/VST3/"
         if-no-files-found: warn
     - name: Upload Standalone
       uses: actions/upload-artifact@v4
       with:
         name: SilentRiot-Windows-Standalone
-        path: "build/TinyTerror_artefacts/Release/Standalone/"
+        path: "build/SilentRiot_artefacts/Release/Standalone/"
         if-no-files-found: warn
 
   test:
@@ -57,6 +57,6 @@ jobs:
           libxext-dev libgl1-mesa-dev libwebkit2gtk-4.1-dev libcurl4-openssl-dev
     - name: Build + Test
       run: |
-        cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug -DTT_BUILD_TESTS=ON
+        cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug -DSR_BUILD_TESTS=ON
         cmake --build build
         cd build && ctest --output-on-failure

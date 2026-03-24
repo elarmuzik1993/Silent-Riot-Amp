@@ -1,5 +1,5 @@
 {"version":"0.2.0","configurations":[{
   "name":"Debug Standalone","type":"cppdbg","request":"launch",
-  "program":"${workspaceFolder}/build/TinyTerror_artefacts/Debug/Standalone/TinyTerror",
+  "program":"${workspaceFolder}/build/SilentRiot_artefacts/Debug/Standalone/Silent Riot",
   "cwd":"${workspaceFolder}","MIMode":"gdb","preLaunchTask":"Build"
 }]}
