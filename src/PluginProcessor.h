@@ -1,6 +1,6 @@
 #pragma once
 // ═══════════════════════════════════════════════════════════════
-// TinyTerrorProcessor — Spec Section 6 class hierarchy
+// SilentRiotProcessor — Spec Section 6 class hierarchy
 // ═══════════════════════════════════════════════════════════════
 
 #include <juce_audio_processors/juce_audio_processors.h>
@@ -25,12 +25,12 @@
 #include "dsp/cabinet/CabinetSim.h"
 #include "dsp/OversampleSwitcher.h"
 
-class TinyTerrorProcessor : public juce::AudioProcessor,
+class SilentRiotProcessor : public juce::AudioProcessor,
                             private juce::AsyncUpdater
 {
 public:
-    TinyTerrorProcessor();
-    ~TinyTerrorProcessor() override;
+    SilentRiotProcessor();
+    ~SilentRiotProcessor() override;
 
     void prepareToPlay(double sampleRate, int samplesPerBlock) override;
     void releaseResources() override;
@@ -126,5 +126,5 @@ public:
 
 private:
 
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(TinyTerrorProcessor)
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(SilentRiotProcessor)
 };

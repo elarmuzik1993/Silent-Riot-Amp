@@ -6,7 +6,7 @@
 
 using namespace sr;
 
-TinyTerrorProcessor::TinyTerrorProcessor()
+SilentRiotProcessor::SilentRiotProcessor()
     : AudioProcessor(BusesProperties()
           .withInput("Input",  juce::AudioChannelSet::stereo(), true)
           .withOutput("Output", juce::AudioChannelSet::stereo(), true)),
@@ -33,12 +33,12 @@ TinyTerrorProcessor::TinyTerrorProcessor()
     v1b_miller.init(CGP_12AX7, CGK_12AX7, V1B_RSOURCE_BASE_REAL, StageGains::V1B_GAIN);
 }
 
-TinyTerrorProcessor::~TinyTerrorProcessor()
+SilentRiotProcessor::~SilentRiotProcessor()
 {
     cancelPendingUpdate(); // prevent callback after destruction
 }
 
-void TinyTerrorProcessor::handleAsyncUpdate()
+void SilentRiotProcessor::handleAsyncUpdate()
 {
     // Runs on message thread — safe to allocate, do file I/O, acquire locks.
     int idx = pendingIRIndex.exchange(-1);
@@ -61,7 +61,7 @@ void TinyTerrorProcessor::handleAsyncUpdate()
     }
 }
 
-juce::AudioProcessorValueTreeState::ParameterLayout TinyTerrorProcessor::createParameterLayout()
+juce::AudioProcessorValueTreeState::ParameterLayout SilentRiotProcessor::createParameterLayout()
 {
     std::vector<std::unique_ptr<juce::RangedAudioParameter>> params;
 
@@ -100,7 +100,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout TinyTerrorProcessor::createP
     return { params.begin(), params.end() };
 }
 
-void TinyTerrorProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
+void SilentRiotProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 {
     baseSampleRate = sampleRate;
 
@@ -145,9 +145,9 @@ void TinyTerrorProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
     volumeSmoother.init(5.0f, effectiveSR);
 }
 
-void TinyTerrorProcessor::releaseResources() {}
+void SilentRiotProcessor::releaseResources() {}
 
-bool TinyTerrorProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const {
+bool SilentRiotProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const {
     auto mainIn  = layouts.getMainInputChannelSet();
     auto mainOut = layouts.getMainOutputChannelSet();
     if (mainOut != juce::AudioChannelSet::mono() && mainOut != juce::AudioChannelSet::stereo())
@@ -155,7 +155,7 @@ bool TinyTerrorProcessor::isBusesLayoutSupported(const BusesLayout& layouts) con
     return mainIn == mainOut;
 }
 
-void TinyTerrorProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer&)
+void SilentRiotProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer&)
 {
     juce::ScopedNoDenormals noDenormals;
 
@@ -415,7 +415,7 @@ void TinyTerrorProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     }
 }
 
-TinyTerrorProcessor::DSPReadout TinyTerrorProcessor::getDSPReadout() const
+SilentRiotProcessor::DSPReadout SilentRiotProcessor::getDSPReadout() const
 {
     DSPReadout r;
     r.vBPlus   = VS::toVolts(psu.vPower());
@@ -431,22 +431,22 @@ TinyTerrorProcessor::DSPReadout TinyTerrorProcessor::getDSPReadout() const
 }
 
 // ── Boilerplate ──
-juce::AudioProcessorEditor* TinyTerrorProcessor::createEditor() { return new TinyTerrorEditor(*this); }
-bool TinyTerrorProcessor::hasEditor() const { return true; }
-const juce::String TinyTerrorProcessor::getName() const { return JucePlugin_Name; }
-bool TinyTerrorProcessor::acceptsMidi() const { return false; }
-bool TinyTerrorProcessor::producesMidi() const { return false; }
-bool TinyTerrorProcessor::isMidiEffect() const { return false; }
-double TinyTerrorProcessor::getTailLengthSeconds() const { return cabSim.getIRTailSeconds(); }
-int TinyTerrorProcessor::getNumPrograms() { return 1; }
-int TinyTerrorProcessor::getCurrentProgram() { return 0; }
-void TinyTerrorProcessor::setCurrentProgram(int) {}
-const juce::String TinyTerrorProcessor::getProgramName(int) { return {}; }
-void TinyTerrorProcessor::changeProgramName(int, const juce::String&) {}
+juce::AudioProcessorEditor* SilentRiotProcessor::createEditor() { return new SilentRiotEditor(*this); }
+bool SilentRiotProcessor::hasEditor() const { return true; }
+const juce::String SilentRiotProcessor::getName() const { return JucePlugin_Name; }
+bool SilentRiotProcessor::acceptsMidi() const { return false; }
+bool SilentRiotProcessor::producesMidi() const { return false; }
+bool SilentRiotProcessor::isMidiEffect() const { return false; }
+double SilentRiotProcessor::getTailLengthSeconds() const { return cabSim.getIRTailSeconds(); }
+int SilentRiotProcessor::getNumPrograms() { return 1; }
+int SilentRiotProcessor::getCurrentProgram() { return 0; }
+void SilentRiotProcessor::setCurrentProgram(int) {}
+const juce::String SilentRiotProcessor::getProgramName(int) { return {}; }
+void SilentRiotProcessor::changeProgramName(int, const juce::String&) {}
 
 // ── User IR Management ──
 
-void TinyTerrorProcessor::loadUserIR(const juce::File& file)
+void SilentRiotProcessor::loadUserIR(const juce::File& file)
 {
     // Called from message thread (editor).
     juce::AudioFormatManager mgr;
@@ -479,7 +479,7 @@ void TinyTerrorProcessor::loadUserIR(const juce::File& file)
         param->setValueNotifyingHost(param->convertTo0to1(static_cast<float>(newIndex)));
 }
 
-void TinyTerrorProcessor::selectUserIR(int userIndex)
+void SilentRiotProcessor::selectUserIR(int userIndex)
 {
     // 0-based index into userIRs
     if (userIndex < 0 || userIndex >= static_cast<int>(userIRs.size())) return;
@@ -494,7 +494,7 @@ void TinyTerrorProcessor::selectUserIR(int userIndex)
         param->setValueNotifyingHost(param->convertTo0to1(static_cast<float>(paramIndex)));
 }
 
-void TinyTerrorProcessor::saveUserIRsToState()
+void SilentRiotProcessor::saveUserIRsToState()
 {
     // Remove any existing UserIRs node
     auto existing = apvts.state.getChildWithName("UserIRs");
@@ -524,7 +524,7 @@ void TinyTerrorProcessor::saveUserIRsToState()
     apvts.state.addChild(irsNode, -1, nullptr);
 }
 
-void TinyTerrorProcessor::loadUserIRsFromState()
+void SilentRiotProcessor::loadUserIRsFromState()
 {
     userIRs.clear();
 
@@ -567,14 +567,14 @@ void TinyTerrorProcessor::loadUserIRsFromState()
 
 // ── State Persistence ──
 
-void TinyTerrorProcessor::getStateInformation(juce::MemoryBlock& destData) {
+void SilentRiotProcessor::getStateInformation(juce::MemoryBlock& destData) {
     saveUserIRsToState();
     auto state = apvts.copyState();
     std::unique_ptr<juce::XmlElement> xml(state.createXml());
     copyXmlToBinary(*xml, destData);
 }
 
-void TinyTerrorProcessor::setStateInformation(const void* data, int sizeInBytes) {
+void SilentRiotProcessor::setStateInformation(const void* data, int sizeInBytes) {
     auto xml = getXmlFromBinary(data, sizeInBytes);
     if (xml && xml->hasTagName(apvts.state.getType()))
     {
@@ -583,4 +583,4 @@ void TinyTerrorProcessor::setStateInformation(const void* data, int sizeInBytes)
     }
 }
 
-juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter() { return new TinyTerrorProcessor(); }
+juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter() { return new SilentRiotProcessor(); }
