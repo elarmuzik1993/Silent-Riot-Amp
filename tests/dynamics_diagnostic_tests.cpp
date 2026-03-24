@@ -17,8 +17,8 @@
 #include "dsp/cabinet/OTSaturation.h"
 #include "dsp/power/SagEnvelope.h"
 
-using namespace tt;
-using namespace tt::test;
+using namespace sr;
+using namespace sr::test;
 // Approx not needed for these tests — all checks use relational operators
 
 // ── Helpers ─────────────────────────────────────────────────────

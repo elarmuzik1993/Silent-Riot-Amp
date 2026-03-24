@@ -2,7 +2,7 @@
 #include "ColourPalette.h"
 #include "FontData.h"
 
-namespace tt {
+namespace sr {
 
 AdvancedPanel::AdvancedPanel()
 {
@@ -124,4 +124,4 @@ void AdvancedPanel::paint(juce::Graphics& g)
     }
 }
 
-} // namespace tt
+} // namespace sr

@@ -1,7 +1,7 @@
 #pragma once
 #include <juce_gui_basics/juce_gui_basics.h>
 
-namespace tt {
+namespace sr {
 
 class SegmentedSelector : public juce::Component {
 public:
@@ -21,4 +21,4 @@ private:
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(SegmentedSelector)
 };
 
-} // namespace tt
+} // namespace sr

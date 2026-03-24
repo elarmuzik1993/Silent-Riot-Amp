@@ -1,7 +1,7 @@
 #include "FontData.h"
 #include "BinaryData.h"
 
-namespace tt::Fonts {
+namespace sr::Fonts {
 
 static juce::Typeface::Ptr smRegular, smBold;
 static juce::Typeface::Ptr dmRegular, dmMedium, dmSemiBold, dmBold;
@@ -44,4 +44,4 @@ juce::Font dmSans(float size, int weight)
     return f;
 }
 
-} // namespace tt::Fonts
+} // namespace sr::Fonts

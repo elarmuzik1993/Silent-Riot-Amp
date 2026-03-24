@@ -13,7 +13,7 @@
 #include <juce_audio_formats/juce_audio_formats.h>
 #include <atomic>
 
-namespace tt {
+namespace sr {
 
 // ── Thread-safe IR buffer transfer (JUCE ConvolutionDemo pattern) ──
 
@@ -93,4 +93,4 @@ private:
     int    currentIRLengthSamples = 0;
 };
 
-} // namespace tt
+} // namespace sr

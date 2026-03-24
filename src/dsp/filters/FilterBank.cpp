@@ -1,6 +1,6 @@
 #include "FilterBank.h"
 
-namespace tt {
+namespace sr {
 
 void FilterBank::recalcAll(float baseSampleRate, int oversampleFactor) {
     effectiveSR = baseSampleRate * oversampleFactor;
@@ -38,4 +38,4 @@ void FilterBank::resetAll() {
     cab_presence.reset(); cab_rolloff.reset(); cab_notch.reset();
 }
 
-} // namespace tt
+} // namespace sr

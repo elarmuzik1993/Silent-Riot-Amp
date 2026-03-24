@@ -2,7 +2,7 @@
 #include "ColourPalette.h"
 #include "FontData.h"
 
-namespace tt {
+namespace sr {
 
 HeaderBar::HeaderBar()
 {
@@ -118,4 +118,4 @@ void HeaderBar::resized()
                              static_cast<int>(selectorW), static_cast<int>(selectorH));
 }
 
-} // namespace tt
+} // namespace sr

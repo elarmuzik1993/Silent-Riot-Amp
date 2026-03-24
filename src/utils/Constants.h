@@ -7,7 +7,7 @@
 
 #include "VoltageScale.h"
 
-namespace tt {
+namespace sr {
 
 // ── Stage gains (dimensionless) ─────────────────────────────
 namespace StageGains {
@@ -144,4 +144,4 @@ constexpr float GAIN_TAPER_EXPONENT = 2.0f;
 #define VS_ASSERT_RANGE(val, lo, hi, stage) ((void)0)
 #endif
 
-} // namespace tt
+} // namespace sr

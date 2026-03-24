@@ -1,7 +1,7 @@
 #pragma once
 #include <juce_core/juce_core.h>
 
-namespace tt::Params {
+namespace sr::Params {
 
 // Parameter IDs — must match UI spec §7.1 and DSP spec §7
 // DSP internal range: 0.0–1.0 (knobs), bool (toggles)
@@ -18,4 +18,4 @@ namespace IDs {
     static const juce::String IR_INDEX    = "irIndex";     // int: 0–N
 }
 
-} // namespace tt::Params
+} // namespace sr::Params

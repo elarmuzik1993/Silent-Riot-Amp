@@ -1,7 +1,7 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/catch_approx.hpp>
 #include "utils/VoltageScale.h"
-using namespace tt;
+using namespace sr;
 using Catch::Approx;
 
 // ═══════════════════════════════════════════════════════════════

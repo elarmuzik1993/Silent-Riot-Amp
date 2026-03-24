@@ -9,7 +9,7 @@
 #include <cmath>
 #include <algorithm>
 
-namespace tt {
+namespace sr {
 
 struct SagEnvelope {
     float envelope     = SAG_QUIESCENT_I_N;  // init at idle cathode current
@@ -40,4 +40,4 @@ struct SagEnvelope {
     }
 };
 
-} // namespace tt
+} // namespace sr

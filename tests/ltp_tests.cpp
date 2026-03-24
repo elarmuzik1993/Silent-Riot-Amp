@@ -15,8 +15,8 @@
 #include "test_helpers.h"
 #include "dsp/power/LTPSolver.h"
 
-using namespace tt;
-using namespace tt::test;
+using namespace sr;
+using namespace sr::test;
 using Catch::Approx;
 
 static LTPModel freshLTP() {

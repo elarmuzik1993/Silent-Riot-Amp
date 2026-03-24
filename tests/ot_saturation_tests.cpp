@@ -14,8 +14,8 @@
 #include "test_helpers.h"
 #include "dsp/cabinet/OTSaturation.h"
 
-using namespace tt;
-using namespace tt::test;
+using namespace sr;
+using namespace sr::test;
 using Catch::Approx;
 
 TEST_CASE("OT saturation: zero input produces zero output", "[ot_sat]") {

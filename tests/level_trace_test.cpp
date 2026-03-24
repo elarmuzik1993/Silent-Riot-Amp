@@ -15,8 +15,8 @@
 
 #include <cstdio>
 
-using namespace tt;
-using namespace tt::test;
+using namespace sr;
+using namespace sr::test;
 
 // Simulate the full signal chain for N samples of a sine wave at given gain/volume,
 // return peak |output| at each stage.

@@ -17,8 +17,8 @@
 #include "dsp/filters/Biquad.h"
 #include "dsp/filters/DynamicMillerLP.h"
 
-using namespace tt;
-using namespace tt::test;
+using namespace sr;
+using namespace sr::test;
 using Catch::Approx;
 
 // ── OnePole LP ───────────────────────────────────────────────

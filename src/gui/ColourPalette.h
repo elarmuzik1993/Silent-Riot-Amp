@@ -1,7 +1,7 @@
 #pragma once
 #include <juce_gui_basics/juce_gui_basics.h>
 
-namespace tt::Colours {
+namespace sr::Colours {
 
 // Background
 inline const juce::Colour bg         { 0xFF08080C };
@@ -36,4 +36,4 @@ inline const juce::Colour red        { 0xFFE84040 };
 inline const juce::Colour teal       { 0xFF00CCB0 };
 inline const juce::Colour tealDim    { 0xFF009980 };
 
-} // namespace tt::Colours
+} // namespace sr::Colours

@@ -2,7 +2,7 @@
 #include "ColourPalette.h"
 #include "FontData.h"
 
-namespace tt {
+namespace sr {
 
 SegmentedSelector::SegmentedSelector(const juce::StringArray& opts, int defaultIdx)
     : options(opts), selectedIndex(defaultIdx) {}
@@ -64,4 +64,4 @@ void SegmentedSelector::paint(juce::Graphics& g)
     }
 }
 
-} // namespace tt
+} // namespace sr

@@ -2,7 +2,7 @@
 #include "ColourPalette.h"
 #include "FontData.h"
 
-namespace tt {
+namespace sr {
 
 IRLoaderPanel::IRLoaderPanel()
 {
@@ -267,4 +267,4 @@ void IRLoaderPanel::resized()
                               static_cast<int>(getWidth() - rx - 8.0f), 72);
 }
 
-} // namespace tt
+} // namespace sr

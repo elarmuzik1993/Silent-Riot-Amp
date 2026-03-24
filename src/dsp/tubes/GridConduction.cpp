@@ -1,6 +1,6 @@
 #include "GridConduction.h"
 
-namespace tt {
+namespace sr {
 
 float applyGridConduction(float vGrid, GridConductionModel& model) {
     float vAbove = vGrid - model.conductionThreshold;
@@ -43,4 +43,4 @@ void recalcGridChargeDecay(GridConductionModel& m, float tauSec, float effective
     m.chargeDecay = std::exp(-1.0f / (tauSec * effectiveSR));
 }
 
-} // namespace tt
+} // namespace sr

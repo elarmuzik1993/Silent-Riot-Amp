@@ -4,7 +4,7 @@
 #include <cmath>
 #include <algorithm>
 
-using namespace tt;
+using namespace sr;
 
 TinyTerrorProcessor::TinyTerrorProcessor()
     : AudioProcessor(BusesProperties()
@@ -130,7 +130,7 @@ void TinyTerrorProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
     cabSim.prepare(sampleRate, samplesPerBlock, getTotalNumOutputChannels());
 
     // Reload active user IR after prepare (convolution state was reset)
-    int irIdx = static_cast<int>(apvts.getRawParameterValue(tt::Params::IDs::IR_INDEX)->load());
+    int irIdx = static_cast<int>(apvts.getRawParameterValue(sr::Params::IDs::IR_INDEX)->load());
     if (irIdx > 0 && irIdx <= static_cast<int>(userIRs.size()))
     {
         auto& ir = userIRs[static_cast<size_t>(irIdx - 1)];
@@ -455,7 +455,7 @@ void TinyTerrorProcessor::loadUserIR(const juce::File& file)
     if (!reader) return;
 
     int numSamples = static_cast<int>(
-        std::min(reader->lengthInSamples, static_cast<juce::int64>(tt::MAX_USER_IR_SAMPLES)));
+        std::min(reader->lengthInSamples, static_cast<juce::int64>(sr::MAX_USER_IR_SAMPLES)));
     int numChannels = static_cast<int>(reader->numChannels);
 
     UserIREntry entry;
@@ -475,7 +475,7 @@ void TinyTerrorProcessor::loadUserIR(const juce::File& file)
     // Set IR_INDEX to the new IR (1-based)
     int newIndex = static_cast<int>(userIRs.size());
     cachedIRIndex = newIndex;  // prevent audio thread from re-triggering async load
-    if (auto* param = apvts.getParameter(tt::Params::IDs::IR_INDEX))
+    if (auto* param = apvts.getParameter(sr::Params::IDs::IR_INDEX))
         param->setValueNotifyingHost(param->convertTo0to1(static_cast<float>(newIndex)));
 }
 
@@ -490,7 +490,7 @@ void TinyTerrorProcessor::selectUserIR(int userIndex)
 
     int paramIndex = userIndex + 1; // 1-based
     cachedIRIndex = paramIndex;
-    if (auto* param = apvts.getParameter(tt::Params::IDs::IR_INDEX))
+    if (auto* param = apvts.getParameter(sr::Params::IDs::IR_INDEX))
         param->setValueNotifyingHost(param->convertTo0to1(static_cast<float>(paramIndex)));
 }
 
@@ -555,7 +555,7 @@ void TinyTerrorProcessor::loadUserIRsFromState()
     }
 
     // Reload active IR if saved
-    int irIndex = static_cast<int>(apvts.getRawParameterValue(tt::Params::IDs::IR_INDEX)->load());
+    int irIndex = static_cast<int>(apvts.getRawParameterValue(sr::Params::IDs::IR_INDEX)->load());
     if (irIndex > 0 && irIndex <= static_cast<int>(userIRs.size()))
     {
         auto& ir = userIRs[static_cast<size_t>(irIndex - 1)];

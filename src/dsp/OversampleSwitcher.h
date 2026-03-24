@@ -5,7 +5,7 @@
 #include <array>
 #include <memory>
 
-namespace tt {
+namespace sr {
 
 enum class OversampleTransition { Idle, FadingOut, Reconfiguring, FadingIn };
 
@@ -28,4 +28,4 @@ struct OversampleSwitcher {
     void applyTransitionFade(juce::AudioBuffer<float>& buffer);
 };
 
-} // namespace tt
+} // namespace sr

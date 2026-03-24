@@ -17,8 +17,8 @@
 #include "dsp/power/PowerSupplyModel.h"
 #include "dsp/power/SagEnvelope.h"
 
-using namespace tt;
-using namespace tt::test;
+using namespace sr;
+using namespace sr::test;
 using Catch::Approx;
 
 // ── PSU initialization ───────────────────────────────────────

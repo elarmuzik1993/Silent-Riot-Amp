@@ -1,6 +1,6 @@
 #include "PentodeWaveshaper.h"
 
-namespace tt {
+namespace sr {
 
 static const KorenPentodeParams el84 = makeEL84Params();
 
@@ -58,4 +58,4 @@ float softConductionCurve(float vGrid_n, float vBias_n) {
     return 0.5f * (1.0f + std::tanh(cutoffMargin / overlapWidth));
 }
 
-} // namespace tt
+} // namespace sr

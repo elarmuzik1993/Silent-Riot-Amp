@@ -1,7 +1,7 @@
 #include "LTPSolver.h"
 #include "../tubes/TriodeWaveshaper.h"
 
-namespace tt {
+namespace sr {
 
 static const KorenTriodeParams ecc83 = makeECC83Params();
 
@@ -49,4 +49,4 @@ LTPOutput solveLTP(float vInput_n, float vSupply_n, LTPModel& ltp) {
     return { vPlateA, vPlateB, ltp.vCathode };
 }
 
-} // namespace tt
+} // namespace sr

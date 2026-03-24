@@ -5,7 +5,7 @@
 #include <cmath>
 #include <algorithm>
 
-namespace tt {
+namespace sr {
 
 struct KorenTriodeParams {
     float mu;      // amplification factor (dimensionless)
@@ -48,4 +48,4 @@ inline float triodeWaveshaper(float vGrid_n, float vBias_n, float vSupply_n, flo
 
 inline float audioTaper(float x) { return x * x; }
 
-} // namespace tt
+} // namespace sr

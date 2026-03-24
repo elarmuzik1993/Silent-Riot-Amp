@@ -1,6 +1,6 @@
 #include "OversampleSwitcher.h"
 
-namespace tt {
+namespace sr {
 
 void OversampleSwitcher::init(int numChannels, int maxBlockSize) {
     // 0=2x, 1=4x, 2=8x
@@ -71,4 +71,4 @@ void OversampleSwitcher::applyTransitionFade(juce::AudioBuffer<float>& buffer) {
     }
 }
 
-} // namespace tt
+} // namespace sr

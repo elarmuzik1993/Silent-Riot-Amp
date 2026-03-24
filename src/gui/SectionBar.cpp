@@ -2,7 +2,7 @@
 #include "ColourPalette.h"
 #include "FontData.h"
 
-namespace tt {
+namespace sr {
 
 SectionBar::SectionBar(const juce::String& l) : label(l) {}
 
@@ -73,4 +73,4 @@ void SectionBar::paint(juce::Graphics& g)
     g.fillRect(0.0f, bounds.getHeight() - 1.0f, bounds.getWidth(), 1.0f);
 }
 
-} // namespace tt
+} // namespace sr

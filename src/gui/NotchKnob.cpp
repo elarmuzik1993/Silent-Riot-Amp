@@ -2,7 +2,7 @@
 #include "ColourPalette.h"
 #include "FontData.h"
 
-namespace tt {
+namespace sr {
 
 static float degToRad(float deg) { return deg * juce::MathConstants<float>::pi / 180.0f; }
 
@@ -169,4 +169,4 @@ void NotchKnob::drawNotchPointer(juce::Graphics& g, float cx, float cy, float an
     g.fillPath(notch);
 }
 
-} // namespace tt
+} // namespace sr

@@ -25,8 +25,8 @@
 #include <vector>
 #include <cstdio>
 
-using namespace tt;
-using namespace tt::test;
+using namespace sr;
+using namespace sr::test;
 
 // ── Load raw float32 mono samples from file ─────────────────────
 static std::vector<float> loadRawFloat(const char* path) {
@@ -178,7 +178,7 @@ TEST_CASE("DI chain trace: envelope at tap points", "[di_trace]") {
         psu.reportPreampLevel(x);
 
         // Gain pot A (audio taper: Spec §3.3)
-        x *= tt::audioTaper(gainVal);
+        x *= sr::audioTaper(gainVal);
 
         // Stage 2: V1b
         x = applyGridConduction(x, v1bGrid);
@@ -191,7 +191,7 @@ TEST_CASE("DI chain trace: envelope at tap points", "[di_trace]") {
         psu.reportPreampLevel(x);
 
         // Gain pot B (audio taper: Spec §3.3) + loading LP
-        x *= tt::audioTaper(gainVal);
+        x *= sr::audioTaper(gainVal);
         x = fb.gainLoadingLP.process(x);
         tapPreamp[i] = x;
 
@@ -211,7 +211,7 @@ TEST_CASE("DI chain trace: envelope at tap points", "[di_trace]") {
         tapLTP[i] = piA;
 
         // Master volume
-        float vol = tt::audioTaper(volVal);
+        float vol = sr::audioTaper(volVal);
         piA *= vol;
         piB *= vol;
         tapPentodeIn[i] = piA;
@@ -307,7 +307,7 @@ TEST_CASE("DI chain trace: envelope at tap points", "[di_trace]") {
         float g1 = (std::abs(v1a_in) > 1e-8f) ? std::abs(x) / std::abs(v1a_in) : StageGains::V1A_GAIN;
         x = v1a_m2.process(x, g1, effectiveSR);
         psu2.reportPreampLevel(x);
-        x *= tt::audioTaper(gainVal);
+        x *= sr::audioTaper(gainVal);
         x = applyGridConduction(x, v1bG2);
         float v1b_in = x;
         x = triodeWaveshaper(x, VS::V_BIAS_12AX7, vPreamp, PREAMP_RPLATE_N, v1bT2);
@@ -316,7 +316,7 @@ TEST_CASE("DI chain trace: envelope at tap points", "[di_trace]") {
         float g2 = (std::abs(v1b_in) > 1e-8f) ? std::abs(x) / std::abs(v1b_in) : StageGains::V1B_GAIN;
         x = v1b_m2.process(x, g2, effectiveSR);
         psu2.reportPreampLevel(x);
-        x *= tt::audioTaper(gainVal);
+        x *= sr::audioTaper(gainVal);
         x = fb2.gainLoadingLP.process(x);
         x = applyGridConduction(x, piG2);
         LTPOutput l = solveLTP(x, vPi, ltp2);
@@ -327,7 +327,7 @@ TEST_CASE("DI chain trace: envelope at tap points", "[di_trace]") {
         float od = fb2.toneCutFilter.process(d);
         pA = (s + od) * 0.5f;
         pB = (s - od) * 0.5f;
-        float v = tt::audioTaper(volVal);
+        float v = sr::audioTaper(volVal);
         pA *= v; pB *= v;
 
         // FIXED bias — no sag
@@ -505,7 +505,7 @@ TEST_CASE("DI dynamics: PSU + sag at hard playing", "[di_dynamics]") {
         v1b_m.init(CGP_12AX7, CGK_12AX7, 38500.0f, StageGains::V1B_GAIN);
         v1a_m.recalc(effectiveSR);
         v1b_m.recalc(effectiveSR);
-        float gainPotR = (1.0f - tt::audioTaper(gainVal)) * GAIN_POT_R_REAL;
+        float gainPotR = (1.0f - sr::audioTaper(gainVal)) * GAIN_POT_R_REAL;
         v1b_m.rSource_real = std::min(V1B_RSOURCE_BASE_REAL + gainPotR, V1B_RSOURCE_MAX_REAL);
 
         auto v1aG = makeV1aGrid(); auto v1bG = makeV1bGrid();
@@ -551,7 +551,7 @@ TEST_CASE("DI dynamics: PSU + sag at hard playing", "[di_dynamics]") {
             float g1 = (std::abs(v1a_in) > 1e-8f) ? std::abs(x) / std::abs(v1a_in) : StageGains::V1A_GAIN;
             x = v1a_m.process(x, g1, effectiveSR);
             psu.reportPreampLevel(x);
-            x *= tt::audioTaper(gainVal);
+            x *= sr::audioTaper(gainVal);
             x = applyGridConduction(x, v1bG);
             float v1b_in = x;
             x = triodeWaveshaper(x, VS::V_BIAS_12AX7, vPreamp, PREAMP_RPLATE_N, v1bT);
@@ -560,7 +560,7 @@ TEST_CASE("DI dynamics: PSU + sag at hard playing", "[di_dynamics]") {
             float g2 = (std::abs(v1b_in) > 1e-8f) ? std::abs(x) / std::abs(v1b_in) : StageGains::V1B_GAIN;
             x = v1b_m.process(x, g2, effectiveSR);
             psu.reportPreampLevel(x);
-            x *= tt::audioTaper(gainVal);
+            x *= sr::audioTaper(gainVal);
             x = fb.gainLoadingLP.process(x);
             preampBuf[i] = x;
 
@@ -573,7 +573,7 @@ TEST_CASE("DI dynamics: PSU + sag at hard playing", "[di_dynamics]") {
             float od = fb.toneCutFilter.process(d);
             pA = (s + od) * 0.5f; pB = (s - od) * 0.5f;
             ltpBuf[i] = pA;
-            float v = tt::audioTaper(volVal);
+            float v = sr::audioTaper(volVal);
             pA *= v; pB *= v;
 
             float effectiveBias = el84BaseBias + sag.biasOffset();

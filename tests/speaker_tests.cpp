@@ -13,8 +13,8 @@
 #include "test_helpers.h"
 #include "dsp/cabinet/SpeakerCoupling.h"
 
-using namespace tt;
-using namespace tt::test;
+using namespace sr;
+using namespace sr::test;
 using Catch::Approx;
 
 TEST_CASE("Speaker coupling: zero input produces zero output", "[speaker]") {

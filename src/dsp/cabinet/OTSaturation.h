@@ -8,7 +8,7 @@
 #include "../../utils/Constants.h"
 #include <cmath>
 
-namespace tt {
+namespace sr {
 
 struct OTSaturation {
     float flux        = 0.0f;
@@ -47,4 +47,4 @@ struct OTSaturation {
     }
 };
 
-} // namespace tt
+} // namespace sr

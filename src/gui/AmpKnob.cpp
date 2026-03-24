@@ -1,5 +1,5 @@
 #include "AmpKnob.h"
-namespace tt {
+namespace sr {
 AmpKnob::AmpKnob(const juce::String& l) : label(l) {
     slider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
     slider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 50, 16);
@@ -15,4 +15,4 @@ void AmpKnob::paint(juce::Graphics& g) {
     g.setFont(juce::Font(12.0f));
     g.drawText(label, getLocalBounds().removeFromTop(18), juce::Justification::centred);
 }
-} // namespace tt
+} // namespace sr

@@ -30,39 +30,39 @@ private:
     void disableCompositorEffects();
 
     TinyTerrorProcessor& proc;
-    tt::SilentRiotLookAndFeel lnf;
+    sr::SilentRiotLookAndFeel lnf;
 
     // Content container
     juce::Component contentArea;
 
     // Layout
-    tt::HeaderBar header;
-    tt::FooterBar footer;
-    tt::VUMeter vuIn{"IN"}, vuOut{"OUT"};
+    sr::HeaderBar header;
+    sr::FooterBar footer;
+    sr::VUMeter vuIn{"IN"}, vuOut{"OUT"};
 
     // Knobs
-    tt::NotchKnob gainKnob{"GAIN", 0.6f};
-    tt::NotchKnob toneKnob{"TONE", 0.5f};
-    tt::NotchKnob volumeKnob{"VOLUME", 0.5f};
+    sr::NotchKnob gainKnob{"GAIN", 0.6f};
+    sr::NotchKnob toneKnob{"TONE", 0.5f};
+    sr::NotchKnob volumeKnob{"VOLUME", 0.5f};
 
     // Toggles
-    tt::ToggleSwitch halfPowerToggle{"7W"};
-    tt::ToggleSwitch cabSimToggle{"CAB"};
-    tt::ToggleSwitch powerToggle{"PWR", juce::Colour(0xFF2DD4A0)};
+    sr::ToggleSwitch halfPowerToggle{"7W"};
+    sr::ToggleSwitch cabSimToggle{"CAB"};
+    sr::ToggleSwitch powerToggle{"PWR", juce::Colour(0xFF2DD4A0)};
 
     // Collapsible sections
-    tt::SectionBar irSectionBar{"IR LOADER"};
-    tt::IRLoaderPanel irLoaderPanel;
+    sr::SectionBar irSectionBar{"IR LOADER"};
+    sr::IRLoaderPanel irLoaderPanel;
     bool irPanelOpen = false;
     float irPanelAnimH = 0.0f;
 
-    tt::SectionBar advSectionBar{"ADVANCED"};
-    tt::AdvancedPanel advancedPanel;
+    sr::SectionBar advSectionBar{"ADVANCED"};
+    sr::AdvancedPanel advancedPanel;
     bool advPanelOpen = false;
     float advPanelAnimH = 0.0f;
 
     // Settings overlay
-    tt::SettingsPanel settingsPanel;
+    sr::SettingsPanel settingsPanel;
 
     // APVTS attachments
     using SliderA = juce::AudioProcessorValueTreeState::SliderAttachment;

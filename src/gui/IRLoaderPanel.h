@@ -3,7 +3,7 @@
 #include <juce_audio_formats/juce_audio_formats.h>
 #include "IRWaveformDisplay.h"
 
-namespace tt {
+namespace sr {
 
 class IRLoaderPanel : public juce::Component,
                       public juce::FileDragAndDropTarget {
@@ -57,4 +57,4 @@ private:
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(IRLoaderPanel)
 };
 
-} // namespace tt
+} // namespace sr

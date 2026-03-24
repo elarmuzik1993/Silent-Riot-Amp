@@ -15,7 +15,7 @@
 #include "test_helpers.h"
 #include "dsp/tubes/PentodeWaveshaper.h"
 
-using namespace tt;
+using namespace sr;
 using Catch::Approx;
 
 // ── Basic output properties ──────────────────────────────────

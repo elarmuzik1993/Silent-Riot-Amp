@@ -3,7 +3,7 @@
 #include "SegmentedSelector.h"
 #include "ToggleSwitch.h"
 
-namespace tt {
+namespace sr {
 
 class SettingsPanel : public juce::Component {
 public:
@@ -35,4 +35,4 @@ private:
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(SettingsPanel)
 };
 
-} // namespace tt
+} // namespace sr

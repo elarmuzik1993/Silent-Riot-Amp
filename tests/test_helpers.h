@@ -10,7 +10,7 @@
 #include "utils/VoltageScale.h"
 #include "utils/Constants.h"
 
-namespace tt::test {
+namespace sr::test {
 
 constexpr float TEST_SR = 44100.0f;
 constexpr float TEST_SR_4X = 44100.0f * 4.0f;
@@ -113,4 +113,4 @@ float measureMagnitudeCustom(ProcessFn processFn, float freqHz, float sr, int cy
     return outPeak / inPeak;
 }
 
-} // namespace tt::test
+} // namespace sr::test

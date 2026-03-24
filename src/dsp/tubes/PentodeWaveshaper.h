@@ -6,7 +6,7 @@
 #include <cmath>
 #include <algorithm>
 
-namespace tt {
+namespace sr {
 
 struct KorenPentodeParams {
     float mu;      // g1-to-g2 amplification factor (dimensionless)
@@ -37,4 +37,4 @@ struct PentodeOutput {
 PentodeOutput pentodeWaveshaper(float vGrid_n, float vBias_n, float vPlate_n, float vScreen_n);
 float softConductionCurve(float vGrid_n, float vBias_n);
 
-} // namespace tt
+} // namespace sr
