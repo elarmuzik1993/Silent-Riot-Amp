@@ -9,6 +9,7 @@
 - **DSP Spec**: `docs/Silent Riot DSP Model Spec v2.13.md` — authoritative source for all signal chain math, function contracts, and constants
 - **UI Spec**: `docs/SilentRiot_UI_Spec.md` — layout, components, colours, typography, JUCE painting strategy
 - **UI Prototype**: `docs/SilentRiot_Final.jsx` — React reference prototype (pixel-accurate interactive mockup)
+- **Credits**: `CREDITS.md` — originality statement, Koren equation sourcing, third-party library licenses; confirms no code copied from Guitarix/SwankyAmp/ChowDSP/NAM
 
 ## Architecture
 
