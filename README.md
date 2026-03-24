@@ -6,7 +6,7 @@ This project is licensed under the GNU General Public License v3.0.
 
 ## Copyright
 
-Copyright © 2026 elarmuzik1993. All rights reserved.
+Copyright © 2026 Boris Miscenco. All rights reserved.
 
 ## Architecture
 
