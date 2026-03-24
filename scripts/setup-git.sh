@@ -5,7 +5,7 @@ git branch -M main 2>/dev/null || true
 git show-ref --verify --quiet refs/heads/develop 2>/dev/null || git checkout -b develop && git checkout main
 if ! git log --oneline -1 &>/dev/null; then
     git add -A
-    git commit -m "feat: Orange Tiny Terror amp sim scaffold
+    git commit -m "feat: Silent Riot amp sim scaffold
 
 Spec v2.6 — full normalized voltage domain, 5-stage signal chain,
 multi-node PSU, LTP nodal solver, EL84 pentode, speaker coupling.
