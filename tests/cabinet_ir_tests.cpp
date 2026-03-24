@@ -1,5 +1,5 @@
 // Cabinet IR Loader Tests — exercises convolution pipeline, mode switching, IR registry
-// Requires JUCE (separate test target: TinyTerrorJuceTests)
+// Requires JUCE (separate test target: SilentRiotJuceTests)
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>

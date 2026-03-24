@@ -1,6 +1,6 @@
 #pragma once
 // ═══════════════════════════════════════════════════════════════
-// Test Helpers — shared utilities for Tiny Terror test suite
+// Test Helpers — shared utilities for Silent Riot test suite
 // ═══════════════════════════════════════════════════════════════
 
 #include <cmath>

@@ -1,4 +1,4 @@
-# Orange Tiny Terror (AD5) — DSP Amp Model Specification
+# Silent Riot (AD5) — DSP Amp Model Specification
 
 ## Monolit Beatz — Amp Sim Plugin v1.0
 
@@ -263,7 +263,7 @@ KNOWN TRADEOFFS:
   - No preset system, no A/B comparison tools (Phase 4)
   - No noise floor or mains hum -- model is silent at zero input (Phase 4)
   - Phase shift is automatic from IIR filters but not validated
-    against real Tiny Terror impulse response (Phase 4)
+    against real Silent Riot impulse response (Phase 4)
 
 INERTIA SYSTEM (five layers that create "tube feel"):
 
@@ -780,7 +780,7 @@ UTILITY: AUDIO TAPER
 
 ## 1. Circuit Overview
 
-The Orange Tiny Terror is a deceptively simple all-valve amplifier built around two ECC83/12AX7 preamp tubes and two EL84 power tubes in push-pull configuration. Despite having only three controls (Gain, Tone, Volume), the circuit achieves a massive range from sparkling cleans to rich, compressed overdrive.
+The Silent Riot is a deceptively simple all-valve amplifier built around two ECC83/12AX7 preamp tubes and two EL84 power tubes in push-pull configuration. Despite having only three controls (Gain, Tone, Volume), the circuit achieves a massive range from sparkling cleans to rich, compressed overdrive.
 
 ### Key Circuit Characteristics
 - **Tubes:** 2× ECC83/12AX7 (preamp), 2× EL84 (power amp)
@@ -2203,7 +2203,7 @@ WHY A NODAL SOLVER INSTEAD OF STATIC IMBALANCE
      means the total available current is limited. When driven hard,
      the tail current can't increase proportionally — the LTP naturally
      compresses and generates soft crossover harmonics. This is a
-     MAJOR contributor to the Tiny Terror's crunch character.
+     MAJOR contributor to the Silent Riot's crunch character.
 
   4. CATHODE VOLTAGE MODULATION: The shared cathode node voltage moves
      with the signal, creating common-mode feedback that reduces gain
@@ -2479,13 +2479,13 @@ Circuit:
 
 === CLASS A vs CLASS AB — WHAT THE TINY TERROR ACTUALLY IS ===
 
-  Orange markets the Tiny Terror as "Class A." This is a simplification.
+  The original amp is marketed as "Class A." This is a simplification.
   True Class A push-pull means both tubes conduct for the FULL 360° of
   the signal cycle — neither tube ever cuts off, regardless of signal
   level. This requires biasing at or above 100% of the maximum signal
   current.
 
-  The Tiny Terror's actual operating class depends on the power mode:
+  The Silent Riot's actual operating class depends on the power mode:
 
   15W mode (~90% bias):
     At idle and low signal: both tubes conduct → Class A behavior.
@@ -2637,7 +2637,7 @@ DSP Implementation:
 === MASTER VOLUME vs SAG INTERACTION ===
 
   The master volume sits between the PI and power amp (Section 3.7).
-  This is the correct circuit position for the Tiny Terror.
+  This is the correct circuit position for the Silent Riot.
   
   The interaction works as follows:
   
@@ -2707,7 +2707,7 @@ THE PROBLEM WITH STATIC EQ
   │       (resonance)      (minimum)     (voice coil inductance)   │
   └─────────────────────────────────────────────────────────────────┘
 
-  Celestion G12H-30 (Tiny Terror stock speaker):
+  Celestion G12H-30 (Silent Riot stock speaker):
     - DC resistance (Re): ~6Ω
     - Resonance (fs): ~75Hz, peak impedance ~30-40Ω
     - Minimum impedance: ~8Ω around 400Hz-1kHz
@@ -2971,7 +2971,7 @@ DSP Implementation (IIR approach, post-SpeakerCoupling):
 ### 3.11 Power Supply Model (Multi-Stage Droop)
 
 ```
-The Tiny Terror uses a simple solid-state rectified supply with RC filtering.
+The Silent Riot uses a simple solid-state rectified supply with RC filtering.
 Under load, the supply voltage droops — and this affects EVERY stage in the amp,
 not just the power tubes. This is a huge part of the "feel" and compression
 character. Modeling droop only at the power stage is a common oversimplification
@@ -3613,7 +3613,7 @@ WHERE IT HAPPENS IN THE TINY TERROR
              ±50-90V at the plate. After the coupling cap and gain pot,
              the signal reaching V1b's grid can easily exceed the
              conduction threshold. This is a primary contributor to
-             the Tiny Terror's crunch character at gain >6.
+             the Silent Riot's crunch character at gain >6.
 
   PI grids:  FREQUENTLY at high gain. V1b output drives the PI hard,
              and the LTP input grid can be driven into conduction.
@@ -4508,7 +4508,7 @@ Alternative: Antiderivative Anti-Aliasing (ADAA)
 ```
 Class Hierarchy:
 
-TinyTerrorProcessor : public juce::AudioProcessor
+SilentRiotProcessor : public juce::AudioProcessor
 ├── VoltageScale (static utility — real↔DSP conversion)
 ├── FilterBank (central filter management — bulk recalc/reset)
 │   ├── 10× OnePoleLP/HP (coupling caps, cathode bypass, tone)
@@ -4789,7 +4789,7 @@ VERIFICATION SEQUENCE (run after every change)
 
 ## 9. Tuning & Validation Reference
 
-### 9.1 What the Tiny Terror Should Sound Like
+### 9.1 What the Silent Riot Should Sound Like
 - **Clean (gain low):** Bright, chimey, Vox-like. Slightly thin but articulate. Strong pick attack.
 - **Edge of breakup (gain ~4-5):** Touch-sensitive. Clean on soft picking, crunches on dig-in. Musical compression starts.
 - **Crunch (gain ~6-7):** Classic British rock crunch. Strong midrange, controlled low end. EL84 compression audible.
@@ -4928,7 +4928,7 @@ WHERE PHASE MIGHT BE WRONG
 ```
 WHY THE MODEL IS SILENT WHEN INPUT IS ZERO
 
-  DSP is deterministic. Zero input = zero output. A real Tiny Terror
+  DSP is deterministic. Zero input = zero output. A real Silent Riot
   has audible noise from three sources:
 
   SOURCE 1: THERMAL NOISE (resistor Johnson noise)
@@ -5055,8 +5055,8 @@ TUNING ORDER (sequential, not parallel):
 ```
 
 ### 9.6 A/B Testing Sources
-- YouTube: "Orange Tiny Terror demo" -- hundreds of reference clips
-- Rig Rundowns featuring the Tiny Terror
+- YouTube: "Silent Riot amp sim demo" -- reference clips
+- Rig Rundowns featuring the Silent Riot
 - Compare against Neural DSP / Amplitube Orange models if available
 
 
@@ -5257,7 +5257,7 @@ constexpr float MILLER_FC_SMOOTH_MS   = 1.0f;                  // fc smoothing t
 // ═══════════════════════════════════════════════════════════════════
 // SPEAKER COUPLING — DYNAMIC LOAD LINE (v2.2)
 // ═══════════════════════════════════════════════════════════════════
-// Speaker parameters: Celestion G12H-30 (Tiny Terror stock)
+// Speaker parameters: Celestion G12H-30 (Silent Riot stock)
 constexpr float SPK_RE_REAL           = 6.0f;                  // DC resistance (real Ω)
 constexpr float SPK_RE_N              = VS::r(6.0f);           // → 0.00002
 constexpr float SPK_ZPEAK_REAL        = 35.0f;                 // impedance at resonance (real Ω)
@@ -5300,7 +5300,7 @@ constexpr int   TABLE_SIZE            = 2048;                   // LUT entries (
 
 ---
 
-*Document: Monolit Beatz — Tiny Terror DSP Model Spec v2.13*
-*Revisions: v1.x–v2.6: see git history. v2.7: Section 8.0 foundation dependencies, Section 4.1 AI disambiguation. v2.8: reading guide (five content types). v2.9: structured reference block (signal chain, blocks, assumptions, constraints, tradeoffs, goals). v2.10: per-function contract blocks for all 15 DSP functions/structs. v2.11: Section 9 expanded. v2.12: Numerical audit found 5 bugs -- triodeCurrentModel missing cutoff offset (K recalibrated 4.2e6->3394), pentode bias was plate supply 270V not cathode voltage 9.6V (EL84_KG recalibrated 800->0.000324), LTP solver oscillates without damping (added alpha=0.25 iteration), softConductionCurve overlap width used raw bias not cutoff distance, pentode power law unbounded (added EL84_IP_MAX_N clamp) -- inertia system (5 layers of tube feel), phase shift documentation, noise/hum plan (Phase 4), ear-tuning guide with sonic problem -> constant mapping, tuning order. v2.13: Sync audit — Section 10 constants updated to match v2.12 scaffold fixes (PENTODE_BIAS 9.6V/7V, EL84_KG=0.000324, K_12AX7=3394, TRIODE_DRIVE removed, V_CUTOFF_12AX7_N and EL84_IP_MAX_N added). Section 7 parameter table expanded with UI spec param IDs (halfPower, cabSim, power, presetIndex, irIndex), display ranges (0–10 for knobs), and defaults. §4.1 Mistake 3 disambiguation fixed (was still referencing -270V). Product name: Silent Riot (CMake PRODUCT_NAME), internal codename: TinyTerror.*
+*Document: Monolit Beatz — Silent Riot DSP Model Spec v2.13*
+*Revisions: v1.x–v2.6: see git history. v2.7: Section 8.0 foundation dependencies, Section 4.1 AI disambiguation. v2.8: reading guide (five content types). v2.9: structured reference block (signal chain, blocks, assumptions, constraints, tradeoffs, goals). v2.10: per-function contract blocks for all 15 DSP functions/structs. v2.11: Section 9 expanded. v2.12: Numerical audit found 5 bugs -- triodeCurrentModel missing cutoff offset (K recalibrated 4.2e6->3394), pentode bias was plate supply 270V not cathode voltage 9.6V (EL84_KG recalibrated 800->0.000324), LTP solver oscillates without damping (added alpha=0.25 iteration), softConductionCurve overlap width used raw bias not cutoff distance, pentode power law unbounded (added EL84_IP_MAX_N clamp) -- inertia system (5 layers of tube feel), phase shift documentation, noise/hum plan (Phase 4), ear-tuning guide with sonic problem -> constant mapping, tuning order. v2.13: Sync audit — Section 10 constants updated to match v2.12 scaffold fixes (PENTODE_BIAS 9.6V/7V, EL84_KG=0.000324, K_12AX7=3394, TRIODE_DRIVE removed, V_CUTOFF_12AX7_N and EL84_IP_MAX_N added). Section 7 parameter table expanded with UI spec param IDs (halfPower, cabSim, power, presetIndex, irIndex), display ranges (0–10 for knobs), and defaults. §4.1 Mistake 3 disambiguation fixed (was still referencing -270V). Product name: Silent Riot (CMake PRODUCT_NAME), internal codename: SilentRiot.*
 *Target: JUCE VST3/AU Plugin — Ubuntu 24.x / CMake + clangd*
 *Author: Boris / Monolit Beatz*
