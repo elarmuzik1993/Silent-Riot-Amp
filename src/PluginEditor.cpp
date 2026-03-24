@@ -9,7 +9,7 @@
 #include <X11/extensions/shape.h>
 #endif
 
-TinyTerrorEditor::TinyTerrorEditor(TinyTerrorProcessor& p)
+SilentRiotEditor::SilentRiotEditor(SilentRiotProcessor& p)
     : AudioProcessorEditor(&p), proc(p)
 {
     sr::Fonts::init();
@@ -173,14 +173,14 @@ TinyTerrorEditor::TinyTerrorEditor(TinyTerrorProcessor& p)
     startTimerHz(30);
 }
 
-TinyTerrorEditor::~TinyTerrorEditor()
+SilentRiotEditor::~SilentRiotEditor()
 {
     saveUIState();
     stopTimer();
     setLookAndFeel(nullptr);
 }
 
-void TinyTerrorEditor::saveUIState()
+void SilentRiotEditor::saveUIState()
 {
     auto& state = proc.apvts.state;
     state.setProperty("irPanelOpen",  irPanelOpen,  nullptr);
@@ -191,7 +191,7 @@ void TinyTerrorEditor::saveUIState()
     state.setProperty("knobMode",     settingsPanel.knobMode, nullptr);
 }
 
-void TinyTerrorEditor::loadUIState()
+void SilentRiotEditor::loadUIState()
 {
     auto& state = proc.apvts.state;
 
@@ -224,14 +224,14 @@ void TinyTerrorEditor::loadUIState()
         settingsPanel.knobMode = static_cast<int>(state.getProperty("knobMode"));
 }
 
-int TinyTerrorEditor::getContentHeight() const
+int SilentRiotEditor::getContentHeight() const
 {
     return kBaseH
          + static_cast<int>(irPanelAnimH)
          + static_cast<int>(advPanelAnimH);
 }
 
-void TinyTerrorEditor::applyShapeMask()
+void SilentRiotEditor::applyShapeMask()
 {
 #if JUCE_LINUX
     int h = static_cast<int>(getContentHeight() * currentScale);
@@ -273,7 +273,7 @@ void TinyTerrorEditor::applyShapeMask()
 #endif
 }
 
-void TinyTerrorEditor::setWindowBackground()
+void SilentRiotEditor::setWindowBackground()
 {
 #if JUCE_LINUX
     // Set X11 window background to our bg colour so newly exposed area
@@ -292,7 +292,7 @@ void TinyTerrorEditor::setWindowBackground()
 #endif
 }
 
-void TinyTerrorEditor::disableCompositorEffects()
+void SilentRiotEditor::disableCompositorEffects()
 {
 #if JUCE_LINUX
     if (compositorBypassed) return;
@@ -316,7 +316,7 @@ void TinyTerrorEditor::disableCompositorEffects()
 #endif
 }
 
-void TinyTerrorEditor::timerCallback()
+void SilentRiotEditor::timerCallback()
 {
     if (!compositorBypassed)
         disableCompositorEffects();
@@ -396,7 +396,7 @@ void TinyTerrorEditor::timerCallback()
     }
 }
 
-void TinyTerrorEditor::paint(juce::Graphics& g)
+void SilentRiotEditor::paint(juce::Graphics& g)
 {
     // Fixed gradient endpoint avoids background colour shifting during animation
     float maxH = static_cast<float>(kBaseH + sr::IRLoaderPanel::panelHeight
@@ -416,14 +416,14 @@ void TinyTerrorEditor::paint(juce::Graphics& g)
         6.0f, 1.0f);
 }
 
-void TinyTerrorEditor::resized()
+void SilentRiotEditor::resized()
 {
     static const int maxH = kBaseH + sr::IRLoaderPanel::panelHeight + sr::AdvancedPanel::panelHeight;
     contentArea.setBounds(0, 0, kWindowW, maxH);
     layoutContent();
 }
 
-void TinyTerrorEditor::layoutContent()
+void SilentRiotEditor::layoutContent()
 {
     auto area = contentArea.getLocalBounds();
 

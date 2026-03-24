@@ -11,11 +11,11 @@
 #include "gui/SettingsPanel.h"
 #include "gui/IRLoaderPanel.h"
 
-class TinyTerrorEditor : public juce::AudioProcessorEditor,
+class SilentRiotEditor : public juce::AudioProcessorEditor,
                          private juce::Timer {
 public:
-    explicit TinyTerrorEditor(TinyTerrorProcessor&);
-    ~TinyTerrorEditor() override;
+    explicit SilentRiotEditor(SilentRiotProcessor&);
+    ~SilentRiotEditor() override;
     void paint(juce::Graphics&) override;
     void resized() override;
 
@@ -29,7 +29,7 @@ private:
     void setWindowBackground();
     void disableCompositorEffects();
 
-    TinyTerrorProcessor& proc;
+    SilentRiotProcessor& proc;
     sr::SilentRiotLookAndFeel lnf;
 
     // Content container
@@ -81,5 +81,5 @@ private:
     bool compositorBypassed = false;
     int lastShapeH = 0;
 
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(TinyTerrorEditor)
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(SilentRiotEditor)
 };

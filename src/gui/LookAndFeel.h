@@ -11,7 +11,4 @@ struct SilentRiotLookAndFeel : public juce::LookAndFeel_V4 {
                           bool highlighted, bool down) override;
 };
 
-// Keep alias for backward compat during transition
-using OrangeLookAndFeel = SilentRiotLookAndFeel;
-
 } // namespace sr
