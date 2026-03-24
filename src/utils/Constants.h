@@ -1,6 +1,6 @@
 #pragma once
 // ═══════════════════════════════════════════════════════════════
-// DSP Constants — Tiny Terror (Spec Section 10)
+// DSP Constants — Silent Riot (Spec Section 10)
 //
 // Convention: _N = normalized, _REAL = real units, no suffix = dimensionless
 // ═══════════════════════════════════════════════════════════════
