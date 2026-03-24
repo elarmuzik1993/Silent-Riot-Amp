@@ -62,7 +62,7 @@ static float toDB(float x) { return 20.0f * std::log10(x + 1e-30f); }
 
 TEST_CASE("DI chain trace: envelope at tap points", "[di_trace]") {
     // Load DI
-    auto diSamples = loadRawFloat("tests/di_sample_82hz.raw");
+    auto diSamples = loadRawFloat(SOURCE_DIR "/tests/di_sample_82hz.raw");
     REQUIRE(diSamples.size() > 10000);
 
     // Base SR = 48kHz, oversample 4x = 192kHz
@@ -470,7 +470,7 @@ TEST_CASE("DI chain trace: envelope at tap points", "[di_trace]") {
 // ═══════════════════════════════════════════════════════════════
 
 TEST_CASE("DI dynamics: PSU + sag at hard playing", "[di_dynamics]") {
-    auto diSamples = loadRawFloat("tests/di_sample_82hz.raw");
+    auto diSamples = loadRawFloat(SOURCE_DIR "/tests/di_sample_82hz.raw");
     REQUIRE(diSamples.size() > 10000);
 
     constexpr float baseSR = 48000.0f;
