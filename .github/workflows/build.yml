@@ -31,21 +31,18 @@ jobs:
       run: |
         cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded
         cmake --build build --config Release
-    - name: Verify VST3 DLL dependencies
+    - name: Verify VST3 binary
+      shell: cmd
       run: |
-        $vst3 = "build\SilentRiot_artefacts\Release\VST3\Silent Riot.vst3\Contents\x86_64-win\Silent Riot.vst3"
-        Write-Host "=== File info ==="
-        Get-Item $vst3 | Select-Object Name, Length, LastWriteTime
-        Write-Host "=== DLL dependencies ==="
-        dumpbin /DEPENDENTS $vst3
-        Write-Host "=== Exports ==="
-        dumpbin /EXPORTS $vst3 | Select-String "GetPluginFactory|InitDll|ExitDll|bundleEntry|bundleExit"
-      shell: pwsh
-    - name: Smoke-test Standalone
-      run: |
-        $exe = "build\SilentRiot_artefacts\Release\Standalone\Silent Riot.exe"
-        Write-Host "=== Standalone dependencies ==="
-        dumpbin /DEPENDENTS $exe
+        call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvarsall.bat" amd64
+        echo === File size ===
+        dir "build\SilentRiot_artefacts\Release\VST3\Silent Riot.vst3\Contents\x86_64-win\Silent Riot.vst3"
+        echo === DLL dependencies ===
+        dumpbin /DEPENDENTS "build\SilentRiot_artefacts\Release\VST3\Silent Riot.vst3\Contents\x86_64-win\Silent Riot.vst3"
+        echo === VST3 exports ===
+        dumpbin /EXPORTS "build\SilentRiot_artefacts\Release\VST3\Silent Riot.vst3\Contents\x86_64-win\Silent Riot.vst3"
+        echo === Standalone dependencies ===
+        dumpbin /DEPENDENTS "build\SilentRiot_artefacts\Release\Standalone\Silent Riot.exe"
     - name: Upload VST3
       uses: actions/upload-artifact@v4
       with:
