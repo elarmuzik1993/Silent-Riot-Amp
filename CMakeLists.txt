@@ -26,6 +26,7 @@ FetchContent_MakeAvailable(JUCE)
 # ── Plugin target ───────────────────────────────
 juce_add_plugin(SilentRiot
     COMPANY_NAME            "Monolit Beatz"
+    BUNDLE_ID               "com.monolitbeatz.SilentRiot"
     PLUGIN_MANUFACTURER_CODE Mnlt
     PLUGIN_CODE              SiRi
     FORMATS                  VST3 Standalone    # add AU LV2 as needed
