@@ -21,8 +21,12 @@ struct FilterBank {
     // ── Phase Inverter ──
     OnePoleHP pi_couplingHP_A, pi_couplingHP_B;
 
-    // ── Tone / Gain loading (modulated per block) ──
-    OnePoleLP toneCutFilter;
+    // ── Shape EQ (3-band on differential, modulated per block) ──
+    Biquad shapeLowShelf;
+    Biquad shapeMidBell;
+    Biquad shapeHighShelf;
+
+    // ── Gain loading (modulated per block) ──
     OnePoleLP gainLoadingLP;
 
     // ── Output Transformer ──
@@ -32,7 +36,7 @@ struct FilterBank {
     Biquad cab_presence, cab_rolloff, cab_notch;
 
     void recalcAll(float baseSampleRate, int oversampleFactor);
-    void updateModulated(float toneFreq, float gainLoadFreq);
+    void updateShape(float shapeVal);
     void resetAll();
 };
 

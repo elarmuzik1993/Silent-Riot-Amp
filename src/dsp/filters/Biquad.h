@@ -90,6 +90,36 @@ struct Biquad {
         a1 = b1;
         a2 = (1.0f - alpha) * a0_inv;
     }
+
+    void makeLowShelf(float newFc, float newQ, float newGainDb, float sr) {
+        fc = newFc; Q = newQ; gainDb = newGainDb;
+        float A = std::pow(10.0f, gainDb / 40.0f);
+        float w0 = 2.0f * PI_F * fc / sr;
+        float sinW0 = std::sin(w0), cosW0 = std::cos(w0);
+        float alpha = sinW0 / (2.0f * Q);
+        float twoSqrtAalpha = 2.0f * std::sqrt(A) * alpha;
+        float a0_inv = 1.0f / ((A + 1.0f) + (A - 1.0f) * cosW0 + twoSqrtAalpha);
+        b0 = (A * ((A + 1.0f) - (A - 1.0f) * cosW0 + twoSqrtAalpha)) * a0_inv;
+        b1 = (2.0f * A * ((A - 1.0f) - (A + 1.0f) * cosW0)) * a0_inv;
+        b2 = (A * ((A + 1.0f) - (A - 1.0f) * cosW0 - twoSqrtAalpha)) * a0_inv;
+        a1 = (-2.0f * ((A - 1.0f) + (A + 1.0f) * cosW0)) * a0_inv;
+        a2 = ((A + 1.0f) + (A - 1.0f) * cosW0 - twoSqrtAalpha) * a0_inv;
+    }
+
+    void makeHighShelf(float newFc, float newQ, float newGainDb, float sr) {
+        fc = newFc; Q = newQ; gainDb = newGainDb;
+        float A = std::pow(10.0f, gainDb / 40.0f);
+        float w0 = 2.0f * PI_F * fc / sr;
+        float sinW0 = std::sin(w0), cosW0 = std::cos(w0);
+        float alpha = sinW0 / (2.0f * Q);
+        float twoSqrtAalpha = 2.0f * std::sqrt(A) * alpha;
+        float a0_inv = 1.0f / ((A + 1.0f) - (A - 1.0f) * cosW0 + twoSqrtAalpha);
+        b0 = (A * ((A + 1.0f) + (A - 1.0f) * cosW0 + twoSqrtAalpha)) * a0_inv;
+        b1 = (-2.0f * A * ((A - 1.0f) + (A + 1.0f) * cosW0)) * a0_inv;
+        b2 = (A * ((A + 1.0f) + (A - 1.0f) * cosW0 - twoSqrtAalpha)) * a0_inv;
+        a1 = (2.0f * ((A - 1.0f) - (A + 1.0f) * cosW0)) * a0_inv;
+        a2 = ((A + 1.0f) - (A - 1.0f) * cosW0 - twoSqrtAalpha) * a0_inv;
+    }
 };
 
 } // namespace sr

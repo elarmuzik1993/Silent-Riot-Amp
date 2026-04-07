@@ -112,10 +112,12 @@ static LevelTrace traceChain(float digitalPeak, float gain, float volume,
             peak.ltpPiB = std::max(peak.ltpPiB, std::abs(piB));
         }
 
-        // Tone (max = 5kHz LP on diff — just pass through for simplicity)
+        // Shape (mid scoop/boost — differential only)
         float diff = piA - piB;
         float sum  = piA + piB;
-        float outDiff = fb.toneCutFilter.process(diff);
+        float outDiff = fb.shapeLowShelf.process(diff);
+        outDiff = fb.shapeMidBell.process(outDiff);
+        outDiff = fb.shapeHighShelf.process(outDiff);
         piA = (sum + outDiff) * 0.5f;
         piB = (sum - outDiff) * 0.5f;
 

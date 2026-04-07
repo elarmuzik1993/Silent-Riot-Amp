@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.22)
 
 project(SilentRiot
-    VERSION 0.3.3
+    VERSION 0.3.4
     LANGUAGES CXX
     DESCRIPTION "Monolit Beatz — Silent Riot Amp Sim"
 )

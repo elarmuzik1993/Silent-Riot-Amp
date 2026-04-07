@@ -71,7 +71,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout SilentRiotProcessor::createP
         juce::NormalisableRange<float>(0.0f, 1.0f, 0.001f), 0.6f));
 
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
-        juce::ParameterID{ Params::IDs::TONE, 1 }, "Tone",
+        juce::ParameterID{ Params::IDs::TONE, 1 }, "Shape",
         juce::NormalisableRange<float>(0.0f, 1.0f, 0.001f), 0.5f));
 
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
@@ -256,13 +256,11 @@ void SilentRiotProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
         float volVal  = volumeSmoother.tick();
         float toneVal = toneSmoother.tick();
 
-        // Update tone filter only when value has changed enough to matter
-        // (saves std::pow + coefficient recalc on ~99% of samples)
-        if (std::abs(toneVal - lastToneCoeffVal) > 0.001f) {
-            constexpr float toneFreqRatio = TONE_MAX_FREQ / TONE_MIN_FREQ;
-            float toneFreq = TONE_MIN_FREQ * std::pow(toneFreqRatio, toneVal);
-            filterBank.toneCutFilter.setFreqFast(toneFreq, filterBank.effectiveSR);
-            lastToneCoeffVal = toneVal;
+        // Update shape EQ only when value has changed enough to matter
+        // (saves sin/cos/sqrt coefficient recalc on ~99% of samples)
+        if (std::abs(toneVal - lastShapeCoeffVal) > 0.001f) {
+            filterBank.updateShape(toneVal);
+            lastShapeCoeffVal = toneVal;
         }
         if (!psuFrozen) psu.update();
         psu.resetCurrentDraw();
@@ -314,10 +312,12 @@ void SilentRiotProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
         float piB = filterBank.pi_couplingHP_B.process(ltp_out.piB);
         psu.reportPiLevel(std::max(std::abs(piA), std::abs(piB)));
 
-        // ── Tone Control (Vox cut — differential only) ──
+        // ── Shape Control (mid scoop/boost — differential only) ──
         float diff = piA - piB;
         float sum  = piA + piB;
-        float outDiff = filterBank.toneCutFilter.process(diff);
+        float outDiff = filterBank.shapeLowShelf.process(diff);
+        outDiff = filterBank.shapeMidBell.process(outDiff);
+        outDiff = filterBank.shapeHighShelf.process(outDiff);
         piA = (sum + outDiff) * 0.5f;
         piB = (sum - outDiff) * 0.5f;
 
