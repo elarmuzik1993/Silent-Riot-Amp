@@ -130,10 +130,8 @@ TEST_CASE("DI chain trace: envelope at tap points", "[di_trace]") {
     constexpr float toneVal = 0.5f;
     float el84BaseBias = PENTODE_BIAS_7W_N;
 
-    // Tone freq at noon
-    constexpr float toneFreqRatio = TONE_MAX_FREQ / TONE_MIN_FREQ;
-    float toneFreq = TONE_MIN_FREQ * std::pow(toneFreqRatio, toneVal);
-    fb.toneCutFilter.setFreqFast(toneFreq, effectiveSR);
+    // Shape EQ at noon
+    fb.updateShape(toneVal);
 
     // V1b Miller source R at gain=0.5
     float gainPotR = (1.0f - gainVal) * GAIN_POT_R_REAL;
@@ -202,10 +200,12 @@ TEST_CASE("DI chain trace: envelope at tap points", "[di_trace]") {
         float piB = fb.pi_couplingHP_B.process(ltp_out.piB);
         psu.reportPiLevel(std::max(std::abs(piA), std::abs(piB)));
 
-        // Tone (Vox cut — differential only)
+        // Shape (mid scoop/boost — differential only)
         float diff = piA - piB;
         float sum  = piA + piB;
-        float outDiff = fb.toneCutFilter.process(diff);
+        float outDiff = fb.shapeLowShelf.process(diff);
+        outDiff = fb.shapeMidBell.process(outDiff);
+        outDiff = fb.shapeHighShelf.process(outDiff);
         piA = (sum + outDiff) * 0.5f;
         piB = (sum - outDiff) * 0.5f;
         tapLTP[i] = piA;
@@ -258,7 +258,7 @@ TEST_CASE("DI chain trace: envelope at tap points", "[di_trace]") {
     // Reset all state
     FilterBank fb2;
     fb2.recalcAll(baseSR, osFactor);
-    fb2.toneCutFilter.setFreqFast(toneFreq, effectiveSR);
+    fb2.updateShape(toneVal);
     TriodeState v1aT2, v1bT2;
     DynamicMillerLP v1a_m2, v1b_m2;
     v1a_m2.init(CGP_12AX7, CGK_12AX7, 38500.0f, StageGains::V1A_GAIN);
@@ -324,7 +324,9 @@ TEST_CASE("DI chain trace: envelope at tap points", "[di_trace]") {
         float pB = fb2.pi_couplingHP_B.process(l.piB);
         psu2.reportPiLevel(std::max(std::abs(pA), std::abs(pB)));
         float d = pA - pB, s = pA + pB;
-        float od = fb2.toneCutFilter.process(d);
+        float od = fb2.shapeLowShelf.process(d);
+        od = fb2.shapeMidBell.process(od);
+        od = fb2.shapeHighShelf.process(od);
         pA = (s + od) * 0.5f;
         pB = (s - od) * 0.5f;
         float v = sr::audioTaper(volVal);
@@ -495,9 +497,7 @@ TEST_CASE("DI dynamics: PSU + sag at hard playing", "[di_dynamics]") {
         fb.recalcAll(baseSR, osFactor);
         constexpr float toneVal = 0.5f;
         constexpr float volVal = 0.5f;
-        constexpr float toneFreqRatio = TONE_MAX_FREQ / TONE_MIN_FREQ;
-        float toneFreq = TONE_MIN_FREQ * std::pow(toneFreqRatio, toneVal);
-        fb.toneCutFilter.setFreqFast(toneFreq, effectiveSR);
+        fb.updateShape(toneVal);
 
         TriodeState v1aT, v1bT;
         DynamicMillerLP v1a_m, v1b_m;
@@ -570,7 +570,9 @@ TEST_CASE("DI dynamics: PSU + sag at hard playing", "[di_dynamics]") {
             float pB = fb.pi_couplingHP_B.process(l.piB);
             psu.reportPiLevel(std::max(std::abs(pA), std::abs(pB)));
             float d = pA - pB, s = pA + pB;
-            float od = fb.toneCutFilter.process(d);
+            float od = fb.shapeLowShelf.process(d);
+            od = fb.shapeMidBell.process(od);
+            od = fb.shapeHighShelf.process(od);
             pA = (s + od) * 0.5f; pB = (s - od) * 0.5f;
             ltpBuf[i] = pA;
             float v = sr::audioTaper(volVal);

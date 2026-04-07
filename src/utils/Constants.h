@@ -51,9 +51,20 @@ constexpr float PI_F = 3.14159265358979323846f;
 // ── Anti-denormal ───────────────────────────────────────────
 constexpr float ANTI_DENORMAL       = 1e-18f;
 
-// ── Tone control ────────────────────────────────────────────
-constexpr float TONE_MIN_FREQ       = 1500.0f;
-constexpr float TONE_MAX_FREQ       = 20000.0f;
+// ── Shape control (Orange-inspired mid scoop/boost) ─────────
+constexpr float SHAPE_LOW_SHELF_FREQ  = 250.0f;    // Hz
+constexpr float SHAPE_LOW_SHELF_Q     = 0.7f;
+constexpr float SHAPE_MID_FREQ        = 800.0f;    // Hz — center of mid bell
+constexpr float SHAPE_MID_Q           = 1.2f;
+constexpr float SHAPE_HIGH_SHELF_FREQ = 3500.0f;   // Hz
+constexpr float SHAPE_HIGH_SHELF_Q    = 0.7f;
+// Gain ranges (dB) — interpolated linearly with shape knob (0→1)
+constexpr float SHAPE_LOW_GAIN_MIN    =  0.0f;     // dB at shape=0 (warm)
+constexpr float SHAPE_LOW_GAIN_MAX    =  4.0f;     // dB at shape=1 (scooped)
+constexpr float SHAPE_MID_GAIN_MIN    =  5.0f;     // dB at shape=0 (mid-forward)
+constexpr float SHAPE_MID_GAIN_MAX    = -9.0f;     // dB at shape=1 (deep scoop)
+constexpr float SHAPE_HIGH_GAIN_MIN   = -3.0f;     // dB at shape=0 (warm treble)
+constexpr float SHAPE_HIGH_GAIN_MAX   =  4.0f;     // dB at shape=1 (bright)
 
 // ── Preamp plate load ────────────────────────────────────────
 constexpr float PREAMP_RPLATE_N     = VS::R_100K;  // 100kΩ plate load for V1a/V1b

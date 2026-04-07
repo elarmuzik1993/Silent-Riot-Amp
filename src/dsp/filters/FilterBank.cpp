@@ -18,14 +18,19 @@ void FilterBank::recalcAll(float baseSampleRate, int oversampleFactor) {
     cab_rolloff.makeLowPass(5500.0f, 0.5f, effectiveSR);
     cab_notch.makeNotch(400.0f, 2.0f, effectiveSR);
 
-    // Initialize modulated filters with sensible defaults
-    toneCutFilter.setFreq(TONE_MAX_FREQ, effectiveSR);      // fully bright
+    // Initialize shape EQ at noon (shape=0.5)
+    updateShape(0.5f);
     gainLoadingLP.setFreq(GAIN_LOADING_LP_FREQ, effectiveSR);
 }
 
-void FilterBank::updateModulated(float toneFreq, float gainLoadFreq) {
-    toneCutFilter.setFreqFast(toneFreq, effectiveSR);
-    gainLoadingLP.setFreqFast(gainLoadFreq, effectiveSR);
+void FilterBank::updateShape(float shapeVal) {
+    float lowGain  = SHAPE_LOW_GAIN_MIN  + (SHAPE_LOW_GAIN_MAX  - SHAPE_LOW_GAIN_MIN)  * shapeVal;
+    float midGain  = SHAPE_MID_GAIN_MIN  + (SHAPE_MID_GAIN_MAX  - SHAPE_MID_GAIN_MIN)  * shapeVal;
+    float highGain = SHAPE_HIGH_GAIN_MIN + (SHAPE_HIGH_GAIN_MAX - SHAPE_HIGH_GAIN_MIN) * shapeVal;
+
+    shapeLowShelf.makeLowShelf(SHAPE_LOW_SHELF_FREQ, SHAPE_LOW_SHELF_Q, lowGain, effectiveSR);
+    shapeMidBell.makePeakEQ(SHAPE_MID_FREQ, SHAPE_MID_Q, midGain, effectiveSR);
+    shapeHighShelf.makeHighShelf(SHAPE_HIGH_SHELF_FREQ, SHAPE_HIGH_SHELF_Q, highGain, effectiveSR);
 }
 
 void FilterBank::resetAll() {
@@ -33,7 +38,8 @@ void FilterBank::resetAll() {
     v1a_cathodeBypass.reset(); v1a_couplingHP.reset();
     v1b_cathodeBypass.reset(); v1b_couplingHP.reset();
     pi_couplingHP_A.reset(); pi_couplingHP_B.reset();
-    toneCutFilter.reset(); gainLoadingLP.reset();
+    shapeLowShelf.reset(); shapeMidBell.reset(); shapeHighShelf.reset();
+    gainLoadingLP.reset();
     ot_leakageLP.reset();
     cab_presence.reset(); cab_rolloff.reset(); cab_notch.reset();
 }
