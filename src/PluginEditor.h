@@ -42,7 +42,7 @@ private:
 
     // Knobs
     sr::NotchKnob gainKnob{"GAIN", 0.6f};
-    sr::NotchKnob toneKnob{"TONE", 0.5f};
+    sr::NotchKnob toneKnob{"SHAPE", 0.5f};
     sr::NotchKnob volumeKnob{"VOLUME", 0.5f};
 
     // Toggles

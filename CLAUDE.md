@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-**Silent Riot** (v0.3.3) is a JUCE 7 amp simulator plugin (VST3/Standalone) by Monolit Beatz. Built with C++17, CMake, and Ninja on Ubuntu Linux.
+**Silent Riot** (v0.3.4) is a JUCE 7 amp simulator plugin (VST3/Standalone) by Monolit Beatz. Built with C++17, CMake, and Ninja on Ubuntu Linux.
 
 ## Key Specs
 
@@ -24,7 +24,7 @@ Input → Scale to guitar domain → HP 7Hz → Grid cond V1a → Triode V1a →
 → Grid cond V1b → Triode V1b → Clamp → Cathode bypass shelf → HP 7Hz
 → Miller LP V1b → Report PSU → Gain pot B → LP 5kHz → Grid cond PI
 → LTP solver (100K/82K asymmetric plate loads) → HP×2 16Hz → Report PSU
-→ Tone (Vox cut) → Master volume → Grid cond EL84×2
+→ Shape (3-band mid scoop/boost) → Master volume → Grid cond EL84×2
 → Soft conduction×2 (bias-dependent Class A/AB) → Pentode×2 → Push-pull sum
 → Report PSU → Sag update (raw plate current) → OT current scale
 → Speaker coupling (bandpass extraction) → OT saturation → OT LP 7kHz
@@ -64,13 +64,15 @@ cmake -B build -DSR_BUILD_TESTS=ON # Build with tests
 ## Implementation Phases
 
 - **Phase 1** (done): Preamp — VoltageScale, triode waveshaper, cascaded stages, gain, oversampling
-- **Phase 2** (done): Power section — LTP solver, tone, EL84 pentode, push-pull, 15W/7W mode
+- **Phase 2** (done): Power section — LTP solver, shape/tone, EL84 pentode, push-pull, 15W/7W mode
 - **Phase 3** (done): Dynamics — PSU droop, sag envelope, grid conduction, speaker coupling, OT saturation
 - **Phase 4** (done): Cabinet IR loader, GUI (14 custom components), presets, polish (animations, live metering, keyboard nav, UI persistence)
 - **DSP Audit** (done): All filter frequencies, Koren tube parameters, and signal chain order verified against spec v2.13 and open-source reference implementations (Guitarix, SwankyAmp, ChowDSP)
 - **Listening Test Round 1** (done): DI chain trace analysis, audio taper fix on gain pots, speaker coupling smoothing
 - **Listening Test Round 2** (done): Fix PI grid conduction pumping at gain≥5 (charge rate + max bias shift)
-- **Next**: Continued listening test and ear-tuning (outputGainCompensation, V1B_RSOURCE_MAX_REAL, dynamics feel)
+- **Listening Test Round 3** (done): Fix volume knob causing distortion/signal loss above noon — tightened sag cold clamp -6V → -3V
+- **Shape Control** (done): Replaced Vox-cut tone with Orange Shape-inspired 3-band EQ (low shelf 250Hz, mid bell 800Hz, high shelf 3.5kHz) — sweeps from warm/mid-forward (CCW) to scooped/modern (CW)
+- **Next**: Continued listening test and ear-tuning (Shape EQ gain ranges, outputGainCompensation, V1B_RSOURCE_MAX_REAL, dynamics feel)
 
 ## Conventions
 
@@ -119,7 +121,7 @@ cmake -B build -DSR_BUILD_TESTS=ON # Build with tests
 
 **Editor timer** (30Hz): Polls atomic level meters (real input/output RMS + grid current), DSP readout for advanced panel, footer stats. Drives animated section expand/collapse (28px/frame linear steps). SectionBar chevrons animate at 300ms, gear icon at 400ms, toggle thumb at ~200ms.
 
-**Keyboard**: Arrow keys ±0.1 display (±0.01 internal), PageUp/Down ±1.0 display (±0.1 internal) via `NotchKnob::KnobSlider` override. Tab order: GAIN→TONE→VOLUME→7W→CAB→PWR.
+**Keyboard**: Arrow keys ±0.1 display (±0.01 internal), PageUp/Down ±1.0 display (±0.1 internal) via `NotchKnob::KnobSlider` override. Tab order: GAIN→SHAPE→VOLUME→7W→CAB→PWR.
 
 **UI state persistence**: Panel open states, theme, meter ballistics, knob mode, and UI scale stored as properties on `apvts.state` ValueTree — automatically saved/restored with plugin state.
 
@@ -129,15 +131,15 @@ cmake -B build -DSR_BUILD_TESTS=ON # Build with tests
 - **Pentode model**: Koren pentode equations (mu=19.5, ex=1.35, Kg1=820, Kp=84, Kvb=300) — screen grid acts as virtual anode in the Koren formula. Softplus cutoff, tanh IP clamp, plate saturation knee, screen redistribution.
 - **LTP solver**: Asymmetric plate loads (100K/82K). Caches plate voltages A/B between samples. 4 iterations with alpha=0.25 damping.
 - **Oversample switching**: Crossfade state machine (FadingOut → Reconfiguring → FadingIn), 128-sample fade at base SR. PSU frozen during transition to prevent voltage recovery pop.
-- **Sag model**: Cathode resistor physics — `biasOffset = -(Itotal - Iquiescent) × R_cathode`. Fed with raw `|ipA| + |ipB|` before OT scaling.
-- **Tone control**: Vox cut on differential signal only (preserves common-mode). Exponential frequency mapping (1.5kHz–20kHz) for perceptually linear knob response.
-- **Tone coefficient threshold**: Skip `std::pow` + filter recalc when smoothed tone value hasn't changed by >0.001 (~99% of samples).
+- **Sag model**: Cathode resistor physics — `biasOffset = -(Itotal - Iquiescent) × R_cathode`. Fed with raw `|ipA| + |ipB|` before OT scaling. Cold clamp is -0.01 (-3V) — keeps effective bias from going past -12.6V (cutoff is -10V); prevents deep Class C signal loss at high volume.
+- **Shape control**: Orange Shape-inspired 3-band EQ on differential signal only (preserves common-mode even harmonics from PI asymmetry). Three biquad filters: low shelf (250Hz, 0→+4dB), mid bell (800Hz Q=1.2, +5→-9dB), high shelf (3.5kHz, -3→+4dB). Gains interpolate linearly with knob position. At noon: mild scoop (+2dB low, -2dB mid, +0.5dB high).
+- **Shape coefficient threshold**: Skip sin/cos/sqrt filter recalc when smoothed shape value hasn't changed by >0.001 (~99% of samples).
 - **Speaker coupling excursion**: Impedance deviation scales with bass-weighted cone excursion (X ∝ V/f²). `tanh(excursion * XCUR_SENSITIVITY)` models Xmax suspension stiffening — low excursion keeps impedance nominal, high excursion allows full deviation. Double-gated with existing `modBlend` for clean off-ramp at silence.
 
-## DSP Audit Status (v0.3.3)
+## DSP Audit Status (v0.3.4)
 
 All filter frequencies now match spec v2.13:
-- Tone: 1.5kHz (dark) to 20kHz (bright)
+- Shape: 3-band EQ — low shelf 250Hz, mid bell 800Hz Q=1.2, high shelf 3.5kHz (replaces Vox-cut tone)
 - Gain loading LP: 5kHz
 - Cab presence: 2.5kHz peak, Q=1.5, +3dB
 - Cab rolloff: 5.5kHz LP, Q=0.5

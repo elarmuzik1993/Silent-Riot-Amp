@@ -143,7 +143,7 @@ SilentRiotEditor::SilentRiotEditor(SilentRiotProcessor& p)
     toneKnob.getSlider().setWantsKeyboardFocus(true);
     volumeKnob.getSlider().setWantsKeyboardFocus(true);
     gainKnob.getSlider().setDescription("Gain control, 0 to 10");
-    toneKnob.getSlider().setDescription("Tone control, 0 to 10");
+    toneKnob.getSlider().setDescription("Shape control, 0 warm to 10 scooped");
     volumeKnob.getSlider().setDescription("Volume control, 0 to 10");
     halfPowerToggle.getButton().setDescription("Half power 7W mode toggle");
     cabSimToggle.getButton().setDescription("Cabinet simulation toggle");
