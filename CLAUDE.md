@@ -1,5 +1,10 @@
 # Silent Riot — CLAUDE.md
 
+## Session Startup
+On first message, read context from the Obsidian vault (`/home/boris/Obsidian/Memory Core/`):
+- Project note: `03 Projects/Silent Riot/`
+- Latest session note matching "Silent Riot" in `07 Claude Sessions/`
+
 ## Project Overview
 
 **Silent Riot** (v0.3.4) is a JUCE 7 amp simulator plugin (VST3/Standalone) by Monolit Beatz. Built with C++17, CMake, and Ninja on Ubuntu Linux.
