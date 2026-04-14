@@ -15,7 +15,7 @@ Copyright © 2026 Boris Miscenco (Monolit Beatz). All rights reserved.
 
 ## Originality
 
-All DSP source code is original work by Boris Miscenco. The tube models use the
+All DSP source code is original ai-assisted work designed by Boris Miscenco . The tube models use the
 publicly documented Koren equations with standard datasheet parameters. No code has
 been copied from any third-party project (Guitarix, SwankyAmp, ChowDSP, NAM, or
 others). See `CREDITS.md` for the full originality statement and attribution details.
