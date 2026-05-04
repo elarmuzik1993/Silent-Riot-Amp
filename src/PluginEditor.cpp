@@ -328,7 +328,9 @@ void SilentRiotEditor::timerCallback()
         float advTarget = advPanelOpen ? static_cast<float>(sr::AdvancedPanel::panelHeight) : 0.0f;
         bool animating = false;
 
-        if (irPanelAnimH != irTarget)
+        constexpr float kAnimEpsilon = 0.5f;
+
+        if (std::abs(irPanelAnimH - irTarget) > kAnimEpsilon)
         {
             irPanelAnimH = (irPanelAnimH < irTarget)
                 ? std::min(irPanelAnimH + kStep, irTarget)
@@ -338,7 +340,7 @@ void SilentRiotEditor::timerCallback()
             animating = true;
         }
 
-        if (advPanelAnimH != advTarget)
+        if (std::abs(advPanelAnimH - advTarget) > kAnimEpsilon)
         {
             advPanelAnimH = (advPanelAnimH < advTarget)
                 ? std::min(advPanelAnimH + kStep, advTarget)
