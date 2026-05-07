@@ -1,10 +1,5 @@
 # Silent Riot — CLAUDE.md
 
-## Session Startup
-On first message, read context from the Obsidian vault (`/home/boris/Obsidian/Memory Core/`):
-- Project note: `03 Projects/Silent Riot/`
-- Latest session note matching "Silent Riot" in `07 Claude Sessions/`
-
 ## Project Overview
 
 **Silent Riot** (v0.3.4) is a JUCE 7 amp simulator plugin (VST3/Standalone) by Monolit Beatz. Built with C++17, CMake, and Ninja on Ubuntu Linux.
@@ -78,6 +73,7 @@ cmake -B build -DSR_BUILD_TESTS=ON # Build with tests
 - **Listening Test Round 3** (done): Fix volume knob causing distortion/signal loss above noon — tightened sag cold clamp -6V → -3V
 - **Shape Control** (done): Replaced Vox-cut tone with Orange Shape-inspired 3-band EQ (low shelf 250Hz, mid bell 800Hz, high shelf 3.5kHz) — sweeps from warm/mid-forward (CCW) to scooped/modern (CW)
 - **Next**: Continued listening test and ear-tuning (Shape EQ gain ranges, outputGainCompensation, V1B_RSOURCE_MAX_REAL, dynamics feel)
+- **Neural model**: On hold until ear-tuning is finalized — training against DSP output that's still changing produces a model that must be retrained after every constant tweak. Finalize the DSP first, then capture and train against a stable target.
 
 ## Conventions
 
