@@ -91,14 +91,22 @@ P3 release engineering → P4 reach/polish.**
   aren't browsable, and "Category tabs" (ALL/STOCK/ORANGE/3RD PARTY/USER per UI spec
   §5.7) aren't implemented. **Deferred** — tied to the parked "ship real cabinet IRs"
   item (stock IRs are synthetic placeholders today).
-- [ ] **[M] Keyboard & accessibility coverage.** Still outstanding (larger, separate
-  effort): PresetSelector arrows, gear icon, both SectionBars, IR list/drop zone, and the
-  SettingsPanel controls are click-only with no `AccessibilityHandler` / keyboard
-  activation. Tooltips were added this pass, but full AX + tab order is not done.
-- [ ] **[M] _(newly surfaced)_ Presets don't recall values.** `PRESET_IDX` stores/displays
-  an index but nothing applies preset values to GAIN/SHAPE/VOLUME/etc. — presets are
-  cosmetic. Implementing recall needs the 5 presets' actual parameter values defined
-  (product input).
+- [x] **[M] Keyboard & accessibility coverage** (main interactive surface). All the
+  previously click-only widgets are now keyboard-operable, focus-ringed, and expose an
+  `AccessibilityHandler` with the right role: PresetSelector (←/→, comboBox),
+  SectionBars (Space/Return, button), the gear (new focusable `GearButton`, button),
+  ToggleSwitch (Space/Return, toggleButton with checked state), SegmentedSelector (←/→,
+  comboBox). Fixed a latent bug — tab order was set on the **hidden** toggle buttons, so
+  the 7W/CAB/PWR switches weren't actually keyboard-reachable; the `ToggleSwitch` is now
+  the focusable element. Explicit tab order: preset → gain → shape → volume → 7W → CAB →
+  PWR → IR → ADV. _Remaining (deferred):_ IRLoaderPanel's user-IR **list/drop-zone**
+  keyboard navigation and the Settings **close-X** (closable via the gear) are still
+  pointer-only.
+- [x] **[M] _(newly surfaced)_ Presets now recall values.** Added a factory-preset table
+  (`sr::Presets::table`, single source of truth — `PresetSelector` reads its names from
+  it) and `SilentRiotProcessor::applyPreset()`, which sets GAIN/SHAPE/VOLUME/7W/CAB +
+  PRESET_IDX. Applied on explicit selection only (not on state restore, so user tweaks
+  saved over a preset survive). The 5 presets have starter values — worth ear-tuning.
 
 ## P3 — Release engineering (gate for any public 1.0)
 

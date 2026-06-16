@@ -4,7 +4,12 @@
 
 namespace sr {
 
-SectionBar::SectionBar(const juce::String& l) : label(l) {}
+SectionBar::SectionBar(const juce::String& l) : label(l)
+{
+    setWantsKeyboardFocus(true);
+    setTitle(l);
+    setDescription(l + " section, expand or collapse");
+}
 
 void SectionBar::setOpen(bool shouldOpen)
 {
@@ -17,6 +22,27 @@ void SectionBar::setOpen(bool shouldOpen)
 void SectionBar::mouseDown(const juce::MouseEvent&)
 {
     setOpen(!open);
+}
+
+bool SectionBar::keyPressed(const juce::KeyPress& key)
+{
+    if (key == juce::KeyPress::returnKey || key == juce::KeyPress::spaceKey)
+    {
+        setOpen(!open);
+        return true;
+    }
+    return false;
+}
+
+void SectionBar::focusGained(juce::Component::FocusChangeType) { repaint(); }
+void SectionBar::focusLost(juce::Component::FocusChangeType)   { repaint(); }
+
+std::unique_ptr<juce::AccessibilityHandler> SectionBar::createAccessibilityHandler()
+{
+    return std::make_unique<juce::AccessibilityHandler>(
+        *this, juce::AccessibilityRole::button,
+        juce::AccessibilityActions().addAction(
+            juce::AccessibilityActionType::press, [this] { setOpen(!open); }));
 }
 
 void SectionBar::timerCallback()
@@ -71,6 +97,13 @@ void SectionBar::paint(juce::Graphics& g)
     // Bottom border
     g.setColour(Colours::border);
     g.fillRect(0.0f, bounds.getHeight() - 1.0f, bounds.getWidth(), 1.0f);
+
+    // Keyboard focus indicator
+    if (hasKeyboardFocus(false))
+    {
+        g.setColour(Colours::accent.withAlpha(0.7f));
+        g.drawRect(bounds.reduced(1.0f), 1.5f);
+    }
 }
 
 } // namespace sr

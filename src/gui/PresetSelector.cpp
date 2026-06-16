@@ -4,12 +4,24 @@
 
 namespace sr {
 
-PresetSelector::PresetSelector() {}
+PresetSelector::PresetSelector()
+{
+    setWantsKeyboardFocus(true);
+    setTitle("Preset");
+    setDescription("Preset selector, left and right arrows to change");
+}
 
 void PresetSelector::setPresetIndex(int idx)
 {
     currentIndex = ((idx % numPresets) + numPresets) % numPresets;
+    setTitle(juce::String("Preset: ") + presetName(currentIndex));  // announced by screen readers
     repaint();
+}
+
+void PresetSelector::step(int delta)
+{
+    setPresetIndex(currentIndex + delta);
+    if (onPresetChanged) onPresetChanged(currentIndex);
 }
 
 void PresetSelector::mouseDown(const juce::MouseEvent& e)
@@ -18,17 +30,27 @@ void PresetSelector::mouseDown(const juce::MouseEvent& e)
     float x = e.position.x;
 
     if (x < arrowW)
-    {
-        // Left arrow — previous
-        setPresetIndex(currentIndex - 1);
-        if (onPresetChanged) onPresetChanged(currentIndex);
-    }
+        step(-1);                                  // Left arrow — previous
     else if (x > bounds.getWidth() - arrowW)
-    {
-        // Right arrow — next
-        setPresetIndex(currentIndex + 1);
-        if (onPresetChanged) onPresetChanged(currentIndex);
-    }
+        step(+1);                                  // Right arrow — next
+}
+
+bool PresetSelector::keyPressed(const juce::KeyPress& key)
+{
+    if (key == juce::KeyPress::leftKey)  { step(-1); return true; }
+    if (key == juce::KeyPress::rightKey) { step(+1); return true; }
+    return false;
+}
+
+void PresetSelector::focusGained(juce::Component::FocusChangeType) { repaint(); }
+void PresetSelector::focusLost(juce::Component::FocusChangeType)   { repaint(); }
+
+std::unique_ptr<juce::AccessibilityHandler> PresetSelector::createAccessibilityHandler()
+{
+    return std::make_unique<juce::AccessibilityHandler>(
+        *this, juce::AccessibilityRole::comboBox,
+        juce::AccessibilityActions()
+            .addAction(juce::AccessibilityActionType::showMenu, [this] { step(+1); }));
 }
 
 void PresetSelector::paint(juce::Graphics& g)
@@ -64,9 +86,16 @@ void PresetSelector::paint(juce::Graphics& g)
     float centerW = bounds.getWidth() - arrowW * 2.0f;
     g.setFont(Fonts::spaceMono(10.0f));
     g.setColour(Colours::bright);
-    g.drawText(presetNames[currentIndex],
+    g.drawText(juce::String(presetName(currentIndex)),
                juce::Rectangle<float>(arrowW, 0.0f, centerW, h),
                juce::Justification::centred, false);
+
+    // Keyboard focus indicator
+    if (hasKeyboardFocus(false))
+    {
+        g.setColour(Colours::accent.withAlpha(0.7f));
+        g.drawRoundedRectangle(bounds.reduced(1.0f), 4.0f, 1.5f);
+    }
 }
 
 } // namespace sr

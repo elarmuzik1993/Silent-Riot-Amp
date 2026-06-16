@@ -5,12 +5,33 @@
 namespace sr {
 
 SegmentedSelector::SegmentedSelector(const juce::StringArray& opts, int defaultIdx)
-    : options(opts), selectedIndex(defaultIdx) {}
+    : options(opts), selectedIndex(defaultIdx)
+{
+    setWantsKeyboardFocus(true);
+}
+
+void SegmentedSelector::setTitleText(const juce::String& t)
+{
+    titlePrefix = t;
+    setTitle(titlePrefix + ": " + options[juce::jlimit(0, options.size() - 1, selectedIndex)]);
+}
 
 void SegmentedSelector::setSelectedIndex(int idx)
 {
     selectedIndex = juce::jlimit(0, options.size() - 1, idx);
+    if (titlePrefix.isNotEmpty())
+        setTitle(titlePrefix + ": " + options[selectedIndex]);
     repaint();
+}
+
+void SegmentedSelector::selectIndex(int idx)
+{
+    idx = juce::jlimit(0, options.size() - 1, idx);
+    if (idx != selectedIndex)
+    {
+        setSelectedIndex(idx);
+        if (onChange) onChange(selectedIndex);
+    }
 }
 
 void SegmentedSelector::mouseDown(const juce::MouseEvent& e)
@@ -18,14 +39,26 @@ void SegmentedSelector::mouseDown(const juce::MouseEvent& e)
     int n = options.size();
     if (n == 0) return;
     float cellW = getWidth() / static_cast<float>(n);
-    int clicked = static_cast<int>(e.position.x / cellW);
-    clicked = juce::jlimit(0, n - 1, clicked);
-    if (clicked != selectedIndex)
-    {
-        selectedIndex = clicked;
-        repaint();
-        if (onChange) onChange(selectedIndex);
-    }
+    selectIndex(static_cast<int>(e.position.x / cellW));
+}
+
+bool SegmentedSelector::keyPressed(const juce::KeyPress& key)
+{
+    if (key == juce::KeyPress::leftKey)  { selectIndex(selectedIndex - 1); return true; }
+    if (key == juce::KeyPress::rightKey) { selectIndex(selectedIndex + 1); return true; }
+    return false;
+}
+
+void SegmentedSelector::focusGained(juce::Component::FocusChangeType) { repaint(); }
+void SegmentedSelector::focusLost(juce::Component::FocusChangeType)   { repaint(); }
+
+std::unique_ptr<juce::AccessibilityHandler> SegmentedSelector::createAccessibilityHandler()
+{
+    return std::make_unique<juce::AccessibilityHandler>(
+        *this, juce::AccessibilityRole::comboBox,
+        juce::AccessibilityActions()
+            .addAction(juce::AccessibilityActionType::showMenu,
+                       [this] { selectIndex(selectedIndex + 1); }));
 }
 
 void SegmentedSelector::paint(juce::Graphics& g)
@@ -61,6 +94,13 @@ void SegmentedSelector::paint(juce::Graphics& g)
         }
 
         g.drawText(options[i], cell, juce::Justification::centred, false);
+    }
+
+    // Keyboard focus indicator
+    if (hasKeyboardFocus(false))
+    {
+        g.setColour(Colours::accent.withAlpha(0.7f));
+        g.drawRoundedRectangle(bounds.reduced(1.0f), 4.0f, 1.5f);
     }
 }
 

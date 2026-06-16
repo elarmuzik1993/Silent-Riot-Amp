@@ -16,6 +16,12 @@ SettingsPanel::SettingsPanel()
     peakHoldToggle.getButton().setToggleState(true, juce::dontSendNotification);
     tooltipsToggle.getButton().setToggleState(true, juce::dontSendNotification);
 
+    themeSelector.setTitleText("Theme");
+    ballisticsSelector.setTitleText("Meter ballistics");
+    knobModeSelector.setTitleText("Knob mode");
+    scaleSelector.setTitleText("UI scale");
+    setTitle("Settings");
+
     auto fireChanged = [this] { if (onSettingsChanged) onSettingsChanged(); };
 
     themeSelector.onChange      = [this, fireChanged](int i) { themeIndex = i; fireChanged(); };
