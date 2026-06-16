@@ -496,6 +496,29 @@ void SilentRiotProcessor::setCurrentProgram(int) {}
 const juce::String SilentRiotProcessor::getProgramName(int) { return {}; }
 void SilentRiotProcessor::changeProgramName(int, const juce::String&) {}
 
+// ── Presets ──
+
+void SilentRiotProcessor::applyPreset(int presetIndex)
+{
+    if (presetIndex < 0 || presetIndex >= sr::Presets::count) return;
+    const auto& p = sr::Presets::table[presetIndex];
+
+    auto setNorm = [this](const juce::String& id, float value01) {
+        if (auto* param = apvts.getParameter(id))
+            param->setValueNotifyingHost(juce::jlimit(0.0f, 1.0f, value01));
+    };
+
+    // GAIN/TONE/VOLUME ranges are 0–1, so the normalized value is the value itself.
+    setNorm(Params::IDs::GAIN,   p.gain);
+    setNorm(Params::IDs::TONE,   p.tone);
+    setNorm(Params::IDs::VOLUME, p.volume);
+    setNorm(Params::IDs::HALF_POWER, p.halfPower ? 1.0f : 0.0f);
+    setNorm(Params::IDs::CAB_SIM,    p.cabSim    ? 1.0f : 0.0f);
+
+    if (auto* pi = apvts.getParameter(Params::IDs::PRESET_IDX))
+        pi->setValueNotifyingHost(pi->convertTo0to1(static_cast<float>(presetIndex)));
+}
+
 // ── User IR Management ──
 
 void SilentRiotProcessor::loadUserIR(const juce::File& file)

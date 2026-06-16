@@ -76,6 +76,11 @@ public:
         juce::AudioBuffer<float> audioData;
     };
 
+    // Apply a factory preset (sets gain/tone/volume/7W/cab + preset index).
+    // Called on an explicit user selection (message thread) — NOT on state
+    // restore, so user tweaks saved over a preset are preserved.
+    void applyPreset(int presetIndex);
+
     void loadUserIR(const juce::File& file);
     void selectUserIR(int userIndex);  // 0-based index into userIRs
     int getNumUserIRs() const { return static_cast<int>(userIRs.size()); }

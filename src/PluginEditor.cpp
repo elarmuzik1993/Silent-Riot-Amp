@@ -124,10 +124,9 @@ SilentRiotEditor::SilentRiotEditor(SilentRiotProcessor& p)
         saveUIState();
     };
 
-    // Preset selector wiring
+    // Preset selector wiring — applying the preset also stores PRESET_IDX
     header.getPresetSelector().onPresetChanged = [this](int idx) {
-        if (auto* param = proc.apvts.getParameter(sr::Params::IDs::PRESET_IDX))
-            param->setValueNotifyingHost(param->convertTo0to1(static_cast<float>(idx)));
+        proc.applyPreset(idx);
     };
 
     // Restore displayed preset from the parameter (does not fire onPresetChanged)
@@ -143,32 +142,38 @@ SilentRiotEditor::SilentRiotEditor(SilentRiotProcessor& p)
     cabSimA    = std::make_unique<ButtonA>(proc.apvts, IDs::CAB_SIM,    cabSimToggle.getButton());
     powerA     = std::make_unique<ButtonA>(proc.apvts, IDs::POWER,      powerToggle.getButton());
 
-    // Keyboard focus and accessibility
-    gainKnob.getSlider().setWantsKeyboardFocus(true);
-    toneKnob.getSlider().setWantsKeyboardFocus(true);
-    volumeKnob.getSlider().setWantsKeyboardFocus(true);
-    gainKnob.getSlider().setDescription("Gain control, 0 to 10");
-    toneKnob.getSlider().setDescription("Shape control, 0 warm to 10 scooped");
-    volumeKnob.getSlider().setDescription("Volume control, 0 to 10");
-    halfPowerToggle.getButton().setDescription("Half power 7W mode toggle");
-    cabSimToggle.getButton().setDescription("Cabinet simulation toggle");
-    powerToggle.getButton().setDescription("Power on/off toggle");
+    // Keyboard focus and accessibility.
+    // Knobs: the (invisible) slider is the focusable leaf. Toggles: the
+    // ToggleSwitch itself is focusable (its wrapped button is hidden).
+    auto& gs = gainKnob.getSlider();
+    auto& ts = toneKnob.getSlider();
+    auto& vs = volumeKnob.getSlider();
+    gs.setWantsKeyboardFocus(true); gs.setTitle("Gain");   gs.setDescription("Gain, 0 to 10");
+    ts.setWantsKeyboardFocus(true); ts.setTitle("Shape");  ts.setDescription("Shape, 0 warm to 10 scooped");
+    vs.setWantsKeyboardFocus(true); vs.setTitle("Volume"); vs.setDescription("Volume, 0 to 10");
+
+    halfPowerToggle.setDescription("Half power 7W mode");
+    cabSimToggle.setDescription("Cabinet simulation");
+    powerToggle.setDescription("Amp power");
 
     // Tooltips (shown only while a TooltipWindow exists — see applySettings)
-    gainKnob.getSlider().setTooltip("Gain — preamp drive");
-    toneKnob.getSlider().setTooltip("Shape — mid scoop (CW) to mid boost (CCW)");
-    volumeKnob.getSlider().setTooltip("Volume — master / power-amp drive");
+    gs.setTooltip("Gain — preamp drive");
+    ts.setTooltip("Shape — mid scoop (CW) to mid boost (CCW)");
+    vs.setTooltip("Volume — master / power-amp drive");
     halfPowerToggle.setTooltip("7W half-power mode");
     cabSimToggle.setTooltip("Cabinet simulation on/off");
     powerToggle.setTooltip("Amp power on/off");
 
-    // Tab order
-    gainKnob.getSlider().setExplicitFocusOrder(1);
-    toneKnob.getSlider().setExplicitFocusOrder(2);
-    volumeKnob.getSlider().setExplicitFocusOrder(3);
-    halfPowerToggle.getButton().setExplicitFocusOrder(4);
-    cabSimToggle.getButton().setExplicitFocusOrder(5);
-    powerToggle.getButton().setExplicitFocusOrder(6);
+    // Tab order: preset → knobs → toggles → section bars (gear & panels follow)
+    header.getPresetSelector().setExplicitFocusOrder(1);
+    gs.setExplicitFocusOrder(2);
+    ts.setExplicitFocusOrder(3);
+    vs.setExplicitFocusOrder(4);
+    halfPowerToggle.setExplicitFocusOrder(5);
+    cabSimToggle.setExplicitFocusOrder(6);
+    powerToggle.setExplicitFocusOrder(7);
+    irSectionBar.setExplicitFocusOrder(8);
+    advSectionBar.setExplicitFocusOrder(9);
 
     // Restore UI state
     loadUIState();
