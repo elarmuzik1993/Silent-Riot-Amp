@@ -56,15 +56,13 @@ P3 release engineering → P4 reach/polish.**
 
 ## P1 — Restore the source-of-truth documentation
 
-- [ ] **[H] Recover or recreate the missing `docs/`.** CLAUDE.md cites
-  `docs/Silent Riot DSP Model Spec v2.13.md` as "authoritative source for all
-  signal-chain math, function contracts, and constants", plus `docs/SilentRiot_UI_Spec.md`
-  and `docs/SilentRiot_Final.jsx`. None exist. Without the spec, every "verified against
-  spec v2.13" claim is unfalsifiable and future tuning has no reference.
-- [ ] **[H] Restore `CREDITS.md`.** Referenced by README and CLAUDE.md as the
-  originality statement + third-party license attribution (Koren equation sourcing,
-  confirmation no code copied from Guitarix/SwankyAmp/ChowDSP/NAM). Its absence is a
-  licensing/provenance liability for a GPLv3 release.
+- [x] **[H] Recover the missing `docs/`.** Root cause found: commit `cad9dff`
+  ("Add project agent instructions") accidentally deleted them alongside removing the
+  Obsidian-vault startup note. Recovered byte-for-byte from `cad9dff^`:
+  `docs/Silent Riot DSP Model Spec v2.13.md` (the authoritative signal-chain math),
+  `docs/SilentRiot_UI_Spec.md`, and `docs/SilentRiot_Final.jsx`.
+- [x] **[H] Restore `CREDITS.md`.** Recovered from `cad9dff^` (originality statement +
+  third-party license attribution; referenced by README.md and CLAUDE.md).
 - [ ] **[M] Reconcile CLAUDE.md against the code.** Several claims are now stale:
   speaker coupling uses a complementary OnePole crossover, **not** `makeBandPass` (the
   pitfall note is outdated, `SpeakerCoupling.cpp:23-26`); README still describes a
