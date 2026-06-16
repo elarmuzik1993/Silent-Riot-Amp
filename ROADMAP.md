@@ -32,32 +32,27 @@ P3 release engineering → P4 reach/polish.**
 
 ---
 
-## P0 — Correctness & safety (do first; these are latent bugs)
+## P0 — Correctness & safety (do first; these are latent bugs) — ✅ DONE
 
-- [ ] **[H] Reset DSP state in `prepareToPlay`.** `filterBank.resetAll()`,
-  `speakerCoupling.reset()`, `otSaturation.reset()`, `cabSim.reset()`, and the cached
-  `TriodeState`/`LTPModel`/grid-charge values are never cleared on (re)prepare or
-  sample-rate change. The reset methods exist but are **never called**. Causes stale
-  state / transient pop after re-init. (`PluginProcessor.cpp` prepareToPlay ~`:111-145`)
-- [ ] **[H] Fix the `getDSPReadout()` data race.** The editor timer (message thread)
-  reads plain non-atomic `float`s — `psu.vPower()/vScreen()/vPi()/vPreamp()`
-  (`PowerSupplyModel.h:44-47`), `sag.biasOffset()`, `el84BaseBias` — while the audio
-  thread writes them. Publish these via `std::atomic<float>` (relaxed), like the VU
-  meters already do. (`PluginProcessor.h:62-67`, `.cpp:418-431`)
-- [ ] **[M] Make `cachedIRIndex` atomic.** Written on the message thread
-  (`loadUserIR`/`selectUserIR`), read+written on the audio thread (`processBlock`
-  `:178-180`); declared a plain `int` (`PluginProcessor.h:119`). UB / possible reorder.
-- [ ] **[M] Fix or document the stock-IR load path.** `handleAsyncUpdate` maps **any**
-  `idx>0` into `userIRs[idx-1]` and never routes stock indices 1–8 through
-  `loadStockIR` — so the 8 stock IRs are effectively unreachable from a normal parameter
-  change. Either route stock indices correctly or collapse the parameter range.
-  (`PluginProcessor.cpp:55-61`, `CabinetSim.cpp:63-72`)
-- [ ] **[M] Clamp/guard the OT saturation integrator.** `flux` is bounded only by DC
-  decay; a sustained DC-biased input can drift it far before the DC block pulls it back.
-  Add a hard clamp + a final `std::isfinite` safety net before output.
-  (`OTSaturation.h:35`)
-- [ ] **[L] Add a final NaN/Inf guard** at the end of the signal chain before output —
-  cheap insurance against a stray `std::pow`/divide producing NaN.
+- [x] **[H] Reset DSP state in `prepareToPlay`.** Added `reset()` to the structs that
+  lacked one (`PowerSupplyModel`, `SagEnvelope`, `GridConductionModel`, `TriodeState`,
+  `LTPModel`) and a `SilentRiotProcessor::resetDSPState()` helper that clears all filter
+  state, integrators, cached plate voltages, and grid charge; called at the end of
+  `prepareToPlay`. Regression tests added for PSU/Sag reset.
+- [x] **[H] Fix the `getDSPReadout()` data race.** PSU/sag/bias/osFactor are now published
+  once per block as `std::atomic` snapshots from the audio thread (`*ForGUI` members);
+  `getDSPReadout()` reads only those atomics — no torn reads of live DSP state.
+- [x] **[M] Make `cachedIRIndex` atomic.** Now `std::atomic<int>` shared between the
+  message and audio threads.
+- [x] **[M] Fix/document the stock-IR load path.** `handleAsyncUpdate` now falls back to
+  IIR mode for any out-of-range index (no more stale-IR state), and the user-IR-only
+  index mapping is documented inline (stock-IR wiring deferred to the "ship real IRs"
+  item).
+- [x] **[M] Clamp/guard the OT saturation integrator.** Added a `std::isfinite` reset +
+  hard clamp to `OT_SAT_FLUX_MAX` on the flux integrator, with a regression test for a
+  sustained-DC blow-up. (`OTSaturation.h`)
+- [x] **[L] Add a final NaN/Inf guard** on both output paths (per-sample IIR path and
+  post-convolution IR path).
 
 ## P1 — Restore the source-of-truth documentation
 
@@ -127,9 +122,9 @@ P3 release engineering → P4 reach/polish.**
   against a Debug build; the shipped Release binary is never test-validated. Also: Linux
   Standalone is built but never uploaded; all artifacts use `if-no-files-found: warn`,
   masking broken packaging.
-- [ ] **[M] Fix `install-deps.sh` ↔ CI drift** — local script omits `libxext-dev`, which
-  `CMakeLists.txt:159` hard-requires (`X11::Xext`), so a clean local build can fail to
-  link while CI passes.
+- [x] **[M] Fix `install-deps.sh` ↔ CI drift** — local script omitted `libxext-dev`,
+  which `CMakeLists.txt:159` hard-requires (`X11::Xext`); added so a clean local build
+  matches CI. _(Done alongside P0 — it blocked the local verification build.)_
 - [ ] **[L] Harden CI**: pin/parameterize the hardcoded VS 2022 _Enterprise_ path in the
   Windows "Verify VST3" step, add `timeout-minutes`, add a `concurrency` group, dedupe
   the apt list copy-pasted between the `build-linux` and `test` jobs.

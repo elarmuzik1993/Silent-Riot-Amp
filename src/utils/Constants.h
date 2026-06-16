@@ -143,6 +143,11 @@ constexpr float XCUR_SENSITIVITY    = 2.0f;     // excursion-to-tanh scaling (ea
 constexpr float OT_CURRENT_SCALE    = 0.015f;
 constexpr float OT_SAT_DRIVE        = 400.0f;
 constexpr float OT_SAT_DC_FREQ      = 20.0f;
+// Hard rail on the flux integrator. Steady-state flux for a normalized input
+// is ~input/(2π·OT_SAT_DC_FREQ) ≈ 0.008·input, so this clamp is ~3 orders of
+// magnitude above normal operation — it never engages musically, but caps a
+// pathological DC-biased input before the integrator can drift toward Inf.
+constexpr float OT_SAT_FLUX_MAX     = 10.0f;
 
 // ── Gain taper ──────────────────────────────────────────────
 constexpr float GAIN_TAPER_EXPONENT = 2.0f;

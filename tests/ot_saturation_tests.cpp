@@ -126,3 +126,17 @@ TEST_CASE("OT saturation: reset clears state", "[ot_sat]") {
     float out = sat.process(0.0f);
     REQUIRE(out == Approx(0.0f).margin(1e-10f));
 }
+
+TEST_CASE("OT saturation: sustained DC input never blows up the integrator", "[ot_sat]") {
+    OTSaturation sat;
+    sat.recalcCoeffs(TEST_SR);
+
+    // Pathological constant DC offset — the asymmetric-tube-DC case the DC block
+    // is meant to bleed out. Output must stay finite and flux must stay clamped.
+    for (int i = 0; i < 200000; ++i) {
+        float out = sat.process(5.0f);
+        REQUIRE(std::isfinite(out));
+    }
+    REQUIRE(std::isfinite(sat.flux));
+    REQUIRE(std::abs(sat.flux) <= OT_SAT_FLUX_MAX);
+}
