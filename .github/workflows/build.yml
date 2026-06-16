@@ -1,74 +1,229 @@
 name: Build & Test
+
 on:
-  push: { branches: [main, develop] }
-  pull_request: { branches: [main] }
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+# Cancel superseded runs on the same ref (roadmap P3 — CI hardening).
+concurrency:
+  group: build-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Persist FetchContent (JUCE 7.0.12 + Catch2) across runs so they aren't
+  # cloned fresh every job — slow and network-flaky (roadmap P3).
+  FETCHCONTENT_BASE_DIR: ${{ github.workspace }}/.deps
+
 jobs:
+  # ── Linux Release: the artifact we actually ship ──────────────────────
   build-linux:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
-    - uses: actions/checkout@v4
-    - name: Install deps
-      run: |
-        sudo apt-get update && sudo apt-get install -y \
-          build-essential cmake ninja-build \
-          libasound2-dev libjack-jackd2-dev libfreetype6-dev \
-          libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev \
-          libxext-dev libgl1-mesa-dev libwebkit2gtk-4.1-dev libcurl4-openssl-dev
-    - name: Build Release
-      run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release && cmake --build build
-    - name: Upload VST3
-      uses: actions/upload-artifact@v4
-      with:
-        name: SilentRiot-Linux-VST3
-        path: "build/SilentRiot_artefacts/Release/VST3/"
-        if-no-files-found: warn
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-linux-deps
+      - name: Cache dependencies (JUCE/Catch2)
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.FETCHCONTENT_BASE_DIR }}
+          key: deps-${{ runner.os }}-${{ hashFiles('CMakeLists.txt', 'tests/CMakeLists.txt') }}
+      - name: ccache
+        uses: hendrikmuhs/ccache-action@v1.2
+        with:
+          key: ccache-linux-release
+      - name: Configure
+        run: >-
+          cmake -B build -G Ninja
+          -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_C_COMPILER_LAUNCHER=ccache
+          -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+      - name: Build
+        run: cmake --build build
+      - name: Upload VST3
+        uses: actions/upload-artifact@v4
+        with:
+          name: SilentRiot-Linux-VST3
+          path: "build/SilentRiot_artefacts/Release/VST3/"
+          if-no-files-found: error
+      - name: Upload Standalone
+        uses: actions/upload-artifact@v4
+        with:
+          name: SilentRiot-Linux-Standalone
+          path: "build/SilentRiot_artefacts/Release/Standalone/"
+          if-no-files-found: error
 
+  # ── Windows Release ───────────────────────────────────────────────────
   build-windows:
     runs-on: windows-latest
+    timeout-minutes: 60
     steps:
-    - uses: actions/checkout@v4
-    - name: Build Release
-      run: |
-        cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded
-        cmake --build build --config Release
-    - name: Verify VST3 binary
-      shell: cmd
-      run: |
-        call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvarsall.bat" amd64
-        echo === File size ===
-        dir "build\SilentRiot_artefacts\Release\VST3\Silent Riot.vst3\Contents\x86_64-win\Silent Riot.vst3"
-        echo === DLL dependencies ===
-        dumpbin /DEPENDENTS "build\SilentRiot_artefacts\Release\VST3\Silent Riot.vst3\Contents\x86_64-win\Silent Riot.vst3"
-        echo === VST3 exports ===
-        dumpbin /EXPORTS "build\SilentRiot_artefacts\Release\VST3\Silent Riot.vst3\Contents\x86_64-win\Silent Riot.vst3"
-        echo === Standalone dependencies ===
-        dumpbin /DEPENDENTS "build\SilentRiot_artefacts\Release\Standalone\Silent Riot.exe"
-    - name: Upload VST3
-      uses: actions/upload-artifact@v4
-      with:
-        name: SilentRiot-Windows-VST3
-        path: "build/SilentRiot_artefacts/Release/VST3/"
-        if-no-files-found: warn
-    - name: Upload Standalone
-      uses: actions/upload-artifact@v4
-      with:
-        name: SilentRiot-Windows-Standalone
-        path: "build/SilentRiot_artefacts/Release/Standalone/"
-        if-no-files-found: warn
+      - uses: actions/checkout@v4
+      - name: Cache dependencies (JUCE/Catch2)
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.FETCHCONTENT_BASE_DIR }}
+          key: deps-${{ runner.os }}-${{ hashFiles('CMakeLists.txt', 'tests/CMakeLists.txt') }}
+      - name: ccache
+        uses: hendrikmuhs/ccache-action@v1.2
+        with:
+          key: ccache-windows-release
+          variant: ccache
+      - name: Configure
+        run: >-
+          cmake -B build
+          -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded
+          -DCMAKE_C_COMPILER_LAUNCHER=ccache
+          -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+      - name: Build
+        run: cmake --build build --config Release
+      - name: Verify VST3 binary
+        shell: pwsh
+        run: |
+          # Locate the MSVC dev tools without hardcoding the VS edition/path
+          # (roadmap P3 — was pinned to "...\2022\Enterprise\...").
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $vsRoot = & $vswhere -latest -products * -property installationPath
+          if (-not $vsRoot) { throw "Visual Studio installation not found via vswhere" }
+          Import-Module (Join-Path $vsRoot "Common7\Tools\Microsoft.VisualStudio.DevShell.dll")
+          Enter-VsDevShell -VsInstallPath $vsRoot -SkipAutomaticLocation -DevCmdArguments "-arch=amd64"
+          $vst3 = "build\SilentRiot_artefacts\Release\VST3\Silent Riot.vst3\Contents\x86_64-win\Silent Riot.vst3"
+          $exe  = "build\SilentRiot_artefacts\Release\Standalone\Silent Riot.exe"
+          Write-Host "=== File size ==="
+          Get-Item $vst3 | Format-List Name, Length
+          Write-Host "=== DLL dependencies ==="
+          dumpbin /DEPENDENTS "$vst3"
+          Write-Host "=== VST3 exports ==="
+          dumpbin /EXPORTS "$vst3"
+          Write-Host "=== Standalone dependencies ==="
+          dumpbin /DEPENDENTS "$exe"
+      - name: Upload VST3
+        uses: actions/upload-artifact@v4
+        with:
+          name: SilentRiot-Windows-VST3
+          path: "build/SilentRiot_artefacts/Release/VST3/"
+          if-no-files-found: error
+      - name: Upload Standalone
+        uses: actions/upload-artifact@v4
+        with:
+          name: SilentRiot-Windows-Standalone
+          path: "build/SilentRiot_artefacts/Release/Standalone/"
+          if-no-files-found: error
 
+  # ── Tests run against a Release configuration ─────────────────────────
+  # (roadmap P3 — validate the shipped Release config, not a separate Debug
+  # build).
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
-    - uses: actions/checkout@v4
-    - name: Install deps
-      run: |
-        sudo apt-get update && sudo apt-get install -y \
-          build-essential cmake ninja-build \
-          libasound2-dev libjack-jackd2-dev libfreetype6-dev \
-          libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev \
-          libxext-dev libgl1-mesa-dev libwebkit2gtk-4.1-dev libcurl4-openssl-dev
-    - name: Build + Test
-      run: |
-        cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug -DSR_BUILD_TESTS=ON
-        cmake --build build
-        cd build && ctest --output-on-failure
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-linux-deps
+      - name: Cache dependencies (JUCE/Catch2)
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.FETCHCONTENT_BASE_DIR }}
+          key: deps-${{ runner.os }}-${{ hashFiles('CMakeLists.txt', 'tests/CMakeLists.txt') }}
+      - name: ccache
+        uses: hendrikmuhs/ccache-action@v1.2
+        with:
+          key: ccache-linux-test
+      - name: Configure + Build + Test
+        run: |
+          cmake -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DSR_BUILD_TESTS=ON \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+          cmake --build build
+          ctest --test-dir build --output-on-failure
+
+  # ── Tests on Windows (roadmap P3 — were Linux-only) ───────────────────
+  test-windows:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - name: Cache dependencies (JUCE/Catch2)
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.FETCHCONTENT_BASE_DIR }}
+          key: deps-${{ runner.os }}-${{ hashFiles('CMakeLists.txt', 'tests/CMakeLists.txt') }}
+      - name: ccache
+        uses: hendrikmuhs/ccache-action@v1.2
+        with:
+          key: ccache-windows-test
+          variant: ccache
+      - name: Configure + Build + Test
+        run: |
+          cmake -B build -DCMAKE_BUILD_TYPE=Release -DSR_BUILD_TESTS=ON `
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+          cmake --build build --config Release
+          ctest --test-dir build -C Release --output-on-failure
+
+  # ── ASan + UBSan over the test targets ────────────────────────────────
+  # (roadmap P3 — catch buffer/UB issues and threading bugs in the DSP).
+  sanitizers:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      ASAN_OPTIONS: detect_leaks=0:detect_stack_use_after_return=1
+      UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-linux-deps
+      - name: Cache dependencies (JUCE/Catch2)
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.FETCHCONTENT_BASE_DIR }}
+          key: deps-${{ runner.os }}-${{ hashFiles('CMakeLists.txt', 'tests/CMakeLists.txt') }}
+      - name: ccache
+        uses: hendrikmuhs/ccache-action@v1.2
+        with:
+          key: ccache-linux-asan
+      - name: Configure + Build (ASan/UBSan)
+        run: |
+          cmake -B build-san -G Ninja \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DSR_BUILD_TESTS=ON \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+            -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer" \
+            -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address,undefined"
+          cmake --build build-san --target SilentRiotTests SilentRiotJuceTests
+      - name: Run sanitized tests
+        run: ctest --test-dir build-san --output-on-failure
+
+  # ── pluginval: the standard JUCE VST3 release gate ────────────────────
+  # (roadmap P3 — state save/restore, automation, threading, fuzzing).
+  pluginval:
+    runs-on: ubuntu-latest
+    needs: build-linux
+    timeout-minutes: 30
+    steps:
+      - name: Install runtime libs + Xvfb
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libasound2t64 libfreetype6 libcurl4 \
+            libx11-6 libxext6 libxrandr2 libxinerama1 libxcursor1 libxi6 \
+            libglib2.0-0 libgl1 xvfb
+      - name: Download built VST3
+        uses: actions/download-artifact@v4
+        with:
+          name: SilentRiot-Linux-VST3
+          path: vst3
+      - name: Download pluginval
+        run: |
+          curl -L -o pluginval.zip \
+            https://github.com/Tracktion/pluginval/releases/download/v1.0.3/pluginval_Linux.zip
+          unzip -o pluginval.zip
+          chmod +x pluginval
+      - name: Validate
+        run: |
+          VST3="$(find vst3 -name '*.vst3' -print -quit)"
+          echo "Validating: $VST3"
+          xvfb-run -a ./pluginval --strictness-level 8 --validate-in-process \
+            --timeout-ms 300000 --validate "$VST3"
