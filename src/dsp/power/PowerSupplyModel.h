@@ -35,6 +35,7 @@ struct PowerSupplyModel {
 
     void init();
     void recalcDecayCoeffs(float effectiveSR);
+    void reset();   // restore node voltages to nominal, clear current draw
     void update();
     void resetCurrentDraw();
     void reportPreampLevel(float plateSwing);

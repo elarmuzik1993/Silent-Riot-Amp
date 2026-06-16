@@ -134,6 +134,28 @@ TEST_CASE("PSU: resetCurrentDraw clears accumulators", "[psu]") {
     REQUIRE(psu.piCurrentAccum == 0.0f);
 }
 
+TEST_CASE("PSU: reset restores nodes to nominal and clears draw", "[psu]") {
+    PowerSupplyModel psu;
+    psu.init();
+    psu.recalcDecayCoeffs(44100.0f);
+
+    // Drive the supply down under heavy load
+    psu.reportPowerDirect(5.0f, 1.0f);
+    psu.reportPreampLevel(0.5f);
+    for (int i = 0; i < 2000; ++i) { psu.update(); psu.resetCurrentDraw();
+                                     psu.reportPowerDirect(5.0f, 1.0f); }
+    REQUIRE(psu.vPower() < V_POWER_NOMINAL_N);  // sagged
+
+    psu.reset();
+
+    REQUIRE(psu.vPower()  == Approx(V_POWER_NOMINAL_N));
+    REQUIRE(psu.vScreen() == Approx(V_SCREEN_NOMINAL_N));
+    REQUIRE(psu.vPi()     == Approx(V_PI_NOMINAL_N));
+    REQUIRE(psu.vPreamp() == Approx(V_PREAMP_NOMINAL_N));
+    REQUIRE(psu.powerCurrent == 0.0f);
+    REQUIRE(psu.preampCurrentAccum == 0.0f);
+}
+
 TEST_CASE("PSU: preamp current accumulates across two stages", "[psu]") {
     PowerSupplyModel psu;
     psu.init();
@@ -176,6 +198,20 @@ TEST_CASE("Sag: zero offset at quiescent current", "[sag]") {
     sag.recalcCoeffs(TEST_SR);
 
     // At init, envelope = quiescent → biasOffset should be ~0
+    REQUIRE(sag.biasOffset() == Approx(0.0f).margin(1e-6f));
+}
+
+TEST_CASE("Sag: reset restores quiescent envelope", "[sag]") {
+    SagEnvelope sag;
+    sag.recalcCoeffs(TEST_SR);
+
+    // Drive the envelope well above quiescent
+    for (int i = 0; i < 1000; ++i)
+        sag.update(SAG_QUIESCENT_I_N * 10.0f);
+    REQUIRE(sag.biasOffset() < 0.0f);  // colder bias under drive
+
+    sag.reset();
+    REQUIRE(sag.envelope == Approx(SAG_QUIESCENT_I_N));
     REQUIRE(sag.biasOffset() == Approx(0.0f).margin(1e-6f));
 }
 

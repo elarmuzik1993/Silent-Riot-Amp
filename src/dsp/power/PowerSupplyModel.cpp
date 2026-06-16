@@ -14,6 +14,15 @@ void PowerSupplyModel::init() {
     rDrop2_n          = R_DROP2_N;
 }
 
+void PowerSupplyModel::reset() {
+    // Restore each node to its nominal voltage (keeps tau/decay coeffs intact)
+    powerNode.voltage  = powerNode.nominalVoltage;
+    screenNode.voltage = screenNode.nominalVoltage;
+    piNode.voltage     = piNode.nominalVoltage;
+    preampNode.voltage = preampNode.nominalVoltage;
+    resetCurrentDraw();
+}
+
 void PowerSupplyModel::recalcDecayCoeffs(float effectiveSR) {
     powerNode.recalcDecay(effectiveSR);
     screenNode.recalcDecay(effectiveSR);
