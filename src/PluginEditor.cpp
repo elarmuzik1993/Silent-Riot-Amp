@@ -105,6 +105,7 @@ SilentRiotEditor::SilentRiotEditor(SilentRiotProcessor& p)
     settingsPanel.onClose = [this] {
         settingsPanel.setVisible(false);
     };
+    settingsPanel.onSettingsChanged = [this] { applySettings(); };
     settingsPanel.onScaleChanged = [this](int scaleIdx) {
         static const float scales[] = { 0.75f, 1.0f, 1.25f, 1.5f };
         currentScale = scales[juce::jlimit(0, 3, scaleIdx)];
@@ -129,6 +130,10 @@ SilentRiotEditor::SilentRiotEditor(SilentRiotProcessor& p)
             param->setValueNotifyingHost(param->convertTo0to1(static_cast<float>(idx)));
     };
 
+    // Restore displayed preset from the parameter (does not fire onPresetChanged)
+    header.getPresetSelector().setPresetIndex(
+        static_cast<int>(proc.apvts.getRawParameterValue(sr::Params::IDs::PRESET_IDX)->load()));
+
     // APVTS attachments
     using namespace sr::Params;
     gainA = std::make_unique<SliderA>(proc.apvts, IDs::GAIN,   gainKnob.getSlider());
@@ -148,6 +153,14 @@ SilentRiotEditor::SilentRiotEditor(SilentRiotProcessor& p)
     halfPowerToggle.getButton().setDescription("Half power 7W mode toggle");
     cabSimToggle.getButton().setDescription("Cabinet simulation toggle");
     powerToggle.getButton().setDescription("Power on/off toggle");
+
+    // Tooltips (shown only while a TooltipWindow exists — see applySettings)
+    gainKnob.getSlider().setTooltip("Gain — preamp drive");
+    toneKnob.getSlider().setTooltip("Shape — mid scoop (CW) to mid boost (CCW)");
+    volumeKnob.getSlider().setTooltip("Volume — master / power-amp drive");
+    halfPowerToggle.setTooltip("7W half-power mode");
+    cabSimToggle.setTooltip("Cabinet simulation on/off");
+    powerToggle.setTooltip("Amp power on/off");
 
     // Tab order
     gainKnob.getSlider().setExplicitFocusOrder(1);
@@ -189,6 +202,8 @@ void SilentRiotEditor::saveUIState()
     state.setProperty("theme",        settingsPanel.themeIndex, nullptr);
     state.setProperty("meterBallistics", settingsPanel.meterBallistics, nullptr);
     state.setProperty("knobMode",     settingsPanel.knobMode, nullptr);
+    state.setProperty("peakHold",     settingsPanel.peakHold, nullptr);
+    state.setProperty("tooltips",     settingsPanel.tooltipsEnabled, nullptr);
 }
 
 void SilentRiotEditor::loadUIState()
@@ -222,6 +237,36 @@ void SilentRiotEditor::loadUIState()
         settingsPanel.meterBallistics = static_cast<int>(state.getProperty("meterBallistics"));
     if (state.hasProperty("knobMode"))
         settingsPanel.knobMode = static_cast<int>(state.getProperty("knobMode"));
+    if (state.hasProperty("peakHold"))
+        settingsPanel.peakHold = static_cast<bool>(state.getProperty("peakHold"));
+    if (state.hasProperty("tooltips"))
+        settingsPanel.tooltipsEnabled = static_cast<bool>(state.getProperty("tooltips"));
+
+    // Push restored values into the controls and apply them to the UI
+    settingsPanel.syncControls();
+    applySettings();
+}
+
+void SilentRiotEditor::applySettings()
+{
+    sr::Colours::setTheme(settingsPanel.themeIndex);
+    setWindowBackground();
+
+    vuIn.setBallistics(settingsPanel.meterBallistics);
+    vuOut.setBallistics(settingsPanel.meterBallistics);
+    vuIn.setPeakHold(settingsPanel.peakHold);
+    vuOut.setPeakHold(settingsPanel.peakHold);
+
+    gainKnob.setKnobMode(settingsPanel.knobMode);
+    toneKnob.setKnobMode(settingsPanel.knobMode);
+    volumeKnob.setKnobMode(settingsPanel.knobMode);
+
+    if (settingsPanel.tooltipsEnabled && tooltipWindow == nullptr)
+        tooltipWindow = std::make_unique<juce::TooltipWindow>(this);
+    else if (!settingsPanel.tooltipsEnabled)
+        tooltipWindow.reset();
+
+    repaint();  // re-theme the whole editor (children repaint within parent region)
 }
 
 int SilentRiotEditor::getContentHeight() const
@@ -284,7 +329,7 @@ void SilentRiotEditor::setWindowBackground()
             reinterpret_cast<uintptr_t>(peer->getNativeHandle()));
         if (auto* dpy = XOpenDisplay(nullptr))
         {
-            XSetWindowBackground(dpy, wh, 0x1A1A2E);
+            XSetWindowBackground(dpy, wh, sr::Colours::bg.getARGB() & 0xFFFFFF);
             XSync(dpy, False);
             XCloseDisplay(dpy);
         }
@@ -393,7 +438,6 @@ void SilentRiotEditor::timerCallback()
         guiR.gridCurrentMA = dspR.gridCurrentMA;
         guiR.osFactor = dspR.osFactor;
         guiR.is7W = dspR.is7W;
-        guiR.tempC = 420.0f;
         advancedPanel.setReadout(guiR);
     }
 }

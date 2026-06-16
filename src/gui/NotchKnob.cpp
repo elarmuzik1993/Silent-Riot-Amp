@@ -20,6 +20,13 @@ NotchKnob::NotchKnob(const juce::String& l, float defaultValue)
     addAndMakeVisible(slider);
 }
 
+void NotchKnob::setKnobMode(int mode)
+{
+    // 0 = Linear: straight vertical drag. 1 = Rotary: circular drag around the knob.
+    slider.setSliderStyle(mode == 1 ? juce::Slider::Rotary
+                                    : juce::Slider::RotaryVerticalDrag);
+}
+
 void NotchKnob::resized()
 {
     // Slider occupies the knob area (top 80px)
