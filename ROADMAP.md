@@ -69,37 +69,36 @@ P3 release engineering → P4 reach/polish.**
   "Vox-style cut" tone control (replaced by the 3-band Shape EQ); IRLoaderPanel "Category
   tabs" described but not implemented.
 
-## P2 — Finish the half-built UI
+## P2 — Finish the half-built UI — mostly ✅
 
-- [ ] **[H] Wire up the Settings panel — or remove the dead controls.** All of these
-  persist to the ValueTree but nothing consumes them:
-  - Theme DARK/LIGHT — `ColourPalette.h` is a single hardcoded dark palette, no theming
-    hook. LIGHT does nothing.
-  - Meter ballistics FAST/MED/SLOW — `VUMeter::lerpFactor`/`jitterAmount` are
-    `constexpr` (`VUMeter.h:21-22`), never wired.
-  - Knob mode LINEAR/ROTARY — `NotchKnob` style hardcoded
-    `RotaryHorizontalVerticalDrag` (`NotchKnob.cpp:12`).
-  - Peak-hold / tooltips toggles — no callbacks at all (`SettingsPanel.cpp:9-22`).
-- [ ] **[M] Surface stock IRs in the IR loader.** The panel only lists user IRs and is
-  literally titled "USER IMPULSE RESPONSES"; the 8 stock IRs (`IR_INDEX` 1–8) are not
-  browsable. (CLAUDE.md "Category tabs" don't exist.)
-- [ ] **[M] Restore PresetSelector display from the parameter on editor open.** The
-  selector pushes to `PRESET_IDX` but never reads it back, so reopening the editor or
-  host-automating the preset leaves the displayed name stale (contrast IR index, which
-  _is_ restored). (`PluginEditor.cpp:127-130`)
-- [ ] **[M] Replace or remove the fabricated "TEMP ~420°C" readout.** Hardcoded
-  `guiR.tempC = 420.0f` (`PluginEditor.cpp:396`); the GUI `DSPReadout` struct has a
-  `tempC` field the processor struct lacks. Either model it or drop it.
-- [ ] **[M] Keyboard & accessibility coverage.** Tab order covers only the 3 knobs + 3
-  toggles. PresetSelector arrows, gear icon, both SectionBars, the IR list/drop zone, and
-  every SettingsPanel control are click-only with no `AccessibilityHandler` — a
-  keyboard-only or screen-reader user cannot change preset, open settings, toggle
-  sections, or load an IR.
-- [ ] **[L] Fix the dead dashed-border in IRLoaderPanel** — `createDashedStroke` output
-  is computed then stroked with a plain `PathStrokeType`, so the border renders solid.
-  (`IRLoaderPanel.cpp:200-205`)
-- [ ] **[L] Fix stale version string** "Silent Riot v0.1.0" in `SettingsPanel.cpp:101`
-  (FooterBar correctly uses `JucePlugin_VersionString`).
+- [x] **[H] Wire up the Settings panel.** All controls now consume their state and
+  persist via the ValueTree:
+  - Theme **DARK/LIGHT** — `ColourPalette.h` converted to runtime-swappable palette
+    globals + `setTheme()`; editor applies it and repaints. (Light values are sensible
+    but not yet visually fine-tuned — flagged below.)
+  - Meter ballistics FAST/MED/SLOW — `VUMeter::setBallistics()` sets the smoothing factor.
+  - Knob mode LINEAR/ROTARY — `NotchKnob::setKnobMode()` switches slider drag style.
+  - Peak hold — `VUMeter::setPeakHold()` + held-peak segment marker.
+  - Tooltips — editor owns a `TooltipWindow` gated by the toggle; controls have tooltip
+    text. `ToggleSwitch` is now a `SettableTooltipClient`.
+- [x] **[M] Restore PresetSelector display from the parameter on editor open.**
+- [x] **[M] Remove the fabricated "TEMP ~420°C" readout** (dropped the `tempC` field +
+  Engine-state row).
+- [x] **[L] Fix the dead dashed-border in IRLoaderPanel** (distinct source/dest paths).
+- [x] **[L] Fix stale version string** — Settings "About" now uses `JucePlugin_VersionString`
+  and shows a clean Product/Version/Format/Developer grid.
+- [ ] **[M] Surface stock IRs in the IR loader.** Still user-IR-only; the 8 stock IRs
+  aren't browsable, and "Category tabs" (ALL/STOCK/ORANGE/3RD PARTY/USER per UI spec
+  §5.7) aren't implemented. **Deferred** — tied to the parked "ship real cabinet IRs"
+  item (stock IRs are synthetic placeholders today).
+- [ ] **[M] Keyboard & accessibility coverage.** Still outstanding (larger, separate
+  effort): PresetSelector arrows, gear icon, both SectionBars, IR list/drop zone, and the
+  SettingsPanel controls are click-only with no `AccessibilityHandler` / keyboard
+  activation. Tooltips were added this pass, but full AX + tab order is not done.
+- [ ] **[M] _(newly surfaced)_ Presets don't recall values.** `PRESET_IDX` stores/displays
+  an index but nothing applies preset values to GAIN/SHAPE/VOLUME/etc. — presets are
+  cosmetic. Implementing recall needs the 5 presets' actual parameter values defined
+  (product input).
 
 ## P3 — Release engineering (gate for any public 1.0)
 

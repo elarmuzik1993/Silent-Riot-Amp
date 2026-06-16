@@ -3,7 +3,9 @@
 
 namespace sr {
 
-class ToggleSwitch : public juce::Component, private juce::Timer {
+class ToggleSwitch : public juce::Component,
+                     public juce::SettableTooltipClient,
+                     private juce::Timer {
 public:
     ToggleSwitch(const juce::String& label, juce::Colour activeColor = juce::Colour(0xFFFF6600));
     void paint(juce::Graphics&) override;
