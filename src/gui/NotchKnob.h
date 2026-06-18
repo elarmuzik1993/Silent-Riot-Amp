@@ -10,6 +10,8 @@ public:
     void paint(juce::Graphics&) override;
     juce::Slider& getSlider() { return slider; }
 
+    void setKnobMode(int mode);  // 0=Linear (vertical drag), 1=Rotary (circular drag)
+
 private:
     void drawSegmentedArc(juce::Graphics&, float cx, float cy, float pos) const;
     void drawNumberedLabels(juce::Graphics&, float cx, float cy) const;

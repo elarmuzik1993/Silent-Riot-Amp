@@ -24,6 +24,7 @@ private:
     void layoutContent();
     void saveUIState();
     void loadUIState();
+    void applySettings();   // apply theme/ballistics/knob-mode/peak-hold/tooltips
     int getContentHeight() const;
     void applyShapeMask();
     void setWindowBackground();
@@ -63,6 +64,9 @@ private:
 
     // Settings overlay
     sr::SettingsPanel settingsPanel;
+
+    // Tooltips (created when enabled in settings; null = tooltips off)
+    std::unique_ptr<juce::TooltipWindow> tooltipWindow;
 
     // APVTS attachments
     using SliderA = juce::AudioProcessorValueTreeState::SliderAttachment;

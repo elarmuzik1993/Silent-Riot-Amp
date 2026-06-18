@@ -76,6 +76,11 @@ public:
         juce::AudioBuffer<float> audioData;
     };
 
+    // Apply a factory preset (sets gain/tone/volume/7W/cab + preset index).
+    // Called on an explicit user selection (message thread) — NOT on state
+    // restore, so user tweaks saved over a preset are preserved.
+    void applyPreset(int presetIndex);
+
     void loadUserIR(const juce::File& file);
     void selectUserIR(int userIndex);  // 0-based index into userIRs
     int getNumUserIRs() const { return static_cast<int>(userIRs.size()); }
@@ -84,6 +89,7 @@ public:
 private:
     juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
     void handleAsyncUpdate() override;  // deferred IR loading on message thread
+    void resetDSPState();               // clear all filter/integrator/cached state
 
     // User IR persistence
     std::vector<UserIREntry> userIRs;
@@ -116,7 +122,7 @@ private:
     float outputGainCompensation = 1.0f;   // scales cab output into tanh soft-clip range
     bool  psuFrozen    = false;
     double baseSampleRate = 44100.0;
-    int   cachedIRIndex = 0;              // last IR index seen by audio thread
+    std::atomic<int> cachedIRIndex { 0 };   // last IR index seen by audio thread (written msg+audio)
     std::atomic<int> pendingIRIndex { -1 }; // deferred IR load (message thread)
 
 public:
@@ -124,6 +130,18 @@ public:
     std::atomic<float> inputLevelForGUI  { 0.0f };
     std::atomic<float> outputLevelForGUI { 0.0f };
     std::atomic<float> gridCurrentForGUI { 0.0f };
+
+    // GUI DSP-state telemetry — published once per block by the audio thread,
+    // read by the editor timer. Atomic snapshots avoid torn reads of the
+    // non-atomic PSU/sag floats they mirror. Initialized to nominal so the
+    // readout is sane before the first processBlock.
+    std::atomic<float> vBPlusForGUI   { sr::V_POWER_NOMINAL_N };
+    std::atomic<float> vScreenForGUI  { sr::V_SCREEN_NOMINAL_N };
+    std::atomic<float> vPiForGUI      { sr::V_PI_NOMINAL_N };
+    std::atomic<float> vPreampForGUI  { sr::V_PREAMP_NOMINAL_N };
+    std::atomic<float> sagOffsetForGUI{ 0.0f };
+    std::atomic<float> el84BiasForGUI { sr::PENTODE_BIAS_15W_N };
+    std::atomic<int>   osFactorForGUI { 1 };
 
 private:
 

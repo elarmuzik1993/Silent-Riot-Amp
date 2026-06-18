@@ -7,6 +7,7 @@
 
 #include "../../utils/Constants.h"
 #include <cmath>
+#include <algorithm>
 
 namespace sr {
 
@@ -34,6 +35,12 @@ struct OTSaturation {
     float process(float input) {
         // Integrate: accumulate flux (Faraday's law)
         flux = flux * dcDecay + input * inverseSR;
+
+        // Safety rail: a sustained DC-biased input (asymmetric tube DC) can drift
+        // the integrator before the DC-block bleeds it out. Clamp + finite-guard so
+        // the state can never reach Inf/NaN and poison the rest of the chain.
+        if (!std::isfinite(flux)) flux = 0.0f;
+        flux = std::clamp(flux, -OT_SAT_FLUX_MAX, OT_SAT_FLUX_MAX);
 
         // Saturate: tanh models core permeability collapse
         // Normalize by dividing by drive so small signals pass at unity

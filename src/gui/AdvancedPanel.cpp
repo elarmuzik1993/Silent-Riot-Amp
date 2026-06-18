@@ -107,7 +107,6 @@ void AdvancedPanel::paint(juce::Graphics& g)
         { "CLASS",   readout.is7W ? "A" : "AB" },
         { "OS",      juce::String(readout.osFactor) + "x" },
         { "BIAS",    juce::String(readout.biasV, 1) + "V" },
-        { "TEMP",    "~" + juce::String(static_cast<int>(readout.tempC)) + "\xC2\xB0""C" },
         { "GRID I",  juce::String(readout.gridCurrentMA, 2) + "mA" },
     };
 

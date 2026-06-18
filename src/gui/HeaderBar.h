@@ -4,12 +4,27 @@
 
 namespace sr {
 
+// Transparent focusable hit-area for the gear icon (HeaderBar paints the icon).
+class GearButton : public juce::Component {
+public:
+    GearButton();
+    void mouseDown(const juce::MouseEvent&) override;
+    bool keyPressed(const juce::KeyPress&) override;
+    void focusGained(juce::Component::FocusChangeType) override;
+    void focusLost(juce::Component::FocusChangeType) override;
+
+    std::function<void()> onActivate;
+
+private:
+    std::unique_ptr<juce::AccessibilityHandler> createAccessibilityHandler() override;
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(GearButton)
+};
+
 class HeaderBar : public juce::Component, private juce::Timer {
 public:
     HeaderBar();
     void paint(juce::Graphics&) override;
     void resized() override;
-    void mouseDown(const juce::MouseEvent&) override;
 
     PresetSelector& getPresetSelector() { return presetSelector; }
 
@@ -18,8 +33,10 @@ public:
 private:
     void timerCallback() override;
     void paintGearIcon(juce::Graphics& g, juce::Rectangle<float> area) const;
+    void activateGear();
 
     PresetSelector presetSelector;
+    GearButton gearButton;
     bool gearActive = false;
     float gearRotation = 0.0f; // 0=inactive, 60=active (animated degrees)
 

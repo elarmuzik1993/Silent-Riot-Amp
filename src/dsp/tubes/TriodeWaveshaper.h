@@ -34,6 +34,7 @@ float korenTriode(float vgk_n, float vPlate_n, const KorenTriodeParams& p);
 // Persistent state for inter-sample plate voltage caching
 struct TriodeState {
     float vPlate = -1.0f;  // <0 = uninitialized (uses vSupply*0.6 as first guess)
+    void reset() { vPlate = -1.0f; }
 };
 
 // Triode waveshaper: iterative load-line solve with Koren model, returns plate voltage

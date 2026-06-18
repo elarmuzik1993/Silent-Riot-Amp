@@ -13,13 +13,45 @@ SettingsPanel::SettingsPanel()
     addAndMakeVisible(peakHoldToggle);
     addAndMakeVisible(tooltipsToggle);
 
-    themeSelector.onChange      = [this](int i) { themeIndex = i; };
-    ballisticsSelector.onChange = [this](int i) { meterBallistics = i; };
-    knobModeSelector.onChange   = [this](int i) { knobMode = i; };
+    peakHoldToggle.getButton().setToggleState(true, juce::dontSendNotification);
+    tooltipsToggle.getButton().setToggleState(true, juce::dontSendNotification);
+
+    themeSelector.setTitleText("Theme");
+    ballisticsSelector.setTitleText("Meter ballistics");
+    knobModeSelector.setTitleText("Knob mode");
+    scaleSelector.setTitleText("UI scale");
+    setTitle("Settings");
+
+    auto fireChanged = [this] { if (onSettingsChanged) onSettingsChanged(); };
+
+    themeSelector.onChange      = [this, fireChanged](int i) { themeIndex = i; fireChanged(); };
+    ballisticsSelector.onChange = [this, fireChanged](int i) { meterBallistics = i; fireChanged(); };
+    knobModeSelector.onChange   = [this, fireChanged](int i) { knobMode = i; fireChanged(); };
     scaleSelector.onChange      = [this](int i) {
         uiScale = i;
         if (onScaleChanged) onScaleChanged(i);
     };
+
+    // ToggleSwitch animates via onStateChange internally — external listeners
+    // must use onClick (see CLAUDE.md pitfall).
+    peakHoldToggle.getButton().onClick = [this, fireChanged] {
+        peakHold = peakHoldToggle.getButton().getToggleState();
+        fireChanged();
+    };
+    tooltipsToggle.getButton().onClick = [this, fireChanged] {
+        tooltipsEnabled = tooltipsToggle.getButton().getToggleState();
+        fireChanged();
+    };
+}
+
+void SettingsPanel::syncControls()
+{
+    themeSelector.setSelectedIndex(themeIndex);
+    ballisticsSelector.setSelectedIndex(meterBallistics);
+    knobModeSelector.setSelectedIndex(knobMode);
+    scaleSelector.setSelectedIndex(uiScale);
+    peakHoldToggle.getButton().setToggleState(peakHold, juce::dontSendNotification);
+    tooltipsToggle.getButton().setToggleState(tooltipsEnabled, juce::dontSendNotification);
 }
 
 void SettingsPanel::mouseDown(const juce::MouseEvent& e)
@@ -95,12 +127,12 @@ void SettingsPanel::paint(juce::Graphics& g)
     y += 24.0f;
 
     // Product info
-    struct InfoRow { const char* key; const char* val; };
+    struct InfoRow { const char* key; juce::String val; };
     InfoRow info[] = {
-        { "Product", "Silent Riot v0.1.0" },
+        { "Product",   "Silent Riot" },
+        { "Version",   "v" JucePlugin_VersionString },
+        { "Format",    "VST3 / Standalone" },
         { "Developer", "Monolit Beatz" },
-        { "Format", "VST3 / Standalone" },
-        { "Engine", "Phase 4 — Convolution" },
     };
 
     for (auto& row : info)

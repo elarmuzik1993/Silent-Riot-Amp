@@ -8,6 +8,9 @@ public:
     explicit SectionBar(const juce::String& label);
     void paint(juce::Graphics&) override;
     void mouseDown(const juce::MouseEvent&) override;
+    bool keyPressed(const juce::KeyPress&) override;
+    void focusGained(juce::Component::FocusChangeType) override;
+    void focusLost(juce::Component::FocusChangeType) override;
 
     bool isOpen() const { return open; }
     void setOpen(bool shouldOpen);
@@ -17,6 +20,7 @@ public:
 
 private:
     void timerCallback() override;
+    std::unique_ptr<juce::AccessibilityHandler> createAccessibilityHandler() override;
 
     juce::String label;
     juce::String hintText;

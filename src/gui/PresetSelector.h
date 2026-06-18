@@ -1,5 +1,6 @@
 #pragma once
 #include <juce_gui_basics/juce_gui_basics.h>
+#include "../utils/Parameters.h"
 
 namespace sr {
 
@@ -8,6 +9,9 @@ public:
     PresetSelector();
     void paint(juce::Graphics&) override;
     void mouseDown(const juce::MouseEvent&) override;
+    bool keyPressed(const juce::KeyPress&) override;
+    void focusGained(juce::Component::FocusChangeType) override;
+    void focusLost(juce::Component::FocusChangeType) override;
 
     int getPresetIndex() const { return currentIndex; }
     void setPresetIndex(int idx);
@@ -15,16 +19,14 @@ public:
     std::function<void(int)> onPresetChanged;
 
 private:
+    void step(int delta);   // change preset by ±1 and notify
+    std::unique_ptr<juce::AccessibilityHandler> createAccessibilityHandler() override;
+
     int currentIndex = 0;
 
-    static constexpr int numPresets = 5;
-    static inline const juce::String presetNames[numPresets] = {
-        "Classic Crunch",
-        "Edge of Breakup",
-        "Full Drive",
-        "Clean Shimmer",
-        "Heavy Sag"
-    };
+    // Single source of truth: names come from the factory preset table.
+    static constexpr int numPresets = sr::Presets::count;
+    static const char* presetName(int i) { return sr::Presets::table[i].name; }
 
     static constexpr float arrowW = 28.0f;
     static constexpr float minCenterW = 140.0f;

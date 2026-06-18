@@ -14,6 +14,9 @@ struct GridConductionModel {
     float couplingCapCharge = 0.0f;
     float chargeDecay       = 0.999f;
     float lastGridCurrent   = 0.0f;  // for GUI readout
+
+    // Clear dynamic state (keeps configured resistances + charge decay)
+    void reset() { couplingCapCharge = 0.0f; lastGridCurrent = 0.0f; }
 };
 
 float applyGridConduction(float vGrid, GridConductionModel& model);
