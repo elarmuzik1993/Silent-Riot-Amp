@@ -20,7 +20,7 @@ TEST_CASE("VS: thermal voltage 26mV maps to 0.0000867", "[voltage_scale]") {
     REQUIRE(VS::v(0.026f) == Approx(0.0000867f).margin(1e-6f));
 }
 
-TEST_CASE("VS: guitar ±0.5V maps to ±0.00167", "[voltage_scale]") {
+TEST_CASE("VS: guitar +/-0.5V maps to +/-0.00167", "[voltage_scale]") {
     REQUIRE(VS::v(0.5f) == Approx(0.001667f).margin(1e-5f));
     REQUIRE(VS::v(-0.5f) == Approx(-0.001667f).margin(1e-5f));
 }
@@ -29,12 +29,12 @@ TEST_CASE("VS: grid bias -1.5V maps to -0.005", "[voltage_scale]") {
     REQUIRE(VS::v(-1.5f) == Approx(-0.005f));
 }
 
-TEST_CASE("VS: plate swing ±60V maps to ±0.2", "[voltage_scale]") {
+TEST_CASE("VS: plate swing +/-60V maps to +/-0.2", "[voltage_scale]") {
     REQUIRE(VS::v(60.0f) == Approx(0.2f));
     REQUIRE(VS::v(-60.0f) == Approx(-0.2f));
 }
 
-TEST_CASE("VS: max plate swing ±150V maps to ±0.5", "[voltage_scale]") {
+TEST_CASE("VS: max plate swing +/-150V maps to +/-0.5", "[voltage_scale]") {
     REQUIRE(VS::v(150.0f) == Approx(0.5f));
 }
 
@@ -86,21 +86,21 @@ TEST_CASE("VS: 1M maps to 3.333", "[voltage_scale]") {
 // Ohm's law preserved in normalized domain
 // ═══════════════════════════════════════════════════════════════
 
-TEST_CASE("VS: Ohm's law — 1mA through 100K = 100V", "[voltage_scale]") {
+TEST_CASE("VS: Ohm's law - 1mA through 100K = 100V", "[voltage_scale]") {
     float i_n = VS::i(0.001f);
     float r_n = VS::R_100K;
     float v_n = i_n * r_n;
     REQUIRE(VS::toVolts(v_n) == Approx(100.0f).margin(0.01f));
 }
 
-TEST_CASE("VS: Ohm's law — 1.2mA through 62.5K = 75V", "[voltage_scale]") {
+TEST_CASE("VS: Ohm's law - 1.2mA through 62.5K = 75V", "[voltage_scale]") {
     float i_n = VS::i(0.0012f);
     float r_n = VS::r(62500.0f);
     float v_n = i_n * r_n;
     REQUIRE(VS::toVolts(v_n) == Approx(75.0f).margin(0.1f));
 }
 
-TEST_CASE("VS: Ohm's law — tail current through 1.2K", "[voltage_scale]") {
+TEST_CASE("VS: Ohm's law - tail current through 1.2K", "[voltage_scale]") {
     float iTail_n = VS::i(0.0024f);
     float vCathode_n = iTail_n * VS::R_1K2;
     REQUIRE(VS::toVolts(vCathode_n) == Approx(2.88f).margin(0.01f));
