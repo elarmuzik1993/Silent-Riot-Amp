@@ -162,7 +162,7 @@ TEST_CASE("Sag modifies effective bias correctly", "[chain][sag]") {
 
 // ── Output limiter ───────────────────────────────────────────
 
-TEST_CASE("tanh limiter: output bounded to ±1.0", "[chain][output]") {
+TEST_CASE("tanh limiter: output bounded to +/-1.0", "[chain][output]") {
     for (float in = -5.0f; in <= 5.0f; in += 0.5f) {
         float out = std::tanh(in);
         REQUIRE(out >= -1.0f);
@@ -178,7 +178,7 @@ TEST_CASE("tanh limiter: small signal passes near-linearly", "[chain][output]") 
 
 // ── End-to-end signal level sanity ───────────────────────────
 
-TEST_CASE("Full preamp chain: guitar → V1a → gain → V1b produces sound", "[chain][e2e]") {
+TEST_CASE("Full preamp chain: guitar -> V1a -> gain -> V1b produces sound", "[chain][e2e]") {
     // Simulate the preamp chain manually
     float input = VS::V_GUITAR;
     float supply = VS::V_PREAMP;
