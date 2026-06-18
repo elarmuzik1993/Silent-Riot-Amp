@@ -21,6 +21,9 @@ struct SagEnvelope {
         releaseDecay = std::exp(-1.0f / (SAG_RELEASE_MS * 0.001f * effectiveSR));
     }
 
+    // Restore the envelope to idle cathode current (no sag offset)
+    void reset() { envelope = SAG_QUIESCENT_I_N; }
+
     // Feed with TOTAL plate current: |ipA| + |ipB| (both tubes through shared cathode R)
     void update(float totalPlateCurrent) {
         float level = std::abs(totalPlateCurrent);

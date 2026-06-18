@@ -105,6 +105,7 @@ SilentRiotEditor::SilentRiotEditor(SilentRiotProcessor& p)
     settingsPanel.onClose = [this] {
         settingsPanel.setVisible(false);
     };
+    settingsPanel.onSettingsChanged = [this] { applySettings(); };
     settingsPanel.onScaleChanged = [this](int scaleIdx) {
         static const float scales[] = { 0.75f, 1.0f, 1.25f, 1.5f };
         currentScale = scales[juce::jlimit(0, 3, scaleIdx)];
@@ -123,11 +124,14 @@ SilentRiotEditor::SilentRiotEditor(SilentRiotProcessor& p)
         saveUIState();
     };
 
-    // Preset selector wiring
+    // Preset selector wiring — applying the preset also stores PRESET_IDX
     header.getPresetSelector().onPresetChanged = [this](int idx) {
-        if (auto* param = proc.apvts.getParameter(sr::Params::IDs::PRESET_IDX))
-            param->setValueNotifyingHost(param->convertTo0to1(static_cast<float>(idx)));
+        proc.applyPreset(idx);
     };
+
+    // Restore displayed preset from the parameter (does not fire onPresetChanged)
+    header.getPresetSelector().setPresetIndex(
+        static_cast<int>(proc.apvts.getRawParameterValue(sr::Params::IDs::PRESET_IDX)->load()));
 
     // APVTS attachments
     using namespace sr::Params;
@@ -138,24 +142,38 @@ SilentRiotEditor::SilentRiotEditor(SilentRiotProcessor& p)
     cabSimA    = std::make_unique<ButtonA>(proc.apvts, IDs::CAB_SIM,    cabSimToggle.getButton());
     powerA     = std::make_unique<ButtonA>(proc.apvts, IDs::POWER,      powerToggle.getButton());
 
-    // Keyboard focus and accessibility
-    gainKnob.getSlider().setWantsKeyboardFocus(true);
-    toneKnob.getSlider().setWantsKeyboardFocus(true);
-    volumeKnob.getSlider().setWantsKeyboardFocus(true);
-    gainKnob.getSlider().setDescription("Gain control, 0 to 10");
-    toneKnob.getSlider().setDescription("Shape control, 0 warm to 10 scooped");
-    volumeKnob.getSlider().setDescription("Volume control, 0 to 10");
-    halfPowerToggle.getButton().setDescription("Half power 7W mode toggle");
-    cabSimToggle.getButton().setDescription("Cabinet simulation toggle");
-    powerToggle.getButton().setDescription("Power on/off toggle");
+    // Keyboard focus and accessibility.
+    // Knobs: the (invisible) slider is the focusable leaf. Toggles: the
+    // ToggleSwitch itself is focusable (its wrapped button is hidden).
+    auto& gs = gainKnob.getSlider();
+    auto& ts = toneKnob.getSlider();
+    auto& vs = volumeKnob.getSlider();
+    gs.setWantsKeyboardFocus(true); gs.setTitle("Gain");   gs.setDescription("Gain, 0 to 10");
+    ts.setWantsKeyboardFocus(true); ts.setTitle("Shape");  ts.setDescription("Shape, 0 warm to 10 scooped");
+    vs.setWantsKeyboardFocus(true); vs.setTitle("Volume"); vs.setDescription("Volume, 0 to 10");
 
-    // Tab order
-    gainKnob.getSlider().setExplicitFocusOrder(1);
-    toneKnob.getSlider().setExplicitFocusOrder(2);
-    volumeKnob.getSlider().setExplicitFocusOrder(3);
-    halfPowerToggle.getButton().setExplicitFocusOrder(4);
-    cabSimToggle.getButton().setExplicitFocusOrder(5);
-    powerToggle.getButton().setExplicitFocusOrder(6);
+    halfPowerToggle.setDescription("Half power 7W mode");
+    cabSimToggle.setDescription("Cabinet simulation");
+    powerToggle.setDescription("Amp power");
+
+    // Tooltips (shown only while a TooltipWindow exists — see applySettings)
+    gs.setTooltip("Gain — preamp drive");
+    ts.setTooltip("Shape — mid scoop (CW) to mid boost (CCW)");
+    vs.setTooltip("Volume — master / power-amp drive");
+    halfPowerToggle.setTooltip("7W half-power mode");
+    cabSimToggle.setTooltip("Cabinet simulation on/off");
+    powerToggle.setTooltip("Amp power on/off");
+
+    // Tab order: preset → knobs → toggles → section bars (gear & panels follow)
+    header.getPresetSelector().setExplicitFocusOrder(1);
+    gs.setExplicitFocusOrder(2);
+    ts.setExplicitFocusOrder(3);
+    vs.setExplicitFocusOrder(4);
+    halfPowerToggle.setExplicitFocusOrder(5);
+    cabSimToggle.setExplicitFocusOrder(6);
+    powerToggle.setExplicitFocusOrder(7);
+    irSectionBar.setExplicitFocusOrder(8);
+    advSectionBar.setExplicitFocusOrder(9);
 
     // Restore UI state
     loadUIState();
@@ -189,6 +207,8 @@ void SilentRiotEditor::saveUIState()
     state.setProperty("theme",        settingsPanel.themeIndex, nullptr);
     state.setProperty("meterBallistics", settingsPanel.meterBallistics, nullptr);
     state.setProperty("knobMode",     settingsPanel.knobMode, nullptr);
+    state.setProperty("peakHold",     settingsPanel.peakHold, nullptr);
+    state.setProperty("tooltips",     settingsPanel.tooltipsEnabled, nullptr);
 }
 
 void SilentRiotEditor::loadUIState()
@@ -222,6 +242,36 @@ void SilentRiotEditor::loadUIState()
         settingsPanel.meterBallistics = static_cast<int>(state.getProperty("meterBallistics"));
     if (state.hasProperty("knobMode"))
         settingsPanel.knobMode = static_cast<int>(state.getProperty("knobMode"));
+    if (state.hasProperty("peakHold"))
+        settingsPanel.peakHold = static_cast<bool>(state.getProperty("peakHold"));
+    if (state.hasProperty("tooltips"))
+        settingsPanel.tooltipsEnabled = static_cast<bool>(state.getProperty("tooltips"));
+
+    // Push restored values into the controls and apply them to the UI
+    settingsPanel.syncControls();
+    applySettings();
+}
+
+void SilentRiotEditor::applySettings()
+{
+    sr::Colours::setTheme(settingsPanel.themeIndex);
+    setWindowBackground();
+
+    vuIn.setBallistics(settingsPanel.meterBallistics);
+    vuOut.setBallistics(settingsPanel.meterBallistics);
+    vuIn.setPeakHold(settingsPanel.peakHold);
+    vuOut.setPeakHold(settingsPanel.peakHold);
+
+    gainKnob.setKnobMode(settingsPanel.knobMode);
+    toneKnob.setKnobMode(settingsPanel.knobMode);
+    volumeKnob.setKnobMode(settingsPanel.knobMode);
+
+    if (settingsPanel.tooltipsEnabled && tooltipWindow == nullptr)
+        tooltipWindow = std::make_unique<juce::TooltipWindow>(this);
+    else if (!settingsPanel.tooltipsEnabled)
+        tooltipWindow.reset();
+
+    repaint();  // re-theme the whole editor (children repaint within parent region)
 }
 
 int SilentRiotEditor::getContentHeight() const
@@ -284,7 +334,7 @@ void SilentRiotEditor::setWindowBackground()
             reinterpret_cast<uintptr_t>(peer->getNativeHandle()));
         if (auto* dpy = XOpenDisplay(nullptr))
         {
-            XSetWindowBackground(dpy, wh, 0x1A1A2E);
+            XSetWindowBackground(dpy, wh, sr::Colours::bg.getARGB() & 0xFFFFFF);
             XSync(dpy, False);
             XCloseDisplay(dpy);
         }
@@ -393,7 +443,6 @@ void SilentRiotEditor::timerCallback()
         guiR.gridCurrentMA = dspR.gridCurrentMA;
         guiR.osFactor = dspR.osFactor;
         guiR.is7W = dspR.is7W;
-        guiR.tempC = 420.0f;
         advancedPanel.setReadout(guiR);
     }
 }

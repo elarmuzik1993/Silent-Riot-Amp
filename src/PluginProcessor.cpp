@@ -44,21 +44,23 @@ void SilentRiotProcessor::handleAsyncUpdate()
     int idx = pendingIRIndex.exchange(-1);
     if (idx < 0) return;
 
-    if (idx == 0)
+    // IR_INDEX maps directly onto user IR slots: 0 = IIR mode, 1..N = userIRs[idx-1].
+    // The stock-IR table in CabinetSim is intentionally NOT reachable from this
+    // parameter today — the loader UI only populates user IRs, and the stock
+    // entries are synthetic placeholders. Wiring stock IRs is deferred until real
+    // cabinet IRs ship (see ROADMAP.md "Ship real cabinet IRs").
+    int userIdx = idx - 1;
+    if (userIdx < 0 || userIdx >= static_cast<int>(userIRs.size()))
     {
-        // IIR mode — disable convolution
+        // IIR mode, or an out-of-range index from restored state / host automation:
+        // disable convolution so we never leave a stale IR active.
         cabSim.setIRIndex(0);
         return;
     }
 
-    // User IR (1-based index → 0-based into userIRs)
-    int userIdx = idx - 1;
-    if (userIdx >= 0 && userIdx < static_cast<int>(userIRs.size()))
-    {
-        auto& ir = userIRs[static_cast<size_t>(userIdx)];
-        juce::AudioBuffer<float> bufCopy(ir.audioData);
-        cabSim.loadIRFromBuffer(std::move(bufCopy), ir.sampleRate);
-    }
+    auto& ir = userIRs[static_cast<size_t>(userIdx)];
+    juce::AudioBuffer<float> bufCopy(ir.audioData);
+    cabSim.loadIRFromBuffer(std::move(bufCopy), ir.sampleRate);
 }
 
 juce::AudioProcessorValueTreeState::ParameterLayout SilentRiotProcessor::createParameterLayout()
@@ -98,6 +100,33 @@ juce::AudioProcessorValueTreeState::ParameterLayout SilentRiotProcessor::createP
         juce::ParameterID{ Params::IDs::IR_INDEX, 1 }, "IR Selection", 0, 32, 0));
 
     return { params.begin(), params.end() };
+}
+
+void SilentRiotProcessor::resetDSPState()
+{
+    // Clear all filter state, integrators, and cached plate voltages so a
+    // (re)prepare or sample-rate change starts from a defined idle state
+    // instead of carrying stale state computed at the old configuration.
+    filterBank.resetAll();
+    v1a_miller.reset();
+    v1b_miller.reset();
+    speakerCoupling.reset();
+    otSaturation.reset();
+    psu.reset();
+    sag.reset();
+    ltpModel.reset();
+
+    v1aTriode.reset();
+    v1bTriode.reset();
+
+    v1aGrid.reset();
+    v1bGrid.reset();
+    piGrid.reset();
+    el84GridA.reset();
+    el84GridB.reset();
+
+    lastShapeCoeffVal = -1.0f;   // force shape coeff recompute on first sample
+    psuFrozen = false;
 }
 
 void SilentRiotProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
@@ -143,6 +172,9 @@ void SilentRiotProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
     gainSmoother.init(5.0f, effectiveSR);
     toneSmoother.init(5.0f, effectiveSR);
     volumeSmoother.init(5.0f, effectiveSR);
+
+    // Clear any state carried over from a previous configuration
+    resetDSPState();
 }
 
 void SilentRiotProcessor::releaseResources() {}
@@ -365,6 +397,9 @@ void SilentRiotProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
             finalOut = std::tanh(finalOut);
         }
 
+        // Final safety net: never emit a non-finite sample into the host
+        if (!std::isfinite(finalOut)) finalOut = 0.0f;
+
         osBlock.setSample(0, static_cast<int>(i), finalOut);
         // Copy to stereo
         if (osBlock.getNumChannels() > 1)
@@ -390,6 +425,7 @@ void SilentRiotProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
             {
                 samples[i] *= outputGainCompensation;
                 samples[i] = std::tanh(samples[i]);
+                if (!std::isfinite(samples[i])) samples[i] = 0.0f;
             }
         }
     }
@@ -413,20 +449,36 @@ void SilentRiotProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
         float peakGridI = std::max(el84GridA.lastGridCurrent, el84GridB.lastGridCurrent);
         gridCurrentForGUI.store(peakGridI, std::memory_order_relaxed);
     }
+
+    // ── DSP-state telemetry for the editor readout (publish atomic snapshot) ──
+    {
+        vBPlusForGUI.store(psu.vPower(),   std::memory_order_relaxed);
+        vScreenForGUI.store(psu.vScreen(), std::memory_order_relaxed);
+        vPiForGUI.store(psu.vPi(),         std::memory_order_relaxed);
+        vPreampForGUI.store(psu.vPreamp(), std::memory_order_relaxed);
+        sagOffsetForGUI.store(sag.biasOffset(), std::memory_order_relaxed);
+        el84BiasForGUI.store(el84BaseBias, std::memory_order_relaxed);
+        osFactorForGUI.store(oversampleSwitcher.activeFactor(), std::memory_order_relaxed);
+    }
 }
 
 SilentRiotProcessor::DSPReadout SilentRiotProcessor::getDSPReadout() const
 {
+    // Reads only atomic snapshots published by the audio thread — no torn reads
+    // of the live (non-atomic) PSU/sag state from the message thread.
+    const float biasOffset = sagOffsetForGUI.load(std::memory_order_relaxed);
+    const float baseBias   = el84BiasForGUI.load(std::memory_order_relaxed);
+
     DSPReadout r;
-    r.vBPlus   = VS::toVolts(psu.vPower());
-    r.vScreen  = VS::toVolts(psu.vScreen());
-    r.vPi      = VS::toVolts(psu.vPi());
-    r.vPreamp  = VS::toVolts(psu.vPreamp());
-    r.sagPercent = sag.biasOffset() / 0.01f; // approximate %
-    r.biasV    = VS::toVolts(el84BaseBias + sag.biasOffset());
+    r.vBPlus   = VS::toVolts(vBPlusForGUI.load(std::memory_order_relaxed));
+    r.vScreen  = VS::toVolts(vScreenForGUI.load(std::memory_order_relaxed));
+    r.vPi      = VS::toVolts(vPiForGUI.load(std::memory_order_relaxed));
+    r.vPreamp  = VS::toVolts(vPreampForGUI.load(std::memory_order_relaxed));
+    r.sagPercent = biasOffset / 0.01f; // approximate %
+    r.biasV    = VS::toVolts(baseBias + biasOffset);
     r.gridCurrentMA = VS::toAmps(gridCurrentForGUI.load(std::memory_order_relaxed)) * 1000.0f;
-    r.osFactor = oversampleSwitcher.activeFactor();
-    r.is7W     = std::abs(el84BaseBias - PENTODE_BIAS_7W_N) < 1e-6f;
+    r.osFactor = osFactorForGUI.load(std::memory_order_relaxed);
+    r.is7W     = std::abs(baseBias - PENTODE_BIAS_7W_N) < 1e-6f;
     return r;
 }
 
@@ -443,6 +495,29 @@ int SilentRiotProcessor::getCurrentProgram() { return 0; }
 void SilentRiotProcessor::setCurrentProgram(int) {}
 const juce::String SilentRiotProcessor::getProgramName(int) { return {}; }
 void SilentRiotProcessor::changeProgramName(int, const juce::String&) {}
+
+// ── Presets ──
+
+void SilentRiotProcessor::applyPreset(int presetIndex)
+{
+    if (presetIndex < 0 || presetIndex >= sr::Presets::count) return;
+    const auto& p = sr::Presets::table[presetIndex];
+
+    auto setNorm = [this](const juce::String& id, float value01) {
+        if (auto* param = apvts.getParameter(id))
+            param->setValueNotifyingHost(juce::jlimit(0.0f, 1.0f, value01));
+    };
+
+    // GAIN/TONE/VOLUME ranges are 0–1, so the normalized value is the value itself.
+    setNorm(Params::IDs::GAIN,   p.gain);
+    setNorm(Params::IDs::TONE,   p.tone);
+    setNorm(Params::IDs::VOLUME, p.volume);
+    setNorm(Params::IDs::HALF_POWER, p.halfPower ? 1.0f : 0.0f);
+    setNorm(Params::IDs::CAB_SIM,    p.cabSim    ? 1.0f : 0.0f);
+
+    if (auto* pi = apvts.getParameter(Params::IDs::PRESET_IDX))
+        pi->setValueNotifyingHost(pi->convertTo0to1(static_cast<float>(presetIndex)));
+}
 
 // ── User IR Management ──
 

@@ -196,13 +196,13 @@ void IRLoaderPanel::paint(juce::Graphics& g)
     g.fillRoundedRectangle(dropArea, 4.0f);
     g.setColour(dragOver ? Colours::accent : Colours::borderHi);
 
-    // Dashed border
-    juce::Path dashRect;
-    dashRect.addRoundedRectangle(dropArea, 4.0f);
-    float dashes[] = { 4.0f, 4.0f };
-    juce::PathStrokeType stroke(1.0f);
-    stroke.createDashedStroke(dashRect, dashRect, dashes, 2);
-    g.strokePath(dashRect, juce::PathStrokeType(1.0f));
+    // Dashed border (source and dest must be distinct paths)
+    juce::Path dropOutline;
+    dropOutline.addRoundedRectangle(dropArea, 4.0f);
+    juce::Path dashed;
+    const float dashes[] = { 4.0f, 4.0f };
+    juce::PathStrokeType(1.0f).createDashedStroke(dashed, dropOutline, dashes, 2);
+    g.strokePath(dashed, juce::PathStrokeType(1.0f));
 
     g.setFont(Fonts::spaceMono(8.0f));
     g.setColour(Colours::label);

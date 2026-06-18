@@ -19,3 +19,29 @@ namespace IDs {
 }
 
 } // namespace sr::Params
+
+namespace sr::Presets {
+
+// Factory presets — order MUST match PresetSelector::presetNames.
+// Knob values are internal 0–1 (UI shows ×10). halfPower: false=15W, true=7W.
+struct Preset {
+    const char* name;
+    float gain;
+    float tone;     // Shape: 0 = warm/mid-forward, 1 = scooped/modern
+    float volume;
+    bool  halfPower;
+    bool  cabSim;
+};
+
+inline constexpr Preset table[] = {
+    // name               gain  tone  vol   7W     cab
+    { "Classic Crunch",   0.55f, 0.45f, 0.55f, false, true },
+    { "Edge of Breakup",  0.35f, 0.50f, 0.62f, false, true },
+    { "Full Drive",       0.85f, 0.62f, 0.58f, false, true },
+    { "Clean Shimmer",    0.18f, 0.60f, 0.50f, false, true },
+    { "Heavy Sag",        0.70f, 0.45f, 0.82f, true,  true },
+};
+
+inline constexpr int count = static_cast<int>(sizeof(table) / sizeof(table[0]));
+
+} // namespace sr::Presets

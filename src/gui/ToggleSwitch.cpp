@@ -10,11 +10,56 @@ ToggleSwitch::ToggleSwitch(const juce::String& l, juce::Colour color)
     button.setClickingTogglesState(true);
     button.onStateChange = [this] { startTimerHz(60); };
     addChildComponent(button); // hidden — we handle clicks
+
+    setWantsKeyboardFocus(true);
+    setTitle(l);
+}
+
+void ToggleSwitch::toggle()
+{
+    button.setToggleState(!button.getToggleState(), juce::sendNotification);
 }
 
 void ToggleSwitch::mouseDown(const juce::MouseEvent&)
 {
-    button.setToggleState(!button.getToggleState(), juce::sendNotification);
+    toggle();
+}
+
+bool ToggleSwitch::keyPressed(const juce::KeyPress& key)
+{
+    if (key == juce::KeyPress::returnKey || key == juce::KeyPress::spaceKey)
+    {
+        toggle();
+        return true;
+    }
+    return false;
+}
+
+void ToggleSwitch::focusGained(juce::Component::FocusChangeType) { repaint(); }
+void ToggleSwitch::focusLost(juce::Component::FocusChangeType)   { repaint(); }
+
+std::unique_ptr<juce::AccessibilityHandler> ToggleSwitch::createAccessibilityHandler()
+{
+    class Handler : public juce::AccessibilityHandler
+    {
+    public:
+        explicit Handler(ToggleSwitch& s)
+            : juce::AccessibilityHandler(
+                  s, juce::AccessibilityRole::toggleButton,
+                  juce::AccessibilityActions().addAction(
+                      juce::AccessibilityActionType::toggle, [&s] { s.toggle(); })),
+              owner(s) {}
+
+        juce::AccessibleState getCurrentState() const override
+        {
+            auto state = juce::AccessibilityHandler::getCurrentState().withCheckable();
+            return owner.getButton().getToggleState() ? state.withChecked() : state;
+        }
+
+    private:
+        ToggleSwitch& owner;
+    };
+    return std::make_unique<Handler>(*this);
 }
 
 void ToggleSwitch::timerCallback()
@@ -68,6 +113,14 @@ void ToggleSwitch::paint(juce::Graphics& g)
     juce::Colour thumbCol = button.getToggleState() ? Colours::white : Colours::dim;
     g.setColour(thumbCol);
     g.fillEllipse(thumbX, thumbY, thumbD, thumbD);
+
+    // Keyboard focus ring around the track
+    if (hasKeyboardFocus(false))
+    {
+        g.setColour(Colours::accent.withAlpha(0.7f));
+        g.drawRoundedRectangle(trackX - 3.0f, trackY - 3.0f,
+                               trackW + 6.0f, trackH + 6.0f, trackRadius + 3.0f, 1.5f);
+    }
 }
 
 } // namespace sr

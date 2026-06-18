@@ -3,37 +3,104 @@
 
 namespace sr::Colours {
 
-// Background
-inline const juce::Colour bg         { 0xFF08080C };
-inline const juce::Colour bg2        { 0xFF0B0B10 };
-inline const juce::Colour surface    { 0xFF0F0F15 };
-inline const juce::Colour panel      { 0xFF111118 };
-inline const juce::Colour panelLight { 0xFF14141C };
+// Runtime-swappable palette. Components read these at paint time, so changing
+// them via setTheme() + a top-level repaint re-themes the whole UI. GUI code is
+// message-thread only, so plain mutable globals are safe here.
+inline juce::Colour bg         { 0xFF08080C };
+inline juce::Colour bg2        { 0xFF0B0B10 };
+inline juce::Colour surface    { 0xFF0F0F15 };
+inline juce::Colour panel      { 0xFF111118 };
+inline juce::Colour panelLight { 0xFF14141C };
 
-// Borders & tracks
-inline const juce::Colour border     { 0xFF1A1A24 };
-inline const juce::Colour borderHi   { 0xFF252533 };
-inline const juce::Colour track      { 0xFF1C1C28 };
+inline juce::Colour border     { 0xFF1A1A24 };
+inline juce::Colour borderHi   { 0xFF252533 };
+inline juce::Colour track      { 0xFF1C1C28 };
 
-// Text hierarchy
-inline const juce::Colour muted      { 0xFF2E2E3C };
-inline const juce::Colour dim        { 0xFF3C3C50 };
-inline const juce::Colour label      { 0xFF4A4A5E };
-inline const juce::Colour text       { 0xFF9898AE };
-inline const juce::Colour bright     { 0xFFD0D0DC };
-inline const juce::Colour white      { 0xFFEAEAF0 };
+inline juce::Colour muted      { 0xFF2E2E3C };
+inline juce::Colour dim        { 0xFF3C3C50 };
+inline juce::Colour label      { 0xFF4A4A5E };
+inline juce::Colour text       { 0xFF9898AE };
+inline juce::Colour bright     { 0xFFD0D0DC };
+inline juce::Colour white      { 0xFFEAEAF0 };
 
-// Accent
-inline const juce::Colour accent     { 0xFFFF6600 };
-inline const juce::Colour accentDim  { 0xFFCC5200 };
-inline const juce::Colour accentLo   { 0xFF993D00 };
+inline juce::Colour accent     { 0xFFFF6600 };
+inline juce::Colour accentDim  { 0xFFCC5200 };
+inline juce::Colour accentLo   { 0xFF993D00 };
 
-// Status
-inline const juce::Colour green      { 0xFF2DD4A0 };
-inline const juce::Colour greenDim   { 0xFF1A8060 };
-inline const juce::Colour yellow     { 0xFFE8C840 };
-inline const juce::Colour red        { 0xFFE84040 };
-inline const juce::Colour teal       { 0xFF00CCB0 };
-inline const juce::Colour tealDim    { 0xFF009980 };
+inline juce::Colour green      { 0xFF2DD4A0 };
+inline juce::Colour greenDim   { 0xFF1A8060 };
+inline juce::Colour yellow     { 0xFFE8C840 };
+inline juce::Colour red        { 0xFFE84040 };
+inline juce::Colour teal       { 0xFF00CCB0 };
+inline juce::Colour tealDim    { 0xFF009980 };
+
+enum Theme { Dark = 0, Light = 1 };
+
+// Apply a theme by reassigning the palette globals. Accent + status colours are
+// shared across themes (they read well on both); only the neutral background/
+// text ramp flips. Caller must repaint the UI afterwards.
+inline void setTheme(int themeIndex)
+{
+    if (themeIndex == Light)
+    {
+        bg         = juce::Colour(0xFFF4F4F7);
+        bg2        = juce::Colour(0xFFFBFBFD);
+        surface    = juce::Colour(0xFFFFFFFF);
+        panel      = juce::Colour(0xFFFFFFFF);
+        panelLight = juce::Colour(0xFFE9E9EF);
+
+        border     = juce::Colour(0xFFD2D2DC);
+        borderHi   = juce::Colour(0xFFBABAC8);
+        track      = juce::Colour(0xFFDCDCE4);
+
+        muted      = juce::Colour(0xFFC2C2CE);
+        dim        = juce::Colour(0xFFA2A2B2);
+        label      = juce::Colour(0xFF76768A);
+        text       = juce::Colour(0xFF45454F);
+        bright     = juce::Colour(0xFF2A2A33);
+        white      = juce::Colour(0xFF16161B);
+
+        accent     = juce::Colour(0xFFFF6600);
+        accentDim  = juce::Colour(0xFFCC5200);
+        accentLo   = juce::Colour(0xFFB35200);
+
+        green      = juce::Colour(0xFF1FA37C);
+        greenDim   = juce::Colour(0xFF1A8060);
+        yellow     = juce::Colour(0xFFC79A1E);
+        red        = juce::Colour(0xFFD43535);
+        teal       = juce::Colour(0xFF009E88);
+        tealDim    = juce::Colour(0xFF007A68);
+    }
+    else // Dark (default)
+    {
+        bg         = juce::Colour(0xFF08080C);
+        bg2        = juce::Colour(0xFF0B0B10);
+        surface    = juce::Colour(0xFF0F0F15);
+        panel      = juce::Colour(0xFF111118);
+        panelLight = juce::Colour(0xFF14141C);
+
+        border     = juce::Colour(0xFF1A1A24);
+        borderHi   = juce::Colour(0xFF252533);
+        track      = juce::Colour(0xFF1C1C28);
+
+        muted      = juce::Colour(0xFF2E2E3C);
+        dim        = juce::Colour(0xFF3C3C50);
+        label      = juce::Colour(0xFF4A4A5E);
+        text       = juce::Colour(0xFF9898AE);
+        bright     = juce::Colour(0xFFD0D0DC);
+        white      = juce::Colour(0xFFEAEAF0);
+
+        accent     = juce::Colour(0xFFFF6600);
+        accentDim  = juce::Colour(0xFFCC5200);
+        accentLo   = juce::Colour(0xFF993D00);
+
+        green      = juce::Colour(0xFF2DD4A0);
+        greenDim   = juce::Colour(0xFF1A8060);
+        yellow     = juce::Colour(0xFFE8C840);
+        red        = juce::Colour(0xFFE84040);
+        teal       = juce::Colour(0xFF00CCB0);
+        tealDim    = juce::Colour(0xFF009980);
+    }
+}
 
 } // namespace sr::Colours

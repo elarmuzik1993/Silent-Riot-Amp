@@ -14,7 +14,6 @@ struct DSPReadout {
     float gridCurrentMA = 0.0f;
     int osFactor = 4;
     bool is7W = false;
-    float tempC = 420.0f;
 };
 
 class AdvancedPanel : public juce::Component, private juce::Timer {

@@ -14,11 +14,33 @@ void VUMeter::setLevel(float newLevel)
     targetLevel = juce::jlimit(0.0f, 1.0f, newLevel);
 }
 
+void VUMeter::setBallistics(int mode)
+{
+    switch (mode)
+    {
+        case 0:  lerpFactor = 0.30f; break;  // Fast
+        case 2:  lerpFactor = 0.05f; break;  // Slow
+        default: lerpFactor = 0.12f; break;  // Medium
+    }
+}
+
+void VUMeter::setPeakHold(bool shouldHold)
+{
+    peakHoldEnabled = shouldHold;
+    if (!shouldHold) peakLevel = 0.0f;
+}
+
 void VUMeter::timerCallback()
 {
     float jitter = (rng.nextFloat() - 0.5f) * 2.0f * jitterAmount;
     float target = juce::jlimit(0.0f, 1.0f, targetLevel + jitter);
     displayLevel += (target - displayLevel) * lerpFactor;
+
+    if (peakHoldEnabled)
+    {
+        if (displayLevel > peakLevel) peakLevel = displayLevel;
+        else                          peakLevel *= peakDecay;
+    }
     repaint();
 }
 
@@ -47,7 +69,15 @@ void VUMeter::paint(juce::Graphics& g)
         else                      segColour = Colours::green;
 
         bool active = (static_cast<float>(drawIdx) < activeSegs);
-        if (active)
+
+        // Peak-hold marker: light the single segment at the held peak position
+        bool isPeak = peakHoldEnabled && peakLevel > 0.001f
+                   && drawIdx == juce::jlimit(0, numSegments - 1,
+                          static_cast<int>(peakLevel * numSegments) - 1);
+
+        if (isPeak)
+            g.setColour(segColour);
+        else if (active)
             g.setColour(segColour.withAlpha(0.9f));
         else
             g.setColour(Colours::track.withAlpha(0.3f));

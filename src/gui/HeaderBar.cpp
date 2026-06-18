@@ -4,9 +4,48 @@
 
 namespace sr {
 
+GearButton::GearButton()
+{
+    setWantsKeyboardFocus(true);
+    setTitle("Settings");
+    setDescription("Open settings panel");
+}
+
+void GearButton::mouseDown(const juce::MouseEvent&) { if (onActivate) onActivate(); }
+
+bool GearButton::keyPressed(const juce::KeyPress& key)
+{
+    if (key == juce::KeyPress::returnKey || key == juce::KeyPress::spaceKey)
+    {
+        if (onActivate) onActivate();
+        return true;
+    }
+    return false;
+}
+
+void GearButton::focusGained(juce::Component::FocusChangeType) { if (auto* p = getParentComponent()) p->repaint(); }
+void GearButton::focusLost(juce::Component::FocusChangeType)   { if (auto* p = getParentComponent()) p->repaint(); }
+
+std::unique_ptr<juce::AccessibilityHandler> GearButton::createAccessibilityHandler()
+{
+    return std::make_unique<juce::AccessibilityHandler>(
+        *this, juce::AccessibilityRole::button,
+        juce::AccessibilityActions().addAction(
+            juce::AccessibilityActionType::press, [this] { if (onActivate) onActivate(); }));
+}
+
 HeaderBar::HeaderBar()
 {
     addAndMakeVisible(presetSelector);
+    addAndMakeVisible(gearButton);
+    gearButton.onActivate = [this] { activateGear(); };
+}
+
+void HeaderBar::activateGear()
+{
+    gearActive = !gearActive;
+    startTimerHz(60); // animate gear rotation
+    if (onGearClick) onGearClick();
 }
 
 void HeaderBar::timerCallback()
@@ -73,6 +112,13 @@ void HeaderBar::paintGearIcon(juce::Graphics& g, juce::Rectangle<float> area) co
         g.fillEllipse(area.expanded(2.0f));
     }
 
+    // Keyboard focus indicator
+    if (gearButton.hasKeyboardFocus(false))
+    {
+        g.setColour(Colours::accent.withAlpha(0.7f));
+        g.drawRoundedRectangle(area.expanded(1.0f), 4.0f, 1.5f);
+    }
+
     float rotRad = gearRotation * juce::MathConstants<float>::pi / 180.0f;
 
     juce::Path gear;
@@ -95,18 +141,6 @@ void HeaderBar::paintGearIcon(juce::Graphics& g, juce::Rectangle<float> area) co
     g.drawEllipse(cx - 2.5f, cy - 2.5f, 5.0f, 5.0f, 1.0f);
 }
 
-void HeaderBar::mouseDown(const juce::MouseEvent& e)
-{
-    // Check if click is on gear icon area
-    auto gearArea = juce::Rectangle<float>(getWidth() - 36.0f, 7.0f, 24.0f, 24.0f);
-    if (gearArea.contains(e.position))
-    {
-        gearActive = !gearActive;
-        startTimerHz(60); // animate gear rotation
-        if (onGearClick) onGearClick();
-    }
-}
-
 void HeaderBar::resized()
 {
     // Preset selector centered
@@ -116,6 +150,9 @@ void HeaderBar::resized()
     float sy = (getHeight() - selectorH) * 0.5f;
     presetSelector.setBounds(static_cast<int>(sx), static_cast<int>(sy),
                              static_cast<int>(selectorW), static_cast<int>(selectorH));
+
+    // Gear hit-area overlays the painted icon (see paint())
+    gearButton.setBounds(getWidth() - 36, 7, 24, 24);
 }
 
 } // namespace sr

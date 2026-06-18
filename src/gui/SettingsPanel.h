@@ -13,13 +13,19 @@ public:
     void mouseDown(const juce::MouseEvent&) override;
 
     // Settings state
-    int themeIndex = 0;         // 0=Dark
-    int meterBallistics = 1;    // 0=Fast, 1=Medium, 2=Slow
-    int knobMode = 0;           // 0=Linear, 1=Rotary
-    int uiScale = 1;            // 0=75%, 1=100%, 2=125%, 3=150%
+    int  themeIndex = 0;        // 0=Dark, 1=Light
+    int  meterBallistics = 1;   // 0=Fast, 1=Medium, 2=Slow
+    int  knobMode = 0;          // 0=Linear, 1=Rotary
+    int  uiScale = 1;           // 0=75%, 1=100%, 2=125%, 3=150%
+    bool peakHold = true;
+    bool tooltipsEnabled = true;
+
+    // Push current state into the controls (after restoring from saved state)
+    void syncControls();
 
     std::function<void()> onClose;
     std::function<void(int)> onScaleChanged;
+    std::function<void()> onSettingsChanged;  // theme/ballistics/knob/peak/tooltips
 
 private:
     SegmentedSelector themeSelector     { {"DARK", "LIGHT"}, 0 };
