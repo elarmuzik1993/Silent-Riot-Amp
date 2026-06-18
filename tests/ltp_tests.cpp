@@ -107,7 +107,7 @@ TEST_CASE("LTP: cathode voltage rises under large drive", "[ltp]") {
     REQUIRE(outDriven.vCathode >= quietCathode - 0.01f);
 }
 
-TEST_CASE("LTP: cathode voltage is positive (current × Rtail)", "[ltp]") {
+TEST_CASE("LTP: cathode voltage is positive (current x Rtail)", "[ltp]") {
     auto ltp = freshLTP();
     
     LTPOutput out;
