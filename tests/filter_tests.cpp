@@ -23,7 +23,7 @@ using Catch::Approx;
 
 // ── OnePole LP ───────────────────────────────────────────────
 
-TEST_CASE("OnePoleLP: passes DC (magnitude ≈ 1.0)", "[filter][onepole]") {
+TEST_CASE("OnePoleLP: passes DC (magnitude ~ 1.0)", "[filter][onepole]") {
     OnePoleLP lp;
     lp.setFreq(1000.0f, TEST_SR);
     

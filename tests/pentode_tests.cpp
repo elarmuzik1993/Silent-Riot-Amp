@@ -29,7 +29,7 @@ TEST_CASE("Pentode: plate current non-negative", "[pentode]") {
     }
 }
 
-TEST_CASE("Pentode: cutoff — zero current when grid far below bias", "[pentode]") {
+TEST_CASE("Pentode: cutoff - zero current when grid far below bias", "[pentode]") {
     // Grid at -2.0 normalized with bias at -0.9 → vg1 = -2.0 + (-0.9) = -2.9
     // Way below cutoff, should produce zero current
     PentodeOutput out = pentodeWaveshaper(-2.0f, PENTODE_BIAS_15W_N,

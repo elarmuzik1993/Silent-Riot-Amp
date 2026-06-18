@@ -34,7 +34,7 @@ TEST_CASE("Triode: zero input at bias produces quiescent plate voltage", "[triod
     REQUIRE(out < VS::V_PREAMP);
 }
 
-TEST_CASE("Triode: asymmetric clipping — positive grid clips harder (plate to floor)", "[triode]") {
+TEST_CASE("Triode: asymmetric clipping - positive grid clips harder (plate to floor)", "[triode]") {
     float supply = VS::V_PREAMP;
     float bias = VS::V_BIAS_12AX7;  // -0.005 normalized
     float quiescent = triodeWaveshaper(0.0f, bias, supply, PREAMP_RPLATE_N);
@@ -73,7 +73,7 @@ TEST_CASE("Triode: lower supply reduces max plate voltage", "[triode]") {
     REQUIRE(outDroop < outFull);
 }
 
-TEST_CASE("Triode: monotonic — increasing grid voltage decreases plate voltage (inverting)", "[triode]") {
+TEST_CASE("Triode: monotonic - increasing grid voltage decreases plate voltage (inverting)", "[triode]") {
     float prev = triodeWaveshaper(0.0f, VS::V_BIAS_12AX7, VS::V_PREAMP, PREAMP_RPLATE_N);
     for (float vg = 0.001f; vg <= 0.01f; vg += 0.001f) {
         float out = triodeWaveshaper(vg, VS::V_BIAS_12AX7, VS::V_PREAMP, PREAMP_RPLATE_N);
@@ -117,7 +117,7 @@ TEST_CASE("Koren: never returns negative", "[koren]") {
     }
 }
 
-TEST_CASE("Koren: plate voltage dependence — higher plate gives more current", "[koren]") {
+TEST_CASE("Koren: plate voltage dependence - higher plate gives more current", "[koren]") {
     auto p = makeECC83Params();
     float vgk = VS::v(-1.5f);  // typical operating point
     float ipLow  = korenTriode(vgk, VS::v(100.0f), p);
