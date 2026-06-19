@@ -12,6 +12,7 @@ add_executable(SilentRiotTests
     # Test files
     voltage_scale_tests.cpp
     param_smoother_tests.cpp
+    regression_tests.cpp
     triode_tests.cpp
     pentode_tests.cpp
     filter_tests.cpp
