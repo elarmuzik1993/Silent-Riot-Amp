@@ -143,11 +143,11 @@ void SilentRiotProcessor::recalcRateDependentCoeffs()
     otSaturation.recalcCoeffs(effectiveSR);
 
     // Grid conduction charge decay
-    recalcGridChargeDecay(v1aGrid,  0.022f, effectiveSR);
-    recalcGridChargeDecay(v1bGrid,  0.022f, effectiveSR);
-    recalcGridChargeDecay(piGrid,   0.047f, effectiveSR);
-    recalcGridChargeDecay(el84GridA, 0.100f, effectiveSR);
-    recalcGridChargeDecay(el84GridB, 0.100f, effectiveSR);
+    recalcGridChargeDecay(v1aGrid,   GRID_TAU_PREAMP_S, effectiveSR);
+    recalcGridChargeDecay(v1bGrid,   GRID_TAU_PREAMP_S, effectiveSR);
+    recalcGridChargeDecay(piGrid,    GRID_TAU_PI_S,     effectiveSR);
+    recalcGridChargeDecay(el84GridA, GRID_TAU_EL84_S,   effectiveSR);
+    recalcGridChargeDecay(el84GridB, GRID_TAU_EL84_S,   effectiveSR);
 
     // Smoothers run per-sample at the oversampled rate
     gainSmoother.init(5.0f, effectiveSR);
