@@ -11,6 +11,7 @@ FetchContent_MakeAvailable(Catch2)
 add_executable(SilentRiotTests
     # Test files
     voltage_scale_tests.cpp
+    param_smoother_tests.cpp
     triode_tests.cpp
     pentode_tests.cpp
     filter_tests.cpp
@@ -55,10 +56,12 @@ catch_discover_tests(SilentRiotTests)
 # ── JUCE-dependent tests (cabinet IR, convolution) ──
 add_executable(SilentRiotJuceTests
     cabinet_ir_tests.cpp
+    oversample_switcher_tests.cpp
 
     ${CMAKE_SOURCE_DIR}/src/dsp/cabinet/CabinetSim.cpp
     ${CMAKE_SOURCE_DIR}/src/dsp/cabinet/SpeakerCoupling.cpp
     ${CMAKE_SOURCE_DIR}/src/dsp/filters/FilterBank.cpp
+    ${CMAKE_SOURCE_DIR}/src/dsp/OversampleSwitcher.cpp
 )
 
 target_link_libraries(SilentRiotJuceTests PRIVATE
