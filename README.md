@@ -2,7 +2,7 @@
 
 **Silent Riot** is a JUCE 7 VST3/Standalone amp simulator plugin by Monolit Beatz.
 It models an original fictional amplifier design built around ECC83/12AX7 preamp tubes
-and EL84 push-pull power tubes, with three controls (Gain, Tone, Volume) and a
+and EL84 push-pull power tubes, with three controls (Gain, Shape, Volume) and a
 switchable 15W/7W power mode.
 
 ## Licensing
@@ -24,7 +24,7 @@ others). See `CREDITS.md` for the full originality statement and attribution det
 
 - **Preamp**: Two cascaded ECC83/12AX7 triode stages with dual-gang gain pot
 - **Phase inverter**: Long-tail pair (ECC83) with asymmetric plate loads
-- **Tone**: Post-PI Vox-style cut control
+- **Shape**: Post-PI Orange-inspired 3-band EQ (low shelf 250Hz, mid bell 800Hz, high shelf 3.5kHz) — warm/mid-forward to scooped/modern
 - **Power amp**: Push-pull EL84 pair, cathode biased, 15W/7W switchable
 - **Dynamics**: PSU droop model, cathode sag envelope, grid conduction
 - **Cabinet**: IIR cab sim (presence/rolloff/notch) or user IR convolution
