@@ -63,11 +63,10 @@ P3 release engineering → P4 reach/polish.**
   `docs/SilentRiot_UI_Spec.md`, and `docs/SilentRiot_Final.jsx`.
 - [x] **[H] Restore `CREDITS.md`.** Recovered from `cad9dff^` (originality statement +
   third-party license attribution; referenced by README.md and CLAUDE.md).
-- [ ] **[M] Reconcile CLAUDE.md against the code.** Several claims are now stale:
-  speaker coupling uses a complementary OnePole crossover, **not** `makeBandPass` (the
-  pitfall note is outdated, `SpeakerCoupling.cpp:23-26`); README still describes a
-  "Vox-style cut" tone control (replaced by the 3-band Shape EQ); IRLoaderPanel "Category
-  tabs" described but not implemented.
+- [x] **[M] Reconcile CLAUDE.md against the code.** Fixed the stale claims: the
+  speaker-coupling pitfall now describes the complementary OnePole 3-way crossover (not
+  `makeBandPass`); README's "Vox-style cut" → the 3-band Shape EQ (and "Tone" control →
+  "Shape"); CLAUDE.md's IRLoaderPanel "Category tabs" note now flags it as not-yet-built.
 
 ## P2 — Finish the half-built UI — mostly ✅
 
@@ -142,17 +141,19 @@ P3 release engineering → P4 reach/polish.**
 - [x] **[M] Decide macOS / AU / LV2 scope.** **Decision (2026-06-19): stay VST3 +
   Standalone for now; macOS / AU / LV2 deferred.** macOS VST3 + AU need a macOS CI runner
   and Apple signing/notarization tooling; revisit once those are available.
-- [ ] **[M] Audit the Linux X11 Shape-Extension window strategy for the plugin case.**
-  `XOpenDisplay(nullptr)` opens a _second_ X11 connection per `applyShapeMask`/
-  `setWindowBackground` call (`PluginEditor.cpp:254,285,303`) rather than reusing the
-  peer's display — fragile when a VST3 is embedded in a host's own X11 connection. Fine
-  for standalone; risky for the plugin.
+- [~] **[M] Audit the Linux X11 Shape-Extension window strategy for the plugin case.**
+  _(partial)_ The per-call `XOpenDisplay(nullptr)`/`XCloseDisplay` churn (it ran every
+  animation frame in `applyShapeMask`, plus `setWindowBackground` and the compositor
+  bypass) is now a single connection opened lazily and cached for the editor's lifetime,
+  closed in the destructor. **Still open:** reusing the host peer's *own* display for the
+  embedded-VST3 case needs JUCE internals (`XWindowSystem`) — deferred as higher-risk.
 - [~] **[M] Centralize layout & DSP magic numbers.** **DSP side done** _(PR #5)_: cab IIR
   coefficients, sag-clamp, OT LP Q, and grid-charge taus are now named constants in
-  `Constants.h`. **Still open:** GUI layout is hardcoded with paint()/resized() positions
-  hand-synced in parallel ladders (`SettingsPanel.cpp`, `PluginEditor.cpp:428-479`), and
-  the duplicate/contradictory panel-height constants (`SettingsPanel` `maxH=600` vs layout
-  `420`).
+  `Constants.h`. **Settings-panel contradiction fixed:** the dead/wrong `maxH=600` is gone;
+  `SettingsPanel::panelW/panelH` (340×420) are now public and the editor positions the
+  panel from them instead of hardcoded literals. **Still open:** the broader GUI
+  paint()/resized() positional ladders (`PluginEditor.cpp:428-479`) — a larger refactor
+  best done with visual verification.
 - [x] **[M] Extract the duplicated coefficient-recalc block** _(PR #5)_ → single
   `SilentRiotProcessor::recalcRateDependentCoeffs()` shared by `prepareToPlay` and the
   oversample-switch commit path.

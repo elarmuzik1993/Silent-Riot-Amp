@@ -115,7 +115,7 @@ cmake -B build -DSR_BUILD_TESTS=ON # Build with tests
 - **PresetSelector.h/.cpp** — `[◂ | name | ▸]` cyclic preset browser
 - **SegmentedSelector.h/.cpp** — Row of mutually-exclusive buttons
 - **SettingsPanel.h/.cpp** — Overlay (340px) with UI preferences + About section
-- **IRLoaderPanel.h/.cpp** — Category tabs, scrollable IR list, waveform display, drag-and-drop
+- **IRLoaderPanel.h/.cpp** — Scrollable IR list, waveform display, drag-and-drop (category tabs per UI spec §5.7 not yet implemented — user-IR-only today)
 - **IRWaveformDisplay.h/.cpp** — Waveform plot with envelope fill
 
 **Window strategy**: Window set to max size (700×772 at 1× scale); X11 Shape Extension clips visible/input region to actual content height. Collapsible panels animate within the fixed-size window — `applyShapeMask()` updates the clip rect each frame. No `setSize()` during panel toggle = no compositor blink. Shape accounts for standalone wrapper title bar offset via `getTopLevelComponent()->getLocalPoint()`.
@@ -163,7 +163,7 @@ Koren tube parameters verified against Guitarix and standard datasheets.
 - `sag.update()` must be called with raw plate current BEFORE `OT_CURRENT_SCALE` multiplication
 - OT saturation: `OT_SAT_DRIVE=400`, `OT_SAT_DC_FREQ=20Hz` — DC block prevents integrator blowup from asymmetric tube DC
 - LTP plate loads are asymmetric: `PI_RPLATE_A_N` (100K) / `PI_RPLATE_B_N` (82K)
-- Speaker coupling uses `makeBandPass` (NOT `makePeakEQ` with 0dB gain — that's a flat passthrough)
+- Speaker coupling uses a complementary 3-way OnePole crossover (`bass + mid + hf == powerOut` always) for impedance-weighted reflection — NOT a `makeBandPass`/`makePeakEQ` extraction (see `SpeakerCoupling::process`)
 - `softConductionCurve` biasFactor: `PENTODE_BIAS_15W_N / vBias_n` (NOT the inverse — 7W must get wider overlap)
 - PSU droop uses impedance-based model (I×R voltage drops through SOURCE_IMPEDANCE_N, R_DROP1_N, R_DROP2_N) — droop depth emerges from physics, not from percentage constants
 - Cathode bypass is a **high-pass gain shelf** (not a lowpass): `x -= lp.process(x) * CATHODE_BYPASS_DEPTH`. Full gain above 4.2 Hz, reduced gain (~0.29×) below.
