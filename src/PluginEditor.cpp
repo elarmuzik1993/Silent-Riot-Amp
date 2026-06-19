@@ -196,6 +196,28 @@ SilentRiotEditor::~SilentRiotEditor()
     saveUIState();
     stopTimer();
     setLookAndFeel(nullptr);
+#if JUCE_LINUX
+    if (x11Display != nullptr)
+    {
+        XCloseDisplay(static_cast<::Display*>(x11Display));
+        x11Display = nullptr;
+    }
+#endif
+}
+
+// Lazily open and cache a single X11 connection for the editor's lifetime.
+// Previously every applyShapeMask/setWindowBackground/bypass call opened and
+// closed its own connection — applyShapeMask runs each animation frame, so that
+// was a lot of connection churn. (Reusing the host peer's own display would be
+// ideal for the embedded-plugin case but needs JUCE internals; one cached
+// connection per editor is the low-risk improvement.)
+void* SilentRiotEditor::getX11Display()
+{
+#if JUCE_LINUX
+    if (x11Display == nullptr)
+        x11Display = XOpenDisplay(nullptr);
+#endif
+    return x11Display;
 }
 
 void SilentRiotEditor::saveUIState()
@@ -301,7 +323,7 @@ void SilentRiotEditor::applyShapeMask()
     auto windowHandle = static_cast<::Window>(
         reinterpret_cast<uintptr_t>(peer->getNativeHandle()));
 
-    if (auto* dpy = XOpenDisplay(nullptr))
+    if (auto* dpy = static_cast<::Display*>(getX11Display()))
     {
         XRectangle rect = { 0, 0,
             static_cast<unsigned short>(totalW),
@@ -312,7 +334,6 @@ void SilentRiotEditor::applyShapeMask()
         XShapeCombineRectangles(dpy, windowHandle, ShapeInput,
                                 0, 0, &rect, 1, ShapeSet, Unsorted);
         XFlush(dpy);
-        XCloseDisplay(dpy);
     }
 #else
     // Windows/macOS: resize window to match content (no compositor blink)
@@ -332,11 +353,10 @@ void SilentRiotEditor::setWindowBackground()
     {
         auto wh = static_cast<::Window>(
             reinterpret_cast<uintptr_t>(peer->getNativeHandle()));
-        if (auto* dpy = XOpenDisplay(nullptr))
+        if (auto* dpy = static_cast<::Display*>(getX11Display()))
         {
             XSetWindowBackground(dpy, wh, sr::Colours::bg.getARGB() & 0xFFFFFF);
             XSync(dpy, False);
-            XCloseDisplay(dpy);
         }
     }
 #endif
@@ -350,14 +370,13 @@ void SilentRiotEditor::disableCompositorEffects()
     {
         auto windowHandle = static_cast<::Window>(
             reinterpret_cast<uintptr_t>(peer->getNativeHandle()));
-        if (auto* dpy = XOpenDisplay(nullptr))
+        if (auto* dpy = static_cast<::Display*>(getX11Display()))
         {
             Atom bypass = XInternAtom(dpy, "_NET_WM_BYPASS_COMPOSITOR", False);
             unsigned long val = 1;
             XChangeProperty(dpy, windowHandle, bypass, XA_CARDINAL, 32,
                            PropModeReplace, reinterpret_cast<unsigned char*>(&val), 1);
             XFlush(dpy);
-            XCloseDisplay(dpy);
             compositorBypassed = true;
         }
     }
@@ -520,7 +539,7 @@ void SilentRiotEditor::layoutContent()
 
     if (settingsPanel.isVisible())
     {
-        int sw = 340, sh = 420;
+        int sw = sr::SettingsPanel::panelW, sh = sr::SettingsPanel::panelH;
         int sy = static_cast<int>(kHeaderH * currentScale);
         settingsPanel.setBounds(getWidth() - sw, sy, sw, sh);
         settingsPanel.toFront(false);
