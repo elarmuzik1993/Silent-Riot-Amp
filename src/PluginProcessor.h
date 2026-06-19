@@ -90,6 +90,11 @@ private:
     juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
     void handleAsyncUpdate() override;  // deferred IR loading on message thread
     void resetDSPState();               // clear all filter/integrator/cached state
+    // Recompute every sample-rate-dependent coefficient for the current base
+    // rate + oversample factor (filters, Millers, PSU/sag/OT, grid-charge decay,
+    // smoothers) and republish DAW latency. Shared by prepareToPlay and the
+    // oversample-switch commit path to avoid silent drift between the two.
+    void recalcRateDependentCoeffs();
 
     // User IR persistence
     std::vector<UserIREntry> userIRs;

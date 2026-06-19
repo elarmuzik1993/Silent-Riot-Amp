@@ -13,7 +13,6 @@ namespace sr {
 namespace StageGains {
     constexpr float V1A_GAIN        = 60.0f;
     constexpr float V1B_GAIN        = 60.0f;
-    constexpr float EL84_GAIN_BASE  = 17.0f;
 }
 
 // ── Supply node voltages ────────────────────────────────────
@@ -69,9 +68,6 @@ constexpr float SHAPE_HIGH_GAIN_MAX   =  4.0f;     // dB at shape=1 (bright)
 // ── Preamp plate load ────────────────────────────────────────
 constexpr float PREAMP_RPLATE_N     = VS::R_100K;  // 100kΩ plate load for V1a/V1b
 
-// ── Triode bias ───────────────────────────────────────────────
-constexpr float TRIODE_BIAS_N       = VS::v(-1.5f);
-
 // ── Pentode model (EL84) ───────────────────────────────────
 constexpr float PENTODE_BIAS_15W_N  = VS::v(-9.6f);    // -0.032 normalized
 constexpr float PENTODE_BIAS_7W_N   = VS::v(-7.0f);    // -0.023 normalized
@@ -121,8 +117,6 @@ constexpr float V1B_RSOURCE_MAX_REAL = 150000.0f;
 constexpr float MILLER_FC_SMOOTH_MS = 1.0f;
 
 // ── Speaker coupling ────────────────────────────────────────
-constexpr float SPK_RE_N            = VS::r(6.0f);
-constexpr float SPK_FS              = 75.0f;
 constexpr float SPK_XOVER_LOW       = 200.0f;   // bass/mid crossover (above Fs resonance)
 constexpr float SPK_XOVER_HIGH      = 2000.0f;  // mid/HF crossover (before voice coil rise)
 constexpr float OT_NOMINAL_LOAD_N   = VS::r(8000.0f);
