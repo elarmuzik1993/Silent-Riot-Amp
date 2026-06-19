@@ -12,6 +12,11 @@ public:
     void resized() override;
     void mouseDown(const juce::MouseEvent&) override;
 
+    // Authoritative overlay dimensions (single source of truth — the editor
+    // positions the panel using these instead of hardcoded literals).
+    static constexpr int panelW = 340;
+    static constexpr int panelH = 420;
+
     // Settings state
     int  themeIndex = 0;        // 0=Dark, 1=Light
     int  meterBallistics = 1;   // 0=Fast, 1=Medium, 2=Slow
@@ -34,9 +39,6 @@ private:
     SegmentedSelector scaleSelector     { {"75%", "100%", "125%", "150%"}, 1 };
     ToggleSwitch peakHoldToggle         { "PEAK HOLD" };
     ToggleSwitch tooltipsToggle         { "TOOLTIPS" };
-
-    static constexpr float panelW = 340.0f;
-    static constexpr float maxH = 600.0f;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(SettingsPanel)
 };
