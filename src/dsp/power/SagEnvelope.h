@@ -39,7 +39,7 @@ struct SagEnvelope {
     float biasOffset() const {
         float excessI = envelope - SAG_QUIESCENT_I_N;
         float shift = -excessI * SAG_R_CATHODE_N;
-        return std::clamp(shift, -0.01f, 0.005f);  // safety: -3V cold, +1.5V warm
+        return std::clamp(shift, SAG_BIAS_CLAMP_COLD_N, SAG_BIAS_CLAMP_WARM_N);  // -3V cold, +1.5V warm
     }
 };
 

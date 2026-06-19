@@ -42,7 +42,17 @@ constexpr float STAGE1_COUPLING_HP  = 72.0f;
 constexpr float STAGE2_COUPLING_HP  = 7.0f;      // 0.047µF × 500KΩ gain pot
 constexpr float PI_COUPLING_HP      = 16.0f;      // 47nF × ~220K grid leak
 constexpr float OT_LP_FREQ          = 7000.0f;
+constexpr float OT_LP_Q             = 0.707f;
 constexpr float GAIN_LOADING_LP_FREQ = 5000.0f;
+
+// ── Cabinet IIR sim (presence peak / HF rolloff / low-mid notch) ────
+constexpr float CAB_PRESENCE_FREQ   = 2500.0f;  // Hz
+constexpr float CAB_PRESENCE_Q      = 1.5f;
+constexpr float CAB_PRESENCE_GAIN_DB = 3.0f;
+constexpr float CAB_ROLLOFF_FREQ    = 5500.0f;  // Hz
+constexpr float CAB_ROLLOFF_Q       = 0.5f;
+constexpr float CAB_NOTCH_FREQ      = 400.0f;   // Hz
+constexpr float CAB_NOTCH_Q         = 2.0f;
 
 // ── Math constant ────────────────────────────────────────────
 constexpr float PI_F = 3.14159265358979323846f;
@@ -93,12 +103,19 @@ constexpr float GRID_R_PI_N                = VS::r(14151.0f);        // ~14.2KΩ
 constexpr float GRID_R_EL84_N              = VS::r(19231.0f);        // ~19.2KΩ (source=38.5KΩ, ratio=0.5)
 constexpr float GRID_CHARGE_RATE            = 0.003f;   // was 0.01 → caused PI grid charge saturation at gain≥5 (pumping)
 constexpr float MAX_BIAS_SHIFT_N            = VS::v(-1.5f); // was -5V → excessive for 12AX7 (clips at ~-1.5V grid)
+// Coupling-cap charge-decay time constants (seconds) per stage
+constexpr float GRID_TAU_PREAMP_S           = 0.022f;  // V1a / V1b
+constexpr float GRID_TAU_PI_S               = 0.047f;  // phase inverter
+constexpr float GRID_TAU_EL84_S             = 0.100f;  // EL84 pair
 
 // ── Sag envelope (cathode bias sag) ─────────────────────────
 constexpr float SAG_ATTACK_MS       = 10.0f;
 constexpr float SAG_RELEASE_MS      = 100.0f;
 constexpr float SAG_R_CATHODE_N     = VS::r(100.0f);   // shared EL84 cathode resistor (100Ω)
 constexpr float SAG_QUIESCENT_I_N   = 96.0f;            // quiescent total cathode current (2×48mA normalized)
+// biasOffset() clamp: keeps effective bias out of deep Class C (cold) / forward grid (warm)
+constexpr float SAG_BIAS_CLAMP_COLD_N = VS::v(-3.0f);  // -0.01 normalized
+constexpr float SAG_BIAS_CLAMP_WARM_N = VS::v(1.5f);   //  0.005 normalized
 
 // ── Phase inverter ──────────────────────────────────────────
 constexpr float PI_TAIL_R_N         = VS::R_1K2;
