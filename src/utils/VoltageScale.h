@@ -39,9 +39,7 @@ struct VoltageScale {
     // a constexpr member function before the struct definition is complete.
     static constexpr float R_100  = 100.0f * R_TO_N;
     static constexpr float R_300  = 300.0f * R_TO_N;
-    static constexpr float R_470  = 470.0f * R_TO_N;
     static constexpr float R_500  = 500.0f * R_TO_N;
-    static constexpr float R_820  = 820.0f * R_TO_N;
     static constexpr float R_1K2  = 1200.0f * R_TO_N;
     static constexpr float R_1K5  = 1500.0f * R_TO_N;
     static constexpr float R_68K  = 68000.0f * R_TO_N;
@@ -56,7 +54,6 @@ struct VoltageScale {
     static constexpr float V_PREAMP      = 250.0f * V_TO_N;
     static constexpr float V_GUITAR      = 0.5f * V_TO_N;
     static constexpr float V_BIAS_12AX7  = -1.5f * V_TO_N;
-    static constexpr float V_THERMAL     = 0.026f * V_TO_N;
 
     // ── Stage output impedances Rplate||rp ──
     static constexpr float Z_OUT_V1A = 38461.0f * R_TO_N;   // 100K||62.5K
