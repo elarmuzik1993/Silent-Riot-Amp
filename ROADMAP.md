@@ -156,10 +156,13 @@ P3 release engineering → P4 reach/polish.**
 - [x] **[M] Extract the duplicated coefficient-recalc block** _(PR #5)_ → single
   `SilentRiotProcessor::recalcRateDependentCoeffs()` shared by `prepareToPlay` and the
   oversample-switch commit path.
-- [ ] **[M] Add a golden-file / null-test** regression for rendered output. _Deferred:_
-  `pluginval` (P3) already exercises null/NaN/threading on the real plugin; a strict
-  golden reference fights the ongoing ear-tuning (Parked) and should wait until the DSP
-  target is frozen. A null + determinism + bounds test is the less-brittle interim option.
+- [~] **[M] Add a golden-file / null-test** regression for rendered output. _(PR #5,
+  partial)_ Added `tests/regression_tests.cpp`: a chain-render guard asserting finite +
+  limiter-bounded + deterministic + stable-under-drive (the less-brittle alternative to a
+  strict golden file, which would fight the ongoing ear-tuning). **Still open:** a true
+  null/golden against the real `processBlock` (needs a plugin-host test target). _Note:_
+  the reconstructed chain shows a small idle DC + slow limit-cycle at max gain — likely a
+  harness artifact (omits PSU/sag, comp=1.5); worth a check against real `processBlock`.
 - [x] **[M] Unit-test `OversampleSwitcher` and `ParamSmoother`** _(PR #5)_ — +6 / +5
   cases covering the deferred crossfade state machine + fade envelope and the one-pole
   smoother's convergence/time-constant behaviour.
