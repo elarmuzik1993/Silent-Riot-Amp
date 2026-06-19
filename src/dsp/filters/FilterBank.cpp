@@ -13,10 +13,10 @@ void FilterBank::recalcAll(float baseSampleRate, int oversampleFactor) {
     pi_couplingHP_A.setFreq(PI_COUPLING_HP, effectiveSR);
     pi_couplingHP_B.setFreq(PI_COUPLING_HP, effectiveSR);
 
-    ot_leakageLP.makeLowPass(OT_LP_FREQ, 0.707f, effectiveSR);
-    cab_presence.makePeakEQ(2500.0f, 1.5f, 3.0f, effectiveSR);
-    cab_rolloff.makeLowPass(5500.0f, 0.5f, effectiveSR);
-    cab_notch.makeNotch(400.0f, 2.0f, effectiveSR);
+    ot_leakageLP.makeLowPass(OT_LP_FREQ, OT_LP_Q, effectiveSR);
+    cab_presence.makePeakEQ(CAB_PRESENCE_FREQ, CAB_PRESENCE_Q, CAB_PRESENCE_GAIN_DB, effectiveSR);
+    cab_rolloff.makeLowPass(CAB_ROLLOFF_FREQ, CAB_ROLLOFF_Q, effectiveSR);
+    cab_notch.makeNotch(CAB_NOTCH_FREQ, CAB_NOTCH_Q, effectiveSR);
 
     // Initialize shape EQ at noon (shape=0.5)
     updateShape(0.5f);

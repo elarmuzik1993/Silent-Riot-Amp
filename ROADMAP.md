@@ -110,59 +110,71 @@ P3 release engineering → P4 reach/polish.**
 
 ## P3 — Release engineering (gate for any public 1.0)
 
-- [ ] **[H] Add a `pluginval` CI job.** No automated VST3 validation today — the
-  standard JUCE release gate for state save/restore, parameter automation, threading, and
-  fuzzing. Especially valuable given the async IR-loading threading.
-- [ ] **[H] Add ASan/UBSan CI job** for the test target. None today; high-value for a
-  DSP plugin with manual buffer management and a "no allocation in processBlock"
+- [x] **[H] Add a `pluginval` CI job.** _(PR #4)_ Validates the shipped Linux VST3
+  (strictness 8, in-process, under Xvfb) — the standard JUCE release gate for state
+  save/restore, parameter automation, threading, and fuzzing.
+- [x] **[H] Add ASan/UBSan CI job** for the test target. _(PR #4)_ Builds the test targets
+  with `-fsanitize=address,undefined -fno-sanitize-recover=all` and runs ctest.
   invariant. Would catch the data races above under TSan.
-- [ ] **[H] Packaging & signing pipeline.** CI uploads raw `.vst3`/`.exe` dirs only — no
-  installer (`.pkg`/NSIS/`.deb`), no Windows Authenticode, no macOS notarization, no
-  git-tag-driven release automation.
-- [ ] **[M] Run tests on Windows** (currently Linux-only) and **run CI on `develop` PRs**
-  (workflow only triggers `pull_request` on `main`).
-- [ ] **[M] Add FetchContent/build caching.** JUCE 7.0.12 + Catch2 are cloned fresh on
-  every run of all 3 jobs — slow and network-flaky.
-- [ ] **[M] Validate the Release artifact, not a separate Debug build.** Tests run
-  against a Debug build; the shipped Release binary is never test-validated. Also: Linux
-  Standalone is built but never uploaded; all artifacts use `if-no-files-found: warn`,
-  masking broken packaging.
+- [~] **[H] Packaging & signing pipeline.** _(PR #4, partial)_ Git-tag-driven release
+  automation added (`release.yml`): builds Release on Linux + Windows, packages versioned
+  archives with SHA256 sums, publishes a GitHub Release on `v*` tags. **Still open:**
+  OS installers (`.pkg`/NSIS/`.deb`), Windows Authenticode, macOS notarization — all need
+  maintainer-provided certs/secrets (placeholder slots are in the workflow).
+- [x] **[M] Run tests on Windows** (was Linux-only) and **run CI on `develop` PRs**.
+  _(PR #4)_ Added a `windows-latest` test job; `pull_request` now triggers on `main` and
+  `develop`.
+- [x] **[M] Add FetchContent/build caching.** _(PR #4)_ ccache on every compile job + a
+  persistent `FETCHCONTENT_BASE_DIR` cache so JUCE/Catch2 aren't re-cloned each run.
+- [x] **[M] Validate the Release artifact, not a separate Debug build.** _(PR #4)_ The
+  test job now configures Release; pluginval runs on the actual built VST3; the Standalone
+  is uploaded; all uploads use `if-no-files-found: error`.
 - [x] **[M] Fix `install-deps.sh` ↔ CI drift** — local script omitted `libxext-dev`,
   which `CMakeLists.txt:159` hard-requires (`X11::Xext`); added so a clean local build
   matches CI. _(Done alongside P0 — it blocked the local verification build.)_
-- [ ] **[L] Harden CI**: pin/parameterize the hardcoded VS 2022 _Enterprise_ path in the
-  Windows "Verify VST3" step, add `timeout-minutes`, add a `concurrency` group, dedupe
-  the apt list copy-pasted between the `build-linux` and `test` jobs.
+- [x] **[L] Harden CI** _(PR #4)_: Windows "Verify VST3" step now locates MSVC via
+  `vswhere` (no hardcoded VS edition path); added `timeout-minutes` on every job, a
+  `concurrency` group with cancel-in-progress, and deduped the apt list into a composite
+  action (`.github/actions/setup-linux-deps`).
 
 ## P4 — Reach, quality bar & tech-debt cleanup
 
-- [ ] **[M] Decide macOS / AU / LV2 scope.** `FORMATS VST3 Standalone` only; no macOS in
-  CI (so no AU and no macOS VST3). This is the biggest reach limiter.
+- [x] **[M] Decide macOS / AU / LV2 scope.** **Decision (2026-06-19): stay VST3 +
+  Standalone for now; macOS / AU / LV2 deferred.** macOS VST3 + AU need a macOS CI runner
+  and Apple signing/notarization tooling; revisit once those are available.
 - [ ] **[M] Audit the Linux X11 Shape-Extension window strategy for the plugin case.**
   `XOpenDisplay(nullptr)` opens a _second_ X11 connection per `applyShapeMask`/
   `setWindowBackground` call (`PluginEditor.cpp:254,285,303`) rather than reusing the
   peer's display — fragile when a VST3 is embedded in a host's own X11 connection. Fine
   for standalone; risky for the plugin.
-- [ ] **[M] Centralize layout & DSP magic numbers.** GUI layout is entirely hardcoded
-  with paint() and resized() positions hand-synced in parallel ladders
-  (`SettingsPanel.cpp`, `PluginEditor.cpp:428-479`); duplicate/contradictory panel-height
-  constants (`SettingsPanel` declares `maxH=600` but layout hardcodes `420`). On the DSP
-  side, cab IIR coefficients (`FilterBank.cpp:17-19`), sag clamps (`SagEnvelope.h:39`),
-  and grid-charge taus live as inline literals despite the "all constants in Constants.h"
-  convention.
-- [ ] **[M] Extract the duplicated coefficient-recalc block** copy-pasted between
-  `prepareToPlay` and the oversample-switch commit path (`PluginProcessor.cpp:111-145` vs
-  `:216-234`) into one helper — silent-drift risk.
-- [ ] **[M] Add a golden-file / null-test** regression for rendered output. A
-  `di_sample_82hz.raw` fixture already exists; ongoing "ear-tuning" silently changes
-  output with nothing guarding against unintended regressions.
-- [ ] **[M] Unit-test `OversampleSwitcher` and `ParamSmoother`** — both flagged
-  pop/timing-sensitive in CLAUDE.md, both currently untested.
-- [ ] **[L] Add `.clang-format`, `.clang-tidy`, `.editorconfig`** and a CI lint/format
-  check. None exist.
-- [ ] **[L] Remove dead constants/code:** `V_THERMAL`, `TRIODE_BIAS_N`, `SPK_RE_N`,
-  `SPK_FS`, `EL84_GAIN_BASE`, `R_470/R_820/R_500K/R_1M/R_68K/R_1K5`
-  (`Constants.h`/`VoltageScale.h`); the unused `segSpanDeg` knob constant (`NotchKnob.h`).
+- [~] **[M] Centralize layout & DSP magic numbers.** **DSP side done** _(PR #5)_: cab IIR
+  coefficients, sag-clamp, OT LP Q, and grid-charge taus are now named constants in
+  `Constants.h`. **Still open:** GUI layout is hardcoded with paint()/resized() positions
+  hand-synced in parallel ladders (`SettingsPanel.cpp`, `PluginEditor.cpp:428-479`), and
+  the duplicate/contradictory panel-height constants (`SettingsPanel` `maxH=600` vs layout
+  `420`).
+- [x] **[M] Extract the duplicated coefficient-recalc block** _(PR #5)_ → single
+  `SilentRiotProcessor::recalcRateDependentCoeffs()` shared by `prepareToPlay` and the
+  oversample-switch commit path.
+- [~] **[M] Add a golden-file / null-test** regression for rendered output. _(PR #5,
+  partial)_ Added `tests/regression_tests.cpp`: a chain-render guard asserting finite +
+  limiter-bounded + deterministic + stable-under-drive (the less-brittle alternative to a
+  strict golden file, which would fight the ongoing ear-tuning). **Still open:** a true
+  null/golden against the real `processBlock` (needs a plugin-host test target). _Note:_
+  the reconstructed chain shows a small idle DC + slow limit-cycle at max gain — likely a
+  harness artifact (omits PSU/sag, comp=1.5); worth a check against real `processBlock`.
+- [x] **[M] Unit-test `OversampleSwitcher` and `ParamSmoother`** _(PR #5)_ — +6 / +5
+  cases covering the deferred crossfade state machine + fade envelope and the one-pole
+  smoother's convergence/time-constant behaviour.
+- [~] **[L] Add `.clang-format`, `.clang-tidy`, `.editorconfig`** _(PR #5, partial)_ —
+  config files added, tuned to the existing hand-aligned style. **Still open:** the CI
+  lint/format check + a baseline reformat decision (the codebase uses manual column
+  alignment, so a blanket reformat would be invasive — needs maintainer buy-in).
+- [~] **[L] Remove dead constants/code** _(PR #5, partial)_ — removed the 8 referenced
+  nowhere: `V_THERMAL`, `R_470`, `R_820`, `EL84_GAIN_BASE`, `TRIODE_BIAS_N`, `SPK_RE_N`,
+  `SPK_FS`, `segSpanDeg`. **Kept** `R_1K5/R_68K/R_500K/R_1M`: still exercised by the
+  VoltageScale resistance-reference-table tests, so removing them means deleting passing
+  spec-characterization tests — left for a separate call.
 
 ## Parked — explicit "later" items (tracked, not scheduled)
 

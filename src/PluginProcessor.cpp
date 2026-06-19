@@ -129,15 +129,12 @@ void SilentRiotProcessor::resetDSPState()
     psuFrozen = false;
 }
 
-void SilentRiotProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
+void SilentRiotProcessor::recalcRateDependentCoeffs()
 {
-    baseSampleRate = sampleRate;
+    const int osFactor = oversampleSwitcher.activeFactor();
+    const float effectiveSR = static_cast<float>(baseSampleRate) * osFactor;
 
-    oversampleSwitcher.init(getTotalNumOutputChannels(), samplesPerBlock);
-    int osFactor = oversampleSwitcher.activeFactor();
-    float effectiveSR = static_cast<float>(sampleRate) * osFactor;
-
-    filterBank.recalcAll(static_cast<float>(sampleRate), osFactor);
+    filterBank.recalcAll(static_cast<float>(baseSampleRate), osFactor);
     v1a_miller.recalc(effectiveSR);
     v1b_miller.recalc(effectiveSR);
     speakerCoupling.recalcFilters(effectiveSR);
@@ -146,14 +143,27 @@ void SilentRiotProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
     otSaturation.recalcCoeffs(effectiveSR);
 
     // Grid conduction charge decay
-    recalcGridChargeDecay(v1aGrid,  0.022f, effectiveSR);
-    recalcGridChargeDecay(v1bGrid,  0.022f, effectiveSR);
-    recalcGridChargeDecay(piGrid,   0.047f, effectiveSR);
-    recalcGridChargeDecay(el84GridA, 0.100f, effectiveSR);
-    recalcGridChargeDecay(el84GridB, 0.100f, effectiveSR);
+    recalcGridChargeDecay(v1aGrid,   GRID_TAU_PREAMP_S, effectiveSR);
+    recalcGridChargeDecay(v1bGrid,   GRID_TAU_PREAMP_S, effectiveSR);
+    recalcGridChargeDecay(piGrid,    GRID_TAU_PI_S,     effectiveSR);
+    recalcGridChargeDecay(el84GridA, GRID_TAU_EL84_S,   effectiveSR);
+    recalcGridChargeDecay(el84GridB, GRID_TAU_EL84_S,   effectiveSR);
+
+    // Smoothers run per-sample at the oversampled rate
+    gainSmoother.init(5.0f, effectiveSR);
+    toneSmoother.init(5.0f, effectiveSR);
+    volumeSmoother.init(5.0f, effectiveSR);
 
     // Report oversampler latency to DAW
     setLatencySamples(static_cast<int>(oversampleSwitcher.active()->getLatencyInSamples()));
+}
+
+void SilentRiotProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
+{
+    baseSampleRate = sampleRate;
+
+    oversampleSwitcher.init(getTotalNumOutputChannels(), samplesPerBlock);
+    recalcRateDependentCoeffs();
 
     // Cabinet IR convolution engine (runs at base SR, after downsample)
     cabSim.prepare(sampleRate, samplesPerBlock, getTotalNumOutputChannels());
@@ -167,11 +177,6 @@ void SilentRiotProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
         cabSim.loadIRFromBuffer(std::move(bufCopy), ir.sampleRate);
         cachedIRIndex = irIdx;
     }
-
-    // Smoothers run per-sample at the oversampled rate
-    gainSmoother.init(5.0f, effectiveSR);
-    toneSmoother.init(5.0f, effectiveSR);
-    volumeSmoother.init(5.0f, effectiveSR);
 
     // Clear any state carried over from a previous configuration
     resetDSPState();
@@ -241,29 +246,7 @@ void SilentRiotProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
         // Complete pending switch at block boundary (after fade-out finished last block)
         if (oversampleSwitcher.readyToSwitch()) {
             oversampleSwitcher.commitSwitch();
-
-            int osFactor = oversampleSwitcher.activeFactor();
-            float effectiveSR = static_cast<float>(baseSampleRate) * osFactor;
-
-            filterBank.recalcAll(static_cast<float>(baseSampleRate), osFactor);
-            v1a_miller.recalc(effectiveSR);
-            v1b_miller.recalc(effectiveSR);
-            speakerCoupling.recalcFilters(effectiveSR);
-            psu.recalcDecayCoeffs(effectiveSR);
-            sag.recalcCoeffs(effectiveSR);
-            otSaturation.recalcCoeffs(effectiveSR);
-
-            recalcGridChargeDecay(v1aGrid,  0.022f, effectiveSR);
-            recalcGridChargeDecay(v1bGrid,  0.022f, effectiveSR);
-            recalcGridChargeDecay(piGrid,   0.047f, effectiveSR);
-            recalcGridChargeDecay(el84GridA, 0.100f, effectiveSR);
-            recalcGridChargeDecay(el84GridB, 0.100f, effectiveSR);
-
-            gainSmoother.init(5.0f, effectiveSR);
-            toneSmoother.init(5.0f, effectiveSR);
-            volumeSmoother.init(5.0f, effectiveSR);
-
-            setLatencySamples(static_cast<int>(oversampleSwitcher.active()->getLatencyInSamples()));
+            recalcRateDependentCoeffs();
         }
 
         // Request mode change → starts fade-out (actual switch deferred to next block)
