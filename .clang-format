@@ -1,0 +1,21 @@
+# Approximates the existing hand-aligned house style: 4-space indent, attached
+# braces, ~100-col, left pointer alignment, and aligned constant tables (the
+# Constants.h / VoltageScale.h columns). No repo-wide reformat has been applied
+# and this is not yet enforced in CI — see ROADMAP P4. Enable format-on-save at
+# your own discretion until a baseline reformat is agreed.
+Language:        Cpp
+BasedOnStyle:    LLVM
+IndentWidth:     4
+TabWidth:        4
+UseTab:          Never
+ColumnLimit:     100
+PointerAlignment: Left
+NamespaceIndentation: None
+SortIncludes:    false
+AlignConsecutiveAssignments:  true
+AlignConsecutiveDeclarations: true
+AllowShortFunctionsOnASingleLine: Inline
+AllowShortIfStatementsOnASingleLine: WithoutElse
+AllowShortCaseLabelsOnASingleLine: true
+BreakBeforeBraces: Attach
+SpaceAfterCStyleCast: false

@@ -1,0 +1,16 @@
+# Static analysis only (no auto-formatting). Conservative check set for a
+# real-time audio plugin: correctness-focused bugprone/performance plus a few
+# modernize/readability checks, with noisy or RT-unfriendly checks disabled.
+# Not yet wired into CI — see ROADMAP P4.
+Checks: >
+  -*,
+  bugprone-*,
+  performance-*,
+  modernize-use-override,
+  modernize-use-nullptr,
+  modernize-use-using,
+  readability-braces-around-statements,
+  -bugprone-easily-swappable-parameters,
+  -bugprone-narrowing-conversions
+WarningsAsErrors: ''
+HeaderFilterRegex: 'src/.*'
