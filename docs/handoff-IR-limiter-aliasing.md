@@ -1,7 +1,8 @@
 # Handoff — IR-path output limiter is not oversampled (aliasing)
 
 **Component:** `SilentRiotProcessor::processBlock` — output stage
-**Status:** confirmed, measured. Not yet fixed.
+**Status:** Fixed — Option B implemented (dedicated 4x oversampler around the
+IR-path limiter, `src/PluginProcessor.{h,cpp}`). IIR path untouched.
 **Severity:** Low–Moderate, *conditional* (IR mode + cranked output + bright IR only).
 **Audience:** DSP maintainer picking up the "DSP audit / sound polish" branch.
 
