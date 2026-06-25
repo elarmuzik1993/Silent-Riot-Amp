@@ -12,6 +12,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # ── Options ─────────────────────────────────────
 option(SR_BUILD_TESTS   "Build unit tests"   OFF)
+option(SR_BUILD_TOOLS   "Build offline tone-sign-off render tool (headless)" OFF)
 
 # ── JUCE via FetchContent ───────────────────────
 include(FetchContent)
@@ -169,4 +170,9 @@ target_include_directories(SilentRiot PRIVATE ${CMAKE_SOURCE_DIR}/src)
 if(SR_BUILD_TESTS)
     enable_testing()
     add_subdirectory(tests)
+endif()
+
+# ── Tools (offline render for the tone-sign-off harness) ──
+if(SR_BUILD_TOOLS)
+    add_subdirectory(tools)
 endif()

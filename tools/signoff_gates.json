@@ -1,0 +1,44 @@
+{
+  "_comment": "Tone sign-off gates + test matrix (docs/Tone_SignOff_Protocol.md §3-4). Targets marked TBM are ratified by the Calibration Pass (§5) against the real processBlock, then frozen. op: '<=','>=','band'[lo,hi],'==' with tol. 'null' target = report-only until calibrated.",
+  "input_rms_dbfs": -18.0,
+
+  "points": {
+    "P-CLEAN":     { "gain": 0.30, "volume": 0.50, "shape": 0.50, "7w": 0, "cab": 1 },
+    "P-EDGE":      { "gain": 0.50, "volume": 0.50, "shape": 0.50, "7w": 0, "cab": 1 },
+    "P-CRANK":     { "gain": 0.80, "volume": 0.70, "shape": 0.50, "7w": 0, "cab": 1 },
+    "P-7W":        { "gain": 0.60, "volume": 0.70, "shape": 0.50, "7w": 1, "cab": 1 },
+    "P-SHAPE-CCW": { "gain": 0.50, "volume": 0.50, "shape": 0.00, "7w": 0, "cab": 1 },
+    "P-SHAPE-CW":  { "gain": 0.50, "volume": 0.50, "shape": 1.00, "7w": 0, "cab": 1 }
+  },
+
+  "renders": [
+    { "id": "thd220_clean", "point": "P-CLEAN", "signal": "sine:220:0.18:1.0", "probe_f0": 220 },
+    { "id": "thd220_edge",  "point": "P-EDGE",  "signal": "sine:220:0.18:1.0", "probe_f0": 220 },
+    { "id": "thd220_crank", "point": "P-CRANK", "signal": "sine:220:0.18:1.0", "probe_f0": 220 },
+    { "id": "sweep_clean",  "point": "P-CLEAN", "signal": "sweep:20:20000:2.0" },
+    { "id": "sweep_ccw",    "point": "P-SHAPE-CCW", "signal": "sweep:20:20000:2.0" },
+    { "id": "sweep_cw",     "point": "P-SHAPE-CW",  "signal": "sweep:20:20000:2.0" },
+    { "id": "note_crank",   "point": "P-CRANK", "signal": "note:110:0.5:2.0" },
+    { "id": "note_7w",      "point": "P-7W",    "signal": "note:110:0.5:2.0" },
+    { "id": "idle_crank",   "point": "P-CRANK", "signal": "silence:5.0" },
+    { "id": "alias_crank",  "point": "P-CRANK", "signal": "sine:11000:0.5:1.0", "probe_f0": 11000, "ir": "OPTIONAL_BRIGHT_IR" }
+  ],
+
+  "gates": [
+    { "id": "A2", "render": "thd220_crank", "metric": "level", "field": "peak_dbfs",      "op": "<=",   "target": -1.0,  "must_pass": true,  "desc": "peak ceiling holds (tanh limiter)" },
+    { "id": "A4", "render": "thd220_clean", "metric": "level", "field": "channel_match_db","op": "<=",  "target": 0.1,   "must_pass": true,  "desc": "L/R identical (mono->stereo copy)" },
+    { "id": "A1", "render": "thd220_clean", "metric": "level", "field": "lufs_integrated", "op": "band", "target": [-17.5, -14.5], "must_pass": false, "desc": "clean loudness window (TBM-calibrate)" },
+
+    { "id": "B1", "render": "thd220_clean", "metric": "thd",   "field": "thd_pct",         "op": "band", "target": [1.0, 5.0],   "must_pass": false, "desc": "clean THD band" },
+    { "id": "B2", "render": "thd220_edge",  "metric": "thd",   "field": "thd_pct",         "op": "band", "target": [6.0, 12.0],  "must_pass": false, "desc": "edge THD band" },
+    { "id": "B3", "render": "thd220_crank", "metric": "thd",   "field": "thd_pct",         "op": "band", "target": [18.0, 35.0], "must_pass": false, "desc": "crank THD band" },
+    { "id": "B4", "render": "thd220_edge",  "metric": "thd",   "field": "even_dominant",   "op": "==",   "target": true,  "must_pass": false, "desc": "H2>=H3 at edge (warmth)" },
+
+    { "id": "D5", "render": "note_crank",   "metric": "sag",   "field": "sustain_300ms_dbfs","op": ">=", "target": -60.0, "must_pass": true,  "desc": "no signal collapse at high vol+gain" },
+    { "id": "D1", "render": "note_crank",   "metric": "sag",   "field": "sag_depth_db",     "op": "band", "target": [1.5, 4.0], "must_pass": false, "desc": "crank sag depth (TBM-calibrate)" },
+
+    { "id": "E1", "render": "idle_crank",   "metric": "noise", "field": "noise_floor_dbfs", "op": "<=",   "target": -90.0, "must_pass": false, "desc": "idle noise floor" },
+    { "id": "E2", "render": "idle_crank",   "metric": "noise", "field": "dc_offset_dbfs",   "op": "<=",   "target": -80.0, "must_pass": false, "desc": "idle DC / no limit cycle (real processBlock)" },
+    { "id": "E3", "render": "alias_crank",  "metric": "spurs", "field": "total_spur_dbc",   "op": "<=",   "target": -85.0, "must_pass": true,  "desc": "IR-path aliasing parity (PR #7/#9 fix target)" }
+  ]
+}
