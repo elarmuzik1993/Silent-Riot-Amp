@@ -196,6 +196,23 @@ TEST_CASE("LTP model: init sets correct constants from spec", "[ltp]") {
     REQUIRE(ltp.vCathode == PI_CATHODE_INIT_N);
 }
 
+// ── reset() parity with init() ───────────────────────────────
+
+TEST_CASE("LTP: reset restores idle cathode + clears plate cache", "[ltp]") {
+    auto ltp = freshLTP();
+
+    // Drive hard so vCathode drifts well away from PI_CATHODE_INIT_N.
+    for (int i = 0; i < 200; ++i)
+        solveLTP(0.1f, V_PI_NOMINAL_N, ltp);
+    REQUIRE(ltp.vCathode != Approx(PI_CATHODE_INIT_N).margin(0.001f));
+
+    ltp.reset();
+
+    REQUIRE(ltp.vCathode == PI_CATHODE_INIT_N);
+    REQUIRE(ltp.vPlateA == -1.0f);
+    REQUIRE(ltp.vPlateB == -1.0f);
+}
+
 TEST_CASE("LTP: plate load asymmetry creates AC gain difference", "[ltp]") {
     auto ltp = freshLTP();
 

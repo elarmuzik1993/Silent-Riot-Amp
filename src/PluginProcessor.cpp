@@ -125,6 +125,9 @@ void SilentRiotProcessor::resetDSPState()
     el84GridA.reset();
     el84GridB.reset();
 
+    if (limiterOversampler != nullptr)
+        limiterOversampler->reset();
+
     lastShapeCoeffVal = -1.0f;   // force shape coeff recompute on first sample
     psuFrozen = false;
 }
@@ -154,8 +157,14 @@ void SilentRiotProcessor::recalcRateDependentCoeffs()
     toneSmoother.init(5.0f, effectiveSR);
     volumeSmoother.init(5.0f, effectiveSR);
 
-    // Report oversampler latency to DAW
-    setLatencySamples(static_cast<int>(oversampleSwitcher.active()->getLatencyInSamples()));
+    // Report oversampler latency to DAW. The limiter oversampler's latency is
+    // included unconditionally (not just when IR mode is active) so total
+    // latency stays constant across cab/IR mode switches instead of requiring
+    // a host renegotiation every time irMode flips.
+    int totalLatency = static_cast<int>(oversampleSwitcher.active()->getLatencyInSamples());
+    if (limiterOversampler != nullptr)
+        totalLatency += static_cast<int>(limiterOversampler->getLatencyInSamples());
+    setLatencySamples(totalLatency);
 }
 
 void SilentRiotProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
@@ -163,6 +172,15 @@ void SilentRiotProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
     baseSampleRate = sampleRate;
 
     oversampleSwitcher.init(getTotalNumOutputChannels(), samplesPerBlock);
+
+    // 4x polyphase-IIR oversampler dedicated to the IR-path output limiter
+    // (see docs/handoff-IR-limiter-aliasing.md). Runs at base SR -> 4x base SR,
+    // independent of the main engine's oversample factor.
+    limiterOversampler = std::make_unique<juce::dsp::Oversampling<float>>(
+        getTotalNumOutputChannels(), 2,
+        juce::dsp::Oversampling<float>::filterHalfBandPolyphaseIIR);
+    limiterOversampler->initProcessing(static_cast<size_t>(samplesPerBlock));
+
     recalcRateDependentCoeffs();
 
     // Cabinet IR convolution engine (runs at base SR, after downsample)
@@ -400,16 +418,28 @@ void SilentRiotProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     {
         cabSim.processBlock(outputBlock);
 
-        // Apply output scaling + tanh limiter after convolution
+        // Apply output scaling + tanh limiter oversampled (4x) so the
+        // harmonics tanh generates don't fold back into the band — running
+        // it at base SR (as before) aliased audibly on bright/cranked IR
+        // tones (see docs/handoff-IR-limiter-aliasing.md).
+        auto limiterBlock = limiterOversampler->processSamplesUp(outputBlock);
+        for (size_t ch = 0; ch < limiterBlock.getNumChannels(); ++ch)
+        {
+            auto* samples = limiterBlock.getChannelPointer(ch);
+            for (size_t i = 0; i < limiterBlock.getNumSamples(); ++i)
+            {
+                samples[i] *= outputGainCompensation;
+                samples[i] = std::tanh(samples[i]);
+            }
+        }
+        limiterOversampler->processSamplesDown(outputBlock);
+
+        // Final safety net: never emit a non-finite sample into the host
         for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
         {
             auto* samples = buffer.getWritePointer(ch);
             for (int i = 0; i < buffer.getNumSamples(); ++i)
-            {
-                samples[i] *= outputGainCompensation;
-                samples[i] = std::tanh(samples[i]);
                 if (!std::isfinite(samples[i])) samples[i] = 0.0f;
-            }
         }
     }
 
