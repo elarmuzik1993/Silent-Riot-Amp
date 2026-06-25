@@ -14,8 +14,10 @@ struct LTPModel {
         vBiasRef = PI_BIAS_REF_N; vCathode = PI_CATHODE_INIT_N;
         vPlateA = vPlateB = -1.0f;
     }
-    // Clear cached plate voltages (forces first-guess re-solve next sample)
-    void reset() { vPlateA = vPlateB = -1.0f; }
+    // Clear cached plate voltages and cathode voltage (forces first-guess
+    // re-solve next sample) — must match init() so a sample-rate change or
+    // oversample switch doesn't carry stale cathode state into a fresh solve.
+    void reset() { vPlateA = vPlateB = -1.0f; vCathode = PI_CATHODE_INIT_N; }
 };
 
 struct LTPOutput {
