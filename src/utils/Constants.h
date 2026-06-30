@@ -170,9 +170,12 @@ constexpr float GAIN_TAPER_EXPONENT = 2.0f;
 // Noise gate (downward expander, pre-amp)
 constexpr float GATE_THRESH_MIN_DB  = -80.0f;   // param min (gate effectively open)
 constexpr float GATE_THRESH_MAX_DB  = -20.0f;   // param max (aggressive)
-constexpr float GATE_ATTACK_MS      = 1.0f;     // fast open
-constexpr float GATE_RELEASE_MS     = 80.0f;    // musical close
-constexpr float GATE_DETECT_MS      = 5.0f;     // envelope follower time constant
+constexpr float GATE_ATTACK_MS      = 1.0f;     // fast gain open
+constexpr float GATE_RELEASE_MS     = 80.0f;    // musical gain close
+constexpr float GATE_DETECT_MS      = 30.0f;    // peak-follower release hold
+                                                // (envelope decays toward |x|;
+                                                //  long enough to hold peak
+                                                //  between low-E cycles)
 constexpr float GATE_HYSTERESIS_DB  = 4.0f;     // close threshold sits this far below open
 
 // Boost (clean make-up + tight low-cut + bright high shelf, pre-amp)

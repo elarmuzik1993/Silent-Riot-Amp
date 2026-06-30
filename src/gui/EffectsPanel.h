@@ -15,7 +15,9 @@ public:
     void paint(juce::Graphics&) override;
     void resized() override;
 
-    static constexpr int panelHeight = 248;
+    // Two card rows tall enough to fully render NotchKnob (knob + value
+    // readout + label ≈ 112 px) plus each card's title strip.
+    static constexpr int panelHeight = 320;
 
     // Toggles
     ToggleSwitch& gateToggle()   { return gateTgl; }

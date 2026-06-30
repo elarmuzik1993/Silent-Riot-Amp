@@ -102,6 +102,14 @@ TEST_CASE("Reverb mix=0 is bit-exact dry", "[reverb]")
     r.prepare(kSR, kBlock, 2);
     r.setParameters(0.0f, 0.5f);
 
+    // Warm up on silence so juce::dsp::Reverb's smoothed wet/dry gains settle
+    // (wet → 0, dry → 1 exactly); reverb state stays zero under zero input.
+    for (int k = 0; k < 8; ++k)
+    {
+        auto warm = makeBuffer(2, kBlock);
+        r.process(warm);
+    }
+
     auto buf = makeBuffer(2, kBlock);
     for (int i = 0; i < kBlock; ++i)
     {
