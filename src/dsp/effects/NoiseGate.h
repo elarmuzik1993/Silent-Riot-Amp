@@ -44,8 +44,14 @@ struct NoiseGate {
     // thresholdDb: open threshold. Gate closes once the signal drops
     // GATE_HYSTERESIS_DB below it, preventing chatter near the boundary.
     float process(float x, float thresholdDb) {
+        // Peak follower: instant attack, smoothed release. Tracks the signal
+        // PEAK (not its average) so the threshold is peak-referenced and the
+        // envelope holds near the peak between cycles — keeping the open/close
+        // decision stable across the hysteresis window.
         float level = std::abs(x);
-        envelope = level + (envelope - level) * detectCoeff;
+        envelope = (level > envelope)
+                 ? level
+                 : level + (envelope - level) * detectCoeff;
 
         const float openLin  = std::pow(10.0f, thresholdDb / 20.0f);
         const float closeLin = std::pow(10.0f, (thresholdDb - GATE_HYSTERESIS_DB) / 20.0f);
