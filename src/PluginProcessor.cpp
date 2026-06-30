@@ -579,6 +579,24 @@ void SilentRiotProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
         reverb.process(buffer);
     }
 
+    // ── Post-effects safety limiter ──
+    // delay/reverb run AFTER the amp's output limiter, so their wet tails can
+    // sum past full-scale. Soft-clip the summed output back into ±1 (and scrub
+    // any non-finite sample). Runs ONLY when an effect is active, so the dry
+    // amp path stays bit-identical when the whole module is off.
+    if (delayOn || reverbOn)
+    {
+        for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
+        {
+            auto* samples = buffer.getWritePointer(ch);
+            for (int i = 0; i < buffer.getNumSamples(); ++i)
+            {
+                float s = samples[i];
+                samples[i] = std::isfinite(s) ? softClip(s) : 0.0f;
+            }
+        }
+    }
+
     // ── GUI level metering (RMS of channel 0) ──
     {
         const int n = buffer.getNumSamples();
