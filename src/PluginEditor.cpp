@@ -164,6 +164,7 @@ SilentRiotEditor::SilentRiotEditor(SilentRiotProcessor& p)
     delayTimeA   = std::make_unique<SliderA>(proc.apvts, IDs::DELAY_TIME,     effectsPanel.delayTimeKnob().getSlider());
     delayFbA     = std::make_unique<SliderA>(proc.apvts, IDs::DELAY_FEEDBACK, effectsPanel.delayFbKnob().getSlider());
     delayMixA    = std::make_unique<SliderA>(proc.apvts, IDs::DELAY_MIX,      effectsPanel.delayMixKnob().getSlider());
+    delayToneA   = std::make_unique<SliderA>(proc.apvts, IDs::DELAY_TONE,     effectsPanel.delayToneKnob().getSlider());
     reverbOnA    = std::make_unique<ButtonA>(proc.apvts, IDs::REVERB_ON,      effectsPanel.reverbToggle().getButton());
     reverbMixA   = std::make_unique<SliderA>(proc.apvts, IDs::REVERB_MIX,     effectsPanel.reverbMixKnob().getSlider());
     reverbSizeA  = std::make_unique<SliderA>(proc.apvts, IDs::REVERB_SIZE,    effectsPanel.reverbSizeKnob().getSlider());
@@ -206,7 +207,8 @@ SilentRiotEditor::SilentRiotEditor(SilentRiotProcessor& p)
         for (auto* k : { &effectsPanel.gateThreshKnob(), &effectsPanel.boostLevelKnob(),
                          &effectsPanel.boostTightKnob(), &effectsPanel.boostBrightKnob(),
                          &effectsPanel.delayTimeKnob(), &effectsPanel.delayFbKnob(),
-                         &effectsPanel.delayMixKnob(), &effectsPanel.reverbMixKnob(),
+                         &effectsPanel.delayMixKnob(), &effectsPanel.delayToneKnob(),
+                         &effectsPanel.reverbMixKnob(),
                          &effectsPanel.reverbSizeKnob(), &effectsPanel.reverbToneKnob() })
         {
             k->getSlider().setWantsKeyboardFocus(true);

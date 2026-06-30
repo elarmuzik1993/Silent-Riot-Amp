@@ -194,6 +194,15 @@ constexpr float SAFETY_LIMIT_THRESH = 0.9f;
 constexpr float DELAY_TIME_MIN_MS   = 20.0f;
 constexpr float DELAY_TIME_MAX_MS   = 1000.0f;
 constexpr float DELAY_MAX_FEEDBACK  = 0.95f;    // clamp to keep it from self-oscillating
+// Analog/tape voicing — feedback-path tone shaping + wow/flutter modulation.
+// The high-cut sits IN the feedback loop, so each repeat is darkened again →
+// echoes fade toward the dark, like a tape/analog echo. TONE convention
+// matches the reverb: 0 = dark, 1 = bright. The low-cut stops bass buildup.
+constexpr float DELAY_TONE_LP_MIN   = 2000.0f;  // TONE=0 → dark, tape-like repeats
+constexpr float DELAY_TONE_LP_MAX   = 16000.0f; // TONE=1 → bright, near-digital repeats
+constexpr float DELAY_LOOP_HP_HZ    = 120.0f;   // fixed feedback low-cut (no bass mud on repeats)
+constexpr float DELAY_MOD_RATE_HZ   = 0.4f;     // wow/flutter LFO rate
+constexpr float DELAY_MOD_DEPTH_MS  = 0.3f;     // ± tap sway for living tape character
 
 // Reverb (post-cab) — spring tank: dispersive all-pass chain in a damped
 // feedback delay loop (published parametric-spring technique; see SpringReverb.h)
