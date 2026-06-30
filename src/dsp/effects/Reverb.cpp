@@ -61,15 +61,21 @@ void Reverb::process(juce::AudioBuffer<float>& buffer)
     const int numSamples = buffer.getNumSamples();
     const int numCh = std::min(buffer.getNumChannels(), channels);
 
+    // Equal-power wet/dry blend: constant perceived loudness across the sweep,
+    // and still bit-exact dry at mix=0 (cos(0)=1, sin(0)=0).
+    constexpr float kHalfPi = 1.57079632679f;
+
     if (numCh <= 1)
     {
         float* ch0 = buffer.getWritePointer(0);
         for (int i = 0; i < numSamples; ++i)
         {
             const float m = mixSm.getNextValue();
+            const float dryG = std::cos(m * kHalfPi);
+            const float wetG = std::sin(m * kHalfPi);
             const float dry = ch0[i];
             const float wet = coreL.process(dry);
-            ch0[i] = dry * (1.0f - m) + wet * m;
+            ch0[i] = dry * dryG + wet * wetG;
         }
         return;
     }
@@ -79,13 +85,15 @@ void Reverb::process(juce::AudioBuffer<float>& buffer)
     for (int i = 0; i < numSamples; ++i)
     {
         const float m = mixSm.getNextValue();
+        const float dryG = std::cos(m * kHalfPi);
+        const float wetG = std::sin(m * kHalfPi);
         const float dryL = L[i];
         const float dryR = R[i];
         const float send = 0.5f * (dryL + dryR);   // mono send into both tanks
         const float wetL = coreL.process(send);
         const float wetR = coreR.process(send);
-        L[i] = dryL * (1.0f - m) + wetL * m;
-        R[i] = dryR * (1.0f - m) + wetR * m;
+        L[i] = dryL * dryG + wetL * wetG;
+        R[i] = dryR * dryG + wetR * wetG;
     }
 }
 

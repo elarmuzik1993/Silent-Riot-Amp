@@ -199,12 +199,16 @@ constexpr float SPRING_LOOP1_MS      = 28.0f;   // base loop length, spring 1
 constexpr float SPRING_LOOP2_MS      = 37.0f;   // base loop length, spring 2 (mutually prime-ish)
 constexpr float SPRING_LEN_SCALE_MIN = 0.75f;   // SIZE=0 → shorter tank
 constexpr float SPRING_LEN_SCALE_MAX = 1.30f;   // SIZE=1 → longer tank
-constexpr float SPRING_FB_MIN        = 0.60f;   // SIZE=0 → shorter decay
-constexpr float SPRING_FB_MAX        = 0.88f;   // SIZE=1 → longer decay (capped < 0.9)
+constexpr float SPRING_FB_MIN        = 0.70f;   // SIZE=0 → shorter decay
+constexpr float SPRING_FB_MAX        = 0.935f;  // SIZE=1 → long, lush decay (capped < 1)
 constexpr float SPRING_TONE_LP_MIN   = 1600.0f; // TONE=0 → dark loop LP cutoff
 constexpr float SPRING_TONE_LP_MAX   = 6000.0f; // TONE=1 → bright (springs stay capped)
 constexpr float SPRING_LOOP_HP_HZ    = 90.0f;   // loop high-pass: kill rumble / DC buildup
 constexpr float SPRING_MAX_LOOP_MS   = 60.0f;   // ring-buffer sizing headroom (loop2 × max scale)
+// Delay-modulation LFO (per spring) — subtle chorus-like wobble for a living tank
+constexpr float SPRING_MOD_DEPTH_SAMP = 2.0f;   // ± samples of loop-length sway
+constexpr float SPRING_MOD_RATE1_HZ   = 0.7f;   // spring 1 LFO rate
+constexpr float SPRING_MOD_RATE2_HZ   = 1.1f;   // spring 2 LFO rate (decorrelated)
 
 // ── Debug assertions ────────────────────────────────────────
 #ifdef DEBUG
