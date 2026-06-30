@@ -54,6 +54,11 @@ The following DSP techniques are textbook knowledge and not owned by any party:
 - **Tanh waveshaping** for soft clipping
 - **Exponential envelope followers** (attack/release)
 - **Oversampling via polyphase FIR** (JUCE `dsp::Oversampling`)
+- **Dispersive all-pass spring-reverb model** — the published parametric-spring
+  technique (a cascade of first-order all-pass filters forming a dispersion network
+  inside a damped feedback delay loop). This is a documented DSP method in the audio
+  literature; the implementation here is original and written from scratch — no
+  third-party reverb code was used.
 
 ---
 

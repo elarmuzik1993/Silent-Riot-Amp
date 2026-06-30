@@ -142,6 +142,9 @@ juce::AudioProcessorValueTreeState::ParameterLayout SilentRiotProcessor::createP
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         juce::ParameterID{ Params::IDs::REVERB_SIZE, 1 }, "Reverb Size",
         juce::NormalisableRange<float>(0.0f, 1.0f, 0.001f), 0.5f));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{ Params::IDs::REVERB_TONE, 1 }, "Reverb Tone",
+        juce::NormalisableRange<float>(0.0f, 1.0f, 0.001f), 0.5f));
 
     return { params.begin(), params.end() };
 }
@@ -308,6 +311,7 @@ void SilentRiotProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     bool  reverbOn  = apvts.getRawParameterValue(Params::IDs::REVERB_ON)->load() > 0.5f;
     float reverbMix = apvts.getRawParameterValue(Params::IDs::REVERB_MIX)->load();
     float reverbSz  = apvts.getRawParameterValue(Params::IDs::REVERB_SIZE)->load();
+    float reverbTn  = apvts.getRawParameterValue(Params::IDs::REVERB_TONE)->load();
 
     // Master power off — silence output
     if (!powerOn) { buffer.clear(); return; }
@@ -571,7 +575,7 @@ void SilentRiotProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     }
     if (reverbOn)
     {
-        reverb.setParameters(reverbMix, reverbSz);
+        reverb.setParameters(reverbMix, reverbSz, reverbTn);
         reverb.process(buffer);
     }
 

@@ -35,6 +35,7 @@ public:
     NotchKnob& delayMixKnob()    { return delayMix; }
     NotchKnob& reverbMixKnob()   { return reverbMix; }
     NotchKnob& reverbSizeKnob()  { return reverbSize; }
+    NotchKnob& reverbToneKnob()  { return reverbTone; }
 
 private:
     // Lay out one card's knobs in a horizontal row inside `card`.
@@ -55,6 +56,7 @@ private:
     NotchKnob delayMix   { "MIX",    0.3f };
     NotchKnob reverbMix  { "MIX",    0.25f };
     NotchKnob reverbSize { "SIZE",   0.5f };
+    NotchKnob reverbTone { "TONE",   0.5f };
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(EffectsPanel)
 };

@@ -1,12 +1,13 @@
 #pragma once
 // ═══════════════════════════════════════════════════════════════
-// Reverb — post-cab reverb (thin wrapper over juce::dsp::Reverb,
-// Freeverb). Baseline room/plate voicing; a spring-style physical
-// model is a future tuning item, not built here. Runs at base SR,
-// after the amp+cab (and after delay). Defaults bypassed.
+// Reverb — post-cab spring-tank reverb. JUCE-facing wrapper around the
+// pure-C++ SpringReverbCore (one core per channel; detuned L/R for genuine
+// stereo width). Runs at base SR, after the amp+cab (and after delay).
+// Defaults bypassed. Controls: MIX, SIZE, TONE.
 // ═══════════════════════════════════════════════════════════════
 
 #include <juce_dsp/juce_dsp.h>
+#include "SpringReverb.h"
 
 namespace sr {
 
@@ -15,8 +16,8 @@ public:
     void prepare(double sampleRate, int samplesPerBlock, int numChannels);
     void reset();
 
-    // mix / size are the raw 0..1 parameter values.
-    void setParameters(float mix, float size);
+    // mix / size / tone are the raw 0..1 parameter values.
+    void setParameters(float mix, float size, float tone);
 
     // Processes the buffer in place. No allocation.
     void process(juce::AudioBuffer<float>& buffer);
@@ -24,9 +25,13 @@ public:
     float tailSeconds() const { return tailEstimate; }
 
 private:
-    juce::dsp::Reverb reverb;
-    juce::dsp::Reverb::Parameters params;
+    SpringReverbCore coreL, coreR;
+    int   channels = 2;
     float tailEstimate = 0.0f;
+
+    juce::SmoothedValue<float> mixSm;
+    float lastSize = -1.0f;
+    float lastTone = -1.0f;
 };
 
 } // namespace sr

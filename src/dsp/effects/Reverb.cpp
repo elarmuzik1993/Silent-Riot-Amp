@@ -1,55 +1,92 @@
 #include "Reverb.h"
 #include <algorithm>
+#include <cmath>
 
 namespace sr {
 
-void Reverb::prepare(double sampleRate, int samplesPerBlock, int numChannels)
+void Reverb::prepare(double sampleRate, int /*samplesPerBlock*/, int numChannels)
 {
-    juce::dsp::ProcessSpec spec;
-    spec.sampleRate       = sampleRate;
-    spec.maximumBlockSize = static_cast<juce::uint32>(samplesPerBlock);
-    spec.numChannels      = static_cast<juce::uint32>(std::max(1, numChannels));
-    reverb.prepare(spec);
+    channels = std::max(1, numChannels);
 
-    params.roomSize  = 0.5f;
-    params.damping   = 0.5f;
-    params.width     = 1.0f;
-    params.wetLevel  = 0.0f;
-    params.dryLevel  = 1.0f;
-    params.freezeMode = 0.0f;
-    reverb.setParameters(params);
+    const float sr = static_cast<float>(sampleRate);
+    coreL.prepare(sr, 1.0f);
+    coreR.prepare(sr, 1.031f);   // detune R for stereo decorrelation
+
+    mixSm.reset(sampleRate, 0.05);
+    mixSm.setCurrentAndTargetValue(0.0f);
+
+    lastSize = -1.0f;
+    lastTone = -1.0f;
     tailEstimate = 0.0f;
 }
 
 void Reverb::reset()
 {
-    reverb.reset();
+    coreL.reset();
+    coreR.reset();
 }
 
-void Reverb::setParameters(float mix, float size)
+void Reverb::setParameters(float mix, float size, float tone)
 {
     mix  = juce::jlimit(0.0f, 1.0f, mix);
     size = juce::jlimit(0.0f, 1.0f, size);
+    tone = juce::jlimit(0.0f, 1.0f, tone);
 
-    // Equal-power-ish wet/dry from a single mix control.
-    params.wetLevel = mix;
-    params.dryLevel = 1.0f - mix;
-    params.roomSize = size;
-    // Larger rooms damp a little less so big settings ring longer.
-    params.damping  = juce::jlimit(0.0f, 1.0f, 0.7f - 0.4f * size);
-    reverb.setParameters(params);
+    mixSm.setTargetValue(mix);
 
-    // Freeverb decay scales roughly with room size; ~0.5..8 s is a sane range.
-    tailEstimate = (mix > 0.0f) ? (0.5f + 7.5f * size) : 0.0f;
+    // SIZE/TONE change loop length & filter cutoffs — recompute only when they
+    // actually move (avoids needless work and loop-length resets every block).
+    if (std::abs(size - lastSize) > 1e-4f)
+    {
+        coreL.setSize(size);
+        coreR.setSize(size);
+        lastSize = size;
+    }
+    if (std::abs(tone - lastTone) > 1e-4f)
+    {
+        coreL.setTone(tone);
+        coreR.setTone(tone);
+        lastTone = tone;
+    }
+
+    // RT60 estimate for getTailLengthSeconds(): loopLen · ln(0.001)/ln(feedback).
+    const float fb = juce::jlimit(1e-4f, 0.999f, coreL.feedbackGain());
+    tailEstimate = (mix > 0.0f)
+        ? coreL.loopSeconds() * (std::log(0.001f) / std::log(fb))
+        : 0.0f;
 }
 
 void Reverb::process(juce::AudioBuffer<float>& buffer)
 {
-    // juce::dsp::Reverb dispatches to processMono / processStereo based on the
-    // block's channel count (asserts 1 or 2 — our bus is mono or stereo).
-    juce::dsp::AudioBlock<float> block(buffer);
-    juce::dsp::ProcessContextReplacing<float> ctx(block);
-    reverb.process(ctx);
+    const int numSamples = buffer.getNumSamples();
+    const int numCh = std::min(buffer.getNumChannels(), channels);
+
+    if (numCh <= 1)
+    {
+        float* ch0 = buffer.getWritePointer(0);
+        for (int i = 0; i < numSamples; ++i)
+        {
+            const float m = mixSm.getNextValue();
+            const float dry = ch0[i];
+            const float wet = coreL.process(dry);
+            ch0[i] = dry * (1.0f - m) + wet * m;
+        }
+        return;
+    }
+
+    float* L = buffer.getWritePointer(0);
+    float* R = buffer.getWritePointer(1);
+    for (int i = 0; i < numSamples; ++i)
+    {
+        const float m = mixSm.getNextValue();
+        const float dryL = L[i];
+        const float dryR = R[i];
+        const float send = 0.5f * (dryL + dryR);   // mono send into both tanks
+        const float wetL = coreL.process(send);
+        const float wetR = coreR.process(send);
+        L[i] = dryL * (1.0f - m) + wetL * m;
+        R[i] = dryR * (1.0f - m) + wetR * m;
+    }
 }
 
 } // namespace sr
