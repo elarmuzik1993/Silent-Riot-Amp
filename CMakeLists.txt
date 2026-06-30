@@ -88,6 +88,7 @@ target_sources(SilentRiot
         # Effects module (gate / boost / delay / reverb — outside the amp loop)
         src/dsp/effects/NoiseGate.h
         src/dsp/effects/Boost.h
+        src/dsp/effects/SafetyLimiter.h
         src/dsp/effects/Delay.h
         src/dsp/effects/Delay.cpp
         src/dsp/effects/SpringReverb.h

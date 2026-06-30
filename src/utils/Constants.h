@@ -185,6 +185,11 @@ constexpr float BOOST_TIGHT_MAX_HZ  = 400.0f;   // tight=1 → tight, focused lo
 constexpr float BOOST_BRIGHT_FREQ   = 2000.0f;  // bright shelf corner
 constexpr float BOOST_BRIGHT_MAX_DB = 9.0f;     // bright=1 → +9 dB above corner
 
+// Post-effects safety limiter (catches wet delay/reverb peaks that would
+// otherwise escape the amp's output limiter and hard-clip the DAC). Soft knee:
+// transparent below the threshold, smoothly bounded to ±1 above it.
+constexpr float SAFETY_LIMIT_THRESH = 0.9f;
+
 // Delay (post-cab)
 constexpr float DELAY_TIME_MIN_MS   = 20.0f;
 constexpr float DELAY_TIME_MAX_MS   = 1000.0f;
