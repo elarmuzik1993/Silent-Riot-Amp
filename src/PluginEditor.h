@@ -10,6 +10,7 @@
 #include "gui/AdvancedPanel.h"
 #include "gui/SettingsPanel.h"
 #include "gui/IRLoaderPanel.h"
+#include "gui/EffectsPanel.h"
 
 class SilentRiotEditor : public juce::AudioProcessorEditor,
                          private juce::Timer {
@@ -58,6 +59,11 @@ private:
     bool irPanelOpen = false;
     float irPanelAnimH = 0.0f;
 
+    sr::SectionBar fxSectionBar{"EFFECTS"};
+    sr::EffectsPanel effectsPanel;
+    bool fxPanelOpen = false;
+    float fxPanelAnimH = 0.0f;
+
     sr::SectionBar advSectionBar{"ADVANCED"};
     sr::AdvancedPanel advancedPanel;
     bool advPanelOpen = false;
@@ -75,12 +81,18 @@ private:
     std::unique_ptr<SliderA> gainA, toneA, volA;
     std::unique_ptr<ButtonA> halfPowerA, cabSimA, powerA;
 
+    // Effects module attachments
+    std::unique_ptr<ButtonA> gateOnA, boostOnA, delayOnA, reverbOnA;
+    std::unique_ptr<SliderA> gateThreshA, boostLevelA, boostTightA, boostBrightA,
+                             delayTimeA, delayFbA, delayMixA, reverbMixA, reverbSizeA;
+
     static constexpr int kWindowW = 700;
     static constexpr int kHeaderH   = 38;
     static constexpr int kBodyH     = 232;
     static constexpr int kSectionH  = 26;
     static constexpr int kFooterH   = 30;
-    static constexpr int kBaseH     = kHeaderH + kBodyH + kSectionH * 2 + kFooterH;
+    // 3 section bars: EFFECTS, IR LOADER, ADVANCED
+    static constexpr int kBaseH     = kHeaderH + kBodyH + kSectionH * 3 + kFooterH;
 
     float currentScale = 1.0f;
     bool compositorBypassed = false;

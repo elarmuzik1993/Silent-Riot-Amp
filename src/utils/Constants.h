@@ -163,6 +163,32 @@ constexpr float OT_SAT_FLUX_MAX     = 10.0f;
 // ── Gain taper ──────────────────────────────────────────────
 constexpr float GAIN_TAPER_EXPONENT = 2.0f;
 
+// ── Effects module (front-of-amp + post-cab) ───────────────
+// These live OUTSIDE the oversampled amp loop and never touch the frozen
+// amp-tone math. All run at base sample rate.
+
+// Noise gate (downward expander, pre-amp)
+constexpr float GATE_THRESH_MIN_DB  = -80.0f;   // param min (gate effectively open)
+constexpr float GATE_THRESH_MAX_DB  = -20.0f;   // param max (aggressive)
+constexpr float GATE_ATTACK_MS      = 1.0f;     // fast open
+constexpr float GATE_RELEASE_MS     = 80.0f;    // musical close
+constexpr float GATE_DETECT_MS      = 5.0f;     // envelope follower time constant
+constexpr float GATE_HYSTERESIS_DB  = 4.0f;     // close threshold sits this far below open
+
+// Boost (clean make-up + tight low-cut + bright high shelf, pre-amp)
+constexpr float BOOST_LEVEL_MAX_DB  = 18.0f;    // param maps 0..1 → 0..+18 dB
+constexpr float BOOST_TIGHT_MIN_HZ  = 20.0f;    // tight=0 → essentially full-range
+constexpr float BOOST_TIGHT_MAX_HZ  = 400.0f;   // tight=1 → tight, focused low end
+constexpr float BOOST_BRIGHT_FREQ   = 2000.0f;  // bright shelf corner
+constexpr float BOOST_BRIGHT_MAX_DB = 9.0f;     // bright=1 → +9 dB above corner
+
+// Delay (post-cab)
+constexpr float DELAY_TIME_MIN_MS   = 20.0f;
+constexpr float DELAY_TIME_MAX_MS   = 1000.0f;
+constexpr float DELAY_MAX_FEEDBACK  = 0.95f;    // clamp to keep it from self-oscillating
+
+// Reverb (post-cab) — see Reverb.h for room-size/damping mapping
+
 // ── Debug assertions ────────────────────────────────────────
 #ifdef DEBUG
 #define VS_ASSERT_RANGE(val, lo, hi, stage) \

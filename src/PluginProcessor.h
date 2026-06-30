@@ -23,6 +23,10 @@
 #include "dsp/cabinet/SpeakerCoupling.h"
 #include "dsp/cabinet/OTSaturation.h"
 #include "dsp/cabinet/CabinetSim.h"
+#include "dsp/effects/NoiseGate.h"
+#include "dsp/effects/Boost.h"
+#include "dsp/effects/Delay.h"
+#include "dsp/effects/Reverb.h"
 #include "dsp/OversampleSwitcher.h"
 
 class SilentRiotProcessor : public juce::AudioProcessor,
@@ -111,6 +115,15 @@ private:
     sr::LTPModel            ltpModel;
     sr::CabinetSim          cabSim;
     sr::OversampleSwitcher  oversampleSwitcher;
+
+    // ── Effects module (run at base SR, outside the oversampled amp loop) ──
+    // Pre-amp: gate + boost. Post-cab: delay + reverb. All default bypassed.
+    sr::NoiseGate           noiseGate;
+    sr::Boost               boost;
+    sr::Delay               delay;
+    sr::Reverb              reverb;
+    // Boost level smoothed at base SR (avoids zipper on the make-up gain).
+    juce::SmoothedValue<float> boostLevelSm, boostTightSm, boostBrightSm, gateThreshSm;
 
     // Oversamples just the IR-path output limiter (tanh) so its harmonics
     // don't alias back into the band — the IIR path's limiter already runs

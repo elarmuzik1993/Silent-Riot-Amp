@@ -99,6 +99,50 @@ juce::AudioProcessorValueTreeState::ParameterLayout SilentRiotProcessor::createP
     params.push_back(std::make_unique<juce::AudioParameterInt>(
         juce::ParameterID{ Params::IDs::IR_INDEX, 1 }, "IR Selection", 0, 32, 0));
 
+    // ── Effects module — all default OFF / dry (tone-neutral when bypassed) ──
+    params.push_back(std::make_unique<juce::AudioParameterBool>(
+        juce::ParameterID{ Params::IDs::GATE_ON, 1 }, "Gate", false));
+    // Threshold is a 0–1 knob (maps 0..1 → GATE_THRESH_MIN..MAX dB in processBlock,
+    // so NotchKnob's 0–1 arc works). Default 0 = -80 dB (effectively open).
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{ Params::IDs::GATE_THRESHOLD, 1 }, "Gate Threshold",
+        juce::NormalisableRange<float>(0.0f, 1.0f, 0.001f), 0.0f));
+
+    params.push_back(std::make_unique<juce::AudioParameterBool>(
+        juce::ParameterID{ Params::IDs::BOOST_ON, 1 }, "Boost", false));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{ Params::IDs::BOOST_LEVEL, 1 }, "Boost Level",
+        juce::NormalisableRange<float>(0.0f, 1.0f, 0.001f), 0.5f));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{ Params::IDs::BOOST_TIGHT, 1 }, "Boost Tight",
+        juce::NormalisableRange<float>(0.0f, 1.0f, 0.001f), 0.0f));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{ Params::IDs::BOOST_BRIGHT, 1 }, "Boost Bright",
+        juce::NormalisableRange<float>(0.0f, 1.0f, 0.001f), 0.0f));
+
+    params.push_back(std::make_unique<juce::AudioParameterBool>(
+        juce::ParameterID{ Params::IDs::DELAY_ON, 1 }, "Delay", false));
+    // Time is a 0–1 knob (maps 0..1 → DELAY_TIME_MIN..MAX ms in processBlock).
+    // Default ~0.34 ≈ 350 ms.
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{ Params::IDs::DELAY_TIME, 1 }, "Delay Time",
+        juce::NormalisableRange<float>(0.0f, 1.0f, 0.001f), 0.337f));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{ Params::IDs::DELAY_FEEDBACK, 1 }, "Delay Feedback",
+        juce::NormalisableRange<float>(0.0f, 1.0f, 0.001f), 0.35f));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{ Params::IDs::DELAY_MIX, 1 }, "Delay Mix",
+        juce::NormalisableRange<float>(0.0f, 1.0f, 0.001f), 0.3f));
+
+    params.push_back(std::make_unique<juce::AudioParameterBool>(
+        juce::ParameterID{ Params::IDs::REVERB_ON, 1 }, "Reverb", false));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{ Params::IDs::REVERB_MIX, 1 }, "Reverb Mix",
+        juce::NormalisableRange<float>(0.0f, 1.0f, 0.001f), 0.25f));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{ Params::IDs::REVERB_SIZE, 1 }, "Reverb Size",
+        juce::NormalisableRange<float>(0.0f, 1.0f, 0.001f), 0.5f));
+
     return { params.begin(), params.end() };
 }
 
@@ -127,6 +171,12 @@ void SilentRiotProcessor::resetDSPState()
 
     if (limiterOversampler != nullptr)
         limiterOversampler->reset();
+
+    // Effects module
+    noiseGate.reset();
+    boost.reset();
+    delay.reset();
+    reverb.reset();
 
     lastShapeCoeffVal = -1.0f;   // force shape coeff recompute on first sample
     psuFrozen = false;
@@ -186,6 +236,27 @@ void SilentRiotProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
     // Cabinet IR convolution engine (runs at base SR, after downsample)
     cabSim.prepare(sampleRate, samplesPerBlock, getTotalNumOutputChannels());
 
+    // ── Effects module (base SR, outside the oversampled amp loop) ──
+    const float baseSR = static_cast<float>(sampleRate);
+    noiseGate.recalcCoeffs(baseSR);
+    boost.prepare(baseSR);
+    delay.prepare(sampleRate, samplesPerBlock, getTotalNumOutputChannels());
+    reverb.prepare(sampleRate, samplesPerBlock, getTotalNumOutputChannels());
+
+    const double fxRampSec = 0.05;
+    gateThreshSm.reset(sampleRate, fxRampSec);
+    boostLevelSm.reset(sampleRate, fxRampSec);
+    boostTightSm.reset(sampleRate, fxRampSec);
+    boostBrightSm.reset(sampleRate, fxRampSec);
+    gateThreshSm.setCurrentAndTargetValue(
+        apvts.getRawParameterValue(Params::IDs::GATE_THRESHOLD)->load());
+    boostLevelSm.setCurrentAndTargetValue(
+        apvts.getRawParameterValue(Params::IDs::BOOST_LEVEL)->load());
+    boostTightSm.setCurrentAndTargetValue(
+        apvts.getRawParameterValue(Params::IDs::BOOST_TIGHT)->load());
+    boostBrightSm.setCurrentAndTargetValue(
+        apvts.getRawParameterValue(Params::IDs::BOOST_BRIGHT)->load());
+
     // Reload active user IR after prepare (convolution state was reset)
     int irIdx = static_cast<int>(apvts.getRawParameterValue(sr::Params::IDs::IR_INDEX)->load());
     if (irIdx > 0 && irIdx <= static_cast<int>(userIRs.size()))
@@ -223,6 +294,21 @@ void SilentRiotProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     bool  powerOn   = apvts.getRawParameterValue(Params::IDs::POWER)->load() > 0.5f;
     int   irIndex   = static_cast<int>(apvts.getRawParameterValue(Params::IDs::IR_INDEX)->load());
 
+    // Effects module parameters (run at base SR, outside the amp loop)
+    bool  gateOn    = apvts.getRawParameterValue(Params::IDs::GATE_ON)->load() > 0.5f;
+    float gateThr   = apvts.getRawParameterValue(Params::IDs::GATE_THRESHOLD)->load();
+    bool  boostOn   = apvts.getRawParameterValue(Params::IDs::BOOST_ON)->load() > 0.5f;
+    float boostLvl  = apvts.getRawParameterValue(Params::IDs::BOOST_LEVEL)->load();
+    float boostTgt  = apvts.getRawParameterValue(Params::IDs::BOOST_TIGHT)->load();
+    float boostBrt  = apvts.getRawParameterValue(Params::IDs::BOOST_BRIGHT)->load();
+    bool  delayOn   = apvts.getRawParameterValue(Params::IDs::DELAY_ON)->load() > 0.5f;
+    float delayTime = apvts.getRawParameterValue(Params::IDs::DELAY_TIME)->load();
+    float delayFb   = apvts.getRawParameterValue(Params::IDs::DELAY_FEEDBACK)->load();
+    float delayMix  = apvts.getRawParameterValue(Params::IDs::DELAY_MIX)->load();
+    bool  reverbOn  = apvts.getRawParameterValue(Params::IDs::REVERB_ON)->load() > 0.5f;
+    float reverbMix = apvts.getRawParameterValue(Params::IDs::REVERB_MIX)->load();
+    float reverbSz  = apvts.getRawParameterValue(Params::IDs::REVERB_SIZE)->load();
+
     // Master power off — silence output
     if (!powerOn) { buffer.clear(); return; }
 
@@ -256,6 +342,35 @@ void SilentRiotProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
             for (int i = 0; i < n; ++i)
                 sumSq += ch0[i] * ch0[i];
             inputLevelForGUI.store(std::sqrt(sumSq / static_cast<float>(n)), std::memory_order_relaxed);
+        }
+    }
+
+    // ── Pre-amp effects (gate → boost) at base SR, BEFORE upsampling ──
+    // The amp reads mono from channel 0, so we process channel 0 only; the
+    // loop copies it to stereo. Both effects are linear/level operations
+    // (no clipping) → safe at base SR with no aliasing.
+    if (gateOn || boostOn)
+    {
+        gateThreshSm.setTargetValue(gateThr);
+        boostLevelSm.setTargetValue(boostLvl);
+        boostTightSm.setTargetValue(boostTgt);
+        boostBrightSm.setTargetValue(boostBrt);
+
+        const int n = buffer.getNumSamples();
+        float* ch0 = buffer.getWritePointer(0);
+        for (int i = 0; i < n; ++i)
+        {
+            // Map threshold knob 0..1 → dB
+            const float thrDb = GATE_THRESH_MIN_DB
+                + gateThreshSm.getNextValue() * (GATE_THRESH_MAX_DB - GATE_THRESH_MIN_DB);
+            const float lvl = boostLevelSm.getNextValue();
+            const float tgt = boostTightSm.getNextValue();
+            const float brt = boostBrightSm.getNextValue();
+
+            float s = ch0[i];
+            if (gateOn)  s = noiseGate.process(s, thrDb);
+            if (boostOn) s = boost.process(s, lvl, tgt, brt);
+            ch0[i] = s;
         }
     }
 
@@ -443,6 +558,23 @@ void SilentRiotProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
         }
     }
 
+    // ── Post-cab effects (delay → reverb) at base SR, after the amp/cab ──
+    // Operate per channel: a stereo bus picks up reverb/delay width; mono
+    // stays mono. Skipped entirely (bit-exact dry) when toggled off.
+    if (delayOn)
+    {
+        // Map time knob 0..1 → ms
+        const float delayMs = DELAY_TIME_MIN_MS
+            + delayTime * (DELAY_TIME_MAX_MS - DELAY_TIME_MIN_MS);
+        delay.setParameters(delayMs, delayFb, delayMix);
+        delay.process(buffer);
+    }
+    if (reverbOn)
+    {
+        reverb.setParameters(reverbMix, reverbSz);
+        reverb.process(buffer);
+    }
+
     // ── GUI level metering (RMS of channel 0) ──
     {
         const int n = buffer.getNumSamples();
@@ -502,7 +634,15 @@ const juce::String SilentRiotProcessor::getName() const { return JucePlugin_Name
 bool SilentRiotProcessor::acceptsMidi() const { return false; }
 bool SilentRiotProcessor::producesMidi() const { return false; }
 bool SilentRiotProcessor::isMidiEffect() const { return false; }
-double SilentRiotProcessor::getTailLengthSeconds() const { return cabSim.getIRTailSeconds(); }
+double SilentRiotProcessor::getTailLengthSeconds() const
+{
+    double tail = cabSim.getIRTailSeconds();
+    if (apvts.getRawParameterValue(Params::IDs::DELAY_ON)->load() > 0.5f)
+        tail = std::max(tail, static_cast<double>(delay.tailSeconds()));
+    if (apvts.getRawParameterValue(Params::IDs::REVERB_ON)->load() > 0.5f)
+        tail = std::max(tail, static_cast<double>(reverb.tailSeconds()));
+    return tail;
+}
 int SilentRiotProcessor::getNumPrograms() { return 1; }
 int SilentRiotProcessor::getCurrentProgram() { return 0; }
 void SilentRiotProcessor::setCurrentProgram(int) {}
