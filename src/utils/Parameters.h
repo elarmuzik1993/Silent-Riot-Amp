@@ -32,6 +32,7 @@ namespace IDs {
     static const juce::String REVERB_ON       = "reverbOn";      // bool
     static const juce::String REVERB_MIX      = "reverbMix";     // float 0–1
     static const juce::String REVERB_SIZE     = "reverbSize";    // float 0–1
+    static const juce::String REVERB_TONE     = "reverbTone";    // float 0–1 (loop damping)
 }
 
 } // namespace sr::Params

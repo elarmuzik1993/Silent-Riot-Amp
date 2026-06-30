@@ -90,6 +90,7 @@ target_sources(SilentRiot
         src/dsp/effects/Boost.h
         src/dsp/effects/Delay.h
         src/dsp/effects/Delay.cpp
+        src/dsp/effects/SpringReverb.h
         src/dsp/effects/Reverb.h
         src/dsp/effects/Reverb.cpp
 

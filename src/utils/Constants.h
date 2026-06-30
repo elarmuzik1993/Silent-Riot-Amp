@@ -190,7 +190,21 @@ constexpr float DELAY_TIME_MIN_MS   = 20.0f;
 constexpr float DELAY_TIME_MAX_MS   = 1000.0f;
 constexpr float DELAY_MAX_FEEDBACK  = 0.95f;    // clamp to keep it from self-oscillating
 
-// Reverb (post-cab) — see Reverb.h for room-size/damping mapping
+// Reverb (post-cab) — spring tank: dispersive all-pass chain in a damped
+// feedback delay loop (published parametric-spring technique; see SpringReverb.h)
+constexpr int   SPRING_NUM           = 2;       // parallel detuned springs per channel
+constexpr int   SPRING_DISP_STAGES   = 100;     // 1st-order all-passes → chirp/dispersion
+constexpr float SPRING_DISP_COEFF    = 0.62f;   // all-pass coefficient (|a|<1)
+constexpr float SPRING_LOOP1_MS      = 28.0f;   // base loop length, spring 1
+constexpr float SPRING_LOOP2_MS      = 37.0f;   // base loop length, spring 2 (mutually prime-ish)
+constexpr float SPRING_LEN_SCALE_MIN = 0.75f;   // SIZE=0 → shorter tank
+constexpr float SPRING_LEN_SCALE_MAX = 1.30f;   // SIZE=1 → longer tank
+constexpr float SPRING_FB_MIN        = 0.60f;   // SIZE=0 → shorter decay
+constexpr float SPRING_FB_MAX        = 0.88f;   // SIZE=1 → longer decay (capped < 0.9)
+constexpr float SPRING_TONE_LP_MIN   = 1600.0f; // TONE=0 → dark loop LP cutoff
+constexpr float SPRING_TONE_LP_MAX   = 6000.0f; // TONE=1 → bright (springs stay capped)
+constexpr float SPRING_LOOP_HP_HZ    = 90.0f;   // loop high-pass: kill rumble / DC buildup
+constexpr float SPRING_MAX_LOOP_MS   = 60.0f;   // ring-buffer sizing headroom (loop2 × max scale)
 
 // ── Debug assertions ────────────────────────────────────────
 #ifdef DEBUG

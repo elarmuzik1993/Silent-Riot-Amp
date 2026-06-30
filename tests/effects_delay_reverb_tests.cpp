@@ -100,7 +100,7 @@ TEST_CASE("Reverb mix=0 is bit-exact dry", "[reverb]")
 {
     Reverb r;
     r.prepare(kSR, kBlock, 2);
-    r.setParameters(0.0f, 0.5f);
+    r.setParameters(0.0f, 0.5f, 0.5f);
 
     // Warm up on silence so juce::dsp::Reverb's smoothed wet/dry gains settle
     // (wet → 0, dry → 1 exactly); reverb state stays zero under zero input.
@@ -128,7 +128,7 @@ TEST_CASE("Reverb mix>0 adds a decaying tail", "[reverb]")
 {
     Reverb r;
     r.prepare(kSR, kBlock, 2);
-    r.setParameters(0.5f, 0.7f);
+    r.setParameters(0.5f, 0.7f, 0.6f);
 
     // Impulse, then silence — a wet reverb keeps ringing after the impulse.
     const int n = static_cast<int>(0.5 * kSR);

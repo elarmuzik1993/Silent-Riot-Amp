@@ -167,6 +167,7 @@ SilentRiotEditor::SilentRiotEditor(SilentRiotProcessor& p)
     reverbOnA    = std::make_unique<ButtonA>(proc.apvts, IDs::REVERB_ON,      effectsPanel.reverbToggle().getButton());
     reverbMixA   = std::make_unique<SliderA>(proc.apvts, IDs::REVERB_MIX,     effectsPanel.reverbMixKnob().getSlider());
     reverbSizeA  = std::make_unique<SliderA>(proc.apvts, IDs::REVERB_SIZE,    effectsPanel.reverbSizeKnob().getSlider());
+    reverbToneA  = std::make_unique<SliderA>(proc.apvts, IDs::REVERB_TONE,    effectsPanel.reverbToneKnob().getSlider());
 
     // Keyboard focus and accessibility.
     // Knobs: the (invisible) slider is the focusable leaf. Toggles: the
@@ -206,7 +207,7 @@ SilentRiotEditor::SilentRiotEditor(SilentRiotProcessor& p)
                          &effectsPanel.boostTightKnob(), &effectsPanel.boostBrightKnob(),
                          &effectsPanel.delayTimeKnob(), &effectsPanel.delayFbKnob(),
                          &effectsPanel.delayMixKnob(), &effectsPanel.reverbMixKnob(),
-                         &effectsPanel.reverbSizeKnob() })
+                         &effectsPanel.reverbSizeKnob(), &effectsPanel.reverbToneKnob() })
         {
             k->getSlider().setWantsKeyboardFocus(true);
             k->getSlider().setExplicitFocusOrder(order++);

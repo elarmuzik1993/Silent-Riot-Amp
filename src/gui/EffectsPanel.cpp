@@ -12,7 +12,7 @@ EffectsPanel::EffectsPanel()
     addAndMakeVisible(reverbTgl);
 
     for (auto* k : { &gateThresh, &boostLevel, &boostTight, &boostBright,
-                     &delayTime, &delayFb, &delayMix, &reverbMix, &reverbSize })
+                     &delayTime, &delayFb, &delayMix, &reverbMix, &reverbSize, &reverbTone })
         addAndMakeVisible(*k);
 }
 
@@ -81,7 +81,7 @@ void EffectsPanel::resized()
     layoutCard(cardBounds(area, 0, 0), gateTgl,   { &gateThresh });
     layoutCard(cardBounds(area, 1, 0), boostTgl,  { &boostLevel, &boostTight, &boostBright });
     layoutCard(cardBounds(area, 0, 1), delayTgl,  { &delayTime, &delayFb, &delayMix });
-    layoutCard(cardBounds(area, 1, 1), reverbTgl, { &reverbMix, &reverbSize });
+    layoutCard(cardBounds(area, 1, 1), reverbTgl, { &reverbMix, &reverbSize, &reverbTone });
 }
 
 } // namespace sr

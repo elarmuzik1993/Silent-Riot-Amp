@@ -84,7 +84,8 @@ private:
     // Effects module attachments
     std::unique_ptr<ButtonA> gateOnA, boostOnA, delayOnA, reverbOnA;
     std::unique_ptr<SliderA> gateThreshA, boostLevelA, boostTightA, boostBrightA,
-                             delayTimeA, delayFbA, delayMixA, reverbMixA, reverbSizeA;
+                             delayTimeA, delayFbA, delayMixA, reverbMixA, reverbSizeA,
+                             reverbToneA;
 
     static constexpr int kWindowW = 700;
     static constexpr int kHeaderH   = 38;
