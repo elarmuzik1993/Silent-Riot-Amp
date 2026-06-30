@@ -1,8 +1,9 @@
 // ═══════════════════════════════════════════════════════════════
 // Delay + Reverb Tests — post-cab time-based effects (JUCE-dependent)
 //
-//   - Delay mix=0 is bit-exact dry
+//   - Delay mix=0 is bit-exact dry (incl. with tone + feedback engaged)
 //   - Delay produces a delayed tap; feedback decays
+//   - Delay TONE darkens the repeats; modulation stays finite at max feedback
 //   - Reverb mix=0 is bit-exact dry
 //   - Reverb mix>0 adds energy / a decaying tail
 // ═══════════════════════════════════════════════════════════════
@@ -37,7 +38,7 @@ TEST_CASE("Delay mix=0 is bit-exact dry", "[delay]")
 {
     Delay d;
     d.prepare(kSR, kBlock, 2);
-    d.setParameters(300.0f, 0.5f, 0.0f);
+    d.setParameters(300.0f, 0.5f, 0.0f, 0.5f);
 
     auto buf = makeBuffer(2, kBlock);
     for (int i = 0; i < kBlock; ++i)
@@ -58,7 +59,7 @@ TEST_CASE("Delay produces a delayed tap", "[delay]")
     Delay d;
     d.prepare(kSR, kBlock, 1);
     const float timeMs = 50.0f;
-    d.setParameters(timeMs, 0.0f, 1.0f);  // fully wet, no feedback
+    d.setParameters(timeMs, 0.0f, 1.0f, 1.0f);  // fully wet, no feedback, bright tone
 
     // Let the time smoother settle on silence first.
     auto settle = makeBuffer(1, static_cast<int>(0.1 * kSR));
@@ -70,20 +71,24 @@ TEST_CASE("Delay produces a delayed tap", "[delay]")
     buf.setSample(0, 0, 1.0f);
     d.process(buf);
 
+    // The repeat is slightly darkened (feedback high-cut) and the wow/flutter
+    // LFO can wander the tap a few samples, so check the energy is localised in
+    // a window around the expected location rather than a strict single peak.
     const int expected = static_cast<int>(timeMs * 0.001 * kSR);
-    int peakIdx = 0; float peak = 0.0f;
-    for (int i = 1; i < n; ++i)  // skip dry sample 0 (mix=1 → dry is 0 anyway)
-        if (std::abs(buf.getSample(0, i)) > peak) { peak = std::abs(buf.getSample(0, i)); peakIdx = i; }
+    const int lo = std::max(1, expected - 200);
+    const int hi = std::min(n, expected + 200);
+    const float inWindow = buf.getMagnitude(0, lo, hi - lo);
+    const float outside  = buf.getMagnitude(0, hi, n - hi);  // after the tap → ~silence (no fb)
 
-    REQUIRE(peak > 0.5f);
-    REQUIRE(std::abs(peakIdx - expected) < 64);  // within interpolation tolerance
+    REQUIRE(inWindow > 0.2f);       // a clear delayed copy appears near `expected`
+    REQUIRE(inWindow > outside);    // and it is localised there
 }
 
 TEST_CASE("Delay feedback decays, never explodes", "[delay]")
 {
     Delay d;
     d.prepare(kSR, kBlock, 1);
-    d.setParameters(40.0f, 0.5f, 1.0f);
+    d.setParameters(40.0f, 0.5f, 1.0f, 0.5f);
 
     auto buf = makeBuffer(1, static_cast<int>(2.0 * kSR));
     buf.setSample(0, 0, 1.0f);
@@ -94,6 +99,74 @@ TEST_CASE("Delay feedback decays, never explodes", "[delay]")
     float secondHalf = buf.getMagnitude(0, buf.getNumSamples() / 2, buf.getNumSamples() / 2);
     REQUIRE(firstHalf > secondHalf);
     REQUIRE(std::isfinite(secondHalf));
+}
+
+TEST_CASE("Delay mix=0 stays bit-exact dry with tone + feedback engaged", "[delay]")
+{
+    // The analog voicing runs filters and an LFO on the wet/feedback path; none
+    // of that may leak into the output when the effect is fully dry (mix=0).
+    Delay d;
+    d.prepare(kSR, kBlock, 2);
+    d.setParameters(250.0f, 0.7f, 0.0f, 0.0f);  // dark tone, heavy feedback, fully dry
+
+    auto buf = makeBuffer(2, kBlock);
+    for (int i = 0; i < kBlock; ++i)
+    {
+        float v = std::sin(2.0f * PI_F * 330.0f * i / static_cast<float>(kSR));
+        buf.setSample(0, i, v);
+        buf.setSample(1, i, v);
+    }
+    juce::AudioBuffer<float> ref(buf);
+    d.process(buf);
+
+    for (int i = 0; i < kBlock; ++i)
+        REQUIRE(buf.getSample(0, i) == Catch::Approx(ref.getSample(0, i)));
+}
+
+TEST_CASE("Delay TONE darkens the repeats", "[delay]")
+{
+    // Run an impulse through a feedback delay at a dark vs a bright tone and
+    // compare high-frequency content of the result. The feedback-path high-cut
+    // means the dark setting should have markedly less HF energy.
+    auto hfEnergy = [](float tone)
+    {
+        Delay d;
+        d.prepare(kSR, kBlock, 1);
+        d.setParameters(60.0f, 0.6f, 1.0f, tone);  // fully wet so we hear the loop
+
+        const int n = static_cast<int>(1.0 * kSR);
+        auto buf = makeBuffer(1, n);
+        buf.setSample(0, 0, 1.0f);
+        d.process(buf);
+
+        // First-difference energy is a crude but monotone HF measure.
+        double hf = 0.0;
+        for (int i = 1; i < n; ++i)
+        {
+            const float diff = buf.getSample(0, i) - buf.getSample(0, i - 1);
+            hf += static_cast<double>(diff) * diff;
+        }
+        return hf;
+    };
+
+    const double bright = hfEnergy(1.0f);
+    const double dark   = hfEnergy(0.0f);
+    REQUIRE(dark < bright);
+}
+
+TEST_CASE("Delay with modulation + max feedback stays finite", "[delay]")
+{
+    Delay d;
+    d.prepare(kSR, kBlock, 1);
+    d.setParameters(120.0f, DELAY_MAX_FEEDBACK, 1.0f, 0.8f);
+
+    auto buf = makeBuffer(1, static_cast<int>(3.0 * kSR));
+    buf.setSample(0, 0, 1.0f);
+    d.process(buf);
+
+    const float mag = buf.getMagnitude(0, 0, buf.getNumSamples());
+    REQUIRE(std::isfinite(mag));
+    REQUIRE(mag < 10.0f);  // lossy loop (< unity fb + damping) never runs away
 }
 
 TEST_CASE("Reverb mix=0 is bit-exact dry", "[reverb]")

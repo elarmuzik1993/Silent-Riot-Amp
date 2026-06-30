@@ -33,6 +33,7 @@ public:
     NotchKnob& delayTimeKnob()   { return delayTime; }
     NotchKnob& delayFbKnob()     { return delayFb; }
     NotchKnob& delayMixKnob()    { return delayMix; }
+    NotchKnob& delayToneKnob()   { return delayTone; }
     NotchKnob& reverbMixKnob()   { return reverbMix; }
     NotchKnob& reverbSizeKnob()  { return reverbSize; }
     NotchKnob& reverbToneKnob()  { return reverbTone; }
@@ -54,6 +55,7 @@ private:
     NotchKnob delayTime  { "TIME",   0.337f };
     NotchKnob delayFb    { "FBK",    0.35f };
     NotchKnob delayMix   { "MIX",    0.3f };
+    NotchKnob delayTone  { "TONE",   0.5f };
     NotchKnob reverbMix  { "MIX",    0.25f };
     NotchKnob reverbSize { "SIZE",   0.5f };
     NotchKnob reverbTone { "TONE",   0.5f };

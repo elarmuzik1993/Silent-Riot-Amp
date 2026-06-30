@@ -133,6 +133,10 @@ juce::AudioProcessorValueTreeState::ParameterLayout SilentRiotProcessor::createP
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         juce::ParameterID{ Params::IDs::DELAY_MIX, 1 }, "Delay Mix",
         juce::NormalisableRange<float>(0.0f, 1.0f, 0.001f), 0.3f));
+    // Tone (feedback high-cut): 0 = dark/tape, 1 = bright/digital. Default 0.5.
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{ Params::IDs::DELAY_TONE, 1 }, "Delay Tone",
+        juce::NormalisableRange<float>(0.0f, 1.0f, 0.001f), 0.5f));
 
     params.push_back(std::make_unique<juce::AudioParameterBool>(
         juce::ParameterID{ Params::IDs::REVERB_ON, 1 }, "Reverb", false));
@@ -308,6 +312,7 @@ void SilentRiotProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     float delayTime = apvts.getRawParameterValue(Params::IDs::DELAY_TIME)->load();
     float delayFb   = apvts.getRawParameterValue(Params::IDs::DELAY_FEEDBACK)->load();
     float delayMix  = apvts.getRawParameterValue(Params::IDs::DELAY_MIX)->load();
+    float delayTone = apvts.getRawParameterValue(Params::IDs::DELAY_TONE)->load();
     bool  reverbOn  = apvts.getRawParameterValue(Params::IDs::REVERB_ON)->load() > 0.5f;
     float reverbMix = apvts.getRawParameterValue(Params::IDs::REVERB_MIX)->load();
     float reverbSz  = apvts.getRawParameterValue(Params::IDs::REVERB_SIZE)->load();
@@ -570,7 +575,7 @@ void SilentRiotProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
         // Map time knob 0..1 → ms
         const float delayMs = DELAY_TIME_MIN_MS
             + delayTime * (DELAY_TIME_MAX_MS - DELAY_TIME_MIN_MS);
-        delay.setParameters(delayMs, delayFb, delayMix);
+        delay.setParameters(delayMs, delayFb, delayMix, delayTone);
         delay.process(buffer);
     }
     if (reverbOn)

@@ -59,6 +59,11 @@ The following DSP techniques are textbook knowledge and not owned by any party:
   inside a damped feedback delay loop). This is a documented DSP method in the audio
   literature; the implementation here is original and written from scratch — no
   third-party reverb code was used.
+- **Analog/tape-voiced feedback delay** — feedback-path tone shaping (a high-cut
+  inside the loop so repeats darken cumulatively, plus a fixed low-cut) and a slow
+  wow/flutter LFO on the read tap. Standard, well-documented echo-modelling
+  techniques; the implementation is original (built on `juce::dsp::DelayLine` and
+  the project's own one-pole filters).
 
 ---
 

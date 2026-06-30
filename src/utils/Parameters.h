@@ -29,6 +29,7 @@ namespace IDs {
     static const juce::String DELAY_TIME      = "delayTime";     // float ms
     static const juce::String DELAY_FEEDBACK  = "delayFeedback"; // float 0–1
     static const juce::String DELAY_MIX       = "delayMix";      // float 0–1
+    static const juce::String DELAY_TONE      = "delayTone";     // float 0–1 (feedback high-cut: 0=dark, 1=bright)
     static const juce::String REVERB_ON       = "reverbOn";      // bool
     static const juce::String REVERB_MIX      = "reverbMix";     // float 0–1
     static const juce::String REVERB_SIZE     = "reverbSize";    // float 0–1
