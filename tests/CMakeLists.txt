@@ -30,6 +30,7 @@ add_executable(SilentRiotTests
     spring_reverb_tests.cpp
     safety_limiter_tests.cpp
     tempo_sync_tests.cpp
+    param_sanitize_tests.cpp
 
     # DSP source files (tests call functions defined in these)
     ${CMAKE_SOURCE_DIR}/src/dsp/tubes/TriodeWaveshaper.cpp
