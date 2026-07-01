@@ -6,6 +6,8 @@
 #include <catch2/catch_approx.hpp>
 #include "dsp/effects/TempoSync.h"
 #include <cstring>
+#include <cmath>
+#include <limits>
 
 using namespace sr;
 
@@ -55,4 +57,25 @@ TEST_CASE("computeSyncMs: clamps to the delay's usable time range", "[tempoSync]
     const int idx16 = findDivisionIndex("1/16");
     REQUIRE(idx16 > 0);
     REQUIRE(computeSyncMs(idx16, 400.0) >= DELAY_TIME_MIN_MS);
+}
+
+TEST_CASE("computeSyncMs: a non-finite or NaN host bpm never poisons the result", "[tempoSync]")
+{
+    // A malformed host could report NaN/inf tempo. bpm<=0.0 alone is false for
+    // NaN (all comparisons with NaN are false), so this guards a real gap:
+    // without it, a NaN would flow straight into the delay line and its
+    // filters, which never recover from NaN state.
+    const int idxQuarter = findDivisionIndex("1/4");
+    REQUIRE(idxQuarter > 0);
+
+    const float nanResult = computeSyncMs(idxQuarter, std::nan(""));
+    const float infResult = computeSyncMs(idxQuarter, std::numeric_limits<double>::infinity());
+    const float negInfResult = computeSyncMs(idxQuarter, -std::numeric_limits<double>::infinity());
+
+    REQUIRE(std::isfinite(nanResult));
+    REQUIRE(nanResult == Catch::Approx(DELAY_TIME_MIN_MS));
+    REQUIRE(std::isfinite(infResult));
+    REQUIRE(infResult == Catch::Approx(DELAY_TIME_MIN_MS));
+    REQUIRE(std::isfinite(negInfResult));
+    REQUIRE(negInfResult == Catch::Approx(DELAY_TIME_MIN_MS));
 }

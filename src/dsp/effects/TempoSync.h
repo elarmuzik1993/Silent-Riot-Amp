@@ -36,7 +36,11 @@ inline constexpr int kNumSyncDivisions = static_cast<int>(sizeof(kSyncDivisions)
 // DELAY_TIME_MIN_MS — callers should not sync-drive the delay in that case.
 inline float computeSyncMs(int divisionIndex, double bpm)
 {
-    if (divisionIndex <= 0 || divisionIndex >= kNumSyncDivisions || bpm <= 0.0)
+    // A malformed/buggy host could report a non-finite or non-positive tempo;
+    // guard against it explicitly since bpm<=0.0 alone is false for NaN and
+    // would otherwise poison the delay line (and its filters) permanently.
+    if (divisionIndex <= 0 || divisionIndex >= kNumSyncDivisions
+        || !(bpm > 0.0) || !std::isfinite(bpm))
         return DELAY_TIME_MIN_MS;
 
     const float ms = static_cast<float>(60000.0 / bpm) * kSyncDivisions[divisionIndex].qnMultiplier;
