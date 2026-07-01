@@ -9,6 +9,18 @@
 #include <X11/extensions/shape.h>
 #endif
 
+ChoiceSelectorAttachment::ChoiceSelectorAttachment(juce::AudioProcessorValueTreeState& state,
+                                                    const juce::String& paramID,
+                                                    sr::SegmentedSelector& selectorIn)
+    : selector(selectorIn),
+      attachment(*state.getParameter(paramID),
+                 [this](float v) { selector.setSelectedIndex(static_cast<int>(v)); },
+                 state.undoManager)
+{
+    selector.onChange = [this](int idx) { attachment.setValueAsCompleteGesture(static_cast<float>(idx)); };
+    attachment.sendInitialUpdate();
+}
+
 SilentRiotEditor::SilentRiotEditor(SilentRiotProcessor& p)
     : AudioProcessorEditor(&p), proc(p)
 {
@@ -165,6 +177,8 @@ SilentRiotEditor::SilentRiotEditor(SilentRiotProcessor& p)
     delayFbA     = std::make_unique<SliderA>(proc.apvts, IDs::DELAY_FEEDBACK, effectsPanel.delayFbKnob().getSlider());
     delayMixA    = std::make_unique<SliderA>(proc.apvts, IDs::DELAY_MIX,      effectsPanel.delayMixKnob().getSlider());
     delayToneA   = std::make_unique<SliderA>(proc.apvts, IDs::DELAY_TONE,     effectsPanel.delayToneKnob().getSlider());
+    delayPingPongA = std::make_unique<ButtonA>(proc.apvts, IDs::DELAY_PINGPONG, effectsPanel.delayPingPongToggle().getButton());
+    delaySyncA   = std::make_unique<ChoiceSelectorAttachment>(proc.apvts, IDs::DELAY_SYNC_DIV, effectsPanel.delaySyncSelector());
     reverbOnA    = std::make_unique<ButtonA>(proc.apvts, IDs::REVERB_ON,      effectsPanel.reverbToggle().getButton());
     reverbMixA   = std::make_unique<SliderA>(proc.apvts, IDs::REVERB_MIX,     effectsPanel.reverbMixKnob().getSlider());
     reverbSizeA  = std::make_unique<SliderA>(proc.apvts, IDs::REVERB_SIZE,    effectsPanel.reverbSizeKnob().getSlider());
@@ -218,10 +232,12 @@ SilentRiotEditor::SilentRiotEditor(SilentRiotProcessor& p)
         effectsPanel.boostToggle().setExplicitFocusOrder(order++);
         effectsPanel.delayToggle().setExplicitFocusOrder(order++);
         effectsPanel.reverbToggle().setExplicitFocusOrder(order++);
+        effectsPanel.delayPingPongToggle().setExplicitFocusOrder(order++);
+        effectsPanel.delaySyncSelector().setExplicitFocusOrder(order++);
     }
 
-    irSectionBar.setExplicitFocusOrder(24);
-    advSectionBar.setExplicitFocusOrder(25);
+    irSectionBar.setExplicitFocusOrder(26);
+    advSectionBar.setExplicitFocusOrder(27);
 
     // Restore UI state
     loadUIState();

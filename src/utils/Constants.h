@@ -201,8 +201,14 @@ constexpr float DELAY_MAX_FEEDBACK  = 0.95f;    // clamp to keep it from self-os
 constexpr float DELAY_TONE_LP_MIN   = 2000.0f;  // TONE=0 → dark, tape-like repeats
 constexpr float DELAY_TONE_LP_MAX   = 16000.0f; // TONE=1 → bright, near-digital repeats
 constexpr float DELAY_LOOP_HP_HZ    = 120.0f;   // fixed feedback low-cut (no bass mud on repeats)
-constexpr float DELAY_MOD_RATE_HZ   = 0.4f;     // wow/flutter LFO rate
-constexpr float DELAY_MOD_DEPTH_MS  = 0.3f;     // ± tap sway for living tape character
+constexpr float DELAY_WOW_RATE_HZ      = 0.4f;  // slow wow LFO rate
+constexpr float DELAY_WOW_DEPTH_MS     = 0.3f;  // ± tap sway for living tape character
+constexpr float DELAY_FLUTTER_RATE_HZ  = 6.5f;  // faster, subtler flutter LFO rate
+constexpr float DELAY_FLUTTER_DEPTH_MS = 0.06f; // ± tap sway (adds high-frequency "buzz" wobble)
+// Feedback-loop saturation — soft-clips the tone-shaped repeat before it's
+// heard and fed back (models what a tape head/BBD chip actually plays back).
+// Unity gain at low level; tanh(x*k)/tanh(k) keeps it transparent until hot.
+constexpr float DELAY_FB_SAT_DRIVE  = 1.8f;
 
 // Reverb (post-cab) — spring tank: dispersive all-pass chain in a damped
 // feedback delay loop (published parametric-spring technique; see SpringReverb.h)

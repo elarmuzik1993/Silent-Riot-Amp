@@ -60,10 +60,16 @@ The following DSP techniques are textbook knowledge and not owned by any party:
   literature; the implementation here is original and written from scratch — no
   third-party reverb code was used.
 - **Analog/tape-voiced feedback delay** — feedback-path tone shaping (a high-cut
-  inside the loop so repeats darken cumulatively, plus a fixed low-cut) and a slow
-  wow/flutter LFO on the read tap. Standard, well-documented echo-modelling
-  techniques; the implementation is original (built on `juce::dsp::DelayLine` and
-  the project's own one-pole filters).
+  inside the loop so repeats darken cumulatively, plus a fixed low-cut), a
+  dual-rate wow+flutter LFO on the read tap, and soft (tanh) saturation of the
+  repeat so each pass compresses/warms like a real tape head or BBD chip.
+  Standard, well-documented echo-modelling techniques; the implementation is
+  original (built on `juce::dsp::DelayLine` and the project's own one-pole
+  filters).
+- **Ping-pong stereo delay topology** — two cross-fed delay taps (a mono send
+  triggers the first tap, which feeds the second, which feeds back into the
+  first) producing a bouncing L/R echo. A standard, widely documented delay
+  topology; the implementation here is original.
 
 ---
 

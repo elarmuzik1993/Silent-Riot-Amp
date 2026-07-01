@@ -169,6 +169,75 @@ TEST_CASE("Delay with modulation + max feedback stays finite", "[delay]")
     REQUIRE(mag < 10.0f);  // lossy loop (< unity fb + damping) never runs away
 }
 
+TEST_CASE("Delay feedback saturation bounds a hot impulse near unity", "[delay]")
+{
+    // A loud impulse into a hot feedback loop should be tamed by the tanh
+    // saturation stage well below where an unsaturated linear loop would sit.
+    Delay d;
+    d.prepare(kSR, kBlock, 1);
+    d.setParameters(80.0f, DELAY_MAX_FEEDBACK, 1.0f, 1.0f);
+
+    auto buf = makeBuffer(1, static_cast<int>(0.5 * kSR));
+    buf.setSample(0, 0, 5.0f);   // hot input, well above unity
+    d.process(buf);
+
+    const float mag = buf.getMagnitude(0, 0, buf.getNumSamples());
+    REQUIRE(std::isfinite(mag));
+    REQUIRE(mag < 1.5f);   // saturation keeps repeats close to unity, not 5x
+}
+
+TEST_CASE("Delay ping-pong bounces repeats between L and R", "[delay]")
+{
+    // Cross-feed topology: a mono send triggers the L tap at time T, which
+    // feeds forward into the R tap (repeat at 2T), which feeds back into L
+    // (repeat at 3T). Verify the energy alternates channel each hop.
+    Delay d;
+    d.prepare(kSR, kBlock, 2);
+    const float timeMs = 50.0f;
+    d.setParameters(timeMs, 0.7f, 1.0f, 1.0f, true);  // fully wet, bright tone, ping-pong on
+
+    // Let the time smoother settle on silence first.
+    auto settle = makeBuffer(2, static_cast<int>(0.1 * kSR));
+    d.process(settle);
+
+    const int n = static_cast<int>(0.3 * kSR);
+    auto buf = makeBuffer(2, n);
+    buf.setSample(0, 0, 1.0f);   // impulse on L only
+    d.process(buf);
+
+    const int hopSamples = static_cast<int>(timeMs * 0.001 * kSR);
+    auto energyAt = [&](int ch, int hop)
+    {
+        const int centre = hopSamples * hop;
+        const int lo = std::max(1, centre - 150);
+        const int hi = std::min(n, centre + 150);
+        return buf.getMagnitude(ch, lo, hi - lo);
+    };
+
+    const float lAtHop1 = energyAt(0, 1), rAtHop1 = energyAt(1, 1);
+    const float lAtHop2 = energyAt(0, 2), rAtHop2 = energyAt(1, 2);
+
+    REQUIRE(lAtHop1 > 0.05f);
+    REQUIRE(lAtHop1 > rAtHop1);   // hop 1 (T): repeat lands on L
+    REQUIRE(rAtHop2 > 0.05f);
+    REQUIRE(rAtHop2 > lAtHop2);   // hop 2 (2T): bounced to R
+}
+
+TEST_CASE("Delay ping-pong is a no-op on mono buffers", "[delay]")
+{
+    Delay d;
+    d.prepare(kSR, kBlock, 1);
+    d.setParameters(50.0f, 0.4f, 0.6f, 0.5f, true);
+
+    auto buf = makeBuffer(1, static_cast<int>(0.2 * kSR));
+    buf.setSample(0, 0, 1.0f);
+    d.process(buf);
+
+    const float mag = buf.getMagnitude(0, 0, buf.getNumSamples());
+    REQUIRE(std::isfinite(mag));
+    REQUIRE(mag > 0.0f);
+}
+
 TEST_CASE("Reverb mix=0 is bit-exact dry", "[reverb]")
 {
     Reverb r;

@@ -10,6 +10,9 @@ EffectsPanel::EffectsPanel()
     addAndMakeVisible(boostTgl);
     addAndMakeVisible(delayTgl);
     addAndMakeVisible(reverbTgl);
+    addAndMakeVisible(delayPP);
+    addAndMakeVisible(delaySync);
+    delaySync.setTitleText("Delay sync");
 
     for (auto* k : { &gateThresh, &boostLevel, &boostTight, &boostBright,
                      &delayTime, &delayFb, &delayMix, &delayTone,
@@ -51,6 +54,22 @@ void EffectsPanel::paint(juce::Graphics& g)
         }
 }
 
+void EffectsPanel::layoutKnobRow(juce::Rectangle<int> row, std::initializer_list<NotchKnob*> knobs)
+{
+    const int n = static_cast<int>(knobs.size());
+    if (n == 0) return;
+    const int knobW = juce::jmin(80, row.getWidth() / n);
+    const int totalW = knobW * n;
+    int x = row.getCentreX() - totalW / 2;
+    const int y = row.getY();
+    const int h = juce::jmin(row.getHeight(), 112);
+    for (auto* k : knobs)
+    {
+        k->setBounds(x, y, knobW, h);
+        x += knobW;
+    }
+}
+
 void EffectsPanel::layoutCard(juce::Rectangle<int> card, ToggleSwitch& tgl,
                               std::initializer_list<NotchKnob*> knobs)
 {
@@ -60,19 +79,7 @@ void EffectsPanel::layoutCard(juce::Rectangle<int> card, ToggleSwitch& tgl,
     tgl.setBounds(titleRow.removeFromRight(44).withSizeKeepingCentre(44, 16));
 
     inner.removeFromTop(4);
-
-    const int n = static_cast<int>(knobs.size());
-    if (n == 0) return;
-    const int knobW = juce::jmin(80, inner.getWidth() / n);
-    const int totalW = knobW * n;
-    int x = inner.getCentreX() - totalW / 2;
-    const int y = inner.getY();
-    const int h = juce::jmin(inner.getHeight(), 112);
-    for (auto* k : knobs)
-    {
-        k->setBounds(x, y, knobW, h);
-        x += knobW;
-    }
+    layoutKnobRow(inner, knobs);
 }
 
 void EffectsPanel::resized()
@@ -81,8 +88,23 @@ void EffectsPanel::resized()
 
     layoutCard(cardBounds(area, 0, 0), gateTgl,   { &gateThresh });
     layoutCard(cardBounds(area, 1, 0), boostTgl,  { &boostLevel, &boostTight, &boostBright });
-    layoutCard(cardBounds(area, 0, 1), delayTgl,  { &delayTime, &delayFb, &delayMix, &delayTone });
     layoutCard(cardBounds(area, 1, 1), reverbTgl, { &reverbMix, &reverbSize, &reverbTone });
+
+    // DELAY card is bespoke: a second small toggle (PING-PONG) shares the
+    // title row with ON, and a sync-division row sits above the knobs. The
+    // knob row shrinks to fit (layoutKnobRow clamps to the available height).
+    auto delayCard  = cardBounds(area, 0, 1);
+    auto delayInner = delayCard.reduced(10, 6);
+    auto titleRow   = delayInner.removeFromTop(16);
+    delayTgl.setBounds(titleRow.removeFromRight(40).withSizeKeepingCentre(40, 16));
+    titleRow.removeFromRight(4);
+    delayPP.setBounds(titleRow.removeFromRight(40).withSizeKeepingCentre(40, 16));
+
+    delayInner.removeFromTop(4);
+    delaySync.setBounds(delayInner.removeFromTop(18));
+
+    delayInner.removeFromTop(4);
+    layoutKnobRow(delayInner, { &delayTime, &delayFb, &delayMix, &delayTone });
 }
 
 } // namespace sr

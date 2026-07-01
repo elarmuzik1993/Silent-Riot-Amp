@@ -12,6 +12,19 @@
 #include "gui/IRLoaderPanel.h"
 #include "gui/EffectsPanel.h"
 
+// Wires an index-based SegmentedSelector to an AudioParameterChoice — there's
+// no built-in APVTS attachment type for this custom widget (mirrors how
+// juce::ComboBoxParameterAttachment wires a juce::ComboBox).
+class ChoiceSelectorAttachment {
+public:
+    ChoiceSelectorAttachment(juce::AudioProcessorValueTreeState& state,
+                              const juce::String& paramID, sr::SegmentedSelector& selectorIn);
+
+private:
+    sr::SegmentedSelector& selector;
+    juce::ParameterAttachment attachment;
+};
+
 class SilentRiotEditor : public juce::AudioProcessorEditor,
                          private juce::Timer {
 public:
@@ -82,10 +95,11 @@ private:
     std::unique_ptr<ButtonA> halfPowerA, cabSimA, powerA;
 
     // Effects module attachments
-    std::unique_ptr<ButtonA> gateOnA, boostOnA, delayOnA, reverbOnA;
+    std::unique_ptr<ButtonA> gateOnA, boostOnA, delayOnA, reverbOnA, delayPingPongA;
     std::unique_ptr<SliderA> gateThreshA, boostLevelA, boostTightA, boostBrightA,
                              delayTimeA, delayFbA, delayMixA, delayToneA,
                              reverbMixA, reverbSizeA, reverbToneA;
+    std::unique_ptr<ChoiceSelectorAttachment> delaySyncA;
 
     static constexpr int kWindowW = 700;
     static constexpr int kHeaderH   = 38;

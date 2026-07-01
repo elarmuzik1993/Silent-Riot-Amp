@@ -4,10 +4,12 @@
 // juce::dsp::DelayLine). Runs at base SR, after the amp+cab output.
 //
 // Analog/tape voicing: the feedback path is tone-shaped (high-cut +
-// fixed low-cut) so each repeat darkens cumulatively, and a slow wow/
-// flutter LFO sways the read tap a fraction of a millisecond for a
-// "living" tape character. Per-channel feedback with wet/dry mix.
-// Defaults bypassed; bit-exact dry when mix=0.
+// fixed low-cut) and soft-saturated (tanh) so each repeat darkens and
+// compresses cumulatively, and a dual-rate wow+flutter LFO sways the
+// read tap a fraction of a millisecond for a "living" tape character.
+// Optional ping-pong mode cross-feeds the two channels for a bouncing
+// stereo repeat instead of independent dual-mono. Equal-power wet/dry
+// mix. Defaults bypassed; bit-exact dry when mix=0.
 // ═══════════════════════════════════════════════════════════════
 
 #include <juce_dsp/juce_dsp.h>
@@ -25,7 +27,10 @@ public:
     // Per-block parameter update (called before processBlock).
     // timeMs / feedback / mix / tone are the raw parameter values.
     // tone is 0..1 (0 = dark/tape, 1 = bright/digital) → feedback high-cut.
-    void setParameters(float timeMs, float feedback, float mix, float tone);
+    // pingPong cross-feeds the two channels (bouncing L/R repeats) instead of
+    // independent dual-mono; no-op on mono buffers.
+    void setParameters(float timeMs, float feedback, float mix, float tone,
+                        bool pingPong = false);
 
     // Processes the buffer in place (wet/dry mixed). No allocation.
     void process(juce::AudioBuffer<float>& buffer);
@@ -53,10 +58,16 @@ private:
     std::array<OnePoleLP, kMaxCh> loopLP;
     std::array<OnePoleHP, kMaxCh> loopHP;
 
-    // Wow/flutter LFO modulating the read tap (mono — shared across channels).
-    float modDepthSamps = 0.0f;
-    float modInc        = 0.0f;
-    float modPhase      = 0.0f;
+    bool pingPongOn = false;
+
+    // Wow (slow) + flutter (fast) LFOs modulating the read tap (mono — shared
+    // across channels; ping-pong keeps its own per-tap timing via the line).
+    float wowDepthSamps     = 0.0f;
+    float wowInc            = 0.0f;
+    float wowPhase          = 0.0f;
+    float flutterDepthSamps = 0.0f;
+    float flutterInc        = 0.0f;
+    float flutterPhase      = 0.0f;
 };
 
 } // namespace sr
