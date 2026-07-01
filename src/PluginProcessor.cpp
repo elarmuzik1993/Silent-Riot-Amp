@@ -137,6 +137,16 @@ juce::AudioProcessorValueTreeState::ParameterLayout SilentRiotProcessor::createP
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         juce::ParameterID{ Params::IDs::DELAY_TONE, 1 }, "Delay Tone",
         juce::NormalisableRange<float>(0.0f, 1.0f, 0.001f), 0.5f));
+    params.push_back(std::make_unique<juce::AudioParameterBool>(
+        juce::ParameterID{ Params::IDs::DELAY_PINGPONG, 1 }, "Delay Ping-Pong", false));
+    // MANUAL (index 0) = use the TIME knob; any other choice syncs to host
+    // tempo at that note division (see TempoSync.h).
+    {
+        juce::StringArray syncNames;
+        for (const auto& d : kSyncDivisions) syncNames.add(d.name);
+        params.push_back(std::make_unique<juce::AudioParameterChoice>(
+            juce::ParameterID{ Params::IDs::DELAY_SYNC_DIV, 1 }, "Delay Sync", syncNames, 0));
+    }
 
     params.push_back(std::make_unique<juce::AudioParameterBool>(
         juce::ParameterID{ Params::IDs::REVERB_ON, 1 }, "Reverb", false));
@@ -313,6 +323,8 @@ void SilentRiotProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     float delayFb   = apvts.getRawParameterValue(Params::IDs::DELAY_FEEDBACK)->load();
     float delayMix  = apvts.getRawParameterValue(Params::IDs::DELAY_MIX)->load();
     float delayTone = apvts.getRawParameterValue(Params::IDs::DELAY_TONE)->load();
+    bool  delayPP   = apvts.getRawParameterValue(Params::IDs::DELAY_PINGPONG)->load() > 0.5f;
+    int   delaySync = static_cast<int>(apvts.getRawParameterValue(Params::IDs::DELAY_SYNC_DIV)->load());
     bool  reverbOn  = apvts.getRawParameterValue(Params::IDs::REVERB_ON)->load() > 0.5f;
     float reverbMix = apvts.getRawParameterValue(Params::IDs::REVERB_MIX)->load();
     float reverbSz  = apvts.getRawParameterValue(Params::IDs::REVERB_SIZE)->load();
@@ -572,10 +584,24 @@ void SilentRiotProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     // stays mono. Skipped entirely (bit-exact dry) when toggled off.
     if (delayOn)
     {
-        // Map time knob 0..1 → ms
-        const float delayMs = DELAY_TIME_MIN_MS
-            + delayTime * (DELAY_TIME_MAX_MS - DELAY_TIME_MIN_MS);
-        delay.setParameters(delayMs, delayFb, delayMix, delayTone);
+        float delayMs;
+        if (delaySync <= 0)
+        {
+            // MANUAL — map time knob 0..1 → ms
+            delayMs = DELAY_TIME_MIN_MS
+                + delayTime * (DELAY_TIME_MAX_MS - DELAY_TIME_MIN_MS);
+        }
+        else
+        {
+            // Tempo-synced — TIME knob is ignored. Standalone hosts typically
+            // report no tempo, so fall back to 120 BPM there.
+            double bpm = 120.0;
+            if (auto* ph = getPlayHead())
+                if (auto pos = ph->getPosition())
+                    bpm = pos->getBpm().orFallback(120.0);
+            delayMs = computeSyncMs(delaySync, bpm);
+        }
+        delay.setParameters(delayMs, delayFb, delayMix, delayTone, delayPP);
         delay.process(buffer);
     }
     if (reverbOn)

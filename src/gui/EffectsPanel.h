@@ -2,6 +2,7 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "NotchKnob.h"
 #include "ToggleSwitch.h"
+#include "SegmentedSelector.h"
 
 namespace sr {
 
@@ -24,6 +25,7 @@ public:
     ToggleSwitch& boostToggle()  { return boostTgl; }
     ToggleSwitch& delayToggle()  { return delayTgl; }
     ToggleSwitch& reverbToggle() { return reverbTgl; }
+    ToggleSwitch& delayPingPongToggle() { return delayPP; }
 
     // Knobs
     NotchKnob& gateThreshKnob()  { return gateThresh; }
@@ -38,8 +40,15 @@ public:
     NotchKnob& reverbSizeKnob()  { return reverbSize; }
     NotchKnob& reverbToneKnob()  { return reverbTone; }
 
+    // Sync division selector — index 0 ("MANUAL") means the TIME knob drives
+    // delay time; any other index syncs to host tempo (see TempoSync.h, whose
+    // kSyncDivisions order this list must match).
+    SegmentedSelector& delaySyncSelector() { return delaySync; }
+
 private:
-    // Lay out one card's knobs in a horizontal row inside `card`.
+    // Lay out N knobs centred in a horizontal row inside `row`.
+    void layoutKnobRow(juce::Rectangle<int> row, std::initializer_list<NotchKnob*> knobs);
+    // Lay out one card's title toggle + knob row inside `card`.
     void layoutCard(juce::Rectangle<int> card, ToggleSwitch& tgl,
                     std::initializer_list<NotchKnob*> knobs);
 
@@ -47,6 +56,7 @@ private:
     ToggleSwitch boostTgl  { "ON" };
     ToggleSwitch delayTgl  { "ON" };
     ToggleSwitch reverbTgl { "ON" };
+    ToggleSwitch delayPP   { "PP" };
 
     NotchKnob gateThresh { "THRESH", 0.0f };
     NotchKnob boostLevel { "LEVEL",  0.5f };
@@ -59,6 +69,8 @@ private:
     NotchKnob reverbMix  { "MIX",    0.25f };
     NotchKnob reverbSize { "SIZE",   0.5f };
     NotchKnob reverbTone { "TONE",   0.5f };
+
+    SegmentedSelector delaySync { { "MANUAL", "1/16", "1/8T", "1/8", "1/8D", "1/4", "1/4D", "1/2" }, 0 };
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(EffectsPanel)
 };

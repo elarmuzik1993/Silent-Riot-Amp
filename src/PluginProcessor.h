@@ -27,6 +27,7 @@
 #include "dsp/effects/Boost.h"
 #include "dsp/effects/SafetyLimiter.h"
 #include "dsp/effects/Delay.h"
+#include "dsp/effects/TempoSync.h"
 #include "dsp/effects/Reverb.h"
 #include "dsp/OversampleSwitcher.h"
 
