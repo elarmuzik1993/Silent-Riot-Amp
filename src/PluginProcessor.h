@@ -11,6 +11,7 @@
 #include "utils/Constants.h"
 #include "utils/Parameters.h"
 #include "utils/ParamSmoother.h"
+#include "utils/ParamSanitize.h"
 
 #include "dsp/filters/FilterBank.h"
 #include "dsp/filters/DynamicMillerLP.h"

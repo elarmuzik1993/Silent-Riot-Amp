@@ -265,14 +265,18 @@ void SilentRiotProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
     boostLevelSm.reset(sampleRate, fxRampSec);
     boostTightSm.reset(sampleRate, fxRampSec);
     boostBrightSm.reset(sampleRate, fxRampSec);
+    // Sanitized for the same reason as the processBlock reads below — seeding
+    // a smoother's *current* value with NaN poisons its interpolation forever
+    // (current += (target-current)*rate never clears NaN), even after a later
+    // block sets a sanitized target.
     gateThreshSm.setCurrentAndTargetValue(
-        apvts.getRawParameterValue(Params::IDs::GATE_THRESHOLD)->load());
+        sanitizeUnitParam(apvts.getRawParameterValue(Params::IDs::GATE_THRESHOLD)->load()));
     boostLevelSm.setCurrentAndTargetValue(
-        apvts.getRawParameterValue(Params::IDs::BOOST_LEVEL)->load());
+        sanitizeUnitParam(apvts.getRawParameterValue(Params::IDs::BOOST_LEVEL)->load()));
     boostTightSm.setCurrentAndTargetValue(
-        apvts.getRawParameterValue(Params::IDs::BOOST_TIGHT)->load());
+        sanitizeUnitParam(apvts.getRawParameterValue(Params::IDs::BOOST_TIGHT)->load()));
     boostBrightSm.setCurrentAndTargetValue(
-        apvts.getRawParameterValue(Params::IDs::BOOST_BRIGHT)->load());
+        sanitizeUnitParam(apvts.getRawParameterValue(Params::IDs::BOOST_BRIGHT)->load()));
 
     // Reload active user IR after prepare (convolution state was reset)
     int irIdx = static_cast<int>(apvts.getRawParameterValue(sr::Params::IDs::IR_INDEX)->load());
@@ -311,24 +315,27 @@ void SilentRiotProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     bool  powerOn   = apvts.getRawParameterValue(Params::IDs::POWER)->load() > 0.5f;
     int   irIndex   = static_cast<int>(apvts.getRawParameterValue(Params::IDs::IR_INDEX)->load());
 
-    // Effects module parameters (run at base SR, outside the amp loop)
+    // Effects module parameters (run at base SR, outside the amp loop).
+    // Float reads are sanitized at this boundary — a misbehaving host could
+    // report NaN via automation, which would otherwise silently poison the
+    // gate/boost/delay/reverb filters' IIR state forever (see ParamSanitize.h).
     bool  gateOn    = apvts.getRawParameterValue(Params::IDs::GATE_ON)->load() > 0.5f;
-    float gateThr   = apvts.getRawParameterValue(Params::IDs::GATE_THRESHOLD)->load();
+    float gateThr   = sanitizeUnitParam(apvts.getRawParameterValue(Params::IDs::GATE_THRESHOLD)->load());
     bool  boostOn   = apvts.getRawParameterValue(Params::IDs::BOOST_ON)->load() > 0.5f;
-    float boostLvl  = apvts.getRawParameterValue(Params::IDs::BOOST_LEVEL)->load();
-    float boostTgt  = apvts.getRawParameterValue(Params::IDs::BOOST_TIGHT)->load();
-    float boostBrt  = apvts.getRawParameterValue(Params::IDs::BOOST_BRIGHT)->load();
+    float boostLvl  = sanitizeUnitParam(apvts.getRawParameterValue(Params::IDs::BOOST_LEVEL)->load());
+    float boostTgt  = sanitizeUnitParam(apvts.getRawParameterValue(Params::IDs::BOOST_TIGHT)->load());
+    float boostBrt  = sanitizeUnitParam(apvts.getRawParameterValue(Params::IDs::BOOST_BRIGHT)->load());
     bool  delayOn   = apvts.getRawParameterValue(Params::IDs::DELAY_ON)->load() > 0.5f;
-    float delayTime = apvts.getRawParameterValue(Params::IDs::DELAY_TIME)->load();
-    float delayFb   = apvts.getRawParameterValue(Params::IDs::DELAY_FEEDBACK)->load();
-    float delayMix  = apvts.getRawParameterValue(Params::IDs::DELAY_MIX)->load();
-    float delayTone = apvts.getRawParameterValue(Params::IDs::DELAY_TONE)->load();
+    float delayTime = sanitizeUnitParam(apvts.getRawParameterValue(Params::IDs::DELAY_TIME)->load());
+    float delayFb   = sanitizeUnitParam(apvts.getRawParameterValue(Params::IDs::DELAY_FEEDBACK)->load());
+    float delayMix  = sanitizeUnitParam(apvts.getRawParameterValue(Params::IDs::DELAY_MIX)->load());
+    float delayTone = sanitizeUnitParam(apvts.getRawParameterValue(Params::IDs::DELAY_TONE)->load());
     bool  delayPP   = apvts.getRawParameterValue(Params::IDs::DELAY_PINGPONG)->load() > 0.5f;
     int   delaySync = static_cast<int>(apvts.getRawParameterValue(Params::IDs::DELAY_SYNC_DIV)->load());
     bool  reverbOn  = apvts.getRawParameterValue(Params::IDs::REVERB_ON)->load() > 0.5f;
-    float reverbMix = apvts.getRawParameterValue(Params::IDs::REVERB_MIX)->load();
-    float reverbSz  = apvts.getRawParameterValue(Params::IDs::REVERB_SIZE)->load();
-    float reverbTn  = apvts.getRawParameterValue(Params::IDs::REVERB_TONE)->load();
+    float reverbMix = sanitizeUnitParam(apvts.getRawParameterValue(Params::IDs::REVERB_MIX)->load());
+    float reverbSz  = sanitizeUnitParam(apvts.getRawParameterValue(Params::IDs::REVERB_SIZE)->load());
+    float reverbTn  = sanitizeUnitParam(apvts.getRawParameterValue(Params::IDs::REVERB_TONE)->load());
 
     // Master power off — silence output
     if (!powerOn) { buffer.clear(); return; }
