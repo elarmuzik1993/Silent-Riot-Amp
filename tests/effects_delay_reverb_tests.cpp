@@ -177,6 +177,13 @@ TEST_CASE("Delay feedback saturation bounds a hot impulse near unity", "[delay]"
     d.prepare(kSR, kBlock, 1);
     d.setParameters(80.0f, DELAY_MAX_FEEDBACK, 1.0f, 1.0f);
 
+    // Let the equal-power mix smoother settle to fully wet on silence first.
+    // Otherwise mix is still ramping from 0 at sample 0 (dryG≈1, wetG≈0), so the
+    // raw dry impulse passes straight through and masks the wet-path saturation
+    // this test targets. (Same settle pattern as the ping-pong test below.)
+    auto settle = makeBuffer(1, static_cast<int>(0.1 * kSR));
+    d.process(settle);
+
     auto buf = makeBuffer(1, static_cast<int>(0.5 * kSR));
     buf.setSample(0, 0, 5.0f);   // hot input, well above unity
     d.process(buf);
