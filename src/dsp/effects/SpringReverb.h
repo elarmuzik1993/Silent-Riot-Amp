@@ -103,6 +103,10 @@ struct Spring {
         if (readPos < 0.0f) readPos += static_cast<float>(bufSize);
         int i0 = static_cast<int>(readPos);
         float frac = readPos - static_cast<float>(i0);
+        // readPos += bufSize (above) can round up to exactly bufSize in float
+        // when the pre-wrap value is a hair below zero, so i0 needs the same
+        // wrap guard as i1 to stay in range.
+        if (i0 >= bufSize) i0 -= bufSize;
         int i1 = i0 + 1;
         if (i1 >= bufSize) i1 -= bufSize;
         float read = buf[static_cast<size_t>(i0)]
