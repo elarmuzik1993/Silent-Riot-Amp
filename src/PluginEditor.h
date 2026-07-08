@@ -10,6 +10,20 @@
 #include "gui/AdvancedPanel.h"
 #include "gui/SettingsPanel.h"
 #include "gui/IRLoaderPanel.h"
+#include "gui/EffectsPanel.h"
+
+// Wires an index-based SegmentedSelector to an AudioParameterChoice — there's
+// no built-in APVTS attachment type for this custom widget (mirrors how
+// juce::ComboBoxParameterAttachment wires a juce::ComboBox).
+class ChoiceSelectorAttachment {
+public:
+    ChoiceSelectorAttachment(juce::AudioProcessorValueTreeState& state,
+                              const juce::String& paramID, sr::SegmentedSelector& selectorIn);
+
+private:
+    sr::SegmentedSelector& selector;
+    juce::ParameterAttachment attachment;
+};
 
 class SilentRiotEditor : public juce::AudioProcessorEditor,
                          private juce::Timer {
@@ -58,6 +72,11 @@ private:
     bool irPanelOpen = false;
     float irPanelAnimH = 0.0f;
 
+    sr::SectionBar fxSectionBar{"EFFECTS"};
+    sr::EffectsPanel effectsPanel;
+    bool fxPanelOpen = false;
+    float fxPanelAnimH = 0.0f;
+
     sr::SectionBar advSectionBar{"ADVANCED"};
     sr::AdvancedPanel advancedPanel;
     bool advPanelOpen = false;
@@ -75,12 +94,20 @@ private:
     std::unique_ptr<SliderA> gainA, toneA, volA;
     std::unique_ptr<ButtonA> halfPowerA, cabSimA, powerA;
 
+    // Effects module attachments
+    std::unique_ptr<ButtonA> gateOnA, boostOnA, delayOnA, reverbOnA, delayPingPongA;
+    std::unique_ptr<SliderA> gateThreshA, boostLevelA, boostTightA, boostBrightA,
+                             delayTimeA, delayFbA, delayMixA, delayToneA,
+                             reverbMixA, reverbSizeA, reverbToneA;
+    std::unique_ptr<ChoiceSelectorAttachment> delaySyncA;
+
     static constexpr int kWindowW = 700;
     static constexpr int kHeaderH   = 38;
     static constexpr int kBodyH     = 232;
     static constexpr int kSectionH  = 26;
     static constexpr int kFooterH   = 30;
-    static constexpr int kBaseH     = kHeaderH + kBodyH + kSectionH * 2 + kFooterH;
+    // 3 section bars: EFFECTS, IR LOADER, ADVANCED
+    static constexpr int kBaseH     = kHeaderH + kBodyH + kSectionH * 3 + kFooterH;
 
     float currentScale = 1.0f;
     bool compositorBypassed = false;

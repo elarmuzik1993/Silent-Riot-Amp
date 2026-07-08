@@ -25,6 +25,12 @@ add_executable(SilentRiotTests
     dynamics_diagnostic_tests.cpp
     di_chain_trace_test.cpp
     level_trace_test.cpp
+    noise_gate_tests.cpp
+    boost_tests.cpp
+    spring_reverb_tests.cpp
+    safety_limiter_tests.cpp
+    tempo_sync_tests.cpp
+    param_sanitize_tests.cpp
 
     # DSP source files (tests call functions defined in these)
     ${CMAKE_SOURCE_DIR}/src/dsp/tubes/TriodeWaveshaper.cpp
@@ -58,11 +64,14 @@ catch_discover_tests(SilentRiotTests)
 add_executable(SilentRiotJuceTests
     cabinet_ir_tests.cpp
     oversample_switcher_tests.cpp
+    effects_delay_reverb_tests.cpp
 
     ${CMAKE_SOURCE_DIR}/src/dsp/cabinet/CabinetSim.cpp
     ${CMAKE_SOURCE_DIR}/src/dsp/cabinet/SpeakerCoupling.cpp
     ${CMAKE_SOURCE_DIR}/src/dsp/filters/FilterBank.cpp
     ${CMAKE_SOURCE_DIR}/src/dsp/OversampleSwitcher.cpp
+    ${CMAKE_SOURCE_DIR}/src/dsp/effects/Delay.cpp
+    ${CMAKE_SOURCE_DIR}/src/dsp/effects/Reverb.cpp
 )
 
 target_link_libraries(SilentRiotJuceTests PRIVATE
