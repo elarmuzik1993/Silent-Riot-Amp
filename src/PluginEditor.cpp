@@ -9,6 +9,18 @@
 #include <X11/extensions/shape.h>
 #endif
 
+ChoiceSelectorAttachment::ChoiceSelectorAttachment(juce::AudioProcessorValueTreeState& state,
+                                                    const juce::String& paramID,
+                                                    sr::SegmentedSelector& selectorIn)
+    : selector(selectorIn),
+      attachment(*state.getParameter(paramID),
+                 [this](float v) { selector.setSelectedIndex(static_cast<int>(v)); },
+                 state.undoManager)
+{
+    selector.onChange = [this](int idx) { attachment.setValueAsCompleteGesture(static_cast<float>(idx)); };
+    attachment.sendInitialUpdate();
+}
+
 SilentRiotEditor::SilentRiotEditor(SilentRiotProcessor& p)
     : AudioProcessorEditor(&p), proc(p)
 {
@@ -32,6 +44,10 @@ SilentRiotEditor::SilentRiotEditor(SilentRiotProcessor& p)
     contentArea.addAndMakeVisible(powerToggle);
 
     // Section bars
+    contentArea.addAndMakeVisible(fxSectionBar);
+    contentArea.addAndMakeVisible(effectsPanel);
+    effectsPanel.setVisible(false);
+
     contentArea.addAndMakeVisible(irSectionBar);
     contentArea.addAndMakeVisible(irLoaderPanel);
     irLoaderPanel.setVisible(false);
@@ -39,6 +55,13 @@ SilentRiotEditor::SilentRiotEditor(SilentRiotProcessor& p)
     contentArea.addAndMakeVisible(advSectionBar);
     contentArea.addAndMakeVisible(advancedPanel);
     advancedPanel.setVisible(false);
+
+    fxSectionBar.onToggle = [this](bool open) {
+        fxPanelOpen = open;
+        if (open)
+            effectsPanel.setVisible(true);
+        layoutContent();
+    };
 
     irSectionBar.onToggle = [this](bool open) {
         irPanelOpen = open;
@@ -112,7 +135,7 @@ SilentRiotEditor::SilentRiotEditor(SilentRiotProcessor& p)
         contentArea.setTransform(juce::AffineTransform::scale(currentScale));
         setWindowBackground();
 #if JUCE_LINUX
-        static const int maxH = kBaseH + sr::IRLoaderPanel::panelHeight + sr::AdvancedPanel::panelHeight;
+        static const int maxH = kBaseH + sr::EffectsPanel::panelHeight + sr::IRLoaderPanel::panelHeight + sr::AdvancedPanel::panelHeight;
         setSize(static_cast<int>(kWindowW * currentScale),
                 static_cast<int>(maxH * currentScale));
         lastShapeH = 0;
@@ -141,6 +164,25 @@ SilentRiotEditor::SilentRiotEditor(SilentRiotProcessor& p)
     halfPowerA = std::make_unique<ButtonA>(proc.apvts, IDs::HALF_POWER, halfPowerToggle.getButton());
     cabSimA    = std::make_unique<ButtonA>(proc.apvts, IDs::CAB_SIM,    cabSimToggle.getButton());
     powerA     = std::make_unique<ButtonA>(proc.apvts, IDs::POWER,      powerToggle.getButton());
+
+    // Effects module attachments
+    gateOnA      = std::make_unique<ButtonA>(proc.apvts, IDs::GATE_ON,        effectsPanel.gateToggle().getButton());
+    gateThreshA  = std::make_unique<SliderA>(proc.apvts, IDs::GATE_THRESHOLD, effectsPanel.gateThreshKnob().getSlider());
+    boostOnA     = std::make_unique<ButtonA>(proc.apvts, IDs::BOOST_ON,       effectsPanel.boostToggle().getButton());
+    boostLevelA  = std::make_unique<SliderA>(proc.apvts, IDs::BOOST_LEVEL,    effectsPanel.boostLevelKnob().getSlider());
+    boostTightA  = std::make_unique<SliderA>(proc.apvts, IDs::BOOST_TIGHT,    effectsPanel.boostTightKnob().getSlider());
+    boostBrightA = std::make_unique<SliderA>(proc.apvts, IDs::BOOST_BRIGHT,   effectsPanel.boostBrightKnob().getSlider());
+    delayOnA     = std::make_unique<ButtonA>(proc.apvts, IDs::DELAY_ON,       effectsPanel.delayToggle().getButton());
+    delayTimeA   = std::make_unique<SliderA>(proc.apvts, IDs::DELAY_TIME,     effectsPanel.delayTimeKnob().getSlider());
+    delayFbA     = std::make_unique<SliderA>(proc.apvts, IDs::DELAY_FEEDBACK, effectsPanel.delayFbKnob().getSlider());
+    delayMixA    = std::make_unique<SliderA>(proc.apvts, IDs::DELAY_MIX,      effectsPanel.delayMixKnob().getSlider());
+    delayToneA   = std::make_unique<SliderA>(proc.apvts, IDs::DELAY_TONE,     effectsPanel.delayToneKnob().getSlider());
+    delayPingPongA = std::make_unique<ButtonA>(proc.apvts, IDs::DELAY_PINGPONG, effectsPanel.delayPingPongToggle().getButton());
+    delaySyncA   = std::make_unique<ChoiceSelectorAttachment>(proc.apvts, IDs::DELAY_SYNC_DIV, effectsPanel.delaySyncSelector());
+    reverbOnA    = std::make_unique<ButtonA>(proc.apvts, IDs::REVERB_ON,      effectsPanel.reverbToggle().getButton());
+    reverbMixA   = std::make_unique<SliderA>(proc.apvts, IDs::REVERB_MIX,     effectsPanel.reverbMixKnob().getSlider());
+    reverbSizeA  = std::make_unique<SliderA>(proc.apvts, IDs::REVERB_SIZE,    effectsPanel.reverbSizeKnob().getSlider());
+    reverbToneA  = std::make_unique<SliderA>(proc.apvts, IDs::REVERB_TONE,    effectsPanel.reverbToneKnob().getSlider());
 
     // Keyboard focus and accessibility.
     // Knobs: the (invisible) slider is the focusable leaf. Toggles: the
@@ -172,15 +214,37 @@ SilentRiotEditor::SilentRiotEditor(SilentRiotProcessor& p)
     halfPowerToggle.setExplicitFocusOrder(5);
     cabSimToggle.setExplicitFocusOrder(6);
     powerToggle.setExplicitFocusOrder(7);
-    irSectionBar.setExplicitFocusOrder(8);
-    advSectionBar.setExplicitFocusOrder(9);
+    // EFFECTS section + its controls come after the amp controls
+    fxSectionBar.setExplicitFocusOrder(8);
+    {
+        int order = 9;
+        for (auto* k : { &effectsPanel.gateThreshKnob(), &effectsPanel.boostLevelKnob(),
+                         &effectsPanel.boostTightKnob(), &effectsPanel.boostBrightKnob(),
+                         &effectsPanel.delayTimeKnob(), &effectsPanel.delayFbKnob(),
+                         &effectsPanel.delayMixKnob(), &effectsPanel.delayToneKnob(),
+                         &effectsPanel.reverbMixKnob(),
+                         &effectsPanel.reverbSizeKnob(), &effectsPanel.reverbToneKnob() })
+        {
+            k->getSlider().setWantsKeyboardFocus(true);
+            k->getSlider().setExplicitFocusOrder(order++);
+        }
+        effectsPanel.gateToggle().setExplicitFocusOrder(order++);
+        effectsPanel.boostToggle().setExplicitFocusOrder(order++);
+        effectsPanel.delayToggle().setExplicitFocusOrder(order++);
+        effectsPanel.reverbToggle().setExplicitFocusOrder(order++);
+        effectsPanel.delayPingPongToggle().setExplicitFocusOrder(order++);
+        effectsPanel.delaySyncSelector().setExplicitFocusOrder(order++);
+    }
+
+    irSectionBar.setExplicitFocusOrder(26);
+    advSectionBar.setExplicitFocusOrder(27);
 
     // Restore UI state
     loadUIState();
 
 #if JUCE_LINUX
     // Linux: max-size window, X11 Shape Extension clips to visible content
-    static const int maxH = kBaseH + sr::IRLoaderPanel::panelHeight + sr::AdvancedPanel::panelHeight;
+    static const int maxH = kBaseH + sr::EffectsPanel::panelHeight + sr::IRLoaderPanel::panelHeight + sr::AdvancedPanel::panelHeight;
     setSize(static_cast<int>(kWindowW * currentScale),
             static_cast<int>(maxH * currentScale));
 #else
@@ -223,6 +287,7 @@ void* SilentRiotEditor::getX11Display()
 void SilentRiotEditor::saveUIState()
 {
     auto& state = proc.apvts.state;
+    state.setProperty("fxPanelOpen",  fxPanelOpen,  nullptr);
     state.setProperty("irPanelOpen",  irPanelOpen,  nullptr);
     state.setProperty("advPanelOpen", advPanelOpen,  nullptr);
     state.setProperty("uiScale",      settingsPanel.uiScale, nullptr);
@@ -238,6 +303,11 @@ void SilentRiotEditor::loadUIState()
     auto& state = proc.apvts.state;
 
     // Snap panel heights on restore (no animation)
+    if (state.hasProperty("fxPanelOpen") && static_cast<bool>(state.getProperty("fxPanelOpen")))
+    {
+        fxPanelAnimH = static_cast<float>(sr::EffectsPanel::panelHeight);
+        fxSectionBar.setOpen(true);
+    }
     if (state.hasProperty("irPanelOpen") && static_cast<bool>(state.getProperty("irPanelOpen")))
     {
         irPanelAnimH = static_cast<float>(sr::IRLoaderPanel::panelHeight);
@@ -299,6 +369,7 @@ void SilentRiotEditor::applySettings()
 int SilentRiotEditor::getContentHeight() const
 {
     return kBaseH
+         + static_cast<int>(fxPanelAnimH)
          + static_cast<int>(irPanelAnimH)
          + static_cast<int>(advPanelAnimH);
 }
@@ -393,11 +464,22 @@ void SilentRiotEditor::timerCallback()
     // Animate collapsible sections within current window bounds
     {
         constexpr float kStep = 28.0f;
+        float fxTarget  = fxPanelOpen  ? static_cast<float>(sr::EffectsPanel::panelHeight)  : 0.0f;
         float irTarget  = irPanelOpen  ? static_cast<float>(sr::IRLoaderPanel::panelHeight)  : 0.0f;
         float advTarget = advPanelOpen ? static_cast<float>(sr::AdvancedPanel::panelHeight) : 0.0f;
         bool animating = false;
 
         constexpr float kAnimEpsilon = 0.5f;
+
+        if (std::abs(fxPanelAnimH - fxTarget) > kAnimEpsilon)
+        {
+            fxPanelAnimH = (fxPanelAnimH < fxTarget)
+                ? std::min(fxPanelAnimH + kStep, fxTarget)
+                : std::max(fxPanelAnimH - kStep, fxTarget);
+            if (!fxPanelOpen && fxPanelAnimH < 1.0f)
+                effectsPanel.setVisible(false);
+            animating = true;
+        }
 
         if (std::abs(irPanelAnimH - irTarget) > kAnimEpsilon)
         {
@@ -469,7 +551,8 @@ void SilentRiotEditor::timerCallback()
 void SilentRiotEditor::paint(juce::Graphics& g)
 {
     // Fixed gradient endpoint avoids background colour shifting during animation
-    float maxH = static_cast<float>(kBaseH + sr::IRLoaderPanel::panelHeight
+    float maxH = static_cast<float>(kBaseH + sr::EffectsPanel::panelHeight
+                                    + sr::IRLoaderPanel::panelHeight
                                     + sr::AdvancedPanel::panelHeight) * currentScale;
     g.setGradientFill(juce::ColourGradient(
         sr::Colours::bg2, 0.0f, 0.0f,
@@ -488,7 +571,7 @@ void SilentRiotEditor::paint(juce::Graphics& g)
 
 void SilentRiotEditor::resized()
 {
-    static const int maxH = kBaseH + sr::IRLoaderPanel::panelHeight + sr::AdvancedPanel::panelHeight;
+    static const int maxH = kBaseH + sr::EffectsPanel::panelHeight + sr::IRLoaderPanel::panelHeight + sr::AdvancedPanel::panelHeight;
     contentArea.setBounds(0, 0, kWindowW, maxH);
     layoutContent();
 }
@@ -524,6 +607,11 @@ void SilentRiotEditor::layoutContent()
     halfPowerToggle.setBounds(toggleStartX, toggleY, toggleW, toggleH);
     cabSimToggle.setBounds(toggleStartX + toggleW + toggleGap, toggleY, toggleW, toggleH);
     powerToggle.setBounds(toggleStartX + (toggleW + toggleGap) * 2, toggleY, toggleW, toggleH);
+
+    fxSectionBar.setBounds(area.removeFromTop(kSectionH));
+    int fxH = static_cast<int>(fxPanelAnimH);
+    if (fxH > 0)
+        effectsPanel.setBounds(area.removeFromTop(fxH));
 
     irSectionBar.setBounds(area.removeFromTop(kSectionH));
     int irH = static_cast<int>(irPanelAnimH);

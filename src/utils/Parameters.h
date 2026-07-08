@@ -16,6 +16,26 @@ namespace IDs {
     static const juce::String OVERSAMPLE  = "oversample";  // choice: 2x/4x/8x
     static const juce::String PRESET_IDX  = "presetIndex"; // int: 0–4
     static const juce::String IR_INDEX    = "irIndex";     // int: 0–N
+
+    // ── Effects module (all default OFF; tone-neutral when bypassed) ──
+    // Pre-amp: noise gate + boost/tight-EQ. Post-cab: delay + reverb.
+    static const juce::String GATE_ON         = "gateOn";        // bool
+    static const juce::String GATE_THRESHOLD  = "gateThreshold"; // float dB
+    static const juce::String BOOST_ON        = "boostOn";       // bool
+    static const juce::String BOOST_LEVEL     = "boostLevel";    // float 0–1 → 0..+18 dB
+    static const juce::String BOOST_TIGHT     = "boostTight";    // float 0–1 (low-cut)
+    static const juce::String BOOST_BRIGHT    = "boostBright";   // float 0–1 (high shelf)
+    static const juce::String DELAY_ON        = "delayOn";       // bool
+    static const juce::String DELAY_TIME      = "delayTime";     // float ms
+    static const juce::String DELAY_FEEDBACK  = "delayFeedback"; // float 0–1
+    static const juce::String DELAY_MIX       = "delayMix";      // float 0–1
+    static const juce::String DELAY_TONE      = "delayTone";     // float 0–1 (feedback high-cut: 0=dark, 1=bright)
+    static const juce::String DELAY_PINGPONG  = "delayPingPong"; // bool: cross-fed bouncing stereo repeats
+    static const juce::String DELAY_SYNC_DIV  = "delaySyncDiv";  // choice: MANUAL (TIME knob) or a note division
+    static const juce::String REVERB_ON       = "reverbOn";      // bool
+    static const juce::String REVERB_MIX      = "reverbMix";     // float 0–1
+    static const juce::String REVERB_SIZE     = "reverbSize";    // float 0–1
+    static const juce::String REVERB_TONE     = "reverbTone";    // float 0–1 (loop damping)
 }
 
 } // namespace sr::Params

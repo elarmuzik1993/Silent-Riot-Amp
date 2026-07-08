@@ -85,6 +85,16 @@ target_sources(SilentRiot
         src/dsp/cabinet/CabinetSim.cpp
         src/dsp/cabinet/IRLibrary.h
 
+        # Effects module (gate / boost / delay / reverb — outside the amp loop)
+        src/dsp/effects/NoiseGate.h
+        src/dsp/effects/Boost.h
+        src/dsp/effects/SafetyLimiter.h
+        src/dsp/effects/Delay.h
+        src/dsp/effects/Delay.cpp
+        src/dsp/effects/SpringReverb.h
+        src/dsp/effects/Reverb.h
+        src/dsp/effects/Reverb.cpp
+
         # Oversampling state machine
         src/dsp/OversampleSwitcher.h
         src/dsp/OversampleSwitcher.cpp
@@ -119,6 +129,8 @@ target_sources(SilentRiot
         src/gui/IRWaveformDisplay.cpp
         src/gui/IRLoaderPanel.h
         src/gui/IRLoaderPanel.cpp
+        src/gui/EffectsPanel.h
+        src/gui/EffectsPanel.cpp
 )
 
 # ── Binary resources ────────────────────────────

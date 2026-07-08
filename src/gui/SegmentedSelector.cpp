@@ -37,7 +37,7 @@ void SegmentedSelector::selectIndex(int idx)
 void SegmentedSelector::mouseDown(const juce::MouseEvent& e)
 {
     int n = options.size();
-    if (n == 0) return;
+    if (n == 0 || getWidth() <= 0) return;
     float cellW = getWidth() / static_cast<float>(n);
     selectIndex(static_cast<int>(e.position.x / cellW));
 }

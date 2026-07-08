@@ -163,6 +163,73 @@ constexpr float OT_SAT_FLUX_MAX     = 10.0f;
 // ── Gain taper ──────────────────────────────────────────────
 constexpr float GAIN_TAPER_EXPONENT = 2.0f;
 
+// ── Effects module (front-of-amp + post-cab) ───────────────
+// These live OUTSIDE the oversampled amp loop and never touch the frozen
+// amp-tone math. All run at base sample rate.
+
+// Noise gate (downward expander, pre-amp)
+constexpr float GATE_THRESH_MIN_DB  = -80.0f;   // param min (gate effectively open)
+constexpr float GATE_THRESH_MAX_DB  = -20.0f;   // param max (aggressive)
+constexpr float GATE_ATTACK_MS      = 1.0f;     // fast gain open
+constexpr float GATE_RELEASE_MS     = 80.0f;    // musical gain close
+constexpr float GATE_DETECT_MS      = 30.0f;    // peak-follower release hold
+                                                // (envelope decays toward |x|;
+                                                //  long enough to hold peak
+                                                //  between low-E cycles)
+constexpr float GATE_HYSTERESIS_DB  = 4.0f;     // close threshold sits this far below open
+
+// Boost (clean make-up + tight low-cut + bright high shelf, pre-amp)
+constexpr float BOOST_LEVEL_MAX_DB  = 18.0f;    // param maps 0..1 → 0..+18 dB
+constexpr float BOOST_TIGHT_MIN_HZ  = 20.0f;    // tight=0 → essentially full-range
+constexpr float BOOST_TIGHT_MAX_HZ  = 400.0f;   // tight=1 → tight, focused low end
+constexpr float BOOST_BRIGHT_FREQ   = 2000.0f;  // bright shelf corner
+constexpr float BOOST_BRIGHT_MAX_DB = 9.0f;     // bright=1 → +9 dB above corner
+
+// Post-effects safety limiter (catches wet delay/reverb peaks that would
+// otherwise escape the amp's output limiter and hard-clip the DAC). Soft knee:
+// transparent below the threshold, smoothly bounded to ±1 above it.
+constexpr float SAFETY_LIMIT_THRESH = 0.9f;
+
+// Delay (post-cab)
+constexpr float DELAY_TIME_MIN_MS   = 20.0f;
+constexpr float DELAY_TIME_MAX_MS   = 1000.0f;
+constexpr float DELAY_MAX_FEEDBACK  = 0.95f;    // clamp to keep it from self-oscillating
+// Analog/tape voicing — feedback-path tone shaping + wow/flutter modulation.
+// The high-cut sits IN the feedback loop, so each repeat is darkened again →
+// echoes fade toward the dark, like a tape/analog echo. TONE convention
+// matches the reverb: 0 = dark, 1 = bright. The low-cut stops bass buildup.
+constexpr float DELAY_TONE_LP_MIN   = 2000.0f;  // TONE=0 → dark, tape-like repeats
+constexpr float DELAY_TONE_LP_MAX   = 16000.0f; // TONE=1 → bright, near-digital repeats
+constexpr float DELAY_LOOP_HP_HZ    = 120.0f;   // fixed feedback low-cut (no bass mud on repeats)
+constexpr float DELAY_WOW_RATE_HZ      = 0.4f;  // slow wow LFO rate
+constexpr float DELAY_WOW_DEPTH_MS     = 0.3f;  // ± tap sway for living tape character
+constexpr float DELAY_FLUTTER_RATE_HZ  = 6.5f;  // faster, subtler flutter LFO rate
+constexpr float DELAY_FLUTTER_DEPTH_MS = 0.06f; // ± tap sway (adds high-frequency "buzz" wobble)
+// Feedback-loop saturation — soft-clips the tone-shaped repeat before it's
+// heard and fed back (models what a tape head/BBD chip actually plays back).
+// Unity gain at low level; tanh(x*k)/tanh(k) keeps it transparent until hot.
+constexpr float DELAY_FB_SAT_DRIVE  = 1.8f;
+
+// Reverb (post-cab) — spring tank: dispersive all-pass chain in a damped
+// feedback delay loop (published parametric-spring technique; see SpringReverb.h)
+constexpr int   SPRING_NUM           = 2;       // parallel detuned springs per channel
+constexpr int   SPRING_DISP_STAGES   = 100;     // 1st-order all-passes → chirp/dispersion
+constexpr float SPRING_DISP_COEFF    = 0.62f;   // all-pass coefficient (|a|<1)
+constexpr float SPRING_LOOP1_MS      = 28.0f;   // base loop length, spring 1
+constexpr float SPRING_LOOP2_MS      = 37.0f;   // base loop length, spring 2 (mutually prime-ish)
+constexpr float SPRING_LEN_SCALE_MIN = 0.75f;   // SIZE=0 → shorter tank
+constexpr float SPRING_LEN_SCALE_MAX = 1.30f;   // SIZE=1 → longer tank
+constexpr float SPRING_FB_MIN        = 0.70f;   // SIZE=0 → shorter decay
+constexpr float SPRING_FB_MAX        = 0.935f;  // SIZE=1 → long, lush decay (capped < 1)
+constexpr float SPRING_TONE_LP_MIN   = 1600.0f; // TONE=0 → dark loop LP cutoff
+constexpr float SPRING_TONE_LP_MAX   = 6000.0f; // TONE=1 → bright (springs stay capped)
+constexpr float SPRING_LOOP_HP_HZ    = 90.0f;   // loop high-pass: kill rumble / DC buildup
+constexpr float SPRING_MAX_LOOP_MS   = 60.0f;   // ring-buffer sizing headroom (loop2 × max scale)
+// Delay-modulation LFO (per spring) — subtle chorus-like wobble for a living tank
+constexpr float SPRING_MOD_DEPTH_SAMP = 2.0f;   // ± samples of loop-length sway
+constexpr float SPRING_MOD_RATE1_HZ   = 0.7f;   // spring 1 LFO rate
+constexpr float SPRING_MOD_RATE2_HZ   = 1.1f;   // spring 2 LFO rate (decorrelated)
+
 // ── Debug assertions ────────────────────────────────────────
 #ifdef DEBUG
 #define VS_ASSERT_RANGE(val, lo, hi, stage) \

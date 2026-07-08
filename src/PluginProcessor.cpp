@@ -99,6 +99,67 @@ juce::AudioProcessorValueTreeState::ParameterLayout SilentRiotProcessor::createP
     params.push_back(std::make_unique<juce::AudioParameterInt>(
         juce::ParameterID{ Params::IDs::IR_INDEX, 1 }, "IR Selection", 0, 32, 0));
 
+    // ── Effects module — all default OFF / dry (tone-neutral when bypassed) ──
+    params.push_back(std::make_unique<juce::AudioParameterBool>(
+        juce::ParameterID{ Params::IDs::GATE_ON, 1 }, "Gate", false));
+    // Threshold is a 0–1 knob (maps 0..1 → GATE_THRESH_MIN..MAX dB in processBlock,
+    // so NotchKnob's 0–1 arc works). Default 0 = -80 dB (effectively open).
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{ Params::IDs::GATE_THRESHOLD, 1 }, "Gate Threshold",
+        juce::NormalisableRange<float>(0.0f, 1.0f, 0.001f), 0.0f));
+
+    params.push_back(std::make_unique<juce::AudioParameterBool>(
+        juce::ParameterID{ Params::IDs::BOOST_ON, 1 }, "Boost", false));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{ Params::IDs::BOOST_LEVEL, 1 }, "Boost Level",
+        juce::NormalisableRange<float>(0.0f, 1.0f, 0.001f), 0.5f));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{ Params::IDs::BOOST_TIGHT, 1 }, "Boost Tight",
+        juce::NormalisableRange<float>(0.0f, 1.0f, 0.001f), 0.0f));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{ Params::IDs::BOOST_BRIGHT, 1 }, "Boost Bright",
+        juce::NormalisableRange<float>(0.0f, 1.0f, 0.001f), 0.0f));
+
+    params.push_back(std::make_unique<juce::AudioParameterBool>(
+        juce::ParameterID{ Params::IDs::DELAY_ON, 1 }, "Delay", false));
+    // Time is a 0–1 knob (maps 0..1 → DELAY_TIME_MIN..MAX ms in processBlock).
+    // Default ~0.34 ≈ 350 ms.
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{ Params::IDs::DELAY_TIME, 1 }, "Delay Time",
+        juce::NormalisableRange<float>(0.0f, 1.0f, 0.001f), 0.337f));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{ Params::IDs::DELAY_FEEDBACK, 1 }, "Delay Feedback",
+        juce::NormalisableRange<float>(0.0f, 1.0f, 0.001f), 0.35f));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{ Params::IDs::DELAY_MIX, 1 }, "Delay Mix",
+        juce::NormalisableRange<float>(0.0f, 1.0f, 0.001f), 0.3f));
+    // Tone (feedback high-cut): 0 = dark/tape, 1 = bright/digital. Default 0.5.
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{ Params::IDs::DELAY_TONE, 1 }, "Delay Tone",
+        juce::NormalisableRange<float>(0.0f, 1.0f, 0.001f), 0.5f));
+    params.push_back(std::make_unique<juce::AudioParameterBool>(
+        juce::ParameterID{ Params::IDs::DELAY_PINGPONG, 1 }, "Delay Ping-Pong", false));
+    // MANUAL (index 0) = use the TIME knob; any other choice syncs to host
+    // tempo at that note division (see TempoSync.h).
+    {
+        juce::StringArray syncNames;
+        for (const auto& d : kSyncDivisions) syncNames.add(d.name);
+        params.push_back(std::make_unique<juce::AudioParameterChoice>(
+            juce::ParameterID{ Params::IDs::DELAY_SYNC_DIV, 1 }, "Delay Sync", syncNames, 0));
+    }
+
+    params.push_back(std::make_unique<juce::AudioParameterBool>(
+        juce::ParameterID{ Params::IDs::REVERB_ON, 1 }, "Reverb", false));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{ Params::IDs::REVERB_MIX, 1 }, "Reverb Mix",
+        juce::NormalisableRange<float>(0.0f, 1.0f, 0.001f), 0.25f));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{ Params::IDs::REVERB_SIZE, 1 }, "Reverb Size",
+        juce::NormalisableRange<float>(0.0f, 1.0f, 0.001f), 0.5f));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{ Params::IDs::REVERB_TONE, 1 }, "Reverb Tone",
+        juce::NormalisableRange<float>(0.0f, 1.0f, 0.001f), 0.5f));
+
     return { params.begin(), params.end() };
 }
 
@@ -127,6 +188,12 @@ void SilentRiotProcessor::resetDSPState()
 
     if (limiterOversampler != nullptr)
         limiterOversampler->reset();
+
+    // Effects module
+    noiseGate.reset();
+    boost.reset();
+    delay.reset();
+    reverb.reset();
 
     lastShapeCoeffVal = -1.0f;   // force shape coeff recompute on first sample
     psuFrozen = false;
@@ -186,6 +253,31 @@ void SilentRiotProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
     // Cabinet IR convolution engine (runs at base SR, after downsample)
     cabSim.prepare(sampleRate, samplesPerBlock, getTotalNumOutputChannels());
 
+    // ── Effects module (base SR, outside the oversampled amp loop) ──
+    const float baseSR = static_cast<float>(sampleRate);
+    noiseGate.recalcCoeffs(baseSR);
+    boost.prepare(baseSR);
+    delay.prepare(sampleRate, samplesPerBlock, getTotalNumOutputChannels());
+    reverb.prepare(sampleRate, samplesPerBlock, getTotalNumOutputChannels());
+
+    const double fxRampSec = 0.05;
+    gateThreshSm.reset(sampleRate, fxRampSec);
+    boostLevelSm.reset(sampleRate, fxRampSec);
+    boostTightSm.reset(sampleRate, fxRampSec);
+    boostBrightSm.reset(sampleRate, fxRampSec);
+    // Sanitized for the same reason as the processBlock reads below — seeding
+    // a smoother's *current* value with NaN poisons its interpolation forever
+    // (current += (target-current)*rate never clears NaN), even after a later
+    // block sets a sanitized target.
+    gateThreshSm.setCurrentAndTargetValue(
+        sanitizeUnitParam(apvts.getRawParameterValue(Params::IDs::GATE_THRESHOLD)->load()));
+    boostLevelSm.setCurrentAndTargetValue(
+        sanitizeUnitParam(apvts.getRawParameterValue(Params::IDs::BOOST_LEVEL)->load()));
+    boostTightSm.setCurrentAndTargetValue(
+        sanitizeUnitParam(apvts.getRawParameterValue(Params::IDs::BOOST_TIGHT)->load()));
+    boostBrightSm.setCurrentAndTargetValue(
+        sanitizeUnitParam(apvts.getRawParameterValue(Params::IDs::BOOST_BRIGHT)->load()));
+
     // Reload active user IR after prepare (convolution state was reset)
     int irIdx = static_cast<int>(apvts.getRawParameterValue(sr::Params::IDs::IR_INDEX)->load());
     if (irIdx > 0 && irIdx <= static_cast<int>(userIRs.size()))
@@ -223,6 +315,28 @@ void SilentRiotProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     bool  powerOn   = apvts.getRawParameterValue(Params::IDs::POWER)->load() > 0.5f;
     int   irIndex   = static_cast<int>(apvts.getRawParameterValue(Params::IDs::IR_INDEX)->load());
 
+    // Effects module parameters (run at base SR, outside the amp loop).
+    // Float reads are sanitized at this boundary — a misbehaving host could
+    // report NaN via automation, which would otherwise silently poison the
+    // gate/boost/delay/reverb filters' IIR state forever (see ParamSanitize.h).
+    bool  gateOn    = apvts.getRawParameterValue(Params::IDs::GATE_ON)->load() > 0.5f;
+    float gateThr   = sanitizeUnitParam(apvts.getRawParameterValue(Params::IDs::GATE_THRESHOLD)->load());
+    bool  boostOn   = apvts.getRawParameterValue(Params::IDs::BOOST_ON)->load() > 0.5f;
+    float boostLvl  = sanitizeUnitParam(apvts.getRawParameterValue(Params::IDs::BOOST_LEVEL)->load());
+    float boostTgt  = sanitizeUnitParam(apvts.getRawParameterValue(Params::IDs::BOOST_TIGHT)->load());
+    float boostBrt  = sanitizeUnitParam(apvts.getRawParameterValue(Params::IDs::BOOST_BRIGHT)->load());
+    bool  delayOn   = apvts.getRawParameterValue(Params::IDs::DELAY_ON)->load() > 0.5f;
+    float delayTime = sanitizeUnitParam(apvts.getRawParameterValue(Params::IDs::DELAY_TIME)->load());
+    float delayFb   = sanitizeUnitParam(apvts.getRawParameterValue(Params::IDs::DELAY_FEEDBACK)->load());
+    float delayMix  = sanitizeUnitParam(apvts.getRawParameterValue(Params::IDs::DELAY_MIX)->load());
+    float delayTone = sanitizeUnitParam(apvts.getRawParameterValue(Params::IDs::DELAY_TONE)->load());
+    bool  delayPP   = apvts.getRawParameterValue(Params::IDs::DELAY_PINGPONG)->load() > 0.5f;
+    int   delaySync = static_cast<int>(apvts.getRawParameterValue(Params::IDs::DELAY_SYNC_DIV)->load());
+    bool  reverbOn  = apvts.getRawParameterValue(Params::IDs::REVERB_ON)->load() > 0.5f;
+    float reverbMix = sanitizeUnitParam(apvts.getRawParameterValue(Params::IDs::REVERB_MIX)->load());
+    float reverbSz  = sanitizeUnitParam(apvts.getRawParameterValue(Params::IDs::REVERB_SIZE)->load());
+    float reverbTn  = sanitizeUnitParam(apvts.getRawParameterValue(Params::IDs::REVERB_TONE)->load());
+
     // Master power off — silence output
     if (!powerOn) { buffer.clear(); return; }
 
@@ -256,6 +370,35 @@ void SilentRiotProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
             for (int i = 0; i < n; ++i)
                 sumSq += ch0[i] * ch0[i];
             inputLevelForGUI.store(std::sqrt(sumSq / static_cast<float>(n)), std::memory_order_relaxed);
+        }
+    }
+
+    // ── Pre-amp effects (gate → boost) at base SR, BEFORE upsampling ──
+    // The amp reads mono from channel 0, so we process channel 0 only; the
+    // loop copies it to stereo. Both effects are linear/level operations
+    // (no clipping) → safe at base SR with no aliasing.
+    if (gateOn || boostOn)
+    {
+        gateThreshSm.setTargetValue(gateThr);
+        boostLevelSm.setTargetValue(boostLvl);
+        boostTightSm.setTargetValue(boostTgt);
+        boostBrightSm.setTargetValue(boostBrt);
+
+        const int n = buffer.getNumSamples();
+        float* ch0 = buffer.getWritePointer(0);
+        for (int i = 0; i < n; ++i)
+        {
+            // Map threshold knob 0..1 → dB
+            const float thrDb = GATE_THRESH_MIN_DB
+                + gateThreshSm.getNextValue() * (GATE_THRESH_MAX_DB - GATE_THRESH_MIN_DB);
+            const float lvl = boostLevelSm.getNextValue();
+            const float tgt = boostTightSm.getNextValue();
+            const float brt = boostBrightSm.getNextValue();
+
+            float s = ch0[i];
+            if (gateOn)  s = noiseGate.process(s, thrDb);
+            if (boostOn) s = boost.process(s, lvl, tgt, brt);
+            ch0[i] = s;
         }
     }
 
@@ -443,6 +586,55 @@ void SilentRiotProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
         }
     }
 
+    // ── Post-cab effects (delay → reverb) at base SR, after the amp/cab ──
+    // Operate per channel: a stereo bus picks up reverb/delay width; mono
+    // stays mono. Skipped entirely (bit-exact dry) when toggled off.
+    if (delayOn)
+    {
+        float delayMs;
+        if (delaySync <= 0)
+        {
+            // MANUAL — map time knob 0..1 → ms
+            delayMs = DELAY_TIME_MIN_MS
+                + delayTime * (DELAY_TIME_MAX_MS - DELAY_TIME_MIN_MS);
+        }
+        else
+        {
+            // Tempo-synced — TIME knob is ignored. Standalone hosts typically
+            // report no tempo, so fall back to 120 BPM there.
+            double bpm = 120.0;
+            if (auto* ph = getPlayHead())
+                if (auto pos = ph->getPosition())
+                    bpm = pos->getBpm().orFallback(120.0);
+            delayMs = computeSyncMs(delaySync, bpm);
+        }
+        delay.setParameters(delayMs, delayFb, delayMix, delayTone, delayPP);
+        delay.process(buffer);
+    }
+    if (reverbOn)
+    {
+        reverb.setParameters(reverbMix, reverbSz, reverbTn);
+        reverb.process(buffer);
+    }
+
+    // ── Post-effects safety limiter ──
+    // delay/reverb run AFTER the amp's output limiter, so their wet tails can
+    // sum past full-scale. Soft-clip the summed output back into ±1 (and scrub
+    // any non-finite sample). Runs ONLY when an effect is active, so the dry
+    // amp path stays bit-identical when the whole module is off.
+    if (delayOn || reverbOn)
+    {
+        for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
+        {
+            auto* samples = buffer.getWritePointer(ch);
+            for (int i = 0; i < buffer.getNumSamples(); ++i)
+            {
+                float s = samples[i];
+                samples[i] = std::isfinite(s) ? softClip(s) : 0.0f;
+            }
+        }
+    }
+
     // ── GUI level metering (RMS of channel 0) ──
     {
         const int n = buffer.getNumSamples();
@@ -502,7 +694,15 @@ const juce::String SilentRiotProcessor::getName() const { return JucePlugin_Name
 bool SilentRiotProcessor::acceptsMidi() const { return false; }
 bool SilentRiotProcessor::producesMidi() const { return false; }
 bool SilentRiotProcessor::isMidiEffect() const { return false; }
-double SilentRiotProcessor::getTailLengthSeconds() const { return cabSim.getIRTailSeconds(); }
+double SilentRiotProcessor::getTailLengthSeconds() const
+{
+    double tail = cabSim.getIRTailSeconds();
+    if (apvts.getRawParameterValue(Params::IDs::DELAY_ON)->load() > 0.5f)
+        tail = std::max(tail, static_cast<double>(delay.tailSeconds()));
+    if (apvts.getRawParameterValue(Params::IDs::REVERB_ON)->load() > 0.5f)
+        tail = std::max(tail, static_cast<double>(reverb.tailSeconds()));
+    return tail;
+}
 int SilentRiotProcessor::getNumPrograms() { return 1; }
 int SilentRiotProcessor::getCurrentProgram() { return 0; }
 void SilentRiotProcessor::setCurrentProgram(int) {}
