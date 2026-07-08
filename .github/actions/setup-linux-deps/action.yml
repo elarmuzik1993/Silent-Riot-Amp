@@ -9,8 +9,28 @@ runs:
     - name: Install apt packages
       shell: bash
       run: |
-        sudo apt-get update
-        sudo apt-get install -y --no-install-recommends \
+        # GitHub's Ubuntu runners preconfigure Microsoft apt repos
+        # (packages.microsoft.com: azure-cli + prod) that this build never uses.
+        # They intermittently serve invalid metadata ("Clearsigned file isn't
+        # valid, got 'NOSPLIT'"), which aborts `apt-get update` for the whole
+        # runner. Drop any such source so a flaky third-party repo can't break
+        # our dependency install.
+        for f in /etc/apt/sources.list.d/*.list /etc/apt/sources.list.d/*.sources; do
+          [ -f "$f" ] || continue
+          if grep -q 'packages.microsoft.com' "$f"; then
+            echo "Removing unused Microsoft apt source: $f"
+            sudo rm -f "$f"
+          fi
+        done
+
+        # Retry to ride out transient network blips on the remaining repos.
+        for i in 1 2 3; do
+          sudo apt-get update -o Acquire::Retries=3 && break
+          echo "apt-get update failed (attempt $i/3); retrying in 5s…"
+          sleep 5
+        done
+
+        sudo apt-get install -y --no-install-recommends -o Acquire::Retries=3 \
           build-essential cmake ninja-build ccache pkg-config \
           libasound2-dev libjack-jackd2-dev libfreetype6-dev \
           libx11-dev libxext-dev libxrandr-dev libxinerama-dev \
