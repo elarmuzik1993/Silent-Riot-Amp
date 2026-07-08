@@ -111,7 +111,6 @@ private:
 
     float currentScale = 1.0f;
     bool compositorBypassed = false;
-    int lastShapeH = 0;
     void* x11Display = nullptr;   // cached Linux X11 connection (closed in dtor)
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(SilentRiotEditor)
