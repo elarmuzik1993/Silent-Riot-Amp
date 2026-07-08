@@ -6,7 +6,6 @@
 #if JUCE_LINUX
 #include <X11/Xlib.h>
 #include <X11/Xatom.h>
-#include <X11/extensions/shape.h>
 #endif
 
 ChoiceSelectorAttachment::ChoiceSelectorAttachment(juce::AudioProcessorValueTreeState& state,
@@ -134,16 +133,8 @@ SilentRiotEditor::SilentRiotEditor(SilentRiotProcessor& p)
         currentScale = scales[juce::jlimit(0, 3, scaleIdx)];
         contentArea.setTransform(juce::AffineTransform::scale(currentScale));
         setWindowBackground();
-#if JUCE_LINUX
-        static const int maxH = kBaseH + sr::EffectsPanel::panelHeight + sr::IRLoaderPanel::panelHeight + sr::AdvancedPanel::panelHeight;
-        setSize(static_cast<int>(kWindowW * currentScale),
-                static_cast<int>(maxH * currentScale));
-        lastShapeH = 0;
-        applyShapeMask();
-#else
         setSize(static_cast<int>(kWindowW * currentScale),
                 static_cast<int>(getContentHeight() * currentScale));
-#endif
         saveUIState();
     };
 
@@ -242,16 +233,13 @@ SilentRiotEditor::SilentRiotEditor(SilentRiotProcessor& p)
     // Restore UI state
     loadUIState();
 
-#if JUCE_LINUX
-    // Linux: max-size window, X11 Shape Extension clips to visible content
-    static const int maxH = kBaseH + sr::EffectsPanel::panelHeight + sr::IRLoaderPanel::panelHeight + sr::AdvancedPanel::panelHeight;
-    setSize(static_cast<int>(kWindowW * currentScale),
-            static_cast<int>(maxH * currentScale));
-#else
-    // Windows/macOS: resize normally (no compositor blink issue)
+    // Size the window to its current content height on every platform. Linux
+    // previously allocated a max-height window and clipped it with the X11 Shape
+    // Extension, but the compositor uses the true window geometry for move
+    // constraints — a window taller than the screen got pinned to the top edge
+    // and could not be dragged. Sizing to content keeps it on-screen and movable.
     setSize(static_cast<int>(kWindowW * currentScale),
             static_cast<int>(getContentHeight() * currentScale));
-#endif
     startTimerHz(30);
 }
 
@@ -376,43 +364,14 @@ int SilentRiotEditor::getContentHeight() const
 
 void SilentRiotEditor::applyShapeMask()
 {
-#if JUCE_LINUX
-    int h = static_cast<int>(getContentHeight() * currentScale);
-    if (h == lastShapeH) return;
-
-    auto* peer = getPeer();
-    if (!peer) return;
-
-    lastShapeH = h;
-
-    // Editor is offset within the native window (title bar above it)
-    auto* topLevel = getTopLevelComponent();
-    auto editorOrigin = topLevel->getLocalPoint(this, juce::Point<int>(0, 0));
-    int totalW = topLevel->getWidth();
-    int totalH = editorOrigin.y + h;
-
-    auto windowHandle = static_cast<::Window>(
-        reinterpret_cast<uintptr_t>(peer->getNativeHandle()));
-
-    if (auto* dpy = static_cast<::Display*>(getX11Display()))
-    {
-        XRectangle rect = { 0, 0,
-            static_cast<unsigned short>(totalW),
-            static_cast<unsigned short>(totalH) };
-
-        XShapeCombineRectangles(dpy, windowHandle, ShapeBounding,
-                                0, 0, &rect, 1, ShapeSet, Unsorted);
-        XShapeCombineRectangles(dpy, windowHandle, ShapeInput,
-                                0, 0, &rect, 1, ShapeSet, Unsorted);
-        XFlush(dpy);
-    }
-#else
-    // Windows/macOS: resize window to match content (no compositor blink)
+    // Resize the window to match the current content height. (Formerly an X11
+    // Shape Extension clip on Linux, which left the real window taller than the
+    // screen and pinned it to the top — see the constructor note.) Called every
+    // animation frame; the size guard makes the steady-state case a no-op.
     int w = static_cast<int>(kWindowW * currentScale);
     int h = static_cast<int>(getContentHeight() * currentScale);
     if (getWidth() != w || getHeight() != h)
         setSize(w, h);
-#endif
 }
 
 void SilentRiotEditor::setWindowBackground()
@@ -560,7 +519,7 @@ void SilentRiotEditor::paint(juce::Graphics& g)
         false));
     g.fillAll();
 
-    // Border at visible content height (shape clips everything below)
+    // Border at content height (the window is sized to this)
     float cw = kWindowW * currentScale;
     float ch = getContentHeight() * currentScale;
     g.setColour(sr::Colours::border);
