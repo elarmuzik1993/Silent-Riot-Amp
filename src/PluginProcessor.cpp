@@ -97,7 +97,8 @@ juce::AudioProcessorValueTreeState::ParameterLayout SilentRiotProcessor::createP
         juce::ParameterID{ Params::IDs::PRESET_IDX, 1 }, "Preset", 0, 4, 0));
 
     params.push_back(std::make_unique<juce::AudioParameterInt>(
-        juce::ParameterID{ Params::IDs::IR_INDEX, 1 }, "IR Selection", 0, 32, 0));
+        juce::ParameterID{ Params::IDs::IR_INDEX, 1 }, "IR Selection",
+        0, sr::MAX_USER_IRS, 0));
 
     // ── Effects module — all default OFF / dry (tone-neutral when bypassed) ──
     params.push_back(std::make_unique<juce::AudioParameterBool>(
@@ -734,17 +735,27 @@ void SilentRiotProcessor::applyPreset(int presetIndex)
 
 // ── User IR Management ──
 
-void SilentRiotProcessor::loadUserIR(const juce::File& file)
+bool SilentRiotProcessor::loadUserIR(const juce::File& file)
 {
     // Called from message thread (editor).
+    // Cap the slot count at the IR_INDEX parameter's max — past it, the
+    // clamped parameter would select a different IR than the one appended.
+    if (static_cast<int>(userIRs.size()) >= sr::MAX_USER_IRS)
+        return false;
+
     juce::AudioFormatManager mgr;
     mgr.registerBasicFormats();
     std::unique_ptr<juce::AudioFormatReader> reader(mgr.createReaderFor(file));
-    if (!reader) return;
+    if (!reader) return false;
 
     int numSamples = static_cast<int>(
         std::min(reader->lengthInSamples, static_cast<juce::int64>(sr::MAX_USER_IR_SAMPLES)));
-    int numChannels = static_cast<int>(reader->numChannels);
+    if (numSamples <= 0) return false;
+
+    // Convolution uses at most 2 channels (Stereo::yes); reading more would
+    // only bloat the saved state — and the restore path rejects >2 channels.
+    int numChannels = std::min(static_cast<int>(reader->numChannels), 2);
+    if (numChannels <= 0) return false;
 
     UserIREntry entry;
     entry.name = file.getFileNameWithoutExtension();
@@ -765,6 +776,8 @@ void SilentRiotProcessor::loadUserIR(const juce::File& file)
     cachedIRIndex = newIndex;  // prevent audio thread from re-triggering async load
     if (auto* param = apvts.getParameter(sr::Params::IDs::IR_INDEX))
         param->setValueNotifyingHost(param->convertTo0to1(static_cast<float>(newIndex)));
+
+    return true;
 }
 
 void SilentRiotProcessor::selectUserIR(int userIndex)
@@ -791,56 +804,14 @@ void SilentRiotProcessor::saveUserIRsToState()
 
     if (userIRs.empty()) return;
 
-    juce::ValueTree irsNode("UserIRs");
-    for (auto& ir : userIRs)
-    {
-        juce::ValueTree irNode("IR");
-        irNode.setProperty("name", ir.name, nullptr);
-        irNode.setProperty("sampleRate", ir.sampleRate, nullptr);
-        irNode.setProperty("numChannels", ir.numChannels, nullptr);
-        irNode.setProperty("numSamples", ir.numSamples, nullptr);
-
-        // Store audio data as raw floats per channel
-        juce::MemoryBlock audioBlock;
-        for (int ch = 0; ch < ir.numChannels; ++ch)
-            audioBlock.append(ir.audioData.getReadPointer(ch),
-                              static_cast<size_t>(ir.numSamples) * sizeof(float));
-
-        irNode.setProperty("audioData", juce::var(audioBlock), nullptr);
-        irsNode.addChild(irNode, -1, nullptr);
-    }
-    apvts.state.addChild(irsNode, -1, nullptr);
+    apvts.state.addChild(sr::userIRsToValueTree(userIRs), -1, nullptr);
 }
 
 void SilentRiotProcessor::loadUserIRsFromState()
 {
-    userIRs.clear();
-
-    auto irsNode = apvts.state.getChildWithName("UserIRs");
-    if (!irsNode.isValid()) return;
-
-    for (int i = 0; i < irsNode.getNumChildren(); ++i)
-    {
-        auto irNode = irsNode.getChild(i);
-        if (!irNode.hasType("IR")) continue;
-
-        UserIREntry entry;
-        entry.name = irNode.getProperty("name").toString();
-        entry.sampleRate = static_cast<double>(irNode.getProperty("sampleRate"));
-        entry.numChannels = static_cast<int>(irNode.getProperty("numChannels"));
-        entry.numSamples = static_cast<int>(irNode.getProperty("numSamples"));
-
-        auto* audioBlob = irNode.getProperty("audioData").getBinaryData();
-        if (audioBlob && audioBlob->getSize() > 0)
-        {
-            entry.audioData.setSize(entry.numChannels, entry.numSamples);
-            const auto* rawData = static_cast<const float*>(audioBlob->getData());
-            for (int ch = 0; ch < entry.numChannels; ++ch)
-                entry.audioData.copyFrom(ch, 0, rawData + ch * entry.numSamples, entry.numSamples);
-        }
-
-        userIRs.push_back(std::move(entry));
-    }
+    // userIRsFromValueTree() validates every entry — state comes from DAW
+    // project files and must not be trusted (see UserIRState.h).
+    userIRs = sr::userIRsFromValueTree(apvts.state.getChildWithName("UserIRs"));
 
     // Reload active IR if saved
     int irIndex = static_cast<int>(apvts.getRawParameterValue(sr::Params::IDs::IR_INDEX)->load());
