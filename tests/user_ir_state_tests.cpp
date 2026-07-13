@@ -2,6 +2,7 @@
 // Requires JUCE (separate test target: SilentRiotJuceTests)
 
 #include <catch2/catch_test_macros.hpp>
+#include <limits>
 #include <vector>
 
 #include "dsp/cabinet/UserIRState.h"
@@ -125,4 +126,34 @@ TEST_CASE("Entry count is capped at MAX_USER_IRS", "[cabinet][ir][state]")
 
     REQUIRE(static_cast<int>(out.size()) == MAX_USER_IRS);
     REQUIRE(out.back().name == "ir_" + juce::String(MAX_USER_IRS - 1));
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Shared format validation (load path and restore path share this,
+// so an IR that loads in-session can always be restored from state)
+// ═══════════════════════════════════════════════════════════════
+
+TEST_CASE("isValidUserIRFormat accepts typical IR formats", "[cabinet][ir][state]")
+{
+    REQUIRE(isValidUserIRFormat(1, 512, 44100.0));
+    REQUIRE(isValidUserIRFormat(2, MAX_USER_IR_SAMPLES, 96000.0));
+    REQUIRE(isValidUserIRFormat(1, 1, MIN_USER_IR_SAMPLE_RATE));   // lower boundary
+    REQUIRE(isValidUserIRFormat(2, 2048, MAX_USER_IR_SAMPLE_RATE)); // upper boundary
+}
+
+TEST_CASE("isValidUserIRFormat rejects out-of-range formats", "[cabinet][ir][state]")
+{
+    // Channels
+    REQUIRE_FALSE(isValidUserIRFormat(0, 512, 48000.0));
+    REQUIRE_FALSE(isValidUserIRFormat(3, 512, 48000.0));
+    // Samples
+    REQUIRE_FALSE(isValidUserIRFormat(1, 0, 48000.0));
+    REQUIRE_FALSE(isValidUserIRFormat(1, MAX_USER_IR_SAMPLES + 1, 48000.0));
+    // Sample rate: out of band, zero, negative, non-finite
+    REQUIRE_FALSE(isValidUserIRFormat(1, 512, MIN_USER_IR_SAMPLE_RATE - 1.0));
+    REQUIRE_FALSE(isValidUserIRFormat(1, 512, MAX_USER_IR_SAMPLE_RATE + 1.0));
+    REQUIRE_FALSE(isValidUserIRFormat(1, 512, 0.0));
+    REQUIRE_FALSE(isValidUserIRFormat(1, 512, -48000.0));
+    REQUIRE_FALSE(isValidUserIRFormat(1, 512, std::numeric_limits<double>::infinity()));
+    REQUIRE_FALSE(isValidUserIRFormat(1, 512, std::numeric_limits<double>::quiet_NaN()));
 }

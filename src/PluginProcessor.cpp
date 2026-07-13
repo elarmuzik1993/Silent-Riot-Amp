@@ -757,6 +757,12 @@ bool SilentRiotProcessor::loadUserIR(const juce::File& file)
     int numChannels = std::min(static_cast<int>(reader->numChannels), 2);
     if (numChannels <= 0) return false;
 
+    // Reject formats the restore path can't accept (e.g. an out-of-band sample
+    // rate) up front — otherwise the IR would load now but be silently dropped
+    // on the next project reload, taking every user IR after it with it.
+    if (!sr::isValidUserIRFormat(numChannels, numSamples, reader->sampleRate))
+        return false;
+
     UserIREntry entry;
     entry.name = file.getFileNameWithoutExtension();
     entry.sampleRate = reader->sampleRate;

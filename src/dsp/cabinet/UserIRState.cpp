@@ -4,6 +4,15 @@
 
 namespace sr {
 
+bool isValidUserIRFormat(int numChannels, int numSamples, double sampleRate)
+{
+    return numChannels >= 1 && numChannels <= 2
+        && numSamples >= 1 && numSamples <= MAX_USER_IR_SAMPLES
+        && std::isfinite(sampleRate)
+        && sampleRate >= MIN_USER_IR_SAMPLE_RATE
+        && sampleRate <= MAX_USER_IR_SAMPLE_RATE;
+}
+
 juce::ValueTree userIRsToValueTree(const std::vector<UserIREntry>& userIRs)
 {
     juce::ValueTree irsNode("UserIRs");
@@ -52,13 +61,10 @@ std::vector<UserIREntry> userIRsFromValueTree(const juce::ValueTree& irsNode)
         entry.numSamples = static_cast<int>(irNode.getProperty("numSamples"));
 
         // All fields are untrusted (state comes from DAW project files).
-        // Bounds match what loadUserIR() can produce: 1–2 channels, at most
-        // MAX_USER_IR_SAMPLES samples, an audio-typical sample rate.
+        // isValidUserIRFormat() is the same gate loadUserIR() applies, so every
+        // restorable entry could also have been loaded fresh, and vice versa.
         const bool dimsValid =
-            entry.numChannels >= 1 && entry.numChannels <= 2
-            && entry.numSamples >= 1 && entry.numSamples <= MAX_USER_IR_SAMPLES
-            && std::isfinite(entry.sampleRate)
-            && entry.sampleRate >= 8000.0 && entry.sampleRate <= 768000.0;
+            isValidUserIRFormat(entry.numChannels, entry.numSamples, entry.sampleRate);
 
         const auto* audioBlob = irNode.getProperty("audioData").getBinaryData();
         const size_t needed = dimsValid
