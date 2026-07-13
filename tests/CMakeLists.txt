@@ -63,10 +63,12 @@ catch_discover_tests(SilentRiotTests)
 # ── JUCE-dependent tests (cabinet IR, convolution) ──
 add_executable(SilentRiotJuceTests
     cabinet_ir_tests.cpp
+    user_ir_state_tests.cpp
     oversample_switcher_tests.cpp
     effects_delay_reverb_tests.cpp
 
     ${CMAKE_SOURCE_DIR}/src/dsp/cabinet/CabinetSim.cpp
+    ${CMAKE_SOURCE_DIR}/src/dsp/cabinet/UserIRState.cpp
     ${CMAKE_SOURCE_DIR}/src/dsp/cabinet/SpeakerCoupling.cpp
     ${CMAKE_SOURCE_DIR}/src/dsp/filters/FilterBank.cpp
     ${CMAKE_SOURCE_DIR}/src/dsp/OversampleSwitcher.cpp
@@ -79,6 +81,7 @@ target_link_libraries(SilentRiotJuceTests PRIVATE
     juce::juce_dsp
     juce::juce_audio_formats
     juce::juce_audio_basics
+    juce::juce_data_structures
 )
 
 target_compile_definitions(SilentRiotJuceTests PRIVATE

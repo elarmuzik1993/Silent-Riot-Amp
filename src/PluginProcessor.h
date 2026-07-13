@@ -24,6 +24,7 @@
 #include "dsp/cabinet/SpeakerCoupling.h"
 #include "dsp/cabinet/OTSaturation.h"
 #include "dsp/cabinet/CabinetSim.h"
+#include "dsp/cabinet/UserIRState.h"
 #include "dsp/effects/NoiseGate.h"
 #include "dsp/effects/Boost.h"
 #include "dsp/effects/SafetyLimiter.h"
@@ -75,20 +76,16 @@ public:
     DSPReadout getDSPReadout() const;
 
     // ── User IR management (message thread only) ──
-    struct UserIREntry {
-        juce::String name;
-        double sampleRate = 0;
-        int numChannels = 0;
-        int numSamples = 0;
-        juce::AudioBuffer<float> audioData;
-    };
+    using UserIREntry = sr::UserIREntry;  // see dsp/cabinet/UserIRState.h
 
     // Apply a factory preset (sets gain/tone/volume/7W/cab + preset index).
     // Called on an explicit user selection (message thread) — NOT on state
     // restore, so user tweaks saved over a preset are preserved.
     void applyPreset(int presetIndex);
 
-    void loadUserIR(const juce::File& file);
+    // Returns false if the file can't be read or the list is already at
+    // sr::MAX_USER_IRS — callers must not assume a new entry was appended.
+    bool loadUserIR(const juce::File& file);
     void selectUserIR(int userIndex);  // 0-based index into userIRs
     int getNumUserIRs() const { return static_cast<int>(userIRs.size()); }
     const UserIREntry& getUserIR(int index) const { return userIRs[static_cast<size_t>(index)]; }
