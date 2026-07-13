@@ -84,6 +84,8 @@ target_sources(SilentRiot
         src/dsp/cabinet/CabinetSim.h
         src/dsp/cabinet/CabinetSim.cpp
         src/dsp/cabinet/IRLibrary.h
+        src/dsp/cabinet/UserIRState.h
+        src/dsp/cabinet/UserIRState.cpp
 
         # Effects module (gate / boost / delay / reverb — outside the amp loop)
         src/dsp/effects/NoiseGate.h

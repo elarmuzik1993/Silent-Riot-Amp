@@ -103,7 +103,16 @@ SilentRiotEditor::SilentRiotEditor(SilentRiotProcessor& p)
     };
 
     irLoaderPanel.onUserIRLoaded = [this](const juce::File& file) {
-        proc.loadUserIR(file);
+        if (proc.getNumUserIRs() >= sr::MAX_USER_IRS) {
+            irSectionBar.setHintText("IR list full (" + juce::String(sr::MAX_USER_IRS) + ")");
+            return;
+        }
+        if (!proc.loadUserIR(file)) {
+            // On failure nothing was appended — adding a panel entry here
+            // would duplicate the previous IR.
+            irSectionBar.setHintText("Couldn't read IR file");
+            return;
+        }
         int newIdx = proc.getNumUserIRs();
         const auto& ir = proc.getUserIR(newIdx - 1);
         irLoaderPanel.addUserIR(ir.name, ir.numSamples, ir.sampleRate,
