@@ -20,6 +20,13 @@ namespace sr {
 // clamped parameter select a different IR than the one shown in the UI.
 inline constexpr int MAX_USER_IRS = 32;
 
+// Accepted user-IR sample-rate band. Shared by the load path (loadUserIR) and
+// the restore path (userIRsFromValueTree) so any IR that can be loaded in a
+// session can also be restored from saved state — an out-of-band rate is
+// rejected up front instead of silently on the next project load.
+inline constexpr double MIN_USER_IR_SAMPLE_RATE = 8000.0;
+inline constexpr double MAX_USER_IR_SAMPLE_RATE = 768000.0;
+
 struct UserIREntry {
     juce::String name;
     double sampleRate = 0;
@@ -27,6 +34,12 @@ struct UserIREntry {
     int numSamples = 0;
     juce::AudioBuffer<float> audioData;
 };
+
+// True when the audio format is within the accepted bounds: 1–2 channels,
+// 1..MAX_USER_IR_SAMPLES samples, and a finite sample rate inside the band
+// above. loadUserIR() and userIRsFromValueTree() share this so their accept
+// criteria can't drift apart.
+bool isValidUserIRFormat(int numChannels, int numSamples, double sampleRate);
 
 // Serialize entries into a "UserIRs" node (audio stored as raw floats,
 // channels concatenated).
