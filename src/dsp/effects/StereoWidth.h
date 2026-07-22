@@ -56,16 +56,24 @@ struct StereoWidth {
     }
 
     void reset() {
-        std::fill(delayBuf.begin(), delayBuf.end(), 0.0f);
-        writePos = 0;
-        lfoPhase = 0.0f;
-        apX1 = apY1 = 0.0f;
+        clearTail();
         width = 0.0f;   // park at OFF so isActive() reports dormant until moved
     }
 
     // True once the smoothed width has left 0 — lets the caller skip the whole
     // stage (bit-exact dry) while the knob sits parked at OFF.
     bool isActive() const { return width > 1e-5f; }
+
+    // Clear only the decorrelator tail (Haas buffer, all-pass, LFO phase) while
+    // leaving the smoothed knob value alone. Called on the OFF→on edge, because
+    // the delay line isn't primed while the stage is skipped — this stops stale
+    // audio from bleeding into the side voice on re-engage.
+    void clearTail() {
+        std::fill(delayBuf.begin(), delayBuf.end(), 0.0f);
+        writePos = 0;
+        lfoPhase = 0.0f;
+        apX1 = apY1 = 0.0f;
+    }
 
     // Widen a stereo pair in place. `target` is the raw 0..1 knob value.
     // Caller guarantees left/right are two valid channels of `numSamples`.
