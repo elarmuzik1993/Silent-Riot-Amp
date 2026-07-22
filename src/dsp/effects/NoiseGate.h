@@ -44,6 +44,17 @@ struct NoiseGate {
     // thresholdDb: open threshold. Gate closes once the signal drops
     // GATE_HYSTERESIS_DB below it, preventing chatter near the boundary.
     float process(float x, float thresholdDb) {
+        // Threshold knob parked at 0 (maps to GATE_THRESH_MIN_DB): the gate is
+        // OFF — true bypass, not just "-80 dB / effectively open". Pass the
+        // sample untouched and hold the gate fully open so there's no residual
+        // gating of near-silence and no click when the knob leaves 0.
+        if (thresholdDb <= GATE_THRESH_MIN_DB) {
+            envelope = std::abs(x);
+            open     = true;
+            gain     = 1.0f;
+            return x;
+        }
+
         // Peak follower: instant attack, smoothed release. Tracks the signal
         // PEAK (not its average) so the threshold is peak-referenced and the
         // envelope holds near the peak between cycles — keeping the open/close
