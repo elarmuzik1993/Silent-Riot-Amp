@@ -193,6 +193,11 @@ constexpr float WIDTH_MAX_SIDE_GAIN = 2.0f;   // full-wide side boost (knob = 1)
 constexpr float WIDTH_SYNTH_MAX     = 0.6f;   // max decorrelated content injected into side
 constexpr float WIDTH_ALLPASS_COEFF = 0.7f;   // all-pass diffusion coefficient
 constexpr float WIDTH_SMOOTH_MS     = 50.0f;  // knob smoothing (avoids zipper)
+// Doubler micro-detune: a slow LFO sways the Haas read tap, continuously
+// pitch-shifting the side voice by a few cents (peak ≈ 1200/ln2 · 2π · rate ·
+// depth_s ≈ ±5 cents here) for the "two slightly detuned guitars" shimmer.
+constexpr float WIDTH_DETUNE_RATE_HZ  = 0.42f; // detune LFO rate (slow drift)
+constexpr float WIDTH_DETUNE_DEPTH_MS = 1.2f;  // read-tap sway → detune depth
 
 // Post-effects safety limiter (catches wet delay/reverb peaks that would
 // otherwise escape the amp's output limiter and hard-clip the DAC). Soft knee:

@@ -91,6 +91,30 @@ TEST_CASE("Widener synthesises width from a MONO (dual-mono) input", "[stereo_wi
     }
 }
 
+TEST_CASE("Micro-detune makes the side voice drift over time", "[stereo_width]") {
+    // Feed a steady mono sine whose period is an exact integer (200 Hz @ 48 kHz
+    // = 240 samples). A STATIC Haas/all-pass widener would make the synthesized
+    // side voice exactly periodic too → side[k] == side[k+240] in steady state.
+    // The LFO detune continuously pitch-shifts that voice, so it slips phase and
+    // side[k] != side[k+240]. That drift is the detune signature.
+    const int n = 20000, P = 240;
+    std::vector<float> L(n), R(n);
+    for (int i = 0; i < n; ++i) {
+        const float s = 0.6f * std::sin(2.0f * 3.14159265f * 200.0f * i / kSR);
+        L[i] = s; R[i] = s;   // dual-mono
+    }
+    StereoWidth w; w.prepare(kSR);
+    w.process(L.data(), R.data(), n, 1.0f);
+
+    float maxDrift = 0.0f;
+    for (int k = 13000; k < n - P; ++k) {
+        const float sideK  = 0.5f * (L[k]     - R[k]);
+        const float sideKP = 0.5f * (L[k + P] - R[k + P]);
+        maxDrift = std::max(maxDrift, std::abs(sideK - sideKP));
+    }
+    REQUIRE(maxDrift > 5e-4f);   // static widener would be ~1e-6 (numerical floor)
+}
+
 TEST_CASE("Widener never emits non-finite samples", "[stereo_width]") {
     Run r(1.0f);
     for (size_t i = 0; i < r.L.size(); ++i) {
