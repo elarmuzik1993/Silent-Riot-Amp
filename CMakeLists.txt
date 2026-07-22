@@ -97,6 +97,10 @@ target_sources(SilentRiot
         src/dsp/effects/Reverb.h
         src/dsp/effects/Reverb.cpp
 
+        # Analysis — live-tuner pitch detection
+        src/dsp/analysis/PitchDetector.h
+        src/dsp/analysis/PitchDetector.cpp
+
         # Oversampling state machine
         src/dsp/OversampleSwitcher.h
         src/dsp/OversampleSwitcher.cpp
@@ -115,6 +119,8 @@ target_sources(SilentRiot
         src/gui/ToggleSwitch.cpp
         src/gui/HeaderBar.h
         src/gui/HeaderBar.cpp
+        src/gui/TunerBar.h
+        src/gui/TunerBar.cpp
         src/gui/FooterBar.h
         src/gui/FooterBar.cpp
         src/gui/SectionBar.h

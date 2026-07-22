@@ -338,6 +338,12 @@ void SilentRiotProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     float reverbSz  = sanitizeUnitParam(apvts.getRawParameterValue(Params::IDs::REVERB_SIZE)->load());
     float reverbTn  = sanitizeUnitParam(apvts.getRawParameterValue(Params::IDs::REVERB_TONE)->load());
 
+    // ── Live tuner capture ──
+    // Tap the raw DI input BEFORE any processing or the power-off return, so
+    // the tuner tracks pitch even when the amp is silenced (classic workflow).
+    if (buffer.getNumChannels() > 0)
+        pushTunerSamples(buffer.getReadPointer(0), buffer.getNumSamples());
+
     // Master power off — silence output
     if (!powerOn) { buffer.clear(); return; }
 
@@ -686,6 +692,35 @@ SilentRiotProcessor::DSPReadout SilentRiotProcessor::getDSPReadout() const
     r.osFactor = osFactorForGUI.load(std::memory_order_relaxed);
     r.is7W     = std::abs(baseBias - PENTODE_BIAS_7W_N) < 1e-6f;
     return r;
+}
+
+// ── Live tuner ring buffer ──
+void SilentRiotProcessor::pushTunerSamples(const float* data, int n)
+{
+    if (data == nullptr || n <= 0) return;
+
+    uint64_t pos = tunerWritePos.load(std::memory_order_relaxed);
+    for (int i = 0; i < n; ++i)
+        tunerRing[static_cast<size_t>((pos + static_cast<uint64_t>(i)) & kTunerRingMask)] = data[i];
+
+    // Publish the advanced write position last (release) so a concurrent reader
+    // that observes the new count also sees the samples written above.
+    tunerWritePos.store(pos + static_cast<uint64_t>(n), std::memory_order_release);
+}
+
+int SilentRiotProcessor::readLatestTunerSamples(float* dest, int maxN) const
+{
+    if (dest == nullptr || maxN <= 0) return 0;
+
+    const uint64_t pos = tunerWritePos.load(std::memory_order_acquire);
+    const int available = static_cast<int>(std::min<uint64_t>(pos, kTunerRingSize));
+    const int count = std::min(maxN, available);
+
+    // Copy the last `count` samples ending at the write position (oldest first).
+    const uint64_t start = pos - static_cast<uint64_t>(count);
+    for (int i = 0; i < count; ++i)
+        dest[i] = tunerRing[static_cast<size_t>((start + static_cast<uint64_t>(i)) & kTunerRingMask)];
+    return count;
 }
 
 // ── Boilerplate ──
