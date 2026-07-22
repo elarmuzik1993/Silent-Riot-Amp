@@ -201,6 +201,7 @@ void SilentRiotProcessor::resetDSPState()
     delay.reset();
     reverb.reset();
     stereoWidth.reset();
+    widenerWasActive = false;
 
     lastShapeCoeffVal = -1.0f;   // force shape coeff recompute on first sample
     psuFrozen = false;
@@ -628,12 +629,33 @@ void SilentRiotProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
         reverb.process(buffer);
     }
 
+    // ── MONO/STEREO widener (stereo bus only) ──
+    // Skipped entirely (bit-exact dry) while the knob sits parked at 0 and the
+    // internal smoother has settled — see StereoWidth::isActive(). Meaningless
+    // on a mono bus, so guarded to two channels. On the OFF→on edge we clear the
+    // Haas tail: while skipped, the delay line stops being primed, so without
+    // this a re-engage could bleed ~12 ms of stale audio into the side voice.
+    const bool widenerActive =
+        buffer.getNumChannels() == 2 && (widthParam != 0.0f || stereoWidth.isActive());
+    if (widenerActive)
+    {
+        if (!widenerWasActive) stereoWidth.clearTail();
+        stereoWidth.process(buffer.getWritePointer(0), buffer.getWritePointer(1),
+                            buffer.getNumSamples(), widthParam);
+    }
+    widenerWasActive = widenerActive;
+
     // ── Post-effects safety limiter ──
-    // delay/reverb run AFTER the amp's output limiter, so their wet tails can
-    // sum past full-scale. Soft-clip the summed output back into ±1 (and scrub
-    // any non-finite sample). Runs ONLY when an effect is active, so the dry
-    // amp path stays bit-identical when the whole module is off.
-    if (delayOn || reverbOn)
+    // delay/reverb run AFTER the amp's output limiter (their wet tails can sum
+    // past full-scale), and the widener boosts one channel's peak above the
+    // input (it can exceed ±1 even when the mono sum is in range). Both land
+    // after the amp's own limiter, so soft-clip the finished bus back into ±1
+    // (and scrub any non-finite sample) as a last line of defence. Runs ONLY
+    // when an effect is active, so the dry amp path stays bit-identical when the
+    // whole module is off. NOTE: this per-channel clip is nonlinear, so on peaks
+    // that actually hit the knee it marginally perturbs the widener's exact
+    // mono-sum invariance — an accepted trade against hard DAC clipping.
+    if (delayOn || reverbOn || widenerActive)
     {
         for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
         {
@@ -644,16 +666,6 @@ void SilentRiotProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
                 samples[i] = std::isfinite(s) ? softClip(s) : 0.0f;
             }
         }
-    }
-
-    // ── MONO/STEREO widener (very last, stereo bus only) ──
-    // Skipped entirely (bit-exact dry) while the knob sits parked at unity and
-    // the internal smoother has settled — see StereoWidth::isActive(). Meaningless
-    // on a mono bus, so guarded to two channels.
-    if (buffer.getNumChannels() == 2 && (widthParam != 0.0f || stereoWidth.isActive()))
-    {
-        stereoWidth.process(buffer.getWritePointer(0), buffer.getWritePointer(1),
-                            buffer.getNumSamples(), widthParam);
     }
 
     // ── GUI level metering (RMS of channel 0) ──
