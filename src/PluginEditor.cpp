@@ -32,7 +32,14 @@ SilentRiotEditor::SilentRiotEditor(SilentRiotProcessor& p)
     contentArea.setInterceptsMouseClicks(false, true);
 
     contentArea.addAndMakeVisible(header);
+    contentArea.addAndMakeVisible(tuner);
     contentArea.addAndMakeVisible(footer);
+
+    // Live tuner: pull DI windows straight from the processor's capture ring.
+    tuner.prepare(proc.getSampleRate() > 0.0 ? proc.getSampleRate() : 44100.0);
+    tuner.readSamples = [this](float* dest, int maxN) {
+        return proc.readLatestTunerSamples(dest, maxN);
+    };
     contentArea.addAndMakeVisible(vuIn);
     contentArea.addAndMakeVisible(vuOut);
     contentArea.addAndMakeVisible(gainKnob);
@@ -491,6 +498,9 @@ void SilentRiotEditor::timerCallback()
         vuOut.setLevel(0.0f);
     }
 
+    // Live tuner — detects from captured DI input (works even with PWR off)
+    tuner.refresh();
+
     // Live footer stats
     {
         auto dspR = proc.getDSPReadout();
@@ -549,6 +559,7 @@ void SilentRiotEditor::layoutContent()
     auto area = contentArea.getLocalBounds();
 
     header.setBounds(area.removeFromTop(kHeaderH));
+    tuner.setBounds(area.removeFromTop(kTunerH));
 
     auto body = area.removeFromTop(kBodyH);
     int vuW = 40;

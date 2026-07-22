@@ -5,6 +5,7 @@
 #include "gui/VUMeter.h"
 #include "gui/ToggleSwitch.h"
 #include "gui/HeaderBar.h"
+#include "gui/TunerBar.h"
 #include "gui/FooterBar.h"
 #include "gui/SectionBar.h"
 #include "gui/AdvancedPanel.h"
@@ -53,6 +54,7 @@ private:
 
     // Layout
     sr::HeaderBar header;
+    sr::TunerBar  tuner;
     sr::FooterBar footer;
     sr::VUMeter vuIn{"IN"}, vuOut{"OUT"};
 
@@ -103,11 +105,12 @@ private:
 
     static constexpr int kWindowW = 700;
     static constexpr int kHeaderH   = 38;
+    static constexpr int kTunerH    = sr::TunerBar::barHeight;  // always-visible live tuner
     static constexpr int kBodyH     = 232;
     static constexpr int kSectionH  = 26;
     static constexpr int kFooterH   = 30;
     // 3 section bars: EFFECTS, IR LOADER, ADVANCED
-    static constexpr int kBaseH     = kHeaderH + kBodyH + kSectionH * 3 + kFooterH;
+    static constexpr int kBaseH     = kHeaderH + kTunerH + kBodyH + kSectionH * 3 + kFooterH;
 
     float currentScale = 1.0f;
     bool compositorBypassed = false;
