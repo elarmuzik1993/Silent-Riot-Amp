@@ -5,10 +5,50 @@
 
 namespace sr {
 
+MuteButton::MuteButton() : juce::Button("Tuner Mute")
+{
+    setClickingTogglesState(true);
+    setWantsKeyboardFocus(true);
+    setTitle("Tuner mute");
+    setDescription("Mute amp output while tuning");
+}
+
+void MuteButton::paintButton(juce::Graphics& g, bool highlighted, bool /*down*/)
+{
+    auto r = getLocalBounds().toFloat().reduced(1.0f);
+    const bool on = getToggleState();
+
+    g.setColour(on ? Colours::accent.withAlpha(0.18f) : Colours::panel);
+    g.fillRoundedRectangle(r, 4.0f);
+
+    g.setColour(on ? Colours::accent
+                   : (highlighted ? Colours::borderHi : Colours::border));
+    g.drawRoundedRectangle(r, 4.0f, 1.0f);
+
+    if (hasKeyboardFocus(false))
+    {
+        g.setColour(Colours::accent.withAlpha(0.7f));
+        g.drawRoundedRectangle(r.expanded(1.0f), 5.0f, 1.5f);
+    }
+
+    g.setFont(Fonts::spaceMono(8.5f, true));
+    g.setColour(on ? Colours::accent : Colours::dim);
+    g.drawText("MUTE", getLocalBounds(), juce::Justification::centred, false);
+}
+
 TunerBar::TunerBar()
 {
-    setInterceptsMouseClicks(false, false);  // passive display
+    setInterceptsMouseClicks(false, true);  // passive strip; mute button clickable
+    addAndMakeVisible(muteButton);
+    muteButton.setTooltip("Mute output while tuning");
     prepare(44100.0);
+}
+
+void TunerBar::resized()
+{
+    // MUTE pill at the right edge, vertically centred.
+    const int w = 42, h = 20;
+    muteButton.setBounds(getWidth() - w - 12, (getHeight() - h) / 2, w, h);
 }
 
 void TunerBar::prepare(double sampleRate)
@@ -130,8 +170,8 @@ void TunerBar::paint(juce::Graphics& g)
                juce::Rectangle<float>(meterX + meterW + 4.0f, 0.0f, 12.0f, bounds.getHeight()),
                juce::Justification::centred, false);
 
-    // ── Frequency + cents readout, right ──
-    auto readBox = juce::Rectangle<float>(bounds.getWidth() - 116.0f, 0.0f, 100.0f, bounds.getHeight());
+    // ── Frequency + cents readout, right (left of the MUTE button) ──
+    auto readBox = juce::Rectangle<float>(bounds.getWidth() - 162.0f, 0.0f, 100.0f, bounds.getHeight());
     g.setFont(Fonts::spaceMono(10.0f));
     if (hasPitch)
     {

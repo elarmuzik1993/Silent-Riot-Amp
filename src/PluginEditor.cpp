@@ -171,6 +171,7 @@ SilentRiotEditor::SilentRiotEditor(SilentRiotProcessor& p)
     halfPowerA = std::make_unique<ButtonA>(proc.apvts, IDs::HALF_POWER, halfPowerToggle.getButton());
     cabSimA    = std::make_unique<ButtonA>(proc.apvts, IDs::CAB_SIM,    cabSimToggle.getButton());
     powerA     = std::make_unique<ButtonA>(proc.apvts, IDs::POWER,      powerToggle.getButton());
+    tunerMuteA = std::make_unique<ButtonA>(proc.apvts, IDs::TUNER_MUTE, tuner.getMuteButton());
 
     // Effects module attachments
     gateOnA      = std::make_unique<ButtonA>(proc.apvts, IDs::GATE_ON,        effectsPanel.gateToggle().getButton());

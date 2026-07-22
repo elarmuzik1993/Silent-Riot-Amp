@@ -89,6 +89,9 @@ juce::AudioProcessorValueTreeState::ParameterLayout SilentRiotProcessor::createP
     params.push_back(std::make_unique<juce::AudioParameterBool>(
         juce::ParameterID{ Params::IDs::POWER, 1 }, "Power", true));
 
+    params.push_back(std::make_unique<juce::AudioParameterBool>(
+        juce::ParameterID{ Params::IDs::TUNER_MUTE, 1 }, "Tuner Mute", false));
+
     params.push_back(std::make_unique<juce::AudioParameterChoice>(
         juce::ParameterID{ Params::IDs::OVERSAMPLE, 1 }, "Oversample",
         juce::StringArray{ "2x", "4x", "8x" }, 1));
@@ -314,6 +317,7 @@ void SilentRiotProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     bool  is7W      = apvts.getRawParameterValue(Params::IDs::HALF_POWER)->load() > 0.5f;
     bool  cabOn     = apvts.getRawParameterValue(Params::IDs::CAB_SIM)->load() > 0.5f;
     bool  powerOn   = apvts.getRawParameterValue(Params::IDs::POWER)->load() > 0.5f;
+    bool  tunerMute = apvts.getRawParameterValue(Params::IDs::TUNER_MUTE)->load() > 0.5f;
     int   irIndex   = static_cast<int>(apvts.getRawParameterValue(Params::IDs::IR_INDEX)->load());
 
     // Effects module parameters (run at base SR, outside the amp loop).
@@ -344,8 +348,9 @@ void SilentRiotProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     if (buffer.getNumChannels() > 0)
         pushTunerSamples(buffer.getReadPointer(0), buffer.getNumSamples());
 
-    // Master power off — silence output
-    if (!powerOn) { buffer.clear(); return; }
+    // Master power off, or tuner mute engaged — silence output. Capture above
+    // still ran, so the tuner keeps tracking pitch while the amp is silent.
+    if (!powerOn || tunerMute) { buffer.clear(); return; }
 
     el84BaseBias = is7W ? PENTODE_BIAS_7W_N : PENTODE_BIAS_15W_N;
     cabSim.setEnabled(cabOn);
