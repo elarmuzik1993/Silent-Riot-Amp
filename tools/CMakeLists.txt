@@ -68,3 +68,37 @@ target_link_libraries(sr_render PRIVATE
 )
 
 target_compile_features(sr_render PRIVATE cxx_std_17)
+
+# ── Offline GUI snapshot (renders the EFFECTS panel to a PNG) ────────────────
+# Standalone from the plugin target; links only the GUI pieces the panel needs.
+juce_add_console_app(sr_snapshot PRODUCT_NAME "sr_snapshot")
+
+target_sources(sr_snapshot PRIVATE
+    sr_snapshot.cpp
+    ${CMAKE_SOURCE_DIR}/src/gui/FontData.cpp
+    ${CMAKE_SOURCE_DIR}/src/gui/NotchKnob.cpp
+    ${CMAKE_SOURCE_DIR}/src/gui/ToggleSwitch.cpp
+    ${CMAKE_SOURCE_DIR}/src/gui/SegmentedSelector.cpp
+    ${CMAKE_SOURCE_DIR}/src/gui/EffectsPanel.cpp
+)
+
+target_compile_definitions(sr_snapshot PRIVATE
+    JUCE_WEB_BROWSER=0
+    JUCE_USE_CURL=0
+    JUCE_STANDALONE_APPLICATION=1
+)
+
+target_include_directories(sr_snapshot PRIVATE ${CMAKE_SOURCE_DIR}/src)
+
+target_link_libraries(sr_snapshot PRIVATE
+    SilentRiotData
+    juce::juce_gui_basics
+    juce::juce_gui_extra
+    juce::juce_graphics
+    $<$<PLATFORM_ID:Linux>:X11::X11>
+    $<$<PLATFORM_ID:Linux>:X11::Xext>
+    juce::juce_recommended_config_flags
+    juce::juce_recommended_warning_flags
+)
+
+target_compile_features(sr_snapshot PRIVATE cxx_std_17)
