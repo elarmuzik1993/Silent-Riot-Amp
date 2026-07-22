@@ -16,6 +16,7 @@ namespace IDs {
     static const juce::String OVERSAMPLE  = "oversample";  // choice: 2x/4x/8x
     static const juce::String PRESET_IDX  = "presetIndex"; // int: 0–4
     static const juce::String IR_INDEX    = "irIndex";     // int: 0–N
+    static const juce::String TUNER_MUTE  = "tunerMute";   // bool: silence output while tuning
 
     // ── Effects module (all default OFF; tone-neutral when bypassed) ──
     // Pre-amp: noise gate + boost/tight-EQ. Post-cab: delay + reverb.

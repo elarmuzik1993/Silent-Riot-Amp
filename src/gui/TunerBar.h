@@ -6,6 +6,14 @@
 
 namespace sr {
 
+// Compact toggle button ("MUTE") painted as a pill — orange when engaged.
+// A juce::Button so it wires straight to an APVTS ButtonAttachment.
+class MuteButton : public juce::Button {
+public:
+    MuteButton();
+    void paintButton(juce::Graphics&, bool highlighted, bool down) override;
+};
+
 // Always-on live tuner strip. Pulls the most-recent DI window from the audio
 // engine (via readSamples), runs monophonic pitch detection off the audio
 // thread, and paints a note name + cents meter. Driven by the editor's shared
@@ -14,6 +22,11 @@ class TunerBar : public juce::Component {
 public:
     TunerBar();
     void paint(juce::Graphics&) override;
+    void resized() override;
+
+    // Mute-while-tuning toggle — silences the amp output while engaged. Wired
+    // to the TUNER_MUTE parameter via a ButtonAttachment in the editor.
+    juce::Button& getMuteButton() { return muteButton; }
 
     // Size the detector for the current base sample rate. Call from prepare /
     // editor construction before the first refresh().
@@ -32,6 +45,7 @@ public:
 private:
     PitchDetector      detector;
     std::vector<float> scratch;
+    MuteButton         muteButton;
 
     // Smoothed / held display state
     bool  hasPitch      = false;   // true while a confident note is shown

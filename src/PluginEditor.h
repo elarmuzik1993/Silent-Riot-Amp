@@ -94,7 +94,7 @@ private:
     using SliderA = juce::AudioProcessorValueTreeState::SliderAttachment;
     using ButtonA = juce::AudioProcessorValueTreeState::ButtonAttachment;
     std::unique_ptr<SliderA> gainA, toneA, volA;
-    std::unique_ptr<ButtonA> halfPowerA, cabSimA, powerA;
+    std::unique_ptr<ButtonA> halfPowerA, cabSimA, powerA, tunerMuteA;
 
     // Effects module attachments
     std::unique_ptr<ButtonA> gateOnA, boostOnA, delayOnA, reverbOnA, delayPingPongA;
