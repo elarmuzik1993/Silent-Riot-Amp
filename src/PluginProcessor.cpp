@@ -104,7 +104,8 @@ juce::AudioProcessorValueTreeState::ParameterLayout SilentRiotProcessor::createP
     params.push_back(std::make_unique<juce::AudioParameterBool>(
         juce::ParameterID{ Params::IDs::GATE_ON, 1 }, "Gate", false));
     // Threshold is a 0–1 knob (maps 0..1 → GATE_THRESH_MIN..MAX dB in processBlock,
-    // so NotchKnob's 0–1 arc works). Default 0 = -80 dB (effectively open).
+    // so NotchKnob's 0–1 arc works). Default 0 = gate OFF (true bypass — see
+    // NoiseGate::process).
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         juce::ParameterID{ Params::IDs::GATE_THRESHOLD, 1 }, "Gate Threshold",
         juce::NormalisableRange<float>(0.0f, 1.0f, 0.001f), 0.0f));

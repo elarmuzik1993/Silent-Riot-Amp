@@ -77,6 +77,24 @@ TEST_CASE("NoiseGate hysteresis holds open between thresholds", "[gate]")
     REQUIRE(g.open == true);
 }
 
+TEST_CASE("NoiseGate is a true bypass at threshold 0 (GATE_THRESH_MIN_DB)", "[gate]")
+{
+    NoiseGate g;
+    g.recalcCoeffs(kSR);
+
+    // A signal far BELOW -80 dB would normally be gated shut, but with the knob
+    // parked at 0 the gate is OFF: output must equal input, sample for sample.
+    const float quiet = std::pow(10.0f, -100.0f / 20.0f);  // -100 dB
+    for (int i = 0; i < 24000; ++i)
+    {
+        float x = quiet * std::sin(2.0f * PI_F * 200.0f * i / kSR);
+        float y = g.process(x, GATE_THRESH_MIN_DB);
+        REQUIRE(y == x);
+    }
+    REQUIRE(g.gain == Catch::Approx(1.0f));
+    REQUIRE(g.open == true);
+}
+
 TEST_CASE("NoiseGate reset restores open state", "[gate]")
 {
     NoiseGate g;
