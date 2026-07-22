@@ -31,6 +31,7 @@
 #include "dsp/effects/Delay.h"
 #include "dsp/effects/TempoSync.h"
 #include "dsp/effects/Reverb.h"
+#include "dsp/effects/StereoWidth.h"
 #include "dsp/OversampleSwitcher.h"
 
 class SilentRiotProcessor : public juce::AudioProcessor,
@@ -122,6 +123,7 @@ private:
     sr::Boost               boost;
     sr::Delay               delay;
     sr::Reverb              reverb;
+    sr::StereoWidth         stereoWidth;   // final MONO↔STEREO widener (stereo only)
     // Boost level smoothed at base SR (avoids zipper on the make-up gain).
     juce::SmoothedValue<float> boostLevelSm, boostTightSm, boostBrightSm, gateThreshSm;
 

@@ -36,6 +36,7 @@ namespace IDs {
     static const juce::String REVERB_MIX      = "reverbMix";     // float 0–1
     static const juce::String REVERB_SIZE     = "reverbSize";    // float 0–1
     static const juce::String REVERB_TONE     = "reverbTone";    // float 0–1 (loop damping)
+    static const juce::String WIDTH           = "width";         // float 0–1: 0=mono, 0.5=unity, 1=wide
 }
 
 } // namespace sr::Params

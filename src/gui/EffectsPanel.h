@@ -29,6 +29,7 @@ public:
 
     // Knobs
     NotchKnob& gateThreshKnob()  { return gateThresh; }
+    NotchKnob& widthKnob()       { return width; }
     NotchKnob& boostLevelKnob()  { return boostLevel; }
     NotchKnob& boostTightKnob()  { return boostTight; }
     NotchKnob& boostBrightKnob() { return boostBright; }
@@ -59,6 +60,7 @@ private:
     ToggleSwitch delayPP   { "PP" };
 
     NotchKnob gateThresh { "THRESH", 0.0f };
+    NotchKnob width      { "WIDTH",  0.5f };   // 0=mono, 5=unity, 10=wide
     NotchKnob boostLevel { "LEVEL",  0.5f };
     NotchKnob boostTight { "TIGHT",  0.0f };
     NotchKnob boostBright{ "BRIGHT", 0.0f };

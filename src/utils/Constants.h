@@ -185,6 +185,15 @@ constexpr float BOOST_TIGHT_MAX_HZ  = 400.0f;   // tight=1 → tight, focused lo
 constexpr float BOOST_BRIGHT_FREQ   = 2000.0f;  // bright shelf corner
 constexpr float BOOST_BRIGHT_MAX_DB = 9.0f;     // bright=1 → +9 dB above corner
 
+// MONO/STEREO widener (final output stage, post-everything). The knob centre
+// (0.5) is unity/bit-exact; below collapses toward mono, above widens and
+// injects synthesised decorrelation into the SIDE only (mono sum preserved).
+constexpr float WIDTH_HAAS_MS       = 12.0f;  // decorrelation delay (Mid → side voice)
+constexpr float WIDTH_MAX_SIDE_GAIN = 2.0f;   // full-wide side boost (knob = 1)
+constexpr float WIDTH_SYNTH_MAX     = 0.6f;   // max decorrelated content injected into side
+constexpr float WIDTH_ALLPASS_COEFF = 0.7f;   // all-pass diffusion coefficient
+constexpr float WIDTH_SMOOTH_MS     = 50.0f;  // knob smoothing (avoids zipper)
+
 // Post-effects safety limiter (catches wet delay/reverb peaks that would
 // otherwise escape the amp's output limiter and hard-clip the DAC). Soft knee:
 // transparent below the threshold, smoothly bounded to ±1 above it.

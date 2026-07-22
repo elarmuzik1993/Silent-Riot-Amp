@@ -161,6 +161,12 @@ juce::AudioProcessorValueTreeState::ParameterLayout SilentRiotProcessor::createP
         juce::ParameterID{ Params::IDs::REVERB_TONE, 1 }, "Reverb Tone",
         juce::NormalisableRange<float>(0.0f, 1.0f, 0.001f), 0.5f));
 
+    // Stereo widener — 0 = mono, 0.5 = unity (bit-exact), 1 = wide. Always
+    // active (no ON toggle); neutral at centre, so it defaults tone-transparent.
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{ Params::IDs::WIDTH, 1 }, "Width",
+        juce::NormalisableRange<float>(0.0f, 1.0f, 0.001f), 0.5f));
+
     return { params.begin(), params.end() };
 }
 
@@ -195,6 +201,7 @@ void SilentRiotProcessor::resetDSPState()
     boost.reset();
     delay.reset();
     reverb.reset();
+    stereoWidth.reset();
 
     lastShapeCoeffVal = -1.0f;   // force shape coeff recompute on first sample
     psuFrozen = false;
@@ -260,6 +267,7 @@ void SilentRiotProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
     boost.prepare(baseSR);
     delay.prepare(sampleRate, samplesPerBlock, getTotalNumOutputChannels());
     reverb.prepare(sampleRate, samplesPerBlock, getTotalNumOutputChannels());
+    stereoWidth.prepare(baseSR);
 
     const double fxRampSec = 0.05;
     gateThreshSm.reset(sampleRate, fxRampSec);
@@ -337,6 +345,7 @@ void SilentRiotProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     float reverbMix = sanitizeUnitParam(apvts.getRawParameterValue(Params::IDs::REVERB_MIX)->load());
     float reverbSz  = sanitizeUnitParam(apvts.getRawParameterValue(Params::IDs::REVERB_SIZE)->load());
     float reverbTn  = sanitizeUnitParam(apvts.getRawParameterValue(Params::IDs::REVERB_TONE)->load());
+    float widthParam= sanitizeUnitParam(apvts.getRawParameterValue(Params::IDs::WIDTH)->load());
 
     // Master power off — silence output
     if (!powerOn) { buffer.clear(); return; }
@@ -634,6 +643,16 @@ void SilentRiotProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
                 samples[i] = std::isfinite(s) ? softClip(s) : 0.0f;
             }
         }
+    }
+
+    // ── MONO/STEREO widener (very last, stereo bus only) ──
+    // Skipped entirely (bit-exact dry) while the knob sits parked at unity and
+    // the internal smoother has settled — see StereoWidth::isActive(). Meaningless
+    // on a mono bus, so guarded to two channels.
+    if (buffer.getNumChannels() == 2 && (widthParam != 0.5f || stereoWidth.isActive()))
+    {
+        stereoWidth.process(buffer.getWritePointer(0), buffer.getWritePointer(1),
+                            buffer.getNumSamples(), widthParam);
     }
 
     // ── GUI level metering (RMS of channel 0) ──
