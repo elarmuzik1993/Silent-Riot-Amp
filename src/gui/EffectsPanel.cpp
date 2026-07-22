@@ -6,7 +6,6 @@ namespace sr {
 
 EffectsPanel::EffectsPanel()
 {
-    addAndMakeVisible(gateTgl);
     addAndMakeVisible(boostTgl);
     addAndMakeVisible(delayTgl);
     addAndMakeVisible(reverbTgl);
@@ -86,9 +85,14 @@ void EffectsPanel::resized()
 {
     auto area = getLocalBounds().reduced(10);
 
-    // UTILITY card: noise gate (ON toggle + THRESH) plus the always-on WIDTH
-    // knob. The ON toggle gates only the gate; WIDTH is neutral at centre.
-    layoutCard(cardBounds(area, 0, 0), gateTgl,   { &gateThresh, &width });
+    // UTILITY card: no toggle — both knobs self-gate (THRESH 0 = gate off,
+    // WIDTH centre = unity). Lay the title strip, then the two knobs.
+    {
+        auto inner = cardBounds(area, 0, 0).reduced(10, 6);
+        inner.removeFromTop(16);   // title strip ("UTILITY")
+        inner.removeFromTop(4);
+        layoutKnobRow(inner, { &gateThresh, &width });
+    }
     layoutCard(cardBounds(area, 1, 0), boostTgl,  { &boostLevel, &boostTight, &boostBright });
     layoutCard(cardBounds(area, 1, 1), reverbTgl, { &reverbMix, &reverbSize, &reverbTone });
 

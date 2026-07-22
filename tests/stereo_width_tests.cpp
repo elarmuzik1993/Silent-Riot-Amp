@@ -43,11 +43,11 @@ float sideEnergy(const std::vector<float>& L, const std::vector<float>& R, int f
 }
 } // namespace
 
-TEST_CASE("Width at centre (0.5) is unity passthrough", "[stereo_width]") {
-    Run r(0.5f);
+TEST_CASE("Width at 0 is off (unity passthrough, stereo preserved)", "[stereo_width]") {
+    Run r(0.0f);
     for (size_t i = 0; i < r.L.size(); ++i) {
-        // Reconstruct the original from origSum is not possible per-channel, so
-        // recompute the expected inputs directly.
+        // At off, the input passes through untouched — existing stereo content
+        // is preserved (NOT collapsed to mono).
         const float expL = 0.7f * std::sin(2.0f * 3.14159265f * 220.0f * i / kSR);
         const float expR = 0.5f * std::sin(2.0f * 3.14159265f * 330.0f * i / kSR + 1.1f);
         REQUIRE_THAT(r.L[i], Catch::Matchers::WithinAbs(expL, 1e-5));
@@ -64,18 +64,11 @@ TEST_CASE("Mono sum L+R is invariant at every width", "[stereo_width]") {
     }
 }
 
-TEST_CASE("Width at 0 collapses to mono (L == R)", "[stereo_width]") {
-    Run r(0.0f);
-    // Check the settled tail (after the smoother reaches the target).
-    for (size_t i = r.L.size() - 500; i < r.L.size(); ++i)
-        REQUIRE_THAT(r.L[i], Catch::Matchers::WithinAbs(r.R[i], 1e-4));
-}
-
-TEST_CASE("Turning past centre widens: side energy increases", "[stereo_width]") {
-    const int from = 4000;   // measure only the settled tail
-    Run unity(0.5f);
-    Run wide (1.0f);
-    REQUIRE(sideEnergy(wide.L, wide.R, from) > sideEnergy(unity.L, unity.R, from));
+TEST_CASE("Turning up widens: side energy increases vs off", "[stereo_width]") {
+    const int from = 24000;   // measure only the settled tail
+    Run off (0.0f);
+    Run wide(1.0f);
+    REQUIRE(sideEnergy(wide.L, wide.R, from) > sideEnergy(off.L, off.R, from));
 }
 
 TEST_CASE("Widener synthesises width from a MONO (dual-mono) input", "[stereo_width]") {

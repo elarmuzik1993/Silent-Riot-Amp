@@ -7,8 +7,8 @@
 namespace sr {
 
 // Collapsible EFFECTS panel — 2×2 grid of effect "cards":
-//   [ NOISE GATE ] [ BOOST ]
-//   [ DELAY ]      [ REVERB ]
+//   [ UTILITY ] [ BOOST ]    UTILITY = noise gate + stereo width, both
+//   [ DELAY ]   [ REVERB ]   autonomous (no toggle; 0 = off/mono).
 // Owns the controls; the editor creates APVTS attachments via the accessors.
 class EffectsPanel : public juce::Component {
 public:
@@ -20,8 +20,7 @@ public:
     // readout + label ≈ 112 px) plus each card's title strip.
     static constexpr int panelHeight = 320;
 
-    // Toggles
-    ToggleSwitch& gateToggle()   { return gateTgl; }
+    // Toggles (the UTILITY card's gate/width knobs self-gate — no toggle)
     ToggleSwitch& boostToggle()  { return boostTgl; }
     ToggleSwitch& delayToggle()  { return delayTgl; }
     ToggleSwitch& reverbToggle() { return reverbTgl; }
@@ -53,14 +52,13 @@ private:
     void layoutCard(juce::Rectangle<int> card, ToggleSwitch& tgl,
                     std::initializer_list<NotchKnob*> knobs);
 
-    ToggleSwitch gateTgl   { "ON" };
     ToggleSwitch boostTgl  { "ON" };
     ToggleSwitch delayTgl  { "ON" };
     ToggleSwitch reverbTgl { "ON" };
     ToggleSwitch delayPP   { "PP" };
 
     NotchKnob gateThresh { "THRESH", 0.0f };
-    NotchKnob width      { "WIDTH",  0.5f };   // 0=mono, 5=unity, 10=wide
+    NotchKnob width      { "WIDTH",  0.0f };   // 0=off (dry/mono), 10=wide
     NotchKnob boostLevel { "LEVEL",  0.5f };
     NotchKnob boostTight { "TIGHT",  0.0f };
     NotchKnob boostBright{ "BRIGHT", 0.0f };

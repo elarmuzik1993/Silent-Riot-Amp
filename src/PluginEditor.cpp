@@ -166,7 +166,6 @@ SilentRiotEditor::SilentRiotEditor(SilentRiotProcessor& p)
     powerA     = std::make_unique<ButtonA>(proc.apvts, IDs::POWER,      powerToggle.getButton());
 
     // Effects module attachments
-    gateOnA      = std::make_unique<ButtonA>(proc.apvts, IDs::GATE_ON,        effectsPanel.gateToggle().getButton());
     gateThreshA  = std::make_unique<SliderA>(proc.apvts, IDs::GATE_THRESHOLD, effectsPanel.gateThreshKnob().getSlider());
     boostOnA     = std::make_unique<ButtonA>(proc.apvts, IDs::BOOST_ON,       effectsPanel.boostToggle().getButton());
     boostLevelA  = std::make_unique<SliderA>(proc.apvts, IDs::BOOST_LEVEL,    effectsPanel.boostLevelKnob().getSlider());
@@ -230,7 +229,6 @@ SilentRiotEditor::SilentRiotEditor(SilentRiotProcessor& p)
             k->getSlider().setWantsKeyboardFocus(true);
             k->getSlider().setExplicitFocusOrder(order++);
         }
-        effectsPanel.gateToggle().setExplicitFocusOrder(order++);
         effectsPanel.boostToggle().setExplicitFocusOrder(order++);
         effectsPanel.delayToggle().setExplicitFocusOrder(order++);
         effectsPanel.reverbToggle().setExplicitFocusOrder(order++);
