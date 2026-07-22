@@ -14,7 +14,7 @@ EffectsPanel::EffectsPanel()
     addAndMakeVisible(delaySync);
     delaySync.setTitleText("Delay sync");
 
-    for (auto* k : { &gateThresh, &boostLevel, &boostTight, &boostBright,
+    for (auto* k : { &gateThresh, &width, &boostLevel, &boostTight, &boostBright,
                      &delayTime, &delayFb, &delayMix, &delayTone,
                      &reverbMix, &reverbSize, &reverbTone })
         addAndMakeVisible(*k);
@@ -35,7 +35,7 @@ void EffectsPanel::paint(juce::Graphics& g)
 {
     auto area = getLocalBounds().reduced(10);
 
-    static const char* titles[4] = { "NOISE GATE", "BOOST", "DELAY", "REVERB" };
+    static const char* titles[4] = { "UTILITY", "BOOST", "DELAY", "REVERB" };
     int idx = 0;
     for (int row = 0; row < 2; ++row)
         for (int col = 0; col < 2; ++col, ++idx)
@@ -86,7 +86,9 @@ void EffectsPanel::resized()
 {
     auto area = getLocalBounds().reduced(10);
 
-    layoutCard(cardBounds(area, 0, 0), gateTgl,   { &gateThresh });
+    // UTILITY card: noise gate (ON toggle + THRESH) plus the always-on WIDTH
+    // knob. The ON toggle gates only the gate; WIDTH is neutral at centre.
+    layoutCard(cardBounds(area, 0, 0), gateTgl,   { &gateThresh, &width });
     layoutCard(cardBounds(area, 1, 0), boostTgl,  { &boostLevel, &boostTight, &boostBright });
     layoutCard(cardBounds(area, 1, 1), reverbTgl, { &reverbMix, &reverbSize, &reverbTone });
 
