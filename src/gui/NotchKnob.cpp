@@ -27,9 +27,20 @@ void NotchKnob::setKnobMode(int mode)
                                     : juce::Slider::RotaryVerticalDrag);
 }
 
+void NotchKnob::setScale(float s)
+{
+    scale  = juce::jmax(0.1f, s);
+    kSize  = kSizeBase  * scale;
+    knobR  = knobRBase  * scale;
+    arcR   = arcRBase   * scale;
+    labelR = labelRBase * scale;
+    resized();
+    repaint();
+}
+
 void NotchKnob::resized()
 {
-    // Slider occupies the knob area (top 80px)
+    // Slider occupies the knob area (top kSize px)
     auto knobArea = getLocalBounds().removeFromTop(static_cast<int>(kSize));
     slider.setBounds(knobArea);
 }
@@ -45,20 +56,21 @@ void NotchKnob::paint(juce::Graphics& g)
     float angleRad = degToRad(angleDeg);
 
     drawSegmentedArc(g, cx, cy, pos);
-    drawNumberedLabels(g, cx, cy);
+    if (scale >= 0.75f)          // numbers become unreadable on compact knobs
+        drawNumberedLabels(g, cx, cy);
     drawKnobBody(g, cx, cy, angleRad);
     drawNotchPointer(g, cx, cy, angleRad);
 
-    // Value readout
+    // Value readout — text keeps a legible floor so compact knobs stay readable
     float displayVal = pos * 10.0f;
     juce::String valText = juce::String(displayVal, 1);
-    auto valFont = Fonts::spaceMono(11.0f);
+    auto valFont = Fonts::spaceMono(juce::jmax(9.0f, 11.0f * scale));
     g.setFont(valFont);
 
-    float valW = valFont.getStringWidthFloat(valText) + 20.0f;
-    float valH = 16.0f;
+    float valW = valFont.getStringWidthFloat(valText) + juce::jmax(12.0f, 20.0f * scale);
+    float valH = juce::jmax(13.0f, 16.0f * scale);
     float valX = cx - valW * 0.5f;
-    float valY = cy + kSize * 0.5f - 6.0f;
+    float valY = cy + kSize * 0.5f - 6.0f * scale;
 
     juce::Rectangle<float> valBox(valX, valY, valW, valH);
     g.setColour(Colours::surface);
@@ -69,11 +81,12 @@ void NotchKnob::paint(juce::Graphics& g)
     g.drawText(valText, valBox, juce::Justification::centred, false);
 
     // Label below readout
-    auto labelFont = Fonts::spaceMono(9.0f, true);
+    auto labelFont = Fonts::spaceMono(juce::jmax(8.0f, 9.0f * scale), true);
     g.setFont(labelFont);
     g.setColour(Colours::label);
-    float labelY = valY + valH + 4.0f;
-    juce::Rectangle<float> labelBox(0.0f, labelY, static_cast<float>(bounds.getWidth()), 14.0f);
+    float labelY = valY + valH + juce::jmax(2.0f, 4.0f * scale);
+    juce::Rectangle<float> labelBox(0.0f, labelY, static_cast<float>(bounds.getWidth()),
+                                    juce::jmax(12.0f, 14.0f * scale));
     g.drawText(label.toUpperCase(), labelBox, juce::Justification::centred, false);
 }
 
@@ -102,13 +115,15 @@ void NotchKnob::drawSegmentedArc(juce::Graphics& g, float cx, float cy, float po
         if (active)
         {
             g.setColour(Colours::accent);
-            g.strokePath(seg, juce::PathStrokeType(3.0f, juce::PathStrokeType::curved,
+            g.strokePath(seg, juce::PathStrokeType(juce::jmax(1.5f, 3.0f * scale),
+                                                    juce::PathStrokeType::curved,
                                                     juce::PathStrokeType::rounded));
         }
         else
         {
             g.setColour(Colours::track.withAlpha(0.5f));
-            g.strokePath(seg, juce::PathStrokeType(2.0f, juce::PathStrokeType::curved,
+            g.strokePath(seg, juce::PathStrokeType(juce::jmax(1.0f, 2.0f * scale),
+                                                    juce::PathStrokeType::curved,
                                                     juce::PathStrokeType::rounded));
         }
     }
@@ -146,9 +161,9 @@ void NotchKnob::drawKnobBody(juce::Graphics& g, float cx, float cy, float /*angl
 
 void NotchKnob::drawNotchPointer(juce::Graphics& g, float cx, float cy, float angleRad) const
 {
-    // Filled triangle — tip at knobR+1, base at knobR-7, ±8° spread
-    float tipDist = knobR + 1.0f;
-    float baseDist = knobR - 7.0f;
+    // Filled triangle — tip at knobR+1, base at knobR-7, ±8° spread (scaled)
+    float tipDist = knobR + 1.0f * scale;
+    float baseDist = knobR - 7.0f * scale;
     float spreadRad = degToRad(8.0f);
 
     // Tip point (along angle direction, using screen coords where 0=top)

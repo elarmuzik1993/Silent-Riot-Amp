@@ -17,7 +17,12 @@ EffectsPanel::EffectsPanel()
     for (auto* k : { &gateThresh, &boostLevel, &boostTight, &boostBright,
                      &delayTime, &delayFb, &delayMix, &delayTone,
                      &reverbMix, &reverbSize, &reverbTone })
+    {
+        // Effect knobs render at half the size of the main amp knobs so the
+        // effects section reads as compact.
+        k->setScale(0.5f);
         addAndMakeVisible(*k);
+    }
 }
 
 // Card geometry — kept in sync between paint() and resized().
@@ -58,11 +63,13 @@ void EffectsPanel::layoutKnobRow(juce::Rectangle<int> row, std::initializer_list
 {
     const int n = static_cast<int>(knobs.size());
     if (n == 0) return;
-    const int knobW = juce::jmin(80, row.getWidth() / n);
+    // Effect knobs are sized at half the main amp knobs (100x120) so the
+    // effects section reads as compact next to the amp controls.
+    const int knobW = juce::jmin(50, row.getWidth() / n);
     const int totalW = knobW * n;
     int x = row.getCentreX() - totalW / 2;
     const int y = row.getY();
-    const int h = juce::jmin(row.getHeight(), 112);
+    const int h = juce::jmin(row.getHeight(), 72);
     for (auto* k : knobs)
     {
         k->setBounds(x, y, knobW, h);
