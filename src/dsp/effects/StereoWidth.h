@@ -1,10 +1,11 @@
 #pragma once
 // ═══════════════════════════════════════════════════════════════
-// StereoWidth — final-stage MONO↔STEREO widener (pure C++, header-only)
+// StereoWidth — final-stage stereo widener (pure C++, header-only)
 //
-// A single "width" knob: 0 = fully mono, 0.5 = unity (bit-exact passthrough),
-// 1 = maximum wide. Runs LAST in the chain, on the finished stereo bus, so it
-// widens the whole mix (amp + delay + reverb).
+// A single autonomous "width" knob (no on/off toggle): 0 = OFF — the dual-mono
+// dry amp is left mono/unchanged — rising to 1 = maximum wide. Runs LAST in the
+// chain, on the finished stereo bus, so it widens the whole mix (amp + delay +
+// reverb). Additive only: it never narrows below the input.
 //
 // The amp/cab path is dual-mono, so a plain M/S width scale has no "side" to
 // act on until the stereo time-FX add some. To get width on the dry amp too
@@ -29,8 +30,8 @@ struct StereoWidth {
     int   haasSamples = 1;
     float apX1 = 0.0f, apY1 = 0.0f;   // all-pass state
 
-    // Smoothed knob value (one-pole toward target). 0.5 = unity.
-    float width       = 0.5f;
+    // Smoothed knob value (one-pole toward target). 0 = off.
+    float width       = 0.0f;
     float smoothCoeff = 0.0f;
 
     void prepare(float sampleRate) {
@@ -45,12 +46,12 @@ struct StereoWidth {
         std::fill(delayBuf.begin(), delayBuf.end(), 0.0f);
         writePos = 0;
         apX1 = apY1 = 0.0f;
-        width = 0.5f;   // park at unity so isActive() reports dormant until moved
+        width = 0.0f;   // park at OFF so isActive() reports dormant until moved
     }
 
-    // True once the smoothed width has departed unity — lets the caller skip the
-    // whole stage (bit-exact dry) while the knob sits parked at 0.5.
-    bool isActive() const { return std::abs(width - 0.5f) > 1e-5f; }
+    // True once the smoothed width has left 0 — lets the caller skip the whole
+    // stage (bit-exact dry) while the knob sits parked at OFF.
+    bool isActive() const { return width > 1e-5f; }
 
     // Widen a stereo pair in place. `target` is the raw 0..1 knob value.
     // Caller guarantees left/right are two valid channels of `numSamples`.
@@ -63,18 +64,12 @@ struct StereoWidth {
             const float mid  = 0.5f * (L + R);
             const float side = 0.5f * (L - R);
 
-            // Knob → side gain + synthesised-decorrelation amount.
-            //   [0,0.5)  : collapse toward mono (sideGain 0→1), no synth
-            //   [0.5,1]  : widen (sideGain 1→MAX) + inject decorrelation (0→MAX)
-            float sideGain, synth;
-            if (width < 0.5f) {
-                sideGain = width * 2.0f;
-                synth    = 0.0f;
-            } else {
-                const float t = (width - 0.5f) * 2.0f;   // 0..1
-                sideGain = 1.0f + t * (WIDTH_MAX_SIDE_GAIN - 1.0f);
-                synth    = t * WIDTH_SYNTH_MAX;
-            }
+            // Knob → side gain + synthesised-decorrelation amount. Additive:
+            //   0 : off — sideGain 1 (preserve), synth 0 (unity passthrough)
+            //   1 : max — sideGain MAX (lift existing side) + full decorrelation
+            // The synth term is what gives the dual-mono dry amp its width.
+            const float sideGain = 1.0f + width * (WIDTH_MAX_SIDE_GAIN - 1.0f);
+            const float synth    = width * WIDTH_SYNTH_MAX;
 
             // Decorrelated signal from delayed Mid (Haas) → all-pass diffusion.
             float d = 0.0f;

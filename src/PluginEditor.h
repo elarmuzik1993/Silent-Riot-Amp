@@ -95,7 +95,7 @@ private:
     std::unique_ptr<ButtonA> halfPowerA, cabSimA, powerA;
 
     // Effects module attachments
-    std::unique_ptr<ButtonA> gateOnA, boostOnA, delayOnA, reverbOnA, delayPingPongA;
+    std::unique_ptr<ButtonA> boostOnA, delayOnA, reverbOnA, delayPingPongA;
     std::unique_ptr<SliderA> gateThreshA, boostLevelA, boostTightA, boostBrightA,
                              delayTimeA, delayFbA, delayMixA, delayToneA,
                              reverbMixA, reverbSizeA, reverbToneA, widthA;

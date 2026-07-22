@@ -101,11 +101,9 @@ juce::AudioProcessorValueTreeState::ParameterLayout SilentRiotProcessor::createP
         0, sr::MAX_USER_IRS, 0));
 
     // ── Effects module — all default OFF / dry (tone-neutral when bypassed) ──
-    params.push_back(std::make_unique<juce::AudioParameterBool>(
-        juce::ParameterID{ Params::IDs::GATE_ON, 1 }, "Gate", false));
-    // Threshold is a 0–1 knob (maps 0..1 → GATE_THRESH_MIN..MAX dB in processBlock,
-    // so NotchKnob's 0–1 arc works). Default 0 = gate OFF (true bypass — see
-    // NoiseGate::process).
+    // Noise gate has no on/off toggle — it self-gates. Threshold is a 0–1 knob
+    // (maps 0..1 → GATE_THRESH_MIN..MAX dB in processBlock, so NotchKnob's 0–1
+    // arc works). Default 0 = gate OFF (true bypass — see NoiseGate::process).
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         juce::ParameterID{ Params::IDs::GATE_THRESHOLD, 1 }, "Gate Threshold",
         juce::NormalisableRange<float>(0.0f, 1.0f, 0.001f), 0.0f));
@@ -162,11 +160,11 @@ juce::AudioProcessorValueTreeState::ParameterLayout SilentRiotProcessor::createP
         juce::ParameterID{ Params::IDs::REVERB_TONE, 1 }, "Reverb Tone",
         juce::NormalisableRange<float>(0.0f, 1.0f, 0.001f), 0.5f));
 
-    // Stereo widener — 0 = mono, 0.5 = unity (bit-exact), 1 = wide. Always
-    // active (no ON toggle); neutral at centre, so it defaults tone-transparent.
+    // Stereo widener — autonomous (no ON toggle): 0 = off (dry/mono), 1 = wide.
+    // Defaults off, so it's tone-transparent until turned up.
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         juce::ParameterID{ Params::IDs::WIDTH, 1 }, "Width",
-        juce::NormalisableRange<float>(0.0f, 1.0f, 0.001f), 0.5f));
+        juce::NormalisableRange<float>(0.0f, 1.0f, 0.001f), 0.0f));
 
     return { params.begin(), params.end() };
 }
@@ -329,8 +327,10 @@ void SilentRiotProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     // Float reads are sanitized at this boundary — a misbehaving host could
     // report NaN via automation, which would otherwise silently poison the
     // gate/boost/delay/reverb filters' IIR state forever (see ParamSanitize.h).
-    bool  gateOn    = apvts.getRawParameterValue(Params::IDs::GATE_ON)->load() > 0.5f;
     float gateThr   = sanitizeUnitParam(apvts.getRawParameterValue(Params::IDs::GATE_THRESHOLD)->load());
+    // No on/off toggle: the gate is active whenever its threshold is off 0
+    // (knob at 0 = off). NoiseGate::process bypasses at the min threshold too.
+    bool  gateOn    = gateThr > 0.0f;
     bool  boostOn   = apvts.getRawParameterValue(Params::IDs::BOOST_ON)->load() > 0.5f;
     float boostLvl  = sanitizeUnitParam(apvts.getRawParameterValue(Params::IDs::BOOST_LEVEL)->load());
     float boostTgt  = sanitizeUnitParam(apvts.getRawParameterValue(Params::IDs::BOOST_TIGHT)->load());
@@ -650,7 +650,7 @@ void SilentRiotProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     // Skipped entirely (bit-exact dry) while the knob sits parked at unity and
     // the internal smoother has settled — see StereoWidth::isActive(). Meaningless
     // on a mono bus, so guarded to two channels.
-    if (buffer.getNumChannels() == 2 && (widthParam != 0.5f || stereoWidth.isActive()))
+    if (buffer.getNumChannels() == 2 && (widthParam != 0.0f || stereoWidth.isActive()))
     {
         stereoWidth.process(buffer.getWritePointer(0), buffer.getWritePointer(1),
                             buffer.getNumSamples(), widthParam);
