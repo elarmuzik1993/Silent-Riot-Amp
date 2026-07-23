@@ -122,3 +122,38 @@ TEST_CASE("Widener never emits non-finite samples", "[stereo_width]") {
         REQUIRE(std::isfinite(r.R[i]));
     }
 }
+
+TEST_CASE("clearTail() drops the Haas tail so re-engage starts clean", "[stereo_width]") {
+    // The processor skips the whole stage while the knob is parked at 0, so the
+    // delay line stops being primed. On the OFF->on edge it calls clearTail()
+    // before re-processing. This test verifies clearTail() actually flushes the
+    // primed Haas buffer: after priming with a loud mono signal, clearing, and
+    // then feeding SILENCE, the first Haas window of the side voice must be
+    // exactly zero — i.e. no stale audio bleeds in on re-engage.
+    StereoWidth w;
+    w.prepare(kSR);
+
+    // Prime the delay line with a full block of loud mono content at full width.
+    const int n = 4096;
+    std::vector<float> L(n), R(n);
+    for (int i = 0; i < n; ++i) {
+        const float s = 0.9f * std::sin(2.0f * 3.14159265f * 200.0f * i / kSR);
+        L[i] = s; R[i] = s;
+    }
+    w.process(L.data(), R.data(), n, 1.0f);
+
+    // Simulate the OFF->on edge: clear the tail, then feed pure silence.
+    w.clearTail();
+    std::vector<float> zL(n, 0.0f), zR(n, 0.0f);
+    w.process(zL.data(), zR.data(), n, 1.0f);
+
+    // With a cleared buffer and silent input, the side voice can only ever read
+    // back the anti-denormal floor (1e-18), so the output must stay at the
+    // numerical floor. A stale (un-cleared) tail would instead leak the primed
+    // 0.9-amplitude 200 Hz tone into the side (order ~0.1+), so a tight bound
+    // cleanly distinguishes the two.
+    for (int i = 0; i < n; ++i) {
+        REQUIRE(std::abs(zL[i]) < 1e-9f);
+        REQUIRE(std::abs(zR[i]) < 1e-9f);
+    }
+}

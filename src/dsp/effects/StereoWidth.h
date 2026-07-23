@@ -10,13 +10,15 @@
 // The amp/cab path is dual-mono, so a plain M/S width scale has no "side" to
 // act on until the stereo time-FX add some. To get width on the dry amp too
 // (the way a NeuralDSP-style doubler does), we SYNTHESISE decorrelated content
-// — the Mid through a Haas delay whose read tap is slowly detuned (±~5 cents by
-// an LFO-modulated fractional delay), then an all-pass — and inject it into the
-// SIDE only. The micro-detune gives the "two slightly out-of-tune guitars"
-// doubling shimmer. Because the output is Mid ± Side, the mono sum L+R = 2·Mid
-// is invariant at any setting: perfect mono compatibility, no comb filtering
-// when a listener folds to mono, regardless of how wide the knob is pushed or
-// what the detune does.
+// — the Mid through a Haas delay whose read tap is swayed by a slow LFO
+// (an LFO-modulated fractional delay), then an all-pass — and inject it into
+// the SIDE only. The modulated tap continuously micro-shifts the pitch of the
+// side voice (chorus-style pitch modulation, peak deviation a few cents — NOT
+// a fixed detune of two separate voices), giving a doubling/shimmer character.
+// Because the output is Mid ± Side, the mono sum L+R = 2·Mid is invariant at
+// any setting: perfect mono compatibility, no comb filtering when a listener
+// folds to mono, regardless of how wide the knob is pushed or what the
+// modulation does.
 // ═══════════════════════════════════════════════════════════════
 
 #include "../../utils/Constants.h"
@@ -93,11 +95,12 @@ struct StereoWidth {
             const float sideGain = 1.0f + width * (WIDTH_MAX_SIDE_GAIN - 1.0f);
             const float synth    = width * WIDTH_SYNTH_MAX;
 
-            // Decorrelated signal from the detuned Mid tap → all-pass diffusion.
+            // Decorrelated signal from the modulated Mid tap → all-pass diffusion.
             // A slow LFO sways the fractional read position (Haas ± detuneDepth),
-            // which continuously micro-shifts the pitch of this voice → the
-            // "doubler" detune character. The tap level scales with `synth`, so
-            // the detune shimmer rides in with the knob.
+            // which continuously micro-shifts the pitch of this voice → a
+            // chorus-style "doubler" character (cyclic pitch modulation, not a
+            // static detune). The tap level scales with `synth`, so the shimmer
+            // rides in with the knob.
             float d = 0.0f;
             if (synth > 0.0f) {
                 lfoPhase += lfoInc;
