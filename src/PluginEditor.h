@@ -114,6 +114,10 @@ private:
 
     float currentScale = 1.0f;
     bool compositorBypassed = false;
+    // Sample rate the tuner's detector is currently prepared for. 0 = not yet
+    // known (editor built before prepareToPlay); timerCallback re-prepares when
+    // this stops matching the processor's rate.
+    double preparedTunerSR = 0.0;
     void* x11Display = nullptr;   // cached Linux X11 connection (closed in dtor)
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(SilentRiotEditor)

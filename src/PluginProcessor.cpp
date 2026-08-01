@@ -885,6 +885,13 @@ void SilentRiotProcessor::setStateInformation(const void* data, int sizeInBytes)
     {
         apvts.replaceState(juce::ValueTree::fromXml(*xml));
         loadUserIRsFromState();
+
+        // Tuner mute is a transient performance control, not a session setting:
+        // it silences the whole plugin, and its only affordance is a small pill
+        // in the tuner strip. Restoring it would reopen a saved session dead
+        // silent with no obvious cause, so it always loads OFF.
+        if (auto* p = apvts.getParameter(Params::IDs::TUNER_MUTE))
+            p->setValueNotifyingHost(0.0f);
     }
 }
 
