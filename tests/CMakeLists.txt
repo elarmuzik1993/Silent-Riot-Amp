@@ -32,6 +32,7 @@ add_executable(SilentRiotTests
     safety_limiter_tests.cpp
     tempo_sync_tests.cpp
     param_sanitize_tests.cpp
+    pitch_detector_tests.cpp
 
     # DSP source files (tests call functions defined in these)
     ${CMAKE_SOURCE_DIR}/src/dsp/tubes/TriodeWaveshaper.cpp
@@ -41,6 +42,7 @@ add_executable(SilentRiotTests
     ${CMAKE_SOURCE_DIR}/src/dsp/power/PowerSupplyModel.cpp
     ${CMAKE_SOURCE_DIR}/src/dsp/power/LTPSolver.cpp
     ${CMAKE_SOURCE_DIR}/src/dsp/cabinet/SpeakerCoupling.cpp
+    ${CMAKE_SOURCE_DIR}/src/dsp/analysis/PitchDetector.cpp
     # CabinetSim.cpp and OversampleSwitcher.cpp excluded — they depend on
     # JUCE headers and no test file exercises them directly.
 )

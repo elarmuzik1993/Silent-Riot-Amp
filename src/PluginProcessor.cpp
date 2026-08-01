@@ -89,6 +89,9 @@ juce::AudioProcessorValueTreeState::ParameterLayout SilentRiotProcessor::createP
     params.push_back(std::make_unique<juce::AudioParameterBool>(
         juce::ParameterID{ Params::IDs::POWER, 1 }, "Power", true));
 
+    params.push_back(std::make_unique<juce::AudioParameterBool>(
+        juce::ParameterID{ Params::IDs::TUNER_MUTE, 1 }, "Tuner Mute", false));
+
     params.push_back(std::make_unique<juce::AudioParameterChoice>(
         juce::ParameterID{ Params::IDs::OVERSAMPLE, 1 }, "Oversample",
         juce::StringArray{ "2x", "4x", "8x" }, 1));
@@ -322,6 +325,7 @@ void SilentRiotProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     bool  is7W      = apvts.getRawParameterValue(Params::IDs::HALF_POWER)->load() > 0.5f;
     bool  cabOn     = apvts.getRawParameterValue(Params::IDs::CAB_SIM)->load() > 0.5f;
     bool  powerOn   = apvts.getRawParameterValue(Params::IDs::POWER)->load() > 0.5f;
+    bool  tunerMute = apvts.getRawParameterValue(Params::IDs::TUNER_MUTE)->load() > 0.5f;
     int   irIndex   = static_cast<int>(apvts.getRawParameterValue(Params::IDs::IR_INDEX)->load());
 
     // Effects module parameters (run at base SR, outside the amp loop).
@@ -352,8 +356,15 @@ void SilentRiotProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     float reverbTn  = sanitizeUnitParam(apvts.getRawParameterValue(Params::IDs::REVERB_TONE)->load());
     float widthParam= sanitizeUnitParam(apvts.getRawParameterValue(Params::IDs::WIDTH)->load());
 
-    // Master power off — silence output
-    if (!powerOn) { buffer.clear(); return; }
+    // ── Live tuner capture ──
+    // Tap the raw DI input BEFORE any processing or the power-off return, so
+    // the tuner tracks pitch even when the amp is silenced (classic workflow).
+    if (buffer.getNumChannels() > 0)
+        pushTunerSamples(buffer.getReadPointer(0), buffer.getNumSamples());
+
+    // Master power off, or tuner mute engaged — silence output. Capture above
+    // still ran, so the tuner keeps tracking pitch while the amp is silent.
+    if (!powerOn || tunerMute) { buffer.clear(); return; }
 
     el84BaseBias = is7W ? PENTODE_BIAS_7W_N : PENTODE_BIAS_15W_N;
     cabSim.setEnabled(cabOn);
@@ -723,6 +734,35 @@ SilentRiotProcessor::DSPReadout SilentRiotProcessor::getDSPReadout() const
     return r;
 }
 
+// ── Live tuner ring buffer ──
+void SilentRiotProcessor::pushTunerSamples(const float* data, int n)
+{
+    if (data == nullptr || n <= 0) return;
+
+    uint64_t pos = tunerWritePos.load(std::memory_order_relaxed);
+    for (int i = 0; i < n; ++i)
+        tunerRing[static_cast<size_t>((pos + static_cast<uint64_t>(i)) & kTunerRingMask)] = data[i];
+
+    // Publish the advanced write position last (release) so a concurrent reader
+    // that observes the new count also sees the samples written above.
+    tunerWritePos.store(pos + static_cast<uint64_t>(n), std::memory_order_release);
+}
+
+int SilentRiotProcessor::readLatestTunerSamples(float* dest, int maxN) const
+{
+    if (dest == nullptr || maxN <= 0) return 0;
+
+    const uint64_t pos = tunerWritePos.load(std::memory_order_acquire);
+    const int available = static_cast<int>(std::min<uint64_t>(pos, kTunerRingSize));
+    const int count = std::min(maxN, available);
+
+    // Copy the last `count` samples ending at the write position (oldest first).
+    const uint64_t start = pos - static_cast<uint64_t>(count);
+    for (int i = 0; i < count; ++i)
+        dest[i] = tunerRing[static_cast<size_t>((start + static_cast<uint64_t>(i)) & kTunerRingMask)];
+    return count;
+}
+
 // ── Boilerplate ──
 juce::AudioProcessorEditor* SilentRiotProcessor::createEditor() { return new SilentRiotEditor(*this); }
 bool SilentRiotProcessor::hasEditor() const { return true; }
@@ -880,6 +920,13 @@ void SilentRiotProcessor::setStateInformation(const void* data, int sizeInBytes)
     {
         apvts.replaceState(juce::ValueTree::fromXml(*xml));
         loadUserIRsFromState();
+
+        // Tuner mute is a transient performance control, not a session setting:
+        // it silences the whole plugin, and its only affordance is a small pill
+        // in the tuner strip. Restoring it would reopen a saved session dead
+        // silent with no obvious cause, so it always loads OFF.
+        if (auto* p = apvts.getParameter(Params::IDs::TUNER_MUTE))
+            p->setValueNotifyingHost(0.0f);
     }
 }
 
