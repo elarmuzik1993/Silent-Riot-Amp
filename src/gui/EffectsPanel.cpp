@@ -6,7 +6,6 @@ namespace sr {
 
 EffectsPanel::EffectsPanel()
 {
-    addAndMakeVisible(gateTgl);
     addAndMakeVisible(boostTgl);
     addAndMakeVisible(delayTgl);
     addAndMakeVisible(reverbTgl);
@@ -14,7 +13,7 @@ EffectsPanel::EffectsPanel()
     addAndMakeVisible(delaySync);
     delaySync.setTitleText("Delay sync");
 
-    for (auto* k : { &gateThresh, &boostLevel, &boostTight, &boostBright,
+    for (auto* k : { &gateThresh, &width, &boostLevel, &boostTight, &boostBright,
                      &delayTime, &delayFb, &delayMix, &delayTone,
                      &reverbMix, &reverbSize, &reverbTone })
         addAndMakeVisible(*k);
@@ -35,7 +34,7 @@ void EffectsPanel::paint(juce::Graphics& g)
 {
     auto area = getLocalBounds().reduced(10);
 
-    static const char* titles[4] = { "NOISE GATE", "BOOST", "DELAY", "REVERB" };
+    static const char* titles[4] = { "UTILITY", "BOOST", "DELAY", "REVERB" };
     int idx = 0;
     for (int row = 0; row < 2; ++row)
         for (int col = 0; col < 2; ++col, ++idx)
@@ -86,7 +85,14 @@ void EffectsPanel::resized()
 {
     auto area = getLocalBounds().reduced(10);
 
-    layoutCard(cardBounds(area, 0, 0), gateTgl,   { &gateThresh });
+    // UTILITY card: no toggle — both knobs self-gate (THRESH 0 = gate off,
+    // WIDTH centre = unity). Lay the title strip, then the two knobs.
+    {
+        auto inner = cardBounds(area, 0, 0).reduced(10, 6);
+        inner.removeFromTop(16);   // title strip ("UTILITY")
+        inner.removeFromTop(4);
+        layoutKnobRow(inner, { &gateThresh, &width });
+    }
     layoutCard(cardBounds(area, 1, 0), boostTgl,  { &boostLevel, &boostTight, &boostBright });
     layoutCard(cardBounds(area, 1, 1), reverbTgl, { &reverbMix, &reverbSize, &reverbTone });
 

@@ -166,7 +166,6 @@ SilentRiotEditor::SilentRiotEditor(SilentRiotProcessor& p)
     powerA     = std::make_unique<ButtonA>(proc.apvts, IDs::POWER,      powerToggle.getButton());
 
     // Effects module attachments
-    gateOnA      = std::make_unique<ButtonA>(proc.apvts, IDs::GATE_ON,        effectsPanel.gateToggle().getButton());
     gateThreshA  = std::make_unique<SliderA>(proc.apvts, IDs::GATE_THRESHOLD, effectsPanel.gateThreshKnob().getSlider());
     boostOnA     = std::make_unique<ButtonA>(proc.apvts, IDs::BOOST_ON,       effectsPanel.boostToggle().getButton());
     boostLevelA  = std::make_unique<SliderA>(proc.apvts, IDs::BOOST_LEVEL,    effectsPanel.boostLevelKnob().getSlider());
@@ -183,6 +182,7 @@ SilentRiotEditor::SilentRiotEditor(SilentRiotProcessor& p)
     reverbMixA   = std::make_unique<SliderA>(proc.apvts, IDs::REVERB_MIX,     effectsPanel.reverbMixKnob().getSlider());
     reverbSizeA  = std::make_unique<SliderA>(proc.apvts, IDs::REVERB_SIZE,    effectsPanel.reverbSizeKnob().getSlider());
     reverbToneA  = std::make_unique<SliderA>(proc.apvts, IDs::REVERB_TONE,    effectsPanel.reverbToneKnob().getSlider());
+    widthA       = std::make_unique<SliderA>(proc.apvts, IDs::WIDTH,          effectsPanel.widthKnob().getSlider());
 
     // Keyboard focus and accessibility.
     // Knobs: the (invisible) slider is the focusable leaf. Toggles: the
@@ -218,7 +218,8 @@ SilentRiotEditor::SilentRiotEditor(SilentRiotProcessor& p)
     fxSectionBar.setExplicitFocusOrder(8);
     {
         int order = 9;
-        for (auto* k : { &effectsPanel.gateThreshKnob(), &effectsPanel.boostLevelKnob(),
+        for (auto* k : { &effectsPanel.gateThreshKnob(), &effectsPanel.widthKnob(),
+                         &effectsPanel.boostLevelKnob(),
                          &effectsPanel.boostTightKnob(), &effectsPanel.boostBrightKnob(),
                          &effectsPanel.delayTimeKnob(), &effectsPanel.delayFbKnob(),
                          &effectsPanel.delayMixKnob(), &effectsPanel.delayToneKnob(),
@@ -228,7 +229,6 @@ SilentRiotEditor::SilentRiotEditor(SilentRiotProcessor& p)
             k->getSlider().setWantsKeyboardFocus(true);
             k->getSlider().setExplicitFocusOrder(order++);
         }
-        effectsPanel.gateToggle().setExplicitFocusOrder(order++);
         effectsPanel.boostToggle().setExplicitFocusOrder(order++);
         effectsPanel.delayToggle().setExplicitFocusOrder(order++);
         effectsPanel.reverbToggle().setExplicitFocusOrder(order++);

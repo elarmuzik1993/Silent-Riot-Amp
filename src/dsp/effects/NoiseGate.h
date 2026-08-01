@@ -14,6 +14,18 @@
 
 namespace sr {
 
+// The gate has no ON/OFF toggle — THRESHOLD 0 means off. The caller's gate
+// block must therefore keep running while the SMOOTHED threshold is still
+// ramping down to the floor, not just while the raw knob is off 0. Cutting the
+// block dead the instant the raw knob reaches 0 leaves the gate mid-attenuation
+// and steps the applied gain from 0 to 1 in a single sample — an audible click.
+// Letting the smoother finish sweeps the threshold below the signal, so the
+// gate opens through its own attack ramp and lands on the true-bypass branch
+// already at unity.
+inline bool gateShouldRun(float rawThreshKnob, float smoothedThreshKnob) {
+    return rawThreshKnob > 0.0f || smoothedThreshKnob > 1.0e-5f;
+}
+
 struct NoiseGate {
     // Coefficients (recomputed on rate change)
     float detectCoeff  = 0.0f;   // envelope follower smoothing
@@ -44,6 +56,17 @@ struct NoiseGate {
     // thresholdDb: open threshold. Gate closes once the signal drops
     // GATE_HYSTERESIS_DB below it, preventing chatter near the boundary.
     float process(float x, float thresholdDb) {
+        // Threshold knob parked at 0 (maps to GATE_THRESH_MIN_DB): the gate is
+        // OFF — true bypass, not just "-80 dB / effectively open". Pass the
+        // sample untouched and hold the gate fully open so there's no residual
+        // gating of near-silence and no click when the knob leaves 0.
+        if (thresholdDb <= GATE_THRESH_MIN_DB) {
+            envelope = std::abs(x);
+            open     = true;
+            gain     = 1.0f;
+            return x;
+        }
+
         // Peak follower: instant attack, smoothed release. Tracks the signal
         // PEAK (not its average) so the threshold is peak-referenced and the
         // envelope holds near the peak between cycles — keeping the open/close

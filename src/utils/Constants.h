@@ -185,6 +185,23 @@ constexpr float BOOST_TIGHT_MAX_HZ  = 400.0f;   // tight=1 → tight, focused lo
 constexpr float BOOST_BRIGHT_FREQ   = 2000.0f;  // bright shelf corner
 constexpr float BOOST_BRIGHT_MAX_DB = 9.0f;     // bright=1 → +9 dB above corner
 
+// Stereo widener (final output stage, post-everything). Autonomous knob:
+// 0 = OFF (unity passthrough — existing stereo is preserved, NOT collapsed to
+// mono), rising to 1 = maximum wide. Additive only — it never narrows below the
+// input. Widens by scaling the SIDE and injecting synthesised decorrelation
+// into the SIDE only, so the mono sum L+R = 2·Mid stays invariant at any setting.
+constexpr float WIDTH_HAAS_MS       = 12.0f;  // decorrelation delay (Mid → side voice)
+constexpr float WIDTH_MAX_SIDE_GAIN = 2.0f;   // full-wide side boost (knob = 1)
+constexpr float WIDTH_SYNTH_MAX     = 0.6f;   // max decorrelated content injected into side
+constexpr float WIDTH_ALLPASS_COEFF = 0.7f;   // all-pass diffusion coefficient
+constexpr float WIDTH_SMOOTH_MS     = 50.0f;  // knob smoothing (avoids zipper)
+// Chorus-style micro-pitch modulation: a slow LFO sways the Haas read tap,
+// continuously pitch-shifting the side voice (peak deviation ≈ 1200/ln2 · 2π ·
+// rate · depth_s ≈ a few cents here) for a doubling/shimmer character. This is
+// cyclic pitch modulation, NOT a fixed detune between two separate voices.
+constexpr float WIDTH_DETUNE_RATE_HZ  = 0.42f; // modulation LFO rate (slow drift)
+constexpr float WIDTH_DETUNE_DEPTH_MS = 1.2f;  // read-tap sway → pitch-mod depth
+
 // Post-effects safety limiter (catches wet delay/reverb peaks that would
 // otherwise escape the amp's output limiter and hard-clip the DAC). Soft knee:
 // transparent below the threshold, smoothly bounded to ±1 above it.
