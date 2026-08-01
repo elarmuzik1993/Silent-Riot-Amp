@@ -6,6 +6,8 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_dsp/juce_dsp.h>
 #include <atomic>
+#include <array>
+#include <cstdint>
 
 #include "utils/VoltageScale.h"
 #include "utils/Constants.h"
@@ -75,6 +77,15 @@ public:
         bool is7W;
     };
     DSPReadout getDSPReadout() const;
+
+    // ── Live tuner input capture ──────────────────────────────────
+    // Audio thread writes the raw DI (channel-0) input into a lock-free ring;
+    // the editor pulls the most-recent window on its timer and runs pitch
+    // detection off the audio thread. Capture happens BEFORE the power-off
+    // early-return so the tuner works with the amp silenced.
+    // Copies up to maxN of the most recent captured samples into dest (oldest
+    // first). Message thread only. Returns the number of samples written.
+    int readLatestTunerSamples(float* dest, int maxN) const;
 
     // ── User IR management (message thread only) ──
     using UserIREntry = sr::UserIREntry;  // see dsp/cabinet/UserIRState.h
@@ -152,6 +163,16 @@ private:
     double baseSampleRate = 44100.0;
     std::atomic<int> cachedIRIndex { 0 };   // last IR index seen by audio thread (written msg+audio)
     std::atomic<int> pendingIRIndex { -1 }; // deferred IR load (message thread)
+
+    // ── Live tuner ring buffer (single-producer audio / single-consumer GUI) ──
+    // Power-of-two size; the writer stores a monotonically increasing total
+    // sample count and the reader grabs the last N samples ending there. Torn
+    // reads are harmless — the next 30Hz frame recovers a clean window.
+    static constexpr int kTunerRingSize = 8192;          // must be a power of two
+    static constexpr int kTunerRingMask = kTunerRingSize - 1;
+    std::array<float, kTunerRingSize> tunerRing {};      // zero-initialised
+    std::atomic<uint64_t> tunerWritePos { 0 };
+    void pushTunerSamples(const float* data, int n);     // audio thread only
 
 public:
     // GUI level metering (atomic, updated per block from audio thread)

@@ -100,7 +100,7 @@ cmake -B build -DSR_BUILD_TESTS=ON # Build with tests
 
 ## GUI Architecture
 
-14 custom components in `src/gui/`, all in `namespace sr`:
+15 custom components in `src/gui/`, all in `namespace sr`:
 
 - **ColourPalette.h** — 23 inline colour constants (dark theme)
 - **FontData.h/.cpp** — Embedded Space Mono + DM Sans fonts via BinaryData
@@ -109,6 +109,7 @@ cmake -B build -DSR_BUILD_TESTS=ON # Build with tests
 - **VUMeter.h/.cpp** — 24-segment LED bar, 60Hz timer, green/yellow/red zones
 - **ToggleSwitch.h/.cpp** — iOS-style toggle wrapping `juce::ToggleButton` for APVTS attachment
 - **HeaderBar.h/.cpp** — Brand + PresetSelector + gear icon
+- **TunerBar.h/.cpp** — Always-visible live tuner strip (note name + octave, cents meter, freq readout). Owns a `PitchDetector`, pulls DI windows from the processor's capture ring on the shared 30Hz timer
 - **FooterBar.h/.cpp** — OS factor, latency, sample rate, bit depth
 - **SectionBar.h/.cpp** — Clickable expand/collapse bar with chevron + hint text
 - **AdvancedPanel.h/.cpp** — PSU supply rails (teal gradient bars) + engine state readout
@@ -120,7 +121,9 @@ cmake -B build -DSR_BUILD_TESTS=ON # Build with tests
 
 **Window strategy**: Window set to max size (700×772 at 1× scale); X11 Shape Extension clips visible/input region to actual content height. Collapsible panels animate within the fixed-size window — `applyShapeMask()` updates the clip rect each frame. No `setSize()` during panel toggle = no compositor blink. Shape accounts for standalone wrapper title bar offset via `getTopLevelComponent()->getLocalPoint()`.
 
-**Editor timer** (30Hz): Polls atomic level meters (real input/output RMS + grid current), DSP readout for advanced panel, footer stats. Drives animated section expand/collapse (28px/frame linear steps). SectionBar chevrons animate at 300ms, gear icon at 400ms, toggle thumb at ~200ms.
+**Live tuner**: `src/dsp/analysis/PitchDetector.h/.cpp` (pure C++, MPM/NSDF) tracks the DI fundamental. The audio thread writes raw channel-0 input into a lock-free ring (`SilentRiotProcessor::pushTunerSamples`) **before** the power-off early-return, so tuning works with the amp silenced; `TunerBar` pulls the latest window via `readLatestTunerSamples` on the editor timer and runs detection off the audio thread. Detection ≥ ±5¢ accuracy on open strings (verified in `pitch_detector_tests.cpp`).
+
+**Editor timer** (30Hz): Polls atomic level meters (real input/output RMS + grid current), DSP readout for advanced panel, footer stats, and refreshes the live tuner. Drives animated section expand/collapse (28px/frame linear steps). SectionBar chevrons animate at 300ms, gear icon at 400ms, toggle thumb at ~200ms.
 
 **Keyboard**: Arrow keys ±0.1 display (±0.01 internal), PageUp/Down ±1.0 display (±0.1 internal) via `NotchKnob::KnobSlider` override. Tab order: GAIN→SHAPE→VOLUME→7W→CAB→PWR.
 
