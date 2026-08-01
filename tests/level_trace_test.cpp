@@ -62,7 +62,7 @@ static LevelTrace traceChain(float digitalPeak, float gain, float volume,
     float vScreen = V_SCREEN_NOMINAL_N;
     float bias    = PENTODE_BIAS_15W_N;
 
-    float gainVal = gain;
+    float gainVal = gainDriveTaper(gain);
     float volVal  = volume * volume;  // audioTaper
 
     // Peak trackers (skip first 10% for settling)
@@ -83,8 +83,9 @@ static LevelTrace traceChain(float digitalPeak, float gain, float volume,
 
         if (i > settleEnd) peak.v1aOut = std::max(peak.v1aOut, std::abs(x));
 
-        // Gang A
-        float gainA = gainVal;
+        // ProcessBlock first remaps the user knob to gainVal, then applies
+        // Gang A as audio taper and Gang B as linear.
+        float gainA = sr::audioTaper(gainVal);
         x *= gainA;
         if (i > settleEnd) peak.gangAOut = std::max(peak.gangAOut, std::abs(x));
 

@@ -72,7 +72,16 @@ cmake -B build -DSR_BUILD_TESTS=ON # Build with tests
 - **Listening Test Round 2** (done): Fix PI grid conduction pumping at gain≥5 (charge rate + max bias shift)
 - **Listening Test Round 3** (done): Fix volume knob causing distortion/signal loss above noon — tightened sag cold clamp -6V → -3V
 - **Shape Control** (done): Replaced Vox-cut tone with Orange Shape-inspired 3-band EQ (low shelf 250Hz, mid bell 800Hz, high shelf 3.5kHz) — sweeps from warm/mid-forward (CCW) to scooped/modern (CW)
-- **Next**: Continued listening test and ear-tuning (Shape EQ gain ranges, outputGainCompensation, V1B_RSOURCE_MAX_REAL, dynamics feel)
+- **Power-Section Calibration** (done, USE-59): the amp core, root-caused against measurements rather than by ear. See `docs/handoff-power-section-calibration.md` for the full record and `docs/handoff-ltp-convergence.md` for the solver.
+  - Gain pot law was **x⁴** — `audioTaper()` applied at both gangs, so the laws multiplied. Now Gang A tapers, Gang B is linear
+  - **LTP solver did not converge** — a period-2 limit cycle, i.e. a Nyquist-rate square wave synthesised from DC. Replaced with a bracketed root-find
+  - Sag reference desynchronised from the tube model → pinned at its warm clamp. Now derived via `pentodeQuiescentTotal()`
+  - **EL84 drew 3.9× too little current** vs datasheet. `EL84_KG1` 820 → 210.5, with `EL84_IP_MAX_N` / `SCREEN_CURRENT_RATIO` corrected
+  - **Grid conduction never clamped** (resistive divider) → PI grid reached 121 V on a −1.5 V-biased 12AX7. Now a logarithmic diode law
+  - **EL84 grid threshold was 0 V** on a −9.6 V-biased tube → coupling-cap charge railed on silence, driving a 17.7 Hz motorboating oscillation at gain ≥ 9
+  - Shape EQ silently reset to noon after any oversample change
+  - Result: all three tone sign-off THD bands pass together for the first time (clean 1.03%, edge 9.44%, crank 30.1%)
+- **Next**: `MAX_BIAS_SHIFT_N` rail (sag depth is 0.38 dB against a 1.5–4.0 target — the charge and sag limiters pin against each other, so neither is a dynamic); IR-path aliasing (E3, −34.7 dBc vs ≤ −85); even-harmonic warmth at edge (B4); ~0.5 s −17 dBFS startup thump while the PSU settles
 - **Neural model**: On hold until ear-tuning is finalized — training against DSP output that's still changing produces a model that must be retrained after every constant tweak. Finalize the DSP first, then capture and train against a stable target.
 
 ## Conventions
@@ -152,11 +161,26 @@ All filter frequencies now match spec v2.13:
 - PI coupling HP: 16Hz (was already correct)
 - All preamp filters verified correct
 
-Koren tube parameters verified against Guitarix and standard datasheets.
+Koren tube parameters verified against Guitarix and standard datasheets. The EL84
+is additionally pinned to its **datasheet operating point** (Va=250V, Vg2=250V,
+Vg1=−7.3V → Ia=48 mA, Ig2=5.5 mA) by tests in `pentode_tests.cpp` — `EL84_KG1`
+and `EL84_IP_MAX_N` are coupled through the tanh knee, so re-solve if either moves.
 
-**Tuning items for listening test:**
-- `outputGainCompensation = 1.0` — ear-tune for optimal headroom (clean: -3.9 dBFS, driven: -0.1 dBFS at comp=1.0)
-- `V1B_RSOURCE_MAX_REAL = 150KΩ` — code-only clamp not in spec; may limit Miller darkening at low gain (consider removing if low-gain tones sound too bright)
+**Ear-tuning knobs, in the order they bite:**
+- `GRID_CLAMP_KNEE_N = 6V` — how many volts above threshold a conducting grid may
+  sit. **This is the primary gain-staging control** — it decides how much drive
+  reaches the next stage. Reach for this before the gain taper.
+- `GAIN_KNOB_HEADROOM = 0.8` — fraction of the drive range the knob can reach.
+  Knob 10 delivers what knob 8 used to. Raise toward 1.0 to return the top end.
+- `OT_CURRENT_SCALE = 0.009` — output level trim. Not a pure derivation: the
+  IP_MAX tanh knee and plate saturation are nonlinear, so it is set empirically.
+- `OT_SAT_DRIVE = 190` — OT flux saturation. Scales *inversely* with signal level,
+  so it must be retuned whenever plate currents or `OT_CURRENT_SCALE` move. Too
+  high crushes the low end first (`flux ∝ 1/f`) and kills palm-mute thump —
+  measure with `tools/sr_thump.py`, not by ear.
+- `outputGainCompensation = 1.0` — final headroom into the output tanh.
+- `V1B_RSOURCE_MAX_REAL = 150KΩ` — code-only clamp not in spec; may limit Miller
+  darkening at low gain (consider removing if low-gain tones sound too bright)
 
 ## Important Pitfalls (from spec)
 
@@ -174,6 +198,9 @@ Koren tube parameters verified against Guitarix and standard datasheets.
 - IR loading must NEVER happen on the audio thread — always use `AsyncUpdater` to defer to message thread
 - `bufferTransfer.set()` (blocking SpinLock) is message-thread only; `bufferTransfer.get()` (try-lock) is audio-thread only
 - ToggleSwitch uses `onStateChange` internally for thumb animation — external callbacks must use `onClick` (not `onStateChange`) to avoid breaking the animation timer
-- Gain pot gangs MUST use `audioTaper()` (Spec §3.3) — without it, signal at the LTP is 4× too hot at noon, causing gain collapse on attack and artificial dip/bloom dynamics
+- Gain pot: taper **Gang A only** (`audioTaper()`, Spec §3.3); **Gang B is LINEAR**. The signal passes through both gangs, so the law the player feels is the *product*. Tapering neither leaves the LTP 4× too hot at noon (gain collapse on attack, dip/bloom); tapering *both* gives x⁴, which puts noon at −24 dB, squeezes all usable drive into dial 7–10, and drives V1b/PI grid conduction into blocking collapse ("drowning" when pushed). The user knob is additionally remapped through `gainDriveTaper()` (cubic × `GAIN_KNOB_HEADROOM`) before the gangs. Pinned by the combined-law tests in `signal_chain_tests.cpp`
+- Grid conduction is a **diode clamp, not a resistive divider**. `vLoaded = threshold + knee·log1p(vAbove/knee)` — transparent below the knee, logarithmic above. The old `Rg/(Rg+Rs)` divider could only ever *attenuate*: at the PI that ratio is 0.23, so a ~520 V swing still delivered a **121 V grid** on a 12AX7 biased at −1.5 V, which left the whole power section overdriven at every knob position and flattened the amp's dynamics
+- Grid conduction thresholds track **|bias|**, because a grid conducts once it approaches the *cathode*. 12AX7 at −1.5 V → 0.5 V. `GRID_CONDUCT_THRESH_EL84_N` must stay near the EL84's −9.6 V bias (8.6 V), NOT 0 — at 0 every positive excursion of amplified noise counts as conduction, ratcheting the coupling-cap charge to its rail **on silence** and driving a ~17.7 Hz motorboating oscillation at gain ≥ 9 with nothing plugged in. Detect with `tools/sr_idle.py`
+- LTP solver **root-finds** the cathode node (secant + bisection fallback); it is NOT a relaxation. Do not "simplify" it back to a damped fixed-point — that version did not converge, it limit-cycled into a Nyquist-rate square wave at constant input. `alpha = 1.0` is a trap: it reports zero residual because it kills the stage. Inner plate iterations must stay at 4 (3 oscillates). See `docs/handoff-ltp-convergence.md`
 - Speaker coupling `SPK_GAINMOD_TAU_MS` must be ≥15ms — shorter values cause per-cycle AM modulation (audible as LFO-like filtering)
 - `GRID_CHARGE_RATE` must stay low (≤0.003) and `MAX_BIAS_SHIFT_N` ≤ 1.5V — higher values cause PI grid charge saturation → LTP pumping at gain≥5

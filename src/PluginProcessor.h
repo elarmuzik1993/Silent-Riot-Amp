@@ -156,6 +156,7 @@ private:
 
     // State
     float el84BaseBias = sr::PENTODE_BIAS_15W_N;
+    float lastSagQuiescentBias = 0.0f;          // forces a sag-reference recompute on first block
     float lastShapeCoeffVal = -1.0f;            // shape coeff update threshold tracker
     float outputGainCompensation = 1.0f;   // scales cab output into tanh soft-clip range
     bool  psuFrozen    = false;

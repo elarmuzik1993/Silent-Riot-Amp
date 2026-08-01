@@ -51,6 +51,67 @@ TEST_CASE("Audio taper: monotonically increasing", "[chain]") {
     }
 }
 
+// ── Gain control law (regression) ─────────────────────────────
+//
+// The gain pot is dual-gang and the signal passes through both gangs. After the
+// EL84 current calibration, the raw x^3 combined law made knob 3 hit edge/crank
+// levels and left no clean range. The user knob is now remapped to a virtual pot
+// position before feeding the two physical gangs.
+//
+// Gang A tapers, Gang B is linear. These tests pin the remap plus combined law
+// so clean/edge/crank stay in their intended parts of the knob.
+
+static float combinedGainPotLaw(float knob) {
+    const float drive = sr::gainDriveTaper(knob);
+    return sr::audioTaper(drive) * drive;
+}
+
+// GAIN_KNOB_HEADROOM remaps the knob's full sweep onto the lower 80% of the
+// drive curve: the old top end added compression rather than usable drive, so
+// knob 10 now delivers what knob 8 used to.
+TEST_CASE("Gain knob headroom: full sweep tops out at the old knob-8 drive", "[chain][taper]") {
+    // The raw cubic, i.e. what the taper produced before the headroom scaling.
+    auto rawCubic = [](float x) {
+        return x * (0.7166667f + x * (-1.55f + x * 1.8333333f));
+    };
+    REQUIRE(sr::gainDriveTaper(1.0f) == Approx(rawCubic(GAIN_KNOB_HEADROOM)).margin(1e-6f));
+    REQUIRE(sr::gainDriveTaper(1.0f) < rawCubic(1.0f));   // top end really was removed
+}
+
+TEST_CASE("Gain drive taper: canonical clean/edge points", "[chain][taper]") {
+    // Anchors move with the headroom scaling — these are the 0.8 values.
+    REQUIRE(sr::gainDriveTaper(0.30f) == Approx(0.108064f).margin(1e-5f));
+    REQUIRE(sr::gainDriveTaper(0.50f) == Approx(0.156000f).margin(1e-5f));
+    REQUIRE(sr::gainDriveTaper(1.00f) == Approx(0.520000f).margin(1e-5f));
+}
+
+TEST_CASE("Gain pot combined law: endpoints", "[chain][taper]") {
+    REQUIRE(combinedGainPotLaw(0.0f) == Approx(0.0f));
+    // Full knob is no longer full drive — that is the point of the headroom cap.
+    REQUIRE(combinedGainPotLaw(1.0f) == Approx(0.140608f).margin(1e-6f));
+    REQUIRE(combinedGainPotLaw(1.0f) < 1.0f);
+}
+
+TEST_CASE("Gain pot combined law: noon sits below the top", "[chain][taper]") {
+    const float noon = combinedGainPotLaw(0.5f);
+    REQUIRE(noon == Approx(0.003796f).margin(1e-6f));
+    REQUIRE(noon < combinedGainPotLaw(1.0f));
+}
+
+TEST_CASE("Gain pot combined law: knob 3 stays clean", "[chain][taper]") {
+    REQUIRE(combinedGainPotLaw(0.3f) == Approx(0.001262f).margin(1e-6f));
+    REQUIRE(combinedGainPotLaw(0.3f) < 0.003f);
+}
+
+TEST_CASE("Gain pot combined law: monotonically increasing", "[chain][taper]") {
+    float prev = 0.0f;
+    for (float g = 0.0f; g <= 1.0f; g += 0.01f) {
+        float y = combinedGainPotLaw(g);
+        REQUIRE(y >= prev - 1e-6f);
+        prev = y;
+    }
+}
+
 // ── V1a stage operating level ────────────────────────────────
 
 TEST_CASE("V1a: guitar input produces plate voltage within supply", "[chain][v1a]") {

@@ -49,4 +49,24 @@ inline float triodeWaveshaper(float vGrid_n, float vBias_n, float vSupply_n, flo
 
 inline float audioTaper(float x) { return x * x; }
 
+// User gain knob -> virtual pot position used by both physical gain gangs.
+// The EL84 recalibration made the old direct x^3 two-gang law hit edge/crank
+// behavior by knob 2-3, so the knob is remapped through a monotonic cubic.
+//
+// GAIN_KNOB_HEADROOM then compresses the knob's full sweep onto the lower part
+// of that curve: the old top end (knob 8-10) was past where the chain runs out
+// of headroom and contributed compression rather than usable drive, so knob 10
+// now lands where knob 8 used to. The full 270 deg arc covers the range that
+// actually sounds good, which also buys finer resolution through it.
+//
+// Anchors at HEADROOM = 0.8:  knob 0.30 -> drive 0.108,
+//                             knob 0.50 -> drive 0.156,
+//                             knob 1.00 -> drive 0.520 (= old knob 0.80).
+// The cubic is monotonic on [0,1] (its derivative 0.7167 - 3.1x + 5.5x^2 has a
+// negative discriminant), and scaling the input keeps it monotonic.
+inline float gainDriveTaper(float x) {
+    x = std::clamp(x, 0.0f, 1.0f) * GAIN_KNOB_HEADROOM;
+    return x * (0.7166667f + x * (-1.55f + x * 1.8333333f));
+}
+
 } // namespace sr

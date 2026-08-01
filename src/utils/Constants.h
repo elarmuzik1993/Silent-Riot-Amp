@@ -79,18 +79,47 @@ constexpr float SHAPE_HIGH_GAIN_MAX   =  4.0f;     // dB at shape=1 (bright)
 constexpr float PREAMP_RPLATE_N     = VS::R_100K;  // 100kΩ plate load for V1a/V1b
 
 // ── Pentode model (EL84) ───────────────────────────────────
+// Koren Kg1, calibrated against the EL84 datasheet operating point
+// (Va=250V, Vg2=250V, Vg1=-7.3V -> Ia=48 mA). The previous value of 820 put the
+// model at 13.5 mA there — 3.9x too little current — so the pair idled at 24 mA
+// instead of ~90 mA. With a 100R shared cathode resistor that tiny idle meant a
+// normal playing swing demanded a huge bias shift relative to it, and the sag
+// offset slammed into its cold clamp from GAIN 3 upward: the power-tube bias
+// froze at -12.6 V and stopped tracking the player's right hand.
+// Solve through the FULL pipeline (tanh knee + plate saturation), not the raw
+// Koren current, and RE-SOLVE if EL84_IP_MAX_N changes — the knee compresses the
+// result, so these two constants are coupled.
+constexpr float EL84_KG1            = 210.5f;
 constexpr float PENTODE_BIAS_15W_N  = VS::v(-9.6f);    // -0.032 normalized
 constexpr float PENTODE_BIAS_7W_N   = VS::v(-7.0f);    // -0.023 normalized
 constexpr float V_PLATE_KNEE_N      = VS::v(40.0f);
-constexpr float SCREEN_CURRENT_RATIO = 0.25f;
+// Ig2/Ia at the datasheet point: 5.5 mA / 48 mA = 0.115. Was 0.25, which drew
+// over twice the real screen current and made the screen node droop too hard.
+constexpr float SCREEN_CURRENT_RATIO = 0.115f;
 constexpr float SCREEN_REDIST_FACTOR = 0.15f;
 constexpr float R_SCREEN_N          = VS::r(470.0f);
 constexpr float EL84_CUTOFF_N       = VS::v(-10.0f);
-constexpr float EL84_IP_MAX_N       = VS::i(0.065f);   // 65.0 normalized
+// Soft ceiling on per-tube plate current (tanh knee). A real EL84 peaks around
+// 90-100 mA in class-AB push-pull; 65 mA sat below the datasheet-correct IDLE
+// point once the model was recalibrated, so the knee was compressing normal
+// operation instead of only catching peaks.
+constexpr float EL84_IP_MAX_N       = VS::i(0.095f);   // 95.0 normalized
 
 // ── Grid conduction ─────────────────────────────────────────
+// Signal level at which the grid starts drawing current. A grid conducts once
+// its voltage approaches the CATHODE, so the threshold sits near |bias| minus
+// the ~1 V of grid current that flows just before zero. The 12AX7 stages are
+// biased at -1.5 V -> 0.5 V, which follows that rule.
+//
+// The EL84 threshold used to be 0.0 V while the tube is biased at -9.6 V, i.e.
+// ~8.6 V too low: every positive excursion of amplified noise counted as grid
+// conduction, so the coupling-cap charge integrator (100 ms tau, no lower bound)
+// ratcheted to its MAX_BIAS_SHIFT_N rail even on SILENCE. That railed charge
+// modulated the bias, which modulated plate current, which drooped the supply,
+// which moved the operating point — a ~17.7 Hz motorboating limit cycle that
+// appeared at gain >= 9 with nothing plugged in.
 constexpr float GRID_CONDUCT_THRESH_N       = VS::v(0.5f);
-constexpr float GRID_CONDUCT_THRESH_EL84_N  = VS::v(0.0f);
+constexpr float GRID_CONDUCT_THRESH_EL84_N  = VS::v(8.6f);
 // Per-stage source impedances (real stage output Z)
 constexpr float GRID_SOURCE_R_V1B_N         = VS::Z_OUT_V1A;  // V1a Zout: 100K||62.5K ≈ 38.5KΩ
 constexpr float GRID_SOURCE_R_PI_N          = VS::Z_OUT_V1B;  // V1b Zout: (100K+68K)||62.5K ≈ 47KΩ
@@ -101,6 +130,13 @@ constexpr float GRID_R_V1A_N               = VS::R_300;              // 300Ω  (
 constexpr float GRID_R_V1B_N               = VS::r(11538.0f);        // ~11.5KΩ (source=38.5KΩ, ratio=0.3)
 constexpr float GRID_R_PI_N                = VS::r(14151.0f);        // ~14.2KΩ (source=47KΩ, ratio=0.3)
 constexpr float GRID_R_EL84_N              = VS::r(19231.0f);        // ~19.2KΩ (source=38.5KΩ, ratio=0.5)
+// Diode clamp knee for grid conduction, scaled per stage by that stage's static
+// loading ratio Rg/(Rg+Rs). Sets how many volts above the conduction threshold
+// the grid is allowed to sit when driven hard. Larger = looser clamp / more grid
+// swing. This is the constant that decides how much drive actually reaches the
+// next stage, so it is the primary gain-staging control — ear-tune it before
+// reaching for the gain taper.
+constexpr float GRID_CLAMP_KNEE_N           = VS::v(6.0f);
 constexpr float GRID_CHARGE_RATE            = 0.003f;   // was 0.01 → caused PI grid charge saturation at gain≥5 (pumping)
 constexpr float MAX_BIAS_SHIFT_N            = VS::v(-1.5f); // was -5V → excessive for 12AX7 (clips at ~-1.5V grid)
 // Coupling-cap charge-decay time constants (seconds) per stage
@@ -123,6 +159,11 @@ constexpr float PI_RPLATE_A_N       = VS::R_100K;          // non-inv plate load
 constexpr float PI_RPLATE_B_N       = VS::r(82000.0f);     // inv plate load (lower → less gain on B side)
 constexpr float PI_BIAS_REF_N       = VS::v(-1.5f);
 constexpr float PI_CATHODE_INIT_N   = VS::v(1.5f);
+// Softness of the plate-voltage lower bound (plate can't go below cathode).
+// Width of the compression knee as the plate approaches the cathode — a real
+// triode saturates smoothly over roughly this span. Ear-tune: larger = softer,
+// more compressed at high drive; 0 would restore the old hard clip.
+constexpr float PI_PLATE_KNEE_N     = VS::v(10.0f);
 
 // ── Dynamic Miller ──────────────────────────────────────────
 constexpr float CGP_12AX7           = 1.7e-12f;
@@ -151,8 +192,13 @@ constexpr float XCUR_WEIGHT_HF      = 0.0025f;  // (200/4000)^2 — HF excursion
 constexpr float XCUR_SENSITIVITY    = 2.0f;     // excursion-to-tanh scaling (ear-tune)
 
 // ── OT core saturation ─────────────────────────────────────
-constexpr float OT_CURRENT_SCALE    = 0.015f;
-constexpr float OT_SAT_DRIVE        = 400.0f;
+// Plate current -> OT primary voltage. Rescaled with the EL84 Kg1 calibration:
+// correcting the model raised plate currents ~3.9x, so this dropped by the same
+// factor, then trimmed empirically. A pure 1/3.9 scaling undershot, because the
+// current rise is not uniform — the IP_MAX tanh knee and plate saturation are
+// nonlinear, and the idle point moved more than the signal swing did.
+constexpr float OT_CURRENT_SCALE    = 0.00900f;
+constexpr float OT_SAT_DRIVE        = 190.0f;
 constexpr float OT_SAT_DC_FREQ      = 20.0f;
 // Hard rail on the flux integrator. Steady-state flux for a normalized input
 // is ~input/(2π·OT_SAT_DC_FREQ) ≈ 0.008·input, so this clamp is ~3 orders of
@@ -162,6 +208,13 @@ constexpr float OT_SAT_FLUX_MAX     = 10.0f;
 
 // ── Gain taper ──────────────────────────────────────────────
 constexpr float GAIN_TAPER_EXPONENT = 2.0f;
+// Fraction of the amp's full drive range the gain knob is allowed to reach.
+// The top of the old range (knob 8-10) ran the chain out of headroom — it added
+// no usable drive, only compression and grit — so the knob's full 0-10 sweep is
+// remapped onto 0-80% of it. Knob 10 now delivers what knob 8 used to, and the
+// whole 270 deg arc is spread across the range that actually sounds good.
+// Raise toward 1.0 to hand the top end back.
+constexpr float GAIN_KNOB_HEADROOM  = 0.8f;
 
 // ── Effects module (front-of-amp + post-cab) ───────────────
 // These live OUTSIDE the oversampled amp loop and never touch the frozen

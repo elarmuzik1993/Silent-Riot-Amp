@@ -367,6 +367,16 @@ void SilentRiotProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     if (!powerOn || tunerMute) { buffer.clear(); return; }
 
     el84BaseBias = is7W ? PENTODE_BIAS_7W_N : PENTODE_BIAS_15W_N;
+
+    // Keep the sag reference locked to what the tube model actually idles at for
+    // this bias. 7W runs a hotter bias → higher idle current → different
+    // reference, so this has to follow the power-mode switch, not be a constant.
+    if (el84BaseBias != lastSagQuiescentBias) {
+        lastSagQuiescentBias = el84BaseBias;
+        sag.setQuiescent(pentodeQuiescentTotal(el84BaseBias,
+                                               V_POWER_NOMINAL_N, V_SCREEN_NOMINAL_N));
+    }
+
     cabSim.setEnabled(cabOn);
 
     // Detect IR parameter changes — defer actual loading to message thread
@@ -434,6 +444,11 @@ void SilentRiotProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
         if (oversampleSwitcher.readyToSwitch()) {
             oversampleSwitcher.commitSwitch();
             recalcRateDependentCoeffs();
+            // recalcAll() rebuilds the shape EQ at noon (FilterBank.cpp), so the
+            // cached value must be invalidated or the per-sample guard below sees
+            // "shape hasn't moved" and never restores the knob's actual position —
+            // leaving Shape silently stuck at noon until the user touches it.
+            lastShapeCoeffVal = -1.0f;
         }
 
         // Request mode change → starts fade-out (actual switch deferred to next block)
@@ -457,6 +472,7 @@ void SilentRiotProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
         float gainVal = gainSmoother.tick();
         float volVal  = volumeSmoother.tick();
         float toneVal = toneSmoother.tick();
+        float gainDrive = gainDriveTaper(gainVal);
 
         // Update shape EQ only when value has changed enough to matter
         // (saves sin/cos/sqrt coefficient recalc on ~99% of samples)
@@ -488,7 +504,7 @@ void SilentRiotProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
         psu.reportPreampLevel(x);
 
         // ── Gain Pot Gang A (audio taper: Spec §3.3) ──
-        float gainA = audioTaper(gainVal);
+        float gainA = audioTaper(gainDrive);
         x *= gainA;
 
         // ── Stage 2: V1b ──
@@ -503,8 +519,12 @@ void SilentRiotProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
         x = v1b_miller.process(x, v1bGainEst, filterBank.effectiveSR);
         psu.reportPreampLevel(x);
 
-        // ── Gain Pot Gang B (audio taper: Spec §3.3) ──
-        x *= audioTaper(gainVal);
+        // ── Gain Pot Gang B (LINEAR — taper already applied on Gang A) ──
+        // The signal passes through both gangs, but the user knob is first
+        // remapped to a virtual pot position. After the EL84 current
+        // calibration, the raw x^3 law made knob 3 behave like edge/crank.
+        // gainDriveTaper() keeps knob 3 clean, knob 5 edge, and knob 10 full.
+        x *= gainDrive;
         x = filterBank.gainLoadingLP.process(x);
 
         // ── Stage 3: Phase Inverter (LTP) ──
