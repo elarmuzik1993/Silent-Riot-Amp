@@ -14,6 +14,18 @@
 
 namespace sr {
 
+// The gate has no ON/OFF toggle — THRESHOLD 0 means off. The caller's gate
+// block must therefore keep running while the SMOOTHED threshold is still
+// ramping down to the floor, not just while the raw knob is off 0. Cutting the
+// block dead the instant the raw knob reaches 0 leaves the gate mid-attenuation
+// and steps the applied gain from 0 to 1 in a single sample — an audible click.
+// Letting the smoother finish sweeps the threshold below the signal, so the
+// gate opens through its own attack ramp and lands on the true-bypass branch
+// already at unity.
+inline bool gateShouldRun(float rawThreshKnob, float smoothedThreshKnob) {
+    return rawThreshKnob > 0.0f || smoothedThreshKnob > 1.0e-5f;
+}
+
 struct NoiseGate {
     // Coefficients (recomputed on rate change)
     float detectCoeff  = 0.0f;   // envelope follower smoothing
