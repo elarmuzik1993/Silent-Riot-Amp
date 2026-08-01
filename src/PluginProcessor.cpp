@@ -331,7 +331,10 @@ void SilentRiotProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     float gateThr   = sanitizeUnitParam(apvts.getRawParameterValue(Params::IDs::GATE_THRESHOLD)->load());
     // No on/off toggle: the gate is active whenever its threshold is off 0
     // (knob at 0 = off). NoiseGate::process bypasses at the min threshold too.
-    bool  gateOn    = gateThr > 0.0f;
+    // Keyed off the SMOOTHED value as well as the raw one, so turning the knob
+    // down to 0 lets the threshold ramp out instead of cutting the gate dead
+    // mid-attenuation — see gateShouldRun() in NoiseGate.h.
+    bool  gateOn    = gateShouldRun(gateThr, gateThreshSm.getCurrentValue());
     bool  boostOn   = apvts.getRawParameterValue(Params::IDs::BOOST_ON)->load() > 0.5f;
     float boostLvl  = sanitizeUnitParam(apvts.getRawParameterValue(Params::IDs::BOOST_LEVEL)->load());
     float boostTgt  = sanitizeUnitParam(apvts.getRawParameterValue(Params::IDs::BOOST_TIGHT)->load());

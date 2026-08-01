@@ -11,6 +11,8 @@
 #include <catch2/catch_approx.hpp>
 #include "dsp/effects/NoiseGate.h"
 #include <cmath>
+#include <vector>
+#include <algorithm>
 
 using namespace sr;
 
@@ -103,4 +105,91 @@ TEST_CASE("NoiseGate reset restores open state", "[gate]")
     REQUIRE(g.gain == Catch::Approx(1.0f));
     REQUIRE(g.open == false);
     REQUIRE(g.envelope == Catch::Approx(0.0f));
+}
+
+// ── Regression: THRESHOLD knob sweeping to/from 0 must not step the gain ──
+// The gate has no ON/OFF toggle, so the THRESHOLD knob is swept through 0 in
+// normal use. Keying the processor's gate block off the RAW knob alone stops
+// calling process() the instant the knob hits 0, abandoning the gate
+// mid-attenuation: the applied gain jumps 0 -> 1 in ONE sample (a click), and
+// the stale smoother then over-gates for a full ramp when the knob leaves 0
+// again. gateShouldRun() keeps the block alive until the smoother reaches the
+// floor, so the threshold sweeps out continuously instead.
+namespace {
+
+// Stand-in for juce::SmoothedValue<float> with reset(sr, 0.05): linear ramp.
+struct LinearRamp {
+    float cur = 0.0f, target = 0.0f;
+    int   stepsLeft = 0, rampSteps = 1;
+    void  reset(float sr, float sec) { rampSteps = std::max(1, static_cast<int>(sr * sec)); }
+    void  setCurrentAndTarget(float v) { cur = target = v; stepsLeft = 0; }
+    void  setTargetValue(float v) { if (v != target) { target = v; stepsLeft = rampSteps; } }
+    float getNextValue() {
+        if (stepsLeft <= 0) { cur = target; return cur; }
+        cur += (target - cur) / static_cast<float>(stepsLeft); --stepsLeft; return cur;
+    }
+    float getCurrentValue() const { return cur; }
+};
+
+// Mirrors the processor's pre-amp gate block over a knob automation curve.
+// Returns the applied gain per sample (1.0 where the block is skipped).
+std::vector<float> runGateBlock(const std::vector<float>& knob, float signalDb)
+{
+    NoiseGate gate; gate.recalcCoeffs(kSR); gate.reset();
+    LinearRamp sm;   sm.reset(kSR, 0.05f); sm.setCurrentAndTarget(0.0f);
+
+    const float amp = std::pow(10.0f, signalDb / 20.0f);
+    std::vector<float> gains(knob.size(), 1.0f);
+
+    for (size_t i = 0; i < knob.size(); ++i)
+    {
+        const float x = amp * std::sin(2.0f * PI_F * 220.0f * static_cast<float>(i) / kSR);
+        if (gateShouldRun(knob[i], sm.getCurrentValue()))
+        {
+            sm.setTargetValue(knob[i]);
+            const float thrDb = GATE_THRESH_MIN_DB
+                              + sm.getNextValue() * (GATE_THRESH_MAX_DB - GATE_THRESH_MIN_DB);
+            gate.process(x, thrDb);
+            gains[i] = gate.gain;
+        }
+    }
+    return gains;
+}
+
+} // namespace
+
+TEST_CASE("NoiseGate threshold sweep to zero is click-free", "[gate][regression]")
+{
+    const int sec = static_cast<int>(kSR);
+    const float signalDb = -55.0f;   // below knob 0.5 (-50 dB), above knob 0.02 (-78.8 dB)
+
+    std::vector<float> knob;
+    knob.insert(knob.end(), sec,     0.5f);    // gate shuts on the quiet signal
+    knob.insert(knob.end(), sec / 2, 0.0f);    // knob to OFF — must ramp, not cut
+    knob.insert(knob.end(), sec / 2, 0.02f);   // small nudge back up off zero
+
+    const auto gains = runGateBlock(knob, signalDb);
+
+    SECTION("no single-sample discontinuity in the applied gain")
+    {
+        float maxJump = 0.0f;
+        for (size_t i = 1; i < gains.size(); ++i)
+            maxJump = std::max(maxJump, std::abs(gains[i] - gains[i - 1]));
+        // Keyed off the raw knob alone this is exactly 1.0 (full-scale step).
+        REQUIRE(maxJump < 0.1f);
+    }
+
+    SECTION("gate actually shut while the threshold was above the signal")
+    {
+        REQUIRE(gains[static_cast<size_t>(sec) - 1] < 0.01f);
+    }
+
+    SECTION("nudging the knob off zero does not over-gate from a stale smoother")
+    {
+        // 10 ms after the knob moves to 0.02 the threshold is far below the
+        // signal, so the gate must already be open — not still ramping down
+        // from the previous 0.5 setting.
+        const size_t at = static_cast<size_t>(sec * 1.5f + kSR * 0.010f);
+        REQUIRE(gains[at] > 0.9f);
+    }
 }
