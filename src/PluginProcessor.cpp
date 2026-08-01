@@ -101,10 +101,9 @@ juce::AudioProcessorValueTreeState::ParameterLayout SilentRiotProcessor::createP
         0, sr::MAX_USER_IRS, 0));
 
     // ── Effects module — all default OFF / dry (tone-neutral when bypassed) ──
-    params.push_back(std::make_unique<juce::AudioParameterBool>(
-        juce::ParameterID{ Params::IDs::GATE_ON, 1 }, "Gate", false));
-    // Threshold is a 0–1 knob (maps 0..1 → GATE_THRESH_MIN..MAX dB in processBlock,
-    // so NotchKnob's 0–1 arc works). Default 0 = -80 dB (effectively open).
+    // Noise gate has no on/off toggle — it self-gates. Threshold is a 0–1 knob
+    // (maps 0..1 → GATE_THRESH_MIN..MAX dB in processBlock, so NotchKnob's 0–1
+    // arc works). Default 0 = gate OFF (true bypass — see NoiseGate::process).
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         juce::ParameterID{ Params::IDs::GATE_THRESHOLD, 1 }, "Gate Threshold",
         juce::NormalisableRange<float>(0.0f, 1.0f, 0.001f), 0.0f));
@@ -161,6 +160,12 @@ juce::AudioProcessorValueTreeState::ParameterLayout SilentRiotProcessor::createP
         juce::ParameterID{ Params::IDs::REVERB_TONE, 1 }, "Reverb Tone",
         juce::NormalisableRange<float>(0.0f, 1.0f, 0.001f), 0.5f));
 
+    // Stereo widener — autonomous (no ON toggle): 0 = off (dry/mono), 1 = wide.
+    // Defaults off, so it's tone-transparent until turned up.
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{ Params::IDs::WIDTH, 1 }, "Width",
+        juce::NormalisableRange<float>(0.0f, 1.0f, 0.001f), 0.0f));
+
     return { params.begin(), params.end() };
 }
 
@@ -195,6 +200,8 @@ void SilentRiotProcessor::resetDSPState()
     boost.reset();
     delay.reset();
     reverb.reset();
+    stereoWidth.reset();
+    widenerWasActive = false;
 
     lastShapeCoeffVal = -1.0f;   // force shape coeff recompute on first sample
     psuFrozen = false;
@@ -260,6 +267,7 @@ void SilentRiotProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
     boost.prepare(baseSR);
     delay.prepare(sampleRate, samplesPerBlock, getTotalNumOutputChannels());
     reverb.prepare(sampleRate, samplesPerBlock, getTotalNumOutputChannels());
+    stereoWidth.prepare(baseSR);
 
     const double fxRampSec = 0.05;
     gateThreshSm.reset(sampleRate, fxRampSec);
@@ -320,8 +328,13 @@ void SilentRiotProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     // Float reads are sanitized at this boundary — a misbehaving host could
     // report NaN via automation, which would otherwise silently poison the
     // gate/boost/delay/reverb filters' IIR state forever (see ParamSanitize.h).
-    bool  gateOn    = apvts.getRawParameterValue(Params::IDs::GATE_ON)->load() > 0.5f;
     float gateThr   = sanitizeUnitParam(apvts.getRawParameterValue(Params::IDs::GATE_THRESHOLD)->load());
+    // No on/off toggle: the gate is active whenever its threshold is off 0
+    // (knob at 0 = off). NoiseGate::process bypasses at the min threshold too.
+    // Keyed off the SMOOTHED value as well as the raw one, so turning the knob
+    // down to 0 lets the threshold ramp out instead of cutting the gate dead
+    // mid-attenuation — see gateShouldRun() in NoiseGate.h.
+    bool  gateOn    = gateShouldRun(gateThr, gateThreshSm.getCurrentValue());
     bool  boostOn   = apvts.getRawParameterValue(Params::IDs::BOOST_ON)->load() > 0.5f;
     float boostLvl  = sanitizeUnitParam(apvts.getRawParameterValue(Params::IDs::BOOST_LEVEL)->load());
     float boostTgt  = sanitizeUnitParam(apvts.getRawParameterValue(Params::IDs::BOOST_TIGHT)->load());
@@ -337,6 +350,7 @@ void SilentRiotProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     float reverbMix = sanitizeUnitParam(apvts.getRawParameterValue(Params::IDs::REVERB_MIX)->load());
     float reverbSz  = sanitizeUnitParam(apvts.getRawParameterValue(Params::IDs::REVERB_SIZE)->load());
     float reverbTn  = sanitizeUnitParam(apvts.getRawParameterValue(Params::IDs::REVERB_TONE)->load());
+    float widthParam= sanitizeUnitParam(apvts.getRawParameterValue(Params::IDs::WIDTH)->load());
 
     // Master power off — silence output
     if (!powerOn) { buffer.clear(); return; }
@@ -618,12 +632,33 @@ void SilentRiotProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
         reverb.process(buffer);
     }
 
+    // ── MONO/STEREO widener (stereo bus only) ──
+    // Skipped entirely (bit-exact dry) while the knob sits parked at 0 and the
+    // internal smoother has settled — see StereoWidth::isActive(). Meaningless
+    // on a mono bus, so guarded to two channels. On the OFF→on edge we clear the
+    // Haas tail: while skipped, the delay line stops being primed, so without
+    // this a re-engage could bleed ~12 ms of stale audio into the side voice.
+    const bool widenerActive =
+        buffer.getNumChannels() == 2 && (widthParam != 0.0f || stereoWidth.isActive());
+    if (widenerActive)
+    {
+        if (!widenerWasActive) stereoWidth.clearTail();
+        stereoWidth.process(buffer.getWritePointer(0), buffer.getWritePointer(1),
+                            buffer.getNumSamples(), widthParam);
+    }
+    widenerWasActive = widenerActive;
+
     // ── Post-effects safety limiter ──
-    // delay/reverb run AFTER the amp's output limiter, so their wet tails can
-    // sum past full-scale. Soft-clip the summed output back into ±1 (and scrub
-    // any non-finite sample). Runs ONLY when an effect is active, so the dry
-    // amp path stays bit-identical when the whole module is off.
-    if (delayOn || reverbOn)
+    // delay/reverb run AFTER the amp's output limiter (their wet tails can sum
+    // past full-scale), and the widener boosts one channel's peak above the
+    // input (it can exceed ±1 even when the mono sum is in range). Both land
+    // after the amp's own limiter, so soft-clip the finished bus back into ±1
+    // (and scrub any non-finite sample) as a last line of defence. Runs ONLY
+    // when an effect is active, so the dry amp path stays bit-identical when the
+    // whole module is off. NOTE: this per-channel clip is nonlinear, so on peaks
+    // that actually hit the knee it marginally perturbs the widener's exact
+    // mono-sum invariance — an accepted trade against hard DAC clipping.
+    if (delayOn || reverbOn || widenerActive)
     {
         for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
         {

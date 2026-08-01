@@ -31,6 +31,7 @@
 #include "dsp/effects/Delay.h"
 #include "dsp/effects/TempoSync.h"
 #include "dsp/effects/Reverb.h"
+#include "dsp/effects/StereoWidth.h"
 #include "dsp/OversampleSwitcher.h"
 
 class SilentRiotProcessor : public juce::AudioProcessor,
@@ -122,6 +123,7 @@ private:
     sr::Boost               boost;
     sr::Delay               delay;
     sr::Reverb              reverb;
+    sr::StereoWidth         stereoWidth;   // final MONO↔STEREO widener (stereo only)
     // Boost level smoothed at base SR (avoids zipper on the make-up gain).
     juce::SmoothedValue<float> boostLevelSm, boostTightSm, boostBrightSm, gateThreshSm;
 
@@ -146,6 +148,7 @@ private:
     float lastShapeCoeffVal = -1.0f;            // shape coeff update threshold tracker
     float outputGainCompensation = 1.0f;   // scales cab output into tanh soft-clip range
     bool  psuFrozen    = false;
+    bool  widenerWasActive = false;   // edge-detect widener on/off for tail clear
     double baseSampleRate = 44100.0;
     std::atomic<int> cachedIRIndex { 0 };   // last IR index seen by audio thread (written msg+audio)
     std::atomic<int> pendingIRIndex { -1 }; // deferred IR load (message thread)
