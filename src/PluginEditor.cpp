@@ -36,7 +36,12 @@ SilentRiotEditor::SilentRiotEditor(SilentRiotProcessor& p)
     contentArea.addAndMakeVisible(footer);
 
     // Live tuner: pull DI windows straight from the processor's capture ring.
+    // getSampleRate() is 0 until prepareToPlay has run, and hosts differ on
+    // whether the editor is built before or after that — so this is only a
+    // provisional rate. timerCallback() re-prepares once the real rate is known
+    // and whenever it changes; see preparedTunerSR.
     tuner.prepare(proc.getSampleRate() > 0.0 ? proc.getSampleRate() : 44100.0);
+    preparedTunerSR = proc.getSampleRate();
     tuner.readSamples = [this](float* dest, int maxN) {
         return proc.readLatestTunerSamples(dest, maxN);
     };
@@ -499,7 +504,20 @@ void SilentRiotEditor::timerCallback()
         vuOut.setLevel(0.0f);
     }
 
-    // Live tuner — detects from captured DI input (works even with PWR off)
+    // Live tuner — detects from captured DI input (works even with PWR off).
+    // The detector converts lag to Hz using its assumed sample rate, so that
+    // rate MUST track the host's or every reading is transposed (a detector
+    // left at 44100 on a 48k host reports a true A4 as G#4 -47 cents). Re-prepare
+    // on any change: the editor can be built before prepareToPlay, and the host
+    // can switch rates while it is open.
+    {
+        const double hostSR = proc.getSampleRate();
+        if (hostSR > 0.0 && hostSR != preparedTunerSR)
+        {
+            tuner.prepare(hostSR);
+            preparedTunerSR = hostSR;
+        }
+    }
     tuner.refresh();
 
     // Live footer stats

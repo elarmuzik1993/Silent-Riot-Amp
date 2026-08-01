@@ -12,6 +12,7 @@
 #include <cmath>
 #include <vector>
 #include <random>
+#include <string>
 
 using namespace sr;
 
@@ -119,4 +120,59 @@ TEST_CASE("frequencyToNote rejects invalid input", "[pitch]")
 {
     REQUIRE_FALSE(frequencyToNote(0.0f).valid);
     REQUIRE_FALSE(frequencyToNote(-100.0f).valid);
+}
+
+// ── Regression: the detector's assumed rate must match the audio's ──
+// process() converts a lag in samples to Hz via its own `sampleRate`, so the
+// rate handed to prepare() is load-bearing: it silently transposes every
+// reading if it disagrees with the audio actually being captured. The editor
+// must therefore re-prepare whenever the host's rate changes (it may also build
+// the editor before prepareToPlay, when getSampleRate() is still 0).
+namespace {
+
+std::vector<float> makeSineAt(double sampleRate, float freq, int n, float amp = 0.3f)
+{
+    std::vector<float> buf(static_cast<size_t>(n));
+    for (int i = 0; i < n; ++i)
+        buf[static_cast<size_t>(i)] =
+            amp * std::sin(2.0f * kPi * freq * i / static_cast<float>(sampleRate));
+    return buf;
+}
+
+} // namespace
+
+TEST_CASE("PitchDetector is accurate at every supported sample rate", "[pitch][regression]")
+{
+    for (double rate : { 44100.0, 48000.0, 88200.0, 96000.0 })
+    {
+        PitchDetector det;
+        det.prepare(rate);
+        auto buf = makeSineAt(rate, 440.0f, det.getWindowSize());
+        auto res = det.process(buf.data(), static_cast<int>(buf.size()));
+
+        INFO("sample rate " << rate);
+        REQUIRE(res.frequencyHz > 0.0f);
+        REQUIRE(std::abs(1200.0f * std::log2(res.frequencyHz / 440.0f)) < 5.0f);
+
+        const NoteInfo note = frequencyToNote(res.frequencyHz);
+        REQUIRE(note.valid);
+        REQUIRE(std::string(note.name) == "A");
+        REQUIRE(note.octave == 4);
+    }
+}
+
+TEST_CASE("PitchDetector transposes when prepared for the wrong rate", "[pitch][regression]")
+{
+    // Characterises the failure the editor's re-prepare exists to prevent: a
+    // detector left at 44100 while the host runs at 48000 reports a true A4 as
+    // a badly flat G#4. Guards against anyone "simplifying" prepare() away.
+    PitchDetector det;
+    det.prepare(44100.0);
+    auto buf = makeSineAt(48000.0, 440.0f, det.getWindowSize());
+    auto res = det.process(buf.data(), static_cast<int>(buf.size()));
+
+    REQUIRE(res.frequencyHz > 0.0f);
+    const float centsOff = 1200.0f * std::log2(res.frequencyHz / 440.0f);
+    REQUIRE(centsOff < -100.0f);                       // more than a semitone flat
+    REQUIRE(std::string(frequencyToNote(res.frequencyHz).name) == "G#");
 }
