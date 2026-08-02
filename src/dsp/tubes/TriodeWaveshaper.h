@@ -87,4 +87,28 @@ inline float volumeDriveTaper(float x) {
     return audioTaper(std::clamp(x, 0.0f, 1.0f) * VOLUME_KNOB_HEADROOM);
 }
 
+// ── Gain-staging trims (see Constants.h) ────────────────────
+// Both are unity at knob centre (0.5). The processor skips the multiply
+// entirely while a trim sits at unity, so the dry path stays bit-identical at
+// defaults — do not "simplify" these to always-on gain stages.
+
+// INPUT: -12 .. +12 dB, linear in dB across the whole sweep.
+inline float inputTrimGain(float x) {
+    x = std::clamp(x, 0.0f, 1.0f);
+    return std::pow(10.0f, ((x - 0.5f) * 2.0f * INPUT_TRIM_RANGE_DB) / 20.0f);
+}
+
+// OUTPUT: silence .. +12 dB. Steeper below the detent than above, so the bottom
+// half works as a master fade (knob 4 -> -12 dB, 2 -> -36 dB) while the top half
+// stays fine enough for mix trimming. Knob 0 is exact silence. The slope
+// discontinuity at the detent is intentional: this is a control curve, not a
+// waveshaper, so it has no audio consequence.
+inline float outputTrimGain(float x) {
+    x = std::clamp(x, 0.0f, 1.0f);
+    if (x <= 0.0f) return 0.0f;                 // exact silence, not just small
+    const float dB = (x >= 0.5f) ? (x - 0.5f) * 2.0f * OUTPUT_TRIM_BOOST_DB
+                                 : (x - 0.5f) * 2.0f * OUTPUT_TRIM_FADE_DB;
+    return std::pow(10.0f, dB / 20.0f);
+}
+
 } // namespace sr

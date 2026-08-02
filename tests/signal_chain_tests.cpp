@@ -311,3 +311,75 @@ TEST_CASE("Full preamp chain: guitar -> V1a -> gain -> V1b produces sound", "[ch
     REQUIRE(x >= 0.0f);      // valid plate voltage
     REQUIRE(x <= supply);     // within supply rails
 }
+
+// ── Input / output level trims (regression) ───────────────────
+//
+// Gain-staging utilities, NOT tone controls. Both are unity at knob centre and
+// the processor skips the multiply entirely while they sit there, so the dry
+// path stays bit-identical at defaults.
+//
+// INPUT is linear in dB across the whole sweep. OUTPUT is deliberately steeper
+// below the detent than above, so the bottom half works as a fader while the
+// top half stays fine enough for mix trimming.
+
+TEST_CASE("Input trim: unity at centre", "[chain][trim]") {
+    REQUIRE(sr::inputTrimGain(0.5f) == Approx(1.0f).margin(1e-7f));
+}
+
+TEST_CASE("Input trim: endpoints are -12 and +12 dB", "[chain][trim]") {
+    REQUIRE(sr::inputTrimGain(0.0f) == Approx(0.2511886f).margin(1e-6f));  // -12 dB
+    REQUIRE(sr::inputTrimGain(1.0f) == Approx(3.9810717f).margin(1e-5f));  // +12 dB
+}
+
+TEST_CASE("Input trim: monotonically increasing", "[chain][trim]") {
+    float prev = -1.0f;
+    for (float x = 0.0f; x <= 1.0f; x += 0.01f) {
+        float y = sr::inputTrimGain(x);
+        REQUIRE(y >= prev);
+        prev = y;
+    }
+}
+
+TEST_CASE("Input trim: clamps out-of-range knob values", "[chain][trim]") {
+    REQUIRE(sr::inputTrimGain(-0.5f) == Approx(sr::inputTrimGain(0.0f)).margin(1e-7f));
+    REQUIRE(sr::inputTrimGain(1.5f)  == Approx(sr::inputTrimGain(1.0f)).margin(1e-7f));
+}
+
+TEST_CASE("Output trim: unity at centre", "[chain][trim]") {
+    REQUIRE(sr::outputTrimGain(0.5f) == Approx(1.0f).margin(1e-7f));
+}
+
+TEST_CASE("Output trim: knob 0 is exact silence", "[chain][trim]") {
+    // Must be exactly zero, not merely small — this is the master fade's floor.
+    REQUIRE(sr::outputTrimGain(0.0f) == 0.0f);
+}
+
+TEST_CASE("Output trim: boosts to +12 dB at full knob", "[chain][trim]") {
+    REQUIRE(sr::outputTrimGain(1.0f) == Approx(3.9810717f).margin(1e-5f));
+}
+
+TEST_CASE("Output trim: fader law below the detent", "[chain][trim]") {
+    REQUIRE(sr::outputTrimGain(0.40f) == Approx(0.2511886f).margin(1e-6f));  // -12 dB
+    REQUIRE(sr::outputTrimGain(0.25f) == Approx(0.0316228f).margin(1e-7f));  // -30 dB
+}
+
+TEST_CASE("Output trim: fade below centre is steeper than boost above", "[chain][trim]") {
+    // Same knob distance either side of the detent, much bigger cut than boost.
+    const float cut   = sr::outputTrimGain(0.4f);   // -12 dB
+    const float boost = sr::outputTrimGain(0.6f);   // +2.4 dB
+    REQUIRE((1.0f / cut) > boost);
+}
+
+TEST_CASE("Output trim: monotonically increasing", "[chain][trim]") {
+    float prev = -1.0f;
+    for (float x = 0.0f; x <= 1.0f; x += 0.01f) {
+        float y = sr::outputTrimGain(x);
+        REQUIRE(y >= prev);
+        prev = y;
+    }
+}
+
+TEST_CASE("Output trim: clamps out-of-range knob values", "[chain][trim]") {
+    REQUIRE(sr::outputTrimGain(-0.5f) == 0.0f);
+    REQUIRE(sr::outputTrimGain(1.5f)  == Approx(sr::outputTrimGain(1.0f)).margin(1e-7f));
+}

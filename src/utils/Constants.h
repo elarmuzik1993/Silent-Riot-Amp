@@ -275,6 +275,16 @@ constexpr float VOLUME_KNOB_HEADROOM = 0.21f;
 // as much D1 as plain make-up did.
 constexpr float OUTPUT_MAKEUP_GAIN = 3.5f;
 
+// ── Input / output level trims (gain staging) ───────────────
+// Tone-neutral utility trims, unity at knob centre — NOT part of the amp's
+// voice. INPUT normalises pickup and interface level so the GAIN knob means
+// roughly the same thing across rigs, which matters now that the amp actually
+// responds to input level (36 dB in -> 10.8 dB out). OUTPUT is a post-limiter
+// master, so boosting it cannot add amp compression.
+constexpr float INPUT_TRIM_RANGE_DB  = 12.0f;  // +/- about unity
+constexpr float OUTPUT_TRIM_BOOST_DB = 12.0f;  // above unity
+constexpr float OUTPUT_TRIM_FADE_DB  = 60.0f;  // below unity, then true silence
+
 // ── Effects module (front-of-amp + post-cab) ───────────────
 // These live OUTSIDE the oversampled amp loop and never touch the frozen
 // amp-tone math. All run at base sample rate.
