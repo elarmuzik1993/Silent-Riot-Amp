@@ -216,6 +216,65 @@ constexpr float GAIN_TAPER_EXPONENT = 2.0f;
 // Raise toward 1.0 to hand the top end back.
 constexpr float GAIN_KNOB_HEADROOM  = 0.8f;
 
+// ── Master volume taper ─────────────────────────────────────
+// The master volume sits directly in front of the EL84 grids, so it is the
+// power-stage drive control. The chain delivers 3-5x more drive than a tube
+// biased at -9.6 V can use: with a plain audioTaper() the grids crossed
+// GRID_CONDUCT_THRESH_EL84_N (8.6 V) around knob 4 and stayed in permanent
+// conduction above it, where the grid clamp rather than the tube sets the level.
+// The top half of the knob then added 1.15 dB of loudness for 3x the drive, and
+// the amp had no touch sensitivity left (36 dB of input -> 2.4 dB of output).
+//
+// Measured against the master volume at gain 10 (see handoff, D1):
+//   knob   EL84 grid   D1 sag   give over 36 dB of input
+//   0.30      5.67 V    1.59      8.7 dB   (4.1:1)
+//   0.50     15.68 V    0.60      4.6 dB   (7.9:1)
+//   0.70     30.28 V    0.38      2.4 dB  (14.8:1)
+//
+// This constant and OUTPUT_MAKEUP_GAIN below must be set TOGETHER. They control
+// two limiters in series — the EL84 grid clamp and the output tanh — and make-up
+// gain does not restore give, it relocates the compression from the first onto
+// the second. Headroom 0.30 with makeup 2.5 measured D1 = 0.98 at knob 10: in
+// band at the gate's volume 0.70, but not where the player actually is.
+//
+// 0.21 puts KNOB 10 (not the gate point) at the top of the range that stays out
+// of permanent grid conduction, which is the operating point that matters:
+//
+//   knob 10:   D1 1.98   give 9.5 dB (3.8:1)   peak -5.70 dBFS
+//   knob 0.70: D1 2.93   give 10.8 dB (3.3:1)  peak -10.76 dBFS  <- D1 gate
+//
+// Same fix, and same reason, as GAIN_KNOB_HEADROOM above; raise toward 1.0 to
+// hand the compressed top end back, and re-measure D1 AT KNOB 10 when you do.
+constexpr float VOLUME_KNOB_HEADROOM = 0.21f;
+
+// Output make-up, applied post-cab and pre-tanh (see outputGainCompensation).
+// VOLUME_KNOB_HEADROOM costs ~20 dB of level at every knob position, because the
+// drive it removes was being converted to loudness by the output tanh rather
+// than by the tube. Restoring dynamics therefore costs average level: the amp
+// now runs a much larger crest factor, so a given peak ceiling implies a lower
+// RMS than the old, permanently-limited chain produced. That is the trade, and
+// it cannot be undone with gain — see the note on VOLUME_KNOB_HEADROOM above.
+//
+// Calibrate this against a REALISTIC DI, not the D1 gate signal. The gate's
+// `note:110:0.5` is ~9 dB hotter than a nominal -18 dBFS DI, so tuning to it
+// over-weights the tanh and leaves the amp quiet in real use: at makeup 2.5 a
+// -18 dBFS DI produced only -17.0 LUFS at gain 10 / volume 10 with 6.3 dB of
+// peak headroom sitting unused.
+//
+// Measured at gain 10 / volume 10 (D1@10 is the column that binds):
+//   makeup   D1 gate   D1@10   give   DI LUFS   DI peak
+//     2.5      2.93     1.98   9.5     -17.01     -7.29
+//     3.5      2.77     1.66   8.6     -14.20     -4.89   <- chosen
+//     4.0      2.67     1.51   8.2     -13.10     -4.03   <- D1@10 on the band edge
+//
+// 3.5 lands in the -18..-12 LUFS window an amp sim is expected to hit while
+// keeping D1 off the band edge. Above ~4 the tanh becomes the dominant limiter,
+// which is the behaviour this whole change exists to remove — the remaining
+// headroom is crest factor and cannot be reclaimed without re-compressing.
+// A soft-knee limiter was tried instead and rejected: it bought 1.5 dB and cost
+// as much D1 as plain make-up did.
+constexpr float OUTPUT_MAKEUP_GAIN = 3.5f;
+
 // ── Effects module (front-of-amp + post-cab) ───────────────
 // These live OUTSIDE the oversampled amp loop and never touch the frozen
 // amp-tone math. All run at base sample rate.

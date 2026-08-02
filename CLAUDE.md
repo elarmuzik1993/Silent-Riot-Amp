@@ -81,7 +81,8 @@ cmake -B build -DSR_BUILD_TESTS=ON # Build with tests
   - **EL84 grid threshold was 0 V** on a −9.6 V-biased tube → coupling-cap charge railed on silence, driving a 17.7 Hz motorboating oscillation at gain ≥ 9
   - Shape EQ silently reset to noon after any oversample change
   - Result: all three tone sign-off THD bands pass together for the first time (clean 1.03%, edge 9.44%, crank 30.1%)
-- **Next**: `MAX_BIAS_SHIFT_N` rail (sag depth is 0.38 dB against a 1.5–4.0 target — the charge and sag limiters pin against each other, so neither is a dynamic); IR-path aliasing (E3, −34.7 dBc vs ≤ −85); even-harmonic warmth at edge (B4); ~0.5 s −17 dBFS startup thump while the PSU settles
+- **Power-Stage Drive / "give"** (done, USE-59): D1 sag depth 0.38 → **2.93 dB** at the gate point and **1.98 dB** at knob 10 (target 1.5–4.0); touch sensitivity 2.4 → **10.8 dB** over a 36 dB input span (14.8:1 → 3.3:1); the volume knob's top half now spreads 12.2 dB of level instead of 1.15 dB. Root cause was *not* `MAX_BIAS_SHIFT_N`: the sag offset never rails, it is **starved** — average plate current was flat (78.4 → 79.5 mA, +1.4%) at every gain and across a 100× input range, so B+ drooped 0.20% where a real amp droops 10–20%. The master volume sits in front of the EL84 grids and the chain hands it 3–5× more drive than a −9.6 V-biased tube can use, so the grids passed `GRID_CONDUCT_THRESH_EL84_N` around knob 4 and the diode clamp set the level from there up. Fixed with `VOLUME_KNOB_HEADROOM` + `volumeDriveTaper()`, mirroring `GAIN_KNOB_HEADROOM`. B4 (even-harmonic warmth) now passes as a side effect. See defect 8 in `docs/handoff-power-section-calibration.md`
+- **Next**: A1 clean loudness + the P-\* volume sign-off positions need re-ratification (Calibration Pass §5) — the volume knob's meaning changed by design, and A1 failed on the *loud* side before this change and the quiet side after; B1 clean THD 0.968% vs a 1.0% floor; IR-path aliasing (E3, −37.8 dBc vs ≤ −85, MUST-PASS); ~0.5 s startup thump while the PSU settles (this is what E1's "idle noise floor" is averaging in)
 - **Neural model**: On hold until ear-tuning is finalized — training against DSP output that's still changing produces a model that must be retrained after every constant tweak. Finalize the DSP first, then capture and train against a stable target.
 
 ## Conventions
@@ -172,6 +173,24 @@ and `EL84_IP_MAX_N` are coupled through the tanh knee, so re-solve if either mov
   reaches the next stage. Reach for this before the gain taper.
 - `GAIN_KNOB_HEADROOM = 0.8` — fraction of the drive range the knob can reach.
   Knob 10 delivers what knob 8 used to. Raise toward 1.0 to return the top end.
+- `VOLUME_KNOB_HEADROOM = 0.21` — **this is the give/touch-sensitivity control.**
+  The master volume *is* the power-stage drive control, and past ~knob 4 on the
+  old law the EL84 grids sat in permanent conduction, where the diode clamp
+  rather than the tube set the level (36 dB in → 2.4 dB out). 0.21 keeps knob 10
+  below `GRID_CONDUCT_THRESH_EL84_N`. Raise toward 1.0 for a louder, more
+  compressed, less dynamic amp — and re-measure D1 **at knob 10**, which moves
+  fast with it.
+- `OUTPUT_MAKEUP_GAIN = 3.5` — recovers ~11 dB of the ~20 dB `VOLUME_KNOB_HEADROOM`
+  costs. Applied post-cab, pre-tanh, so it does NOT disturb the OT-saturation
+  calibration. **Set it together with `VOLUME_KNOB_HEADROOM`:** they are two
+  limiters in series, and make-up gain does not restore give, it relocates the
+  compression from the grid clamp onto the output tanh. Headroom 0.30 + makeup
+  2.5 read D1 1.98 at the gate's volume 0.70 but **0.98 at knob 10**.
+  **Calibrate against a real DI, not the D1 gate signal** — `note:110:0.5` is
+  ~9 dB hotter than a nominal −18 dBFS DI, so tuning to it leaves the amp quiet
+  in actual use (makeup 2.5 gave only −17.0 LUFS at gain 10 / volume 10, with
+  6.3 dB of peak headroom unused). 3.5 lands at −14.2 LUFS. Above ~4 the tanh
+  becomes the dominant limiter and D1 at knob 10 falls out of band.
 - `OT_CURRENT_SCALE = 0.009` — output level trim. Not a pure derivation: the
   IP_MAX tanh knee and plate saturation are nonlinear, so it is set empirically.
 - `OT_SAT_DRIVE = 190` — OT flux saturation. Scales *inversely* with signal level,
@@ -203,4 +222,5 @@ and `EL84_IP_MAX_N` are coupled through the tanh knee, so re-solve if either mov
 - Grid conduction thresholds track **|bias|**, because a grid conducts once it approaches the *cathode*. 12AX7 at −1.5 V → 0.5 V. `GRID_CONDUCT_THRESH_EL84_N` must stay near the EL84's −9.6 V bias (8.6 V), NOT 0 — at 0 every positive excursion of amplified noise counts as conduction, ratcheting the coupling-cap charge to its rail **on silence** and driving a ~17.7 Hz motorboating oscillation at gain ≥ 9 with nothing plugged in. Detect with `tools/sr_idle.py`
 - LTP solver **root-finds** the cathode node (secant + bisection fallback); it is NOT a relaxation. Do not "simplify" it back to a damped fixed-point — that version did not converge, it limit-cycled into a Nyquist-rate square wave at constant input. `alpha = 1.0` is a trap: it reports zero residual because it kills the stage. Inner plate iterations must stay at 4 (3 oscillates). See `docs/handoff-ltp-convergence.md`
 - Speaker coupling `SPK_GAINMOD_TAU_MS` must be ≥15ms — shorter values cause per-cycle AM modulation (audible as LFO-like filtering)
-- `GRID_CHARGE_RATE` must stay low (≤0.003) and `MAX_BIAS_SHIFT_N` ≤ 1.5V — higher values cause PI grid charge saturation → LTP pumping at gain≥5
+- `GRID_CHARGE_RATE` must stay low (≤0.003) and `MAX_BIAS_SHIFT_N` ≤ 1.5V — higher values cause PI grid charge saturation → LTP pumping at gain≥5. The EL84 charge sits **railed at this clamp across the whole playing range**, which looks exactly like the "pinned dynamic" bug fixed four times elsewhere in this file — it is not. The rail is **load-bearing**: it absorbs an overdrive that should not reach the grid, and raising it to −6 V produces blocking collapse (output dead at −58 dBFS, D1 reads a meaningless 39.94 dB). Fix the drive, not the clamp — see `VOLUME_KNOB_HEADROOM`
+- The master volume is the **power-stage drive control**, not an output level control — it sits directly in front of the EL84 grids. Above `GRID_CONDUCT_THRESH_EL84_N` (8.6 V of grid drive) the diode clamp rather than the tube sets the level, and the amp stops responding to playing dynamics. Sag and PSU droop are both driven by *average plate current*, so once the grids clamp, that current goes flat (+1.4% under a full-crank note) and every downstream dynamic starves at once. If sag/give measures low, check plate-current swing **before** touching any sag constant — a starved dynamic and a railed one read identically at the gate

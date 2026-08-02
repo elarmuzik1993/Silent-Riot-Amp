@@ -112,6 +112,59 @@ TEST_CASE("Gain pot combined law: monotonically increasing", "[chain][taper]") {
     }
 }
 
+// ── Master volume control law (regression) ────────────────────
+//
+// The master volume sits directly in front of the EL84 grids, so it IS the
+// power-stage drive control. The chain delivers 3-5x more drive than an EL84
+// biased at -9.6 V can use, so with a plain audioTaper() the grids crossed
+// GRID_CONDUCT_THRESH_EL84_N (8.6 V) at about knob 4 and stayed in permanent
+// conduction above it. Past that point the grid clamp — not the tube — sets the
+// level, so the top half of the knob added 1.15 dB of loudness for 3x the drive
+// and the amp lost its touch sensitivity:
+//
+//   knob   EL84 grid drive   D1 sag depth   output span over 36 dB of input
+//   0.30        5.67 V          1.59 dB          8.7 dB   (4.1:1)
+//   0.50       15.68 V          0.60 dB          4.6 dB   (7.9:1)
+//   0.70       30.28 V          0.38 dB          2.4 dB  (14.8:1)  <- old P-CRANK
+//   0.90       49.76 V          0.31 dB          1.3 dB  (27.6:1)
+//
+// The output tanh is the second limiter in the same chain: OUTPUT_MAKEUP_GAIN
+// moves compression from the grid clamp onto it, so the two must be set
+// together. At headroom 0.30 with makeup 2.5, knob 10 measured D1 = 0.98 —
+// the give had simply relocated. 0.21 + makeup 3.5 keeps knob 10 at D1 = 1.66.
+//
+// VOLUME_KNOB_HEADROOM remaps the full sweep onto the part of the range that
+// stays out of permanent grid conduction — the same fix GAIN_KNOB_HEADROOM
+// applies to the gain knob, and for the same reason.
+
+TEST_CASE("Volume knob headroom: full sweep tops out below grid conduction", "[chain][taper]") {
+    // Knob 10 now delivers what knob 2 used to — the drive that measures
+    // D1 = 1.98 dB with 9.5 dB of give, instead of the railed 0.38 dB.
+    REQUIRE(sr::volumeDriveTaper(1.0f)
+            == Approx(sr::audioTaper(VOLUME_KNOB_HEADROOM)).margin(1e-6f));
+    REQUIRE(sr::volumeDriveTaper(1.0f) < sr::audioTaper(1.0f));  // top end really was removed
+}
+
+TEST_CASE("Volume drive taper: canonical points", "[chain][taper]") {
+    REQUIRE(sr::volumeDriveTaper(0.00f) == Approx(0.0f).margin(1e-9f));
+    REQUIRE(sr::volumeDriveTaper(0.50f) == Approx(0.011025f).margin(1e-6f));
+    REQUIRE(sr::volumeDriveTaper(1.00f) == Approx(0.044100f).margin(1e-6f));
+}
+
+TEST_CASE("Volume drive taper: monotonically increasing", "[chain][taper]") {
+    float prev = -1.0f;
+    for (float v = 0.0f; v <= 1.0f; v += 0.01f) {
+        float y = sr::volumeDriveTaper(v);
+        REQUIRE(y >= prev - 1e-9f);
+        prev = y;
+    }
+}
+
+TEST_CASE("Volume drive taper: clamps out-of-range knob values", "[chain][taper]") {
+    REQUIRE(sr::volumeDriveTaper(-0.5f) == Approx(0.0f).margin(1e-9f));
+    REQUIRE(sr::volumeDriveTaper(1.5f) == Approx(sr::volumeDriveTaper(1.0f)).margin(1e-9f));
+}
+
 // ── V1a stage operating level ────────────────────────────────
 
 TEST_CASE("V1a: guitar input produces plate voltage within supply", "[chain][v1a]") {

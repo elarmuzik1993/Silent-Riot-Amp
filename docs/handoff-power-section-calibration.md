@@ -124,6 +124,85 @@ it without invalidating `lastShapeCoeffVal`, so the per-sample guard saw "shape
 hasn't moved" and never restored the knob. Shape silently sat at noon until
 touched.
 
+### 8. Master volume drove the power stage into permanent grid conduction
+
+D1 sag depth measured 0.38 dB against a 1.5–4.0 target. The note above blamed two
+pinned mechanisms cancelling. Traced in-situ through the real `processBlock`,
+only half of that was true:
+
+| | claimed | measured at HEAD |
+|---|---|---|
+| EL84 grid charge | rails at −1.5 V | **confirmed** — railed 40.6% of the note |
+| Sag offset | rails at +1.5 V | **never rails** — swings +0.895 → −0.390 V against clamps of +1.5 / −3.0 |
+
+Sag was not pinned, it was **starved**. Sag and PSU droop are both driven by
+average plate current, and that current was flat: **78.4 → 79.5 mA (+1.4%)**
+under a full-crank note, so B+ drooped 0.57 V out of 282 V (0.20%) where a real
+EL84 amp droops 10–20%. Flat at *every* gain setting and across a 100× input
+range — 36 dB of input produced 2.4 dB of output, a 15:1 compressor.
+
+Three single-constant fixes were tried and falsified:
+
+| experiment | D1 | give | verdict |
+|---|---|---|---|
+| `MAX_BIAS_SHIFT_N` −1.5 → −6 V | 39.94 | −29.6 dB | **blocking collapse** — output dead at −58 dBFS |
+| `GRID_CLAMP_KNEE_N` 6 → 24 V | 0.44 | 1.1 dB | give gets *worse* |
+| `EL84_IP_MAX_N` 95 → 300 | 0.96 | 2.2 dB | helps sag, adds a *new* rail |
+
+The 1.5 V charge rail is **load-bearing** — it is the only thing holding back an
+overdrive that should not be there, and removing it collapses the stage. It was
+masking the bug, not causing it.
+
+The real cause: the master volume sits directly in front of the EL84 grids, so it
+*is* the power-stage drive control, and the chain hands it 3–5× more drive than a
+tube biased at −9.6 V can use. Sweeping it at gain 10:
+
+| volume | EL84 grid drive | D1 | give over 36 dB of input |
+|---|---|---|---|
+| 0.30 | 5.67 V | 1.59 | 8.7 dB (4.1:1) |
+| 0.50 | 15.68 V | 0.60 | 4.6 dB (7.9:1) |
+| 0.70 | 30.28 V | 0.38 | 2.4 dB (14.8:1) ← old P-CRANK |
+| 0.90 | 49.76 V | 0.31 | 1.3 dB (27.6:1) |
+
+The give dies exactly where the grid crosses `GRID_CONDUCT_THRESH_EL84_N`
+(8.6 V), between knob 3 and 5. Above it the diode clamp — not the tube — sets the
+level, so the top half of the knob added **1.15 dB of loudness for 3× the
+drive**. That is also the unexplained residue of the Round 3 listening complaint
+("volume knob causing distortion/signal loss above noon"), which had been
+symptom-fixed by tightening the sag cold clamp.
+
+Fixed with `VOLUME_KNOB_HEADROOM = 0.21` + `volumeDriveTaper()` — the same remap
+`GAIN_KNOB_HEADROOM` already applies to the gain knob, for the same reason. Knob
+10 now delivers what knob 2 used to, and the whole arc spreads level instead of
+grit:
+
+| | before | after |
+|---|---|---|
+| D1 at the gate point (volume 0.70) | 0.38 | **2.93** |
+| D1 at knob 10 | 0.31 | **1.98** |
+| give, 36 dB input span | 2.4 dB (14.8:1) | **10.8 dB (3.3:1)** |
+| volume 0.5 → 1.0 loudness | 1.15 dB | **12.2 dB** |
+| B4 even-harmonic warmth | FAIL | **PASS** |
+
+`OUTPUT_MAKEUP_GAIN = 3.5` recovers ~11 dB of the ~20 dB the remap costs, putting
+a nominal −18 dBFS DI at **−14.2 LUFS** at gain 10 / volume 10.
+
+Calibrate that constant against a **real DI**, not the D1 gate signal — the
+gate's `note:110:0.5` is ~9 dB hotter than a nominal DI, so tuning to it leaves
+the amp quiet in actual use. The first pass set 2.5 that way and the amp measured
+−17.0 LUFS with 6.3 dB of peak headroom unused; playing it was the thing that
+caught it. The remaining headroom is crest factor and cannot be reclaimed without
+re-compressing. A soft-knee output limiter was tried as an alternative to plain
+make-up and rejected — it bought 1.5 dB and cost as much D1.
+
+**Set these two together.** They are two limiters in series — the grid clamp and
+the output tanh — and make-up gain does not restore give, it *relocates* the
+compression onto the tanh. Headroom 0.30 with makeup 2.5 passed D1 at the gate's
+volume 0.70 (1.98) while reading **0.98 at knob 10**, i.e. green on the gate and
+wrong where the player actually is. Measure D1 at knob 10, not just at P-CRANK.
+
+**Sag itself was never the problem and was not touched.**
+
 ## Result
 
 All three tone sign-off THD bands pass together for the first time:
@@ -153,19 +232,43 @@ tone at equivalent operating points is unchanged.
 - **E3 aliasing −34.7 dBc** vs ≤ −85 (MUST-PASS). Improved from −8.8 but not
   fixed. Note the gate references an `OPTIONAL_BRIGHT_IR` that is not supplied,
   so confirm it exercises the intended path before treating it as a hard number.
-- **D1 sag depth 0.38 dB** vs 1.5–4.0. The EL84 grid charge rails at
-  `MAX_BIAS_SHIFT_N` (−1.5 V) while the sag offset rails at +1.5 V — two pinned
-  mechanisms cancelling, so neither is a dynamic. **This is the next structural
-  item**, and it is the same failure shape as defects 3 and 6.
-- **B4 even-harmonic warmth** (H2 ≥ H3 at edge).
+- ~~**D1 sag depth 0.38 dB**~~ — **fixed, see defect 8.** The diagnosis first
+  recorded here was half wrong and cost a session: the sag offset does *not*
+  rail. Re-measure before trusting a "still open" note.
+- ~~**B4 even-harmonic warmth**~~ — now passes (H2 ≥ H3 at edge) as a side
+  effect of defect 8. It was failing because the edge point was in grid
+  conduction, where the clamp's odd-order products swamped the PI's asymmetry.
+- **A1 clean loudness and the P-\* volume positions need re-ratification.** A1
+  failed before this change too, on the *loud* side (−13.7 LUFS against a
+  −17.5…−14.5 band); it now fails on the quiet side (−28.1). The volume knob's
+  meaning changed by design, so the sign-off points must follow — the same
+  rescale the gates header describes for `GAIN_KNOB_HEADROOM`. It is not a pure
+  rescale this time: old P-CLEAN (volume 0.50) maps to 1.67, i.e. off the knob,
+  because that operating point was inside permanent grid conduction. Needs a
+  Calibration Pass (§5), not a constant tweak.
+- **B1 clean THD 0.968%** vs a 1.0% floor — slipped from 1.034% with defect 8.
+  Marginal and not must-pass; re-ratify alongside A1.
 - **Startup thump**: ~0.5 s at −17 dBFS on silence at gain 10 while the PSU
   settles from initial conditions. Audible on plugin load. `E1`'s "idle noise
   floor −47 dBFS" is this transient being averaged in, *not* steady noise — the
   settled level is −279.8 dBFS.
 
-## Lesson worth keeping
+## Lessons worth keeping
 
-Four of these seven defects are the same shape: **a dynamic pinned against its
+Four of these eight defects are the same shape: **a dynamic pinned against its
 limiter stops being a dynamic**. Sag warm rail, sag cold rail, grid-charge rail,
 LTP plate clamp. When a "dynamic" constant sits at its clamp across most of the
 control range, that is the bug — not the clamp value.
+
+Defect 8 is the counter-example, and it is the more important half of the lesson:
+**a railed clamp can also be the only thing holding a stage together.** The
+EL84 grid-charge rail fit the pattern perfectly — pinned across the whole playing
+range — but unpinning it collapsed the amp entirely, because it was absorbing an
+overdrive that should never have reached it. Before relaxing a clamp, check
+whether it is *causing* the pinning or *containing* it. The test is cheap: relax
+it and measure. A clamp that is containing something fails loudly.
+
+The corollary: **a starved dynamic looks exactly like a pinned one from the
+gate's value alone.** Sag read 0.38 dB whether it was railed or simply had no
+current swing to respond to. Only the in-situ trace distinguished them, and the
+note that skipped that step sent the next session after the wrong constant.

@@ -544,7 +544,7 @@ void SilentRiotProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
         piB = (sum - outDiff) * 0.5f;
 
         // ── Master Volume ──
-        float vol = audioTaper(volVal);
+        float vol = volumeDriveTaper(volVal);
         piA *= vol;
         piB *= vol;
 

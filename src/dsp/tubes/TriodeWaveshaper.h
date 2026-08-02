@@ -69,4 +69,22 @@ inline float gainDriveTaper(float x) {
     return x * (0.7166667f + x * (-1.55f + x * 1.8333333f));
 }
 
+// User master-volume knob -> gain applied to the PI outputs feeding the EL84
+// grids. The volume control IS the power-stage drive control, and the chain
+// hands it far more drive than the tube can use, so the plain audioTaper() law
+// pushed the grids into permanent conduction from about knob 4 upward. Above
+// that the grid diode clamp set the level instead of the tube, which cost the
+// amp its touch sensitivity and left the top half of the knob adding grit
+// rather than loudness.
+//
+// VOLUME_KNOB_HEADROOM remaps the full sweep onto the part of the drive range
+// that stays out of permanent conduction, exactly as GAIN_KNOB_HEADROOM does
+// for the gain knob. Knob 10 now delivers what knob 2 used to.
+//
+// Anchors at HEADROOM = 0.21:  knob 0.50 -> 0.011025,
+//                              knob 1.00 -> 0.044100 (= old knob 0.21).
+inline float volumeDriveTaper(float x) {
+    return audioTaper(std::clamp(x, 0.0f, 1.0f) * VOLUME_KNOB_HEADROOM);
+}
+
 } // namespace sr
