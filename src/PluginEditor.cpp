@@ -196,6 +196,10 @@ SilentRiotEditor::SilentRiotEditor(SilentRiotProcessor& p)
     reverbSizeA  = std::make_unique<SliderA>(proc.apvts, IDs::REVERB_SIZE,    effectsPanel.reverbSizeKnob().getSlider());
     reverbToneA  = std::make_unique<SliderA>(proc.apvts, IDs::REVERB_TONE,    effectsPanel.reverbToneKnob().getSlider());
     widthA       = std::make_unique<SliderA>(proc.apvts, IDs::WIDTH,          effectsPanel.widthKnob().getSlider());
+    inputLevelA  = std::make_unique<SliderA>(proc.apvts, IDs::INPUT_LEVEL,
+                                             effectsPanel.inputLevelKnob().getSlider());
+    outputLevelA = std::make_unique<SliderA>(proc.apvts, IDs::OUTPUT_LEVEL,
+                                             effectsPanel.outputLevelKnob().getSlider());
 
     // Keyboard focus and accessibility.
     // Knobs: the (invisible) slider is the focusable leaf. Toggles: the

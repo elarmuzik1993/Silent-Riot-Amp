@@ -29,6 +29,8 @@ public:
     // Knobs
     NotchKnob& gateThreshKnob()  { return gateThresh; }
     NotchKnob& widthKnob()       { return width; }
+    NotchKnob& inputLevelKnob()  { return inputLevel; }
+    NotchKnob& outputLevelKnob() { return outputLevel; }
     NotchKnob& boostLevelKnob()  { return boostLevel; }
     NotchKnob& boostTightKnob()  { return boostTight; }
     NotchKnob& boostBrightKnob() { return boostBright; }
@@ -59,6 +61,8 @@ private:
 
     NotchKnob gateThresh { "THRESH", 0.0f };
     NotchKnob width      { "WIDTH",  0.0f };   // 0=off (dry/mono), 10=wide
+    NotchKnob inputLevel { "INPUT",  0.5f };   // centre = unity, ±12 dB
+    NotchKnob outputLevel{ "OUTPUT", 0.5f };   // centre = unity, silence..+12 dB
     NotchKnob boostLevel { "LEVEL",  0.5f };
     NotchKnob boostTight { "TIGHT",  0.0f };
     NotchKnob boostBright{ "BRIGHT", 0.0f };
