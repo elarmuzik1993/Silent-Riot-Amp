@@ -39,18 +39,25 @@ Out of scope:
 
 ## Chain placement
 
+Anchor to the section comments, not line numbers — these drift.
+
 ```
 buffer in
-  ├─ pushTunerSamples(raw)         line 363   UNCHANGED — tunes at any trim
-  ├─ INPUT trim (smoothed)                    NEW
-  ├─ input metering RMS            line 399   moves post-trim
-  ├─ noise gate → boost
+  ├─ "Live tuner capture"            UNCHANGED — raw tap, tunes at any trim
+  ├─ if (!powerOn || tunerMute) return;        <-- NOTE: early return sits here
+  ├─ INPUT trim (smoothed)                     NEW — AFTER the early return
+  ├─ "Input level metering (RMS)"    moves post-trim
+  ├─ "Pre-amp effects (gate → boost)"
   ├─ oversample → AMP → cab → tanh → downsample
   ├─ delay → reverb → widener
-  ├─ OUTPUT trim (smoothed)                   NEW
-  ├─ softClip safety               line 692   condition extended
-  └─ output metering RMS           line 705   moves post-trim
+  ├─ OUTPUT trim (smoothed)                    NEW
+  ├─ "Post-effects safety limiter"   condition extended
+  └─ "GUI level metering (RMS)"      moves post-trim
 ```
+
+The INPUT trim goes **after** the `!powerOn || tunerMute` early return, not
+immediately after the tuner tap. Putting it before the return would be wasted
+work on a cleared buffer and would not change behaviour.
 
 Both trims are linear gains at base sample rate, outside the oversampled amp
 loop — there is no nonlinearity to alias.
@@ -76,6 +83,23 @@ static const juce::String OUTPUT_LEVEL = "outputLevel";  // float 0–1, 0.5 = u
 ```
 
 Both default `0.5f`.
+
+### Host-value sanitization (mandatory)
+
+Every float parameter read in `processBlock` is wrapped in `sanitizeUnitParam()`
+(see `ParamSanitize.h`), and `prepareToPlay` seeds its smoothers from sanitized
+values for the same reason. A misbehaving host can push NaN/inf into a raw
+parameter and poison filter state permanently — this was fixed deliberately in
+commit `34a1758` and is guarded by `param_sanitize_tests.cpp`.
+
+The two new parameters **must** follow that pattern:
+
+```cpp
+float inTrim  = sanitizeUnitParam(apvts.getRawParameterValue(Params::IDs::INPUT_LEVEL )->load());
+float outTrim = sanitizeUnitParam(apvts.getRawParameterValue(Params::IDs::OUTPUT_LEVEL)->load());
+```
+
+Add both to `param_sanitize_tests.cpp` alongside the existing coverage.
 
 ## Tapers
 
@@ -150,6 +174,28 @@ BOOST/DELAY/REVERB cards already run three knobs each. No ON toggle, consistent
 with the card's convention that centre/zero is a no-op. APVTS `SliderAttachment`
 as with every other knob.
 
+## Files to touch
+
+| file | change |
+|---|---|
+| `src/utils/Parameters.h` | two new IDs |
+| `src/utils/Constants.h` | three range constants |
+| `src/dsp/tubes/TriodeWaveshaper.h` | `inputTrimGain` / `outputTrimGain` |
+| `src/PluginProcessor.h` | two `juce::SmoothedValue<float>` members |
+| `src/PluginProcessor.cpp` | params appended after `WIDTH`; sanitized reads; smoother init in `prepareToPlay`; snap in `resetDSPState()`; two trim applications; softClip condition; both meter taps move |
+| `src/gui/EffectsPanel.h` | two `NotchKnob` members + two accessors |
+| `src/gui/EffectsPanel.cpp` | add to the UTILITY `layoutKnobRow` list; labels |
+| `src/PluginEditor.cpp` | two `SliderAttachment`s |
+| `tests/signal_chain_tests.cpp` | taper tests |
+| `tests/param_sanitize_tests.cpp` | sanitize coverage for both |
+| `docs/SilentRiot_UI_Spec.md` | UTILITY card is described as two-knob at lines ~590/600/649 |
+| `CLAUDE.md` | UTILITY card description; note that meters are now post-trim |
+
+`prepareToPlay` must seed both smoothers from **sanitized** parameter values
+(matching the existing `boostLevelSm` block) so the first block does not ramp
+from a stale or poisoned value. `resetDSPState()` should snap both smoothers to
+their current target rather than to unity, so a re-prepare does not audibly jump.
+
 ## Testing
 
 Unit (`signal_chain_tests.cpp`, mirroring the gain/volume taper tests):
@@ -160,10 +206,26 @@ Unit (`signal_chain_tests.cpp`, mirroring the gain/volume taper tests):
 - Monotonic across [0,1] for both.
 - Out-of-range knob values clamp.
 
-Integration:
+Bit-exactness (concrete method — there is no processBlock-level harness in the
+JUCE-free suite, so use the render tool):
 
-- Bit-exactness: both trims at 0.5 with effects off produces output identical to
-  the untrimmed path.
+```bash
+# on the parent commit
+sr_render --out /tmp/before --signal note:110:0.5:2.0 \
+          --gain 1.00 --volume 0.70 --shape 0.50 --7w 0 --cab 1
+# after the change, defaults unchanged
+sr_render --out /tmp/after  --signal note:110:0.5:2.0 \
+          --gain 1.00 --volume 0.70 --shape 0.50 --7w 0 --cab 1
+cmp /tmp/before.f32 /tmp/after.f32     # must be byte-identical
+```
+
+Repeat with `--signal silence:5.0` to cover the idle path. The skip-when-unity
+check is what makes this pass; if `cmp` reports a difference, the trim is being
+applied at unity and the guarantee at the "Post-effects safety limiter" comment
+is broken.
+
+Express "settled" with `juce::SmoothedValue::isSmoothing()` — the skip applies
+only when the smoother is not ramping *and* its current value is exactly 1.0f.
 
 Regression (sign-off harness, at defaults — must be unchanged):
 
@@ -175,6 +237,13 @@ Regression (sign-off harness, at defaults — must be unchanged):
 | A2 peak | −6.00 |
 
 ## Risks
+
+- **Knob width.** `layoutKnobRow` sets `knobW = jmin(80, rowWidth / n)`. The
+  UTILITY card's inner row is ~305 px, so a fourth knob takes each from 80 px to
+  ~76 px. It fits arithmetically, but `NotchKnob` draws knob + value + label, and
+  "THRESH"/"OUTPUT" at 76 px needs **visual confirmation in the built UI** — do
+  not assume it. If labels clip, shorten to "IN"/"OUT" rather than reflowing the
+  card.
 
 - Adding parameters shifts nothing for state restore, but any host that stores
   automation by index would see two new lanes at the end. Mitigated by appending.
