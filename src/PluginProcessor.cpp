@@ -737,6 +737,13 @@ void SilentRiotProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     outputTrimSm.setTargetValue(outTrimParam);
     const bool outputTrimActive =
         outputTrimSm.isSmoothing() || outputTrimGain(outputTrimSm.getCurrentValue()) != 1.0f;
+    // Only boosting can push past full scale; at or below unity the amp's own
+    // tanh already guarantees ±1, so the dry path stays untouched. Tracked
+    // per-sample (not sampled once after the loop) because a 50ms ramp can
+    // cross down through unity mid-block on a large host buffer — sampling
+    // the smoother's value only after the loop would miss samples that were
+    // boosted earlier in the same block.
+    bool outputBoosting = false;
     if (outputTrimActive)
     {
         const int n     = buffer.getNumSamples();
@@ -744,14 +751,11 @@ void SilentRiotProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
         for (int i = 0; i < n; ++i)
         {
             const float g = outputTrimGain(outputTrimSm.getNextValue());
+            outputBoosting = outputBoosting || (g > 1.0f);
             for (int ch = 0; ch < numCh; ++ch)
                 buffer.getWritePointer(ch)[i] *= g;
         }
     }
-    // Only boosting can push past full scale; at or below unity the amp's own
-    // tanh already guarantees ±1, so the dry path stays untouched.
-    const bool outputBoosting =
-        outputTrimActive && outputTrimGain(outputTrimSm.getCurrentValue()) > 1.0f;
 
     // ── Post-effects safety limiter ──
     // delay/reverb run AFTER the amp's output limiter (their wet tails can sum
