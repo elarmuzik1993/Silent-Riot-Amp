@@ -92,14 +92,40 @@ values for the same reason. A misbehaving host can push NaN/inf into a raw
 parameter and poison filter state permanently — this was fixed deliberately in
 commit `34a1758` and is guarded by `param_sanitize_tests.cpp`.
 
-The two new parameters **must** follow that pattern:
+**`sanitizeUnitParam()` cannot be used as-is.** It falls back to `0.0f`, and its
+comment states that is neutral "for every one of these params" — true for the
+existing effects params (0 = bypassed), but false for a centre-detented trim:
+`0.0f` is −12 dB on INPUT and **exact silence** on OUTPUT. A single NaN from a
+host would mute the plugin.
+
+Add a fallback-taking overload and route the trims through it:
 
 ```cpp
-float inTrim  = sanitizeUnitParam(apvts.getRawParameterValue(Params::IDs::INPUT_LEVEL )->load());
-float outTrim = sanitizeUnitParam(apvts.getRawParameterValue(Params::IDs::OUTPUT_LEVEL)->load());
+inline float sanitizeUnitParamOr(float v, float fallback)
+{
+    return std::isfinite(v) ? std::clamp(v, 0.0f, 1.0f) : fallback;
+}
+inline float sanitizeUnitParam(float v) { return sanitizeUnitParamOr(v, 0.0f); }
 ```
 
-Add both to `param_sanitize_tests.cpp` alongside the existing coverage.
+```cpp
+float inTrim  = sanitizeUnitParamOr(apvts.getRawParameterValue(Params::IDs::INPUT_LEVEL )->load(), 0.5f);
+float outTrim = sanitizeUnitParamOr(apvts.getRawParameterValue(Params::IDs::OUTPUT_LEVEL)->load(), 0.5f);
+```
+
+Correct the now-false comment in `ParamSanitize.h`, and add coverage for the
+overload to `param_sanitize_tests.cpp`.
+
+### Channel handling
+
+The amp reads **channel 0 only** and copies to stereo on output — the pre-amp
+gate/boost block follows that same convention. So:
+
+- **INPUT** trims channel 0 only, advancing the smoother once per sample.
+- **OUTPUT** runs after delay/reverb/widener on a genuine stereo bus, so it must
+  trim every channel with the smoother advanced once per **sample**, not once per
+  channel (sample-outer, channel-inner), or the two channels desynchronise during
+  a ramp.
 
 ## Tapers
 
@@ -133,9 +159,10 @@ detent is intended — fine resolution above unity for mix trimming, quick fade
 below. This is a control curve, not a waveshaper, so the kink has no audio
 consequence.
 
-Both values are smoothed with `juce::SmoothedValue<float>` at base SR with a
-**30 ms** ramp, matching the existing `boostLevelSm` pattern, to avoid zipper
-noise. The skip-when-unity check below tests the *smoothed* value, so a trim
+Both values are smoothed with `juce::SmoothedValue<float>` at base SR, reusing
+the existing `fxRampSec = 0.05` (50 ms) that every other effects smoother
+already uses, rather than introducing a second ramp constant. The
+skip-when-unity check tests the *smoothed* value via `isSmoothing()`, so a trim
 returning to centre resumes the bit-exact path once its ramp completes.
 
 ## Tone-neutrality guarantee
