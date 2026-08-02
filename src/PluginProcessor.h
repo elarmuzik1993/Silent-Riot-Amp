@@ -137,6 +137,10 @@ private:
     sr::StereoWidth         stereoWidth;   // final MONO↔STEREO widener (stereo only)
     // Boost level smoothed at base SR (avoids zipper on the make-up gain).
     juce::SmoothedValue<float> boostLevelSm, boostTightSm, boostBrightSm, gateThreshSm;
+    // Gain-staging trims, smoothed at base SR. processBlock skips the multiply
+    // entirely while a trim sits at unity and is not ramping, which is what keeps
+    // the dry path bit-identical at defaults.
+    juce::SmoothedValue<float> inputTrimSm, outputTrimSm;
 
     // Oversamples just the IR-path output limiter (tanh) so its harmonics
     // don't alias back into the band — the IIR path's limiter already runs

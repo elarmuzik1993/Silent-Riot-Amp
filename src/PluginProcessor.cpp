@@ -169,6 +169,18 @@ juce::AudioProcessorValueTreeState::ParameterLayout SilentRiotProcessor::createP
         juce::ParameterID{ Params::IDs::WIDTH, 1 }, "Width",
         juce::NormalisableRange<float>(0.0f, 1.0f, 0.001f), 0.0f));
 
+    // ── Gain staging (utility trims) ──
+    // APPEND-ONLY BELOW THIS POINT. Hosts that index automation positionally
+    // bind lanes by order, so inserting a parameter above this line shifts every
+    // later lane and breaks automation in sessions saved with an earlier build.
+    // Add new parameters at the end, never in the middle.
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{ Params::IDs::INPUT_LEVEL, 1 }, "Input Level",
+        juce::NormalisableRange<float>(0.0f, 1.0f, 0.001f), 0.5f));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{ Params::IDs::OUTPUT_LEVEL, 1 }, "Output Level",
+        juce::NormalisableRange<float>(0.0f, 1.0f, 0.001f), 0.5f));
+
     return { params.begin(), params.end() };
 }
 
@@ -208,6 +220,11 @@ void SilentRiotProcessor::resetDSPState()
 
     lastShapeCoeffVal = -1.0f;   // force shape coeff recompute on first sample
     psuFrozen = false;
+
+    // Snap the gain-staging trims to their current targets so a re-prepare or
+    // sample-rate change doesn't audibly ramp from a stale value.
+    inputTrimSm.setCurrentAndTargetValue(inputTrimSm.getTargetValue());
+    outputTrimSm.setCurrentAndTargetValue(outputTrimSm.getTargetValue());
 }
 
 void SilentRiotProcessor::recalcRateDependentCoeffs()
@@ -290,6 +307,15 @@ void SilentRiotProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
     boostBrightSm.setCurrentAndTargetValue(
         sanitizeUnitParam(apvts.getRawParameterValue(Params::IDs::BOOST_BRIGHT)->load()));
 
+    inputTrimSm.reset(sampleRate, fxRampSec);
+    outputTrimSm.reset(sampleRate, fxRampSec);
+    // 0.5 (unity), not 0.0 — see ParamSanitize.h. A 0.0 fallback here would
+    // mean -12 dB in and silence out on the first block after a NaN.
+    inputTrimSm.setCurrentAndTargetValue(sanitizeUnitParamOr(
+        apvts.getRawParameterValue(Params::IDs::INPUT_LEVEL)->load(), 0.5f));
+    outputTrimSm.setCurrentAndTargetValue(sanitizeUnitParamOr(
+        apvts.getRawParameterValue(Params::IDs::OUTPUT_LEVEL)->load(), 0.5f));
+
     // Reload active user IR after prepare (convolution state was reset)
     int irIdx = static_cast<int>(apvts.getRawParameterValue(sr::Params::IDs::IR_INDEX)->load());
     if (irIdx > 0 && irIdx <= static_cast<int>(userIRs.size()))
@@ -355,6 +381,10 @@ void SilentRiotProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     float reverbSz  = sanitizeUnitParam(apvts.getRawParameterValue(Params::IDs::REVERB_SIZE)->load());
     float reverbTn  = sanitizeUnitParam(apvts.getRawParameterValue(Params::IDs::REVERB_TONE)->load());
     float widthParam= sanitizeUnitParam(apvts.getRawParameterValue(Params::IDs::WIDTH)->load());
+    float inTrimParam  = sanitizeUnitParamOr(
+        apvts.getRawParameterValue(Params::IDs::INPUT_LEVEL)->load(), 0.5f);
+    float outTrimParam = sanitizeUnitParamOr(
+        apvts.getRawParameterValue(Params::IDs::OUTPUT_LEVEL)->load(), 0.5f);
 
     // ── Live tuner capture ──
     // Tap the raw DI input BEFORE any processing or the power-off return, so
@@ -396,7 +426,26 @@ void SilentRiotProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     toneSmoother.setTarget(toneParam);
     volumeSmoother.setTarget(volParam);
 
-    // ── Input level metering (RMS before processing) ──
+    // ── INPUT trim (gain staging) ──
+    // Tone-neutral ±12 dB trim so the GAIN knob means roughly the same thing
+    // across pickups and interfaces. Sits AFTER the power/tuner-mute return
+    // (before it would be wasted work on a cleared buffer) and BEFORE the input
+    // meter, so the meter shows what the amp is actually being fed. The amp
+    // reads channel 0 only, so only channel 0 is trimmed — same convention as
+    // the gate/boost block below. Skipped entirely at unity to keep the dry
+    // path bit-identical.
+    inputTrimSm.setTargetValue(inTrimParam);
+    if (inputTrimSm.isSmoothing() || inputTrimGain(inputTrimSm.getCurrentValue()) != 1.0f)
+    {
+        const int n = buffer.getNumSamples();
+        float* ch0 = buffer.getWritePointer(0);
+        for (int i = 0; i < n; ++i)
+            ch0[i] *= inputTrimGain(inputTrimSm.getNextValue());
+    }
+
+    // ── Input level metering (RMS, post-trim) ──
+    // Post-trim on purpose: the meter has to show what the amp sees, or the
+    // INPUT knob can't be set by eye.
     {
         const int n = buffer.getNumSamples();
         if (n > 0)
@@ -679,6 +728,31 @@ void SilentRiotProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     }
     widenerWasActive = widenerActive;
 
+    // ── OUTPUT trim (gain staging) ──
+    // Post-limiter master: it rides on top of OUTPUT_MAKEUP_GAIN and cannot add
+    // amp compression, because the amp's own tanh already ran. Runs on the full
+    // stereo bus (delay/reverb/widener are stereo), advancing the smoother once
+    // per SAMPLE rather than once per channel — per-channel advance would
+    // desynchronise L and R during a ramp. Skipped entirely at unity.
+    outputTrimSm.setTargetValue(outTrimParam);
+    const bool outputTrimActive =
+        outputTrimSm.isSmoothing() || outputTrimGain(outputTrimSm.getCurrentValue()) != 1.0f;
+    if (outputTrimActive)
+    {
+        const int n     = buffer.getNumSamples();
+        const int numCh = buffer.getNumChannels();
+        for (int i = 0; i < n; ++i)
+        {
+            const float g = outputTrimGain(outputTrimSm.getNextValue());
+            for (int ch = 0; ch < numCh; ++ch)
+                buffer.getWritePointer(ch)[i] *= g;
+        }
+    }
+    // Only boosting can push past full scale; at or below unity the amp's own
+    // tanh already guarantees ±1, so the dry path stays untouched.
+    const bool outputBoosting =
+        outputTrimActive && outputTrimGain(outputTrimSm.getCurrentValue()) > 1.0f;
+
     // ── Post-effects safety limiter ──
     // delay/reverb run AFTER the amp's output limiter (their wet tails can sum
     // past full-scale), and the widener boosts one channel's peak above the
@@ -689,7 +763,7 @@ void SilentRiotProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     // whole module is off. NOTE: this per-channel clip is nonlinear, so on peaks
     // that actually hit the knee it marginally perturbs the widener's exact
     // mono-sum invariance — an accepted trade against hard DAC clipping.
-    if (delayOn || reverbOn || widenerActive)
+    if (delayOn || reverbOn || widenerActive || outputBoosting)
     {
         for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
         {
@@ -702,7 +776,7 @@ void SilentRiotProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
         }
     }
 
-    // ── GUI level metering (RMS of channel 0) ──
+    // ── GUI level metering (RMS of channel 0, post-trim) ──
     {
         const int n = buffer.getNumSamples();
         if (n > 0)
