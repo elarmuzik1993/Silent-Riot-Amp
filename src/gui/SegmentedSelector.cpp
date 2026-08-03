@@ -75,7 +75,7 @@ void SegmentedSelector::paint(juce::Graphics& g)
     g.setColour(Colours::border);
     g.drawRoundedRectangle(bounds, 4.0f, 1.0f);
 
-    g.setFont(Fonts::spaceMono(8.0f, true));
+    g.setFont(Fonts::spaceMono(Fonts::Sizes::small, true));
 
     for (int i = 0; i < n; ++i)
     {

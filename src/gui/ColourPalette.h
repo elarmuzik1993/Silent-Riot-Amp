@@ -14,14 +14,17 @@ inline juce::Colour panelLight { 0xFF14141C };
 
 inline juce::Colour border     { 0xFF1A1A24 };
 inline juce::Colour borderHi   { 0xFF252533 };
-inline juce::Colour track      { 0xFF1C1C28 };
+inline juce::Colour track      { 0xFF262635 };
 
-inline juce::Colour muted      { 0xFF2E2E3C };
-inline juce::Colour dim        { 0xFF3C3C50 };
-inline juce::Colour label      { 0xFF4A4A5E };
-inline juce::Colour text       { 0xFF9898AE };
-inline juce::Colour bright     { 0xFFD0D0DC };
-inline juce::Colour white      { 0xFFEAEAF0 };
+// Text ramp, ordered muted < dim < label < text < bright < white. Every tier that
+// carries text clears 4.5:1 against `panel`; `muted` (3.5:1) is decoration only —
+// tick marks and meter grid, never a glyph.
+inline juce::Colour muted      { 0xFF6A6A80 };
+inline juce::Colour dim        { 0xFF7E7E96 };
+inline juce::Colour label      { 0xFFA0A0B8 };
+inline juce::Colour text       { 0xFFC4C4D4 };
+inline juce::Colour bright     { 0xFFE0E0EA };
+inline juce::Colour white      { 0xFFF5F5F9 };
 
 inline juce::Colour accent     { 0xFFFF6600 };
 inline juce::Colour accentDim  { 0xFFCC5200 };
@@ -51,14 +54,14 @@ inline void setTheme(int themeIndex)
 
         border     = juce::Colour(0xFFD2D2DC);
         borderHi   = juce::Colour(0xFFBABAC8);
-        track      = juce::Colour(0xFFDCDCE4);
+        track      = juce::Colour(0xFFD4D4DE);
 
-        muted      = juce::Colour(0xFFC2C2CE);
-        dim        = juce::Colour(0xFFA2A2B2);
-        label      = juce::Colour(0xFF76768A);
-        text       = juce::Colour(0xFF45454F);
-        bright     = juce::Colour(0xFF2A2A33);
-        white      = juce::Colour(0xFF16161B);
+        muted      = juce::Colour(0xFF9494A4);
+        dim        = juce::Colour(0xFF6E6E80);
+        label      = juce::Colour(0xFF4E4E60);
+        text       = juce::Colour(0xFF333340);
+        bright     = juce::Colour(0xFF212129);
+        white      = juce::Colour(0xFF0E0E12);
 
         accent     = juce::Colour(0xFFFF6600);
         accentDim  = juce::Colour(0xFFCC5200);
@@ -81,14 +84,14 @@ inline void setTheme(int themeIndex)
 
         border     = juce::Colour(0xFF1A1A24);
         borderHi   = juce::Colour(0xFF252533);
-        track      = juce::Colour(0xFF1C1C28);
+        track      = juce::Colour(0xFF262635);
 
-        muted      = juce::Colour(0xFF2E2E3C);
-        dim        = juce::Colour(0xFF3C3C50);
-        label      = juce::Colour(0xFF4A4A5E);
-        text       = juce::Colour(0xFF9898AE);
-        bright     = juce::Colour(0xFFD0D0DC);
-        white      = juce::Colour(0xFFEAEAF0);
+        muted      = juce::Colour(0xFF6A6A80);
+        dim        = juce::Colour(0xFF7E7E96);
+        label      = juce::Colour(0xFFA0A0B8);
+        text       = juce::Colour(0xFFC4C4D4);
+        bright     = juce::Colour(0xFFE0E0EA);
+        white      = juce::Colour(0xFFF5F5F9);
 
         accent     = juce::Colour(0xFFFF6600);
         accentDim  = juce::Colour(0xFFCC5200);

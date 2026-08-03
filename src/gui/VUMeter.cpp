@@ -80,13 +80,13 @@ void VUMeter::paint(juce::Graphics& g)
         else if (active)
             g.setColour(segColour.withAlpha(0.9f));
         else
-            g.setColour(Colours::track.withAlpha(0.3f));
+            g.setColour(Colours::track.withAlpha(0.45f));
 
         g.fillRect(meterX, y, meterW, segH);
     }
 
     // Label below
-    g.setFont(Fonts::spaceMono(8.0f));
+    g.setFont(Fonts::spaceMono(Fonts::Sizes::small));
     g.setColour(Colours::dim);
     juce::Rectangle<float> labelBox(0.0f, meterH + 2.0f, bounds.getWidth(), labelH);
     g.drawText(label, labelBox, juce::Justification::centredTop, false);

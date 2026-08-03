@@ -50,13 +50,13 @@ void NotchKnob::paint(juce::Graphics& g)
     drawNotchPointer(g, cx, cy, angleRad);
 
     // Value readout
-    float displayVal = pos * 10.0f;
-    juce::String valText = juce::String(displayVal, 1);
-    auto valFont = Fonts::spaceMono(11.0f);
+    juce::String valText = valueFormatter ? valueFormatter(pos)
+                                          : juce::String(pos * 10.0f, 1);
+    auto valFont = Fonts::spaceMono(Fonts::Sizes::value);
     g.setFont(valFont);
 
     float valW = valFont.getStringWidthFloat(valText) + 20.0f;
-    float valH = 16.0f;
+    float valH = 18.0f;
     float valX = cx - valW * 0.5f;
     float valY = cy + kSize * 0.5f - 6.0f;
 
@@ -69,11 +69,11 @@ void NotchKnob::paint(juce::Graphics& g)
     g.drawText(valText, valBox, juce::Justification::centred, false);
 
     // Label below readout
-    auto labelFont = Fonts::spaceMono(9.0f, true);
+    auto labelFont = Fonts::spaceMono(Fonts::Sizes::body, true);
     g.setFont(labelFont);
     g.setColour(Colours::label);
     float labelY = valY + valH + 4.0f;
-    juce::Rectangle<float> labelBox(0.0f, labelY, static_cast<float>(bounds.getWidth()), 14.0f);
+    juce::Rectangle<float> labelBox(0.0f, labelY, static_cast<float>(bounds.getWidth()), 16.0f);
     g.drawText(label.toUpperCase(), labelBox, juce::Justification::centred, false);
 }
 
@@ -107,7 +107,7 @@ void NotchKnob::drawSegmentedArc(juce::Graphics& g, float cx, float cy, float po
         }
         else
         {
-            g.setColour(Colours::track.withAlpha(0.5f));
+            g.setColour(Colours::track.withAlpha(0.9f));
             g.strokePath(seg, juce::PathStrokeType(2.0f, juce::PathStrokeType::curved,
                                                     juce::PathStrokeType::rounded));
         }
@@ -116,7 +116,7 @@ void NotchKnob::drawSegmentedArc(juce::Graphics& g, float cx, float cy, float po
 
 void NotchKnob::drawNumberedLabels(juce::Graphics& g, float cx, float cy) const
 {
-    auto font = Fonts::spaceMono(7.0f);
+    auto font = Fonts::spaceMono(Fonts::Sizes::micro);
     g.setFont(font);
     g.setColour(Colours::dim);
 
@@ -130,7 +130,7 @@ void NotchKnob::drawNumberedLabels(juce::Graphics& g, float cx, float cy) const
         float ly = cy + labelR * std::sin(angleRad);
 
         juce::String numText = juce::String(i);
-        juce::Rectangle<float> numBox(lx - 6.0f, ly - 5.0f, 12.0f, 10.0f);
+        juce::Rectangle<float> numBox(lx - 8.0f, ly - 6.0f, 16.0f, 12.0f);
         g.drawText(numText, numBox, juce::Justification::centred, false);
     }
 }

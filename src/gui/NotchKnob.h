@@ -1,5 +1,6 @@
 #pragma once
 #include <juce_gui_basics/juce_gui_basics.h>
+#include <functional>
 
 namespace sr {
 
@@ -11,6 +12,21 @@ public:
     juce::Slider& getSlider() { return slider; }
 
     void setKnobMode(int mode);  // 0=Linear (vertical drag), 1=Rotary (circular drag)
+
+    // Override the readout text. The argument is the raw 0–1 slider position;
+    // return whatever the knob should display (e.g. "350ms", "35%"). Unset =
+    // the default 0.0–10.0 scale.
+    void setValueFormatter(std::function<juce::String(float)> fn)
+    {
+        valueFormatter = std::move(fn);
+        repaint();
+    }
+
+    // Vertical room a knob needs to render in full: the knob graphic, the value
+    // readout box, and the name below it. Lay one out shorter than this and the
+    // name is drawn past the bottom edge and silently clipped — which is exactly
+    // what used to happen to the DELAY card's knobs.
+    static constexpr int preferredHeight = 112;
 
 private:
     void drawSegmentedArc(juce::Graphics&, float cx, float cy, float pos) const;
@@ -41,6 +57,7 @@ private:
     KnobSlider slider;
     juce::String label;
     float defaultVal;
+    std::function<juce::String(float)> valueFormatter;
 
     // Geometry constants (relative to 80px bounding box)
     static constexpr float kSize     = 80.0f;

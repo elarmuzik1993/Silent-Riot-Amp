@@ -16,9 +16,12 @@ public:
     void paint(juce::Graphics&) override;
     void resized() override;
 
-    // Two card rows tall enough to fully render NotchKnob (knob + value
-    // readout + label ≈ 112 px) plus each card's title strip.
-    static constexpr int panelHeight = 320;
+    // Two card rows tall enough to fully render NotchKnob
+    // (NotchKnob::preferredHeight) plus each card's title strip — and, in the
+    // DELAY card, its extra sync-division row. That card is the binding
+    // constraint: at the old 320 its knob row came out 21px short and the knob
+    // names were drawn past the bottom edge, so they never appeared.
+    static constexpr int panelHeight = 352;
 
     // Toggles (the UTILITY card's gate/width knobs self-gate — no toggle)
     ToggleSwitch& boostToggle()  { return boostTgl; }

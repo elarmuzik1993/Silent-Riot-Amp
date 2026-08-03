@@ -67,7 +67,7 @@ void PresetSelector::paint(juce::Graphics& g)
     // Left arrow cell
     g.setColour(Colours::border);
     g.fillRect(arrowW, 0.0f, 1.0f, h);
-    g.setFont(Fonts::spaceMono(11.0f));
+    g.setFont(Fonts::spaceMono(Fonts::Sizes::value));
     g.setColour(Colours::label);
     g.drawText(juce::CharPointer_UTF8("\xe2\x97\x82"),
                juce::Rectangle<float>(0.0f, 0.0f, arrowW, h),
@@ -84,7 +84,7 @@ void PresetSelector::paint(juce::Graphics& g)
 
     // Center: preset name
     float centerW = bounds.getWidth() - arrowW * 2.0f;
-    g.setFont(Fonts::spaceMono(10.0f));
+    g.setFont(Fonts::spaceMono(Fonts::Sizes::body));
     g.setColour(Colours::bright);
     g.drawText(juce::String(presetName(currentIndex)),
                juce::Rectangle<float>(arrowW, 0.0f, centerW, h),
