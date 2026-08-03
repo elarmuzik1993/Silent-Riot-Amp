@@ -306,8 +306,10 @@ wrapping to –135°. Point at angle `a`, radius `r`: `x = cx + sin(a)·r`,
 #### Value arc
 - `accent`, from the start angle to the current angle, round cap
 - Drawn *behind* the body so the cap clips visually rather than floating
-- At exactly 0, `addCentredArc` draws nothing — stamp the cap by hand so the
-  minimum position still shows a mark
+- At exactly 0 the arc is **empty** — `addCentredArc` draws nothing at zero
+  sweep and nothing is stamped in its place. A parameter parked at zero (gate
+  threshold, width, boost) must read as genuinely off; the indicator still
+  shows where the knob points. Do not reintroduce a minimum-position cap.
 - With no range track, a knob near zero is a short orange stub and the ticks are
   the only thing indicating the arc continues. This is expected — the ticks
   carry the range. Flag it rather than reintroducing a track unilaterally.

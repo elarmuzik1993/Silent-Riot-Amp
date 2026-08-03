@@ -83,21 +83,16 @@ void SilentRiotLookAndFeel::drawRotarySlider(juce::Graphics& g, int x, int y, in
     }
 
     // 2 — value arc, drawn before the body so its round cap clips against the
-    // body edge rather than floating.
-    g.setColour(Colours::accent);
+    // body edge rather than floating. At exactly 0 the arc is empty — no cap is
+    // stamped in its place, so a parameter parked at zero (gate, width, boost)
+    // reads as genuinely off. The indicator still shows where the knob points.
     if (pos > 0.001f)
     {
+        g.setColour(Colours::accent);
         juce::Path fill;
         fill.addCentredArc(centre.x, centre.y, arcR, arcR, 0.0f, startAngle, angle, true);
         g.strokePath(fill, juce::PathStrokeType(arcW, juce::PathStrokeType::curved,
                                                       juce::PathStrokeType::rounded));
-    }
-    else
-    {
-        // addCentredArc with zero sweep draws nothing — stamp the cap by hand
-        // so the minimum position still shows a mark.
-        const auto p = polar(startAngle, arcR);
-        g.fillEllipse(p.x - arcW * 0.5f, p.y - arcW * 0.5f, arcW, arcW);
     }
 
     // 3 — body
