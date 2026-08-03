@@ -3,6 +3,15 @@
 
 namespace sr {
 
+// Rotary knob + value readout + parameter label.
+//
+// The knob face itself is painted by SilentRiotLookAndFeel::drawRotarySlider
+// (see LookAndFeel.cpp) — this component owns the slider, reserves the bottom
+// strip for the readout and label, and sizes the slider to a square so the
+// LookAndFeel's jmin(w,h) has no asymmetric padding to work with.
+//
+// The name is historical: the knob was a segmented arc with a notch pointer
+// before the five-tick arc design landed.
 class NotchKnob : public juce::Component {
 public:
     explicit NotchKnob(const juce::String& label, float defaultValue = 0.5f);
@@ -13,17 +22,15 @@ public:
     void setKnobMode(int mode);  // 0=Linear (vertical drag), 1=Rotary (circular drag)
 
 private:
-    void drawSegmentedArc(juce::Graphics&, float cx, float cy, float pos) const;
-    void drawNumberedLabels(juce::Graphics&, float cx, float cy) const;
-    void drawKnobBody(juce::Graphics&, float cx, float cy, float angle) const;
-    void drawNotchPointer(juce::Graphics&, float cx, float cy, float angle) const;
-
-    // Custom slider with keyboard step overrides
+    // Custom slider with keyboard step overrides and a focus ring.
     // Arrow: ±0.01 internal (±0.1 on 0-10 display)
     // PageUp/Down: ±0.1 internal (±1.0 on display)
     class KnobSlider : public juce::Slider {
     public:
         using Slider::Slider;
+        void paint(juce::Graphics&) override;
+        void focusGained(FocusChangeType) override;
+        void focusLost(FocusChangeType) override;
         bool keyPressed(const juce::KeyPress& key) override
         {
             if (key == juce::KeyPress::upKey || key == juce::KeyPress::rightKey)
@@ -42,17 +49,13 @@ private:
     juce::String label;
     float defaultVal;
 
-    // Geometry constants (relative to 80px bounding box)
-    static constexpr float kSize     = 80.0f;
-    static constexpr float knobR     = 22.4f;   // body radius (28%)
-    static constexpr float arcR      = 28.8f;   // segment ring (36%)
-    static constexpr float labelR    = 36.8f;   // number positions (46%)
-    static constexpr float startAngle = -135.0f; // degrees
-    static constexpr float endAngle   =  135.0f;
-    static constexpr float sweepDeg   = 270.0f;
-    static constexpr int   numSegments = 20;
-    static constexpr float segGapDeg   =  3.0f;
-    static constexpr int   numLabels   = 11;
+    // Bottom strip reserved out of the component bounds; whatever square is
+    // left over becomes the knob, so the knob scales with the component.
+    static constexpr int kReadoutH   = 16;
+    static constexpr int kReadoutGap = 4;
+    static constexpr int kLabelH     = 14;
+    static constexpr int kStripH     = kReadoutH + kReadoutGap + kLabelH;
+    static constexpr float kReadoutMinW = 44.0f;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(NotchKnob)
 };

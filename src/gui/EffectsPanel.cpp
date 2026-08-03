@@ -60,8 +60,10 @@ void EffectsPanel::layoutKnobRow(juce::Rectangle<int> row, std::initializer_list
     const int knobW = juce::jmin(80, row.getWidth() / n);
     const int totalW = knobW * n;
     int x = row.getCentreX() - totalW / 2;
-    const int y = row.getY();
+    // Knobs are capped at 112 so cards with room to spare don't grow giant
+    // knobs; centre the row in the leftover space rather than top-aligning it.
     const int h = juce::jmin(row.getHeight(), 112);
+    const int y = row.getY() + (row.getHeight() - h) / 2;
     for (auto* k : knobs)
     {
         k->setBounds(x, y, knobW, h);

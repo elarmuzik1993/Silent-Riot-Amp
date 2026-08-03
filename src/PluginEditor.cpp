@@ -231,16 +231,29 @@ SilentRiotEditor::SilentRiotEditor(SilentRiotProcessor& p)
     fxSectionBar.setExplicitFocusOrder(8);
     {
         int order = 9;
-        for (auto* k : { &effectsPanel.gateThreshKnob(), &effectsPanel.widthKnob(),
-                         &effectsPanel.boostLevelKnob(),
-                         &effectsPanel.boostTightKnob(), &effectsPanel.boostBrightKnob(),
-                         &effectsPanel.delayTimeKnob(), &effectsPanel.delayFbKnob(),
-                         &effectsPanel.delayMixKnob(), &effectsPanel.delayToneKnob(),
-                         &effectsPanel.reverbMixKnob(),
-                         &effectsPanel.reverbSizeKnob(), &effectsPanel.reverbToneKnob() })
+        // Titles are qualified by effect — several cards share a knob name
+        // (MIX, TONE), and the visible label is a sibling of the slider, so a
+        // screen reader has nothing else to disambiguate them with.
+        struct FxKnob { sr::NotchKnob* knob; const char* title; const char* description; };
+        for (auto [k, title, description] : {
+                 FxKnob{ &effectsPanel.gateThreshKnob(),  "Gate threshold",  "Noise gate threshold, 0 off to 10" },
+                 FxKnob{ &effectsPanel.widthKnob(),       "Stereo width",    "Stereo width, 0 off to 10 wide" },
+                 FxKnob{ &effectsPanel.boostLevelKnob(),  "Boost level",     "Boost level, 0 to 10" },
+                 FxKnob{ &effectsPanel.boostTightKnob(),  "Boost tight",     "Boost low cut, 0 to 10" },
+                 FxKnob{ &effectsPanel.boostBrightKnob(), "Boost bright",    "Boost high boost, 0 to 10" },
+                 FxKnob{ &effectsPanel.delayTimeKnob(),   "Delay time",      "Delay time, 0 to 10" },
+                 FxKnob{ &effectsPanel.delayFbKnob(),     "Delay feedback",  "Delay feedback, 0 to 10" },
+                 FxKnob{ &effectsPanel.delayMixKnob(),    "Delay mix",       "Delay mix, 0 dry to 10 wet" },
+                 FxKnob{ &effectsPanel.delayToneKnob(),   "Delay tone",      "Delay tone, 0 dark to 10 bright" },
+                 FxKnob{ &effectsPanel.reverbMixKnob(),   "Reverb mix",      "Reverb mix, 0 dry to 10 wet" },
+                 FxKnob{ &effectsPanel.reverbSizeKnob(),  "Reverb size",     "Reverb size, 0 to 10" },
+                 FxKnob{ &effectsPanel.reverbToneKnob(),  "Reverb tone",     "Reverb tone, 0 dark to 10 bright" } })
         {
-            k->getSlider().setWantsKeyboardFocus(true);
-            k->getSlider().setExplicitFocusOrder(order++);
+            auto& s = k->getSlider();
+            s.setWantsKeyboardFocus(true);
+            s.setExplicitFocusOrder(order++);
+            s.setTitle(title);
+            s.setDescription(description);
         }
         effectsPanel.boostToggle().setExplicitFocusOrder(order++);
         effectsPanel.delayToggle().setExplicitFocusOrder(order++);

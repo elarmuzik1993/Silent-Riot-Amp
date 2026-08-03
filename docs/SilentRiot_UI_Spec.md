@@ -39,20 +39,26 @@ ROLE              HEX        USAGE
 ─────────────────────────────────────────────────────────
 bg                #08080C    App background (bottom)
 bg2               #0B0B10    App background (top of gradient)
-surface           #0F0F15    Knob bodies, input fields, readouts
+surface           #0F0F15    Input fields, knob value readouts
 panel             #111118    Header/footer bars, section bars
 panelLight        #14141C    Hovered/active section bar bg
 border            #1A1A24    All borders, dividers, 1px lines
 borderHi          #252533    Hover borders, drop zone dashed
-track             #1C1C28    Inactive arc segments, meter bg, toggle off
+track             #1C1C28    Meter bg, toggle off
 muted             #2E2E3C    Minor ticks, inactive dots
-dim               #3C3C50    Major ticks, numbered scale, secondary text
+dim               #3C3C50    Secondary text
+
+knobBody          #15171E    Knob body fill
+knobBodyEdge      #272B36    Knob body outline
+knobFace          #191C24    Knob inner face fill
+knobFaceEdge      #20242E    Knob inner face outline
+knobTick          #6C7284    Knob scale ticks
 label             #4A4A5E    Knob labels, section labels, toggle labels
 text              #9898AE    Body text, IR list text, state values
 bright            #D0D0DC    Value readouts, preset name, active labels
-white             #EAEAF0    Knob pointer stroke
+white             #EAEAF0    Highest-contrast text
 
-accent            #FF6600    Primary orange — active arcs, notch pointer,
+accent            #FF6600    Primary orange — value arcs, knob indicator,
                              toggles on, section labels active, gear icon
 accentDim         #CC5200    Scrollbar thumb, accent subdued
 accentLo          #993D00    Section heading labels (SUPPLY, STATE, etc.)
@@ -96,7 +102,6 @@ Preset arrows              11px    400      —          Space Mono
 Brand "MONOLIT"            8px     400      2.5px      Space Mono
 Knob value readout         11px    400      0.5px      Space Mono
 Knob label                 9px     500      3px        Space Mono
-Knob numbered scale        7px     400      —          Space Mono
 Toggle label               8px     400      2.5px      Space Mono
 VU meter label             8px     400      2px        Space Mono
 Section bar label          8px     700      2.5px      Space Mono
@@ -163,7 +168,7 @@ The plugin is a vertical stack of sections. Each section is full-width.
 ├─────────┴───────────────────────────────────┴───────────┤
 │  EFFECTS SECTION BAR                         h=~26px    │
 ├─────────────────────────────────────────────────────────┤
-│  EFFECTS PANEL (collapsible)                 h=0–320px  │
+│  EFFECTS PANEL (collapsible)                 h=0–356px  │
 ├─────────────────────────────────────────────────────────┤
 │  IR LOADER SECTION BAR                       h=~26px    │
 ├─────────────────────────────────────────────────────────┤
@@ -255,42 +260,94 @@ See §5.9 for the component itself.
 
 ## 5. Component Specifications
 
-### 5.1 Knob — Notch Pointer (Variant C)
+### 5.1 Knob — Arc + Five Ticks
 
-This is a custom `juce::Slider` with `RotaryHorizontalVerticalDrag` style and a fully custom `LookAndFeel::drawRotarySlider()`.
+A custom `juce::Slider` painted by `SilentRiotLookAndFeel::drawRotarySlider()`.
+Five uniform ticks, no inactive range track, indicator inside the face.
 
-**Bounding box**: 80 × 80px  
-**Knob body radius**: 22.4px (size × 0.28)  
-**Segmented arc radius**: 28.8px (size × 0.36)  
-**Number label radius**: 36.8px (size × 0.46)
+Every dimension is a ratio of **D**, where `D = jmin(width, height)` of the
+*slider* bounds — one paint routine covers every knob on the panel. Ratios come
+from a 150 × 150 reference grid. The slider bounds must be square or `jmin`
+leaves asymmetric padding; `NotchKnob::resized()` reserves the readout/label
+strip first and centres a square in what's left.
 
-**Rotation**: start angle = –135° (7 o'clock), sweep = 270°, end = +135° (5 o'clock)
+**Rotation**: start = 225°, sweep = 270°, end = 495° (135° + 360°)
 
-#### Numbered scale
-- 11 text labels (0 through 10) placed at `labelR` from center
-- Distributed evenly across the 270° sweep
-- Font: Space Mono 7px, colour `dim`
-- Positioned using polar coordinates, center-anchor aligned
+JUCE measures rotary angles in radians, clockwise, **0 = 12 o'clock**.
+`setRotaryParameters` requires `end > start`, hence the extra `twoPi` instead of
+wrapping to –135°. Point at angle `a`, radius `r`: `x = cx + sin(a)·r`,
+`y = cy − cos(a)·r` (the maths-textbook convention would mirror the knob).
 
-#### Segmented arc
-- 20 segments across the 270° sweep
-- Each segment spans `270/20 = 13.5°` with 3° gap between segments
-- **Active segments** (below current value): stroke `accent`, strokeWidth 3px, opacity 1.0
-- **Inactive segments**: stroke `track`, strokeWidth 3px, opacity 0.5
-- Arc radius: `arcR` from center
-- Draw as individual arc paths with `strokeLinecap: butt`
+| Element | Ratio of D | @ 75px (effects) | @ 86px (amp row) |
+|---|---|---|---|
+| Arc radius | 0.3200 | 24.00 | 27.52 |
+| Arc stroke | 0.0467 | 3.50 | 4.02 |
+| Body radius | 0.2267 | 17.00 | 19.50 |
+| Face radius | 0.1933 | 14.50 | 16.62 |
+| Circle outlines | 0.0067 | 0.50 | 0.58 |
+| Tick inner radius | 0.3533 | 26.50 | 30.38 |
+| Tick outer radius | 0.3900 | 29.25 | 33.54 |
+| Tick stroke | 0.0100 | 0.75 | 0.86 |
+| Indicator tip radius | 0.1733 | 13.00 | 14.90 |
+| Indicator base radius | 0.1333 | 10.00 | 11.46 |
+| Indicator half-angle | 6.4° fixed | — | — |
 
-#### Knob body
-- Circle at center, radius `knobR`
-- Fill: `surface` (#0F0F15)
-- Stroke: 1px `border`
+#### Ticks
+- Five marks at normalised **0, 0.25, 0.50, 0.75, 1.00**
+- Identical colour, width and length — no major/minor hierarchy; do not
+  lengthen the ends or centre
+- Colour `knobTick` (#6C7284)
+- Positions are normalised, so a skewed parameter puts marks at the same five
+  screen positions regardless of skew — they are orientation, not values. Pick
+  one convention per plugin; mixing them across a panel is worse than either.
+- If the scale reads faint on a given panel, **lengthen the ticks — don't add
+  more**
 
-#### Notch pointer
-- **Filled triangle** (polygon with 3 vertices)
-- Tip: at `knobR + 1` from center, along the current angle
-- Base corners: at `knobR - 7` from center, at `angle ± 8°`
-- Fill: `accent`, opacity 0.9
-- This is the key visual — a bright orange triangle notch cut into the rim
+#### Value arc
+- `accent`, from the start angle to the current angle, round cap
+- Drawn *behind* the body so the cap clips visually rather than floating
+- At exactly 0, `addCentredArc` draws nothing — stamp the cap by hand so the
+  minimum position still shows a mark
+- With no range track, a knob near zero is a short orange stub and the ticks are
+  the only thing indicating the arc continues. This is expected — the ticks
+  carry the range. Flag it rather than reintroducing a track unilaterally.
+
+#### Body and face
+- Body circle: fill `knobBody`, outline `knobBodyEdge` at `0.0067·D`
+- Face circle: fill `knobFace`, outline `knobFaceEdge` at `0.0067·D`
+
+#### Indicator
+- Filled triangle, `accent`, entirely inside the face, clearing the face edge by
+  `0.02·D` at the tip; it must not touch either circle outline
+- It does not bridge the face and the arc — the ~`0.15·D` gap between them is
+  intentional and should survive any resize
+- The 6.4° half-angle holds the base at ≈`0.03·D`; if the radius changes,
+  recompute the angle to preserve that width rather than carrying 6.4° over
+
+#### Draw order
+1. Ticks
+2. Value arc
+3. Body — fill, then outline
+4. Face — fill, then outline
+5. Indicator, over the face
+
+#### Anti-aliasing
+Keep every coordinate in float, derived from `D`. The outlines are sub-pixel at
+small sizes and should stay that way — snapping to whole pixels makes the body
+edge harsh next to the arc.
+
+#### Tick caching
+`drawRotarySlider` runs on every repaint and tick geometry never changes. At
+eight or more knobs the scale can be rendered once into a `juce::Image` or a
+static background component, leaving the paint routine only arc, body and
+indicator. Not done here: knobs repaint on value change, not on the 30 Hz
+editor timer, so five `drawLine` calls per knob doesn't warrant the indirection.
+
+#### Bipolar parameters
+Pan, tilt and similar need the arc to fill from centre outward:
+`addCentredArc` from `rotaryStartAngle + sweep * 0.5f` to `angle`. This is the
+one case where a distinct centre mark is justified. No current parameter is
+bipolar — SHAPE is not neutral at noon, and WIDTH/TIGHT/THRESH are 0-is-off.
 
 #### Value readout (below knob)
 - Separate `juce::Label` or paint in the parent
@@ -312,18 +369,32 @@ This is a custom `juce::Slider` with `RotaryHorizontalVerticalDrag` style and a 
 - **Fine mode** (hold Shift): multiply sensitivity by 0.25
 - **Double-click**: reset to default value
 
+#### Accessibility
+- `setTitle` and `setDescription` per slider, since the visible parameter name
+  is a separate component. Titles are qualified by effect where a knob name
+  repeats across cards (MIX, TONE).
+- Keyboard focus draws a 2px `accent` ring on the knob bounds.
+
 #### JUCE implementation notes
 ```cpp
-class NotchKnobLookAndFeel : public juce::LookAndFeel_V4 {
-public:
-    void drawRotarySlider(juce::Graphics& g, int x, int y, int w, int h,
-        float sliderPos, float rotaryStartAngle, float rotaryEndAngle,
-        juce::Slider& slider) override;
-};
+// LookAndFeel.h
+inline constexpr float kRotaryStartAngle = juce::degreesToRadians(225.0f);
+inline constexpr float kRotaryEndAngle   = juce::degreesToRadians(135.0f)
+                                         + juce::MathConstants<float>::twoPi;
+
+// per slider — JUCE's default rotary sweep is NOT 270°
+slider.setRotaryParameters(kRotaryStartAngle, kRotaryEndAngle, true);
+slider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
+slider.setTextBoxStyle(juce::Slider::NoTextBox, true, 0, 0);
 ```
-Set `slider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag)` and
-`slider.setTextBoxStyle(juce::Slider::NoTextBox, true, 0, 0)` — draw the readout
-separately in the parent component for precise positioning.
+Reserve the readout separately rather than using `TextBoxBelow` — `NotchKnob`
+paints it for precise positioning:
+```cpp
+auto area = getLocalBounds();
+area.removeFromBottom(kStripH);          // readout 16 + gap 4 + label 14
+const int side = juce::jmin(area.getWidth(), area.getHeight());
+slider.setBounds(area.withSizeKeepingCentre(side, side));
+```
 
 ### 5.2 VU Meter
 
@@ -584,7 +655,7 @@ saved state — a session saved with it engaged would reopen silent.
 ### 5.10 Effects Panel
 
 Collapsible 2×2 grid of effect "cards" (`EffectsPanel.h/.cpp`), `panelHeight`
-320px:
+356px (sized off the DELAY card, which loses a further 22px to its sync row):
 
 ```
 ┌ UTILITY ──────────┐ ┌ BOOST ──────── ON ┐
@@ -819,28 +890,41 @@ target_compile_definitions(SilentRiot
 
 ### General approach
 - All custom painting happens in `paint(juce::Graphics& g)` overrides
-- Use `juce::Path` for arcs, segments, and the notch triangle
+- Use `juce::Path` for arcs and the knob indicator triangle
 - Use `g.setColour()` and `g.fillPath()` / `g.strokePath()` for rendering
 - Anti-aliasing is on by default in JUCE — leave it enabled
 - Use `juce::DropShadow` for glow effects (accent arc glow, toggle glow)
 
-### Knob arc segments
+### Knob ticks and value arc
 ```cpp
-// For each of the 20 segments:
-juce::Path segPath;
-float segStartRad = degreesToRadians(startDeg + (i / 20.0f) * 270.0f);
-float segEndRad = degreesToRadians(startDeg + ((i + 1) / 20.0f) * 270.0f - 3.0f);
-segPath.addCentredArc(cx, cy, arcR, arcR, 0, segStartRad, segEndRad, true);
-g.setColour(isActive ? accent : track);
-g.strokePath(segPath, juce::PathStrokeType(3.0f, juce::PathStrokeType::butt));
+// polar(): JUCE rotary angles are radians, clockwise, 0 = 12 o'clock
+auto polar = [centre](float a, float r) {
+    return juce::Point<float>(centre.x + std::sin(a) * r,
+                              centre.y - std::cos(a) * r);
+};
+
+g.setColour(knobTick);
+for (int i = 0; i < 5; ++i) {
+    const float a = startAngle + (i * 0.25f) * sweep;
+    g.drawLine({ polar(a, tickIn), polar(a, tickOut) }, tickW);
+}
+
+g.setColour(accent);
+juce::Path fill;
+fill.addCentredArc(centre.x, centre.y, arcR, arcR, 0.0f, startAngle, angle, true);
+g.strokePath(fill, juce::PathStrokeType(arcW, juce::PathStrokeType::curved,
+                                              juce::PathStrokeType::rounded));
 ```
 
-### Notch triangle pointer
+### Knob indicator triangle
 ```cpp
-juce::Path notch;
-notch.addTriangle(tipX, tipY, leftX, leftY, rightX, rightY);
-g.setColour(accent.withAlpha(0.9f));
-g.fillPath(notch);
+juce::Path ind;
+ind.startNewSubPath(polar(angle, indTip));
+ind.lineTo         (polar(angle - indHalf, indBase));
+ind.lineTo         (polar(angle + indHalf, indBase));
+ind.closeSubPath();
+g.setColour(accent);
+g.fillPath(ind);
 ```
 
 ### VU meter segments

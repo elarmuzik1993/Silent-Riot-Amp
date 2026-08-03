@@ -102,10 +102,10 @@ cmake -B build -DSR_BUILD_TESTS=ON # Build with tests
 
 15 custom components in `src/gui/`, all in `namespace sr`:
 
-- **ColourPalette.h** — 23 inline colour constants (dark theme)
+- **ColourPalette.h** — 28 inline colour constants (dark theme), incl. the `knobBody`/`knobFace`/`knobTick` ramp
 - **FontData.h/.cpp** — Embedded Space Mono + DM Sans fonts via BinaryData
-- **LookAndFeel.h/.cpp** — `SilentRiotLookAndFeel`
-- **NotchKnob.h/.cpp** — Segmented-arc rotary knob (20 segments over 270° sweep, numbered 0–10, notch pointer)
+- **LookAndFeel.h/.cpp** — `SilentRiotLookAndFeel`. Owns `drawRotarySlider` — the arc knob paint routine (five uniform ticks, value arc, body + face circles, indicator triangle inside the face). Every dimension is a ratio of `D = jmin(w,h)`, so one routine covers all knob sizes. `kRotaryStartAngle`/`kRotaryEndAngle` (225°→495°) define the 270° sweep
+- **NotchKnob.h/.cpp** — Rotary knob shell: owns the slider, reserves the readout + label strip (34px) and centres a square knob in what's left, paints the value readout and parameter label, draws the keyboard focus ring. The knob face itself is painted by the LookAndFeel. Name is historical — the knob was a segmented arc with a notch pointer before the arc design
 - **VUMeter.h/.cpp** — 24-segment LED bar, 60Hz timer, green/yellow/red zones
 - **ToggleSwitch.h/.cpp** — iOS-style toggle wrapping `juce::ToggleButton` for APVTS attachment
 - **HeaderBar.h/.cpp** — Brand + PresetSelector + gear icon

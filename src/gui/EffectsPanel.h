@@ -17,8 +17,11 @@ public:
     void resized() override;
 
     // Two card rows tall enough to fully render NotchKnob (knob + value
-    // readout + label ≈ 112 px) plus each card's title strip.
-    static constexpr int panelHeight = 320;
+    // readout + label ≈ 112 px) plus each card's title strip. Sized off the
+    // DELAY card, which loses a further 22 px to its sync-division row — at
+    // 320 px its knobs came out visibly smaller than the other cards' (and its
+    // labels were clipped outright when the knob was fixed-size).
+    static constexpr int panelHeight = 356;
 
     // Toggles (the UTILITY card's gate/width knobs self-gate — no toggle)
     ToggleSwitch& boostToggle()  { return boostTgl; }
