@@ -27,6 +27,10 @@ target_sources(sr_render PRIVATE
     ${CMAKE_SOURCE_DIR}/src/dsp/power/LTPSolver.cpp
     ${CMAKE_SOURCE_DIR}/src/dsp/cabinet/SpeakerCoupling.cpp
     ${CMAKE_SOURCE_DIR}/src/dsp/cabinet/CabinetSim.cpp
+    ${CMAKE_SOURCE_DIR}/src/dsp/cabinet/UserIRState.cpp
+    ${CMAKE_SOURCE_DIR}/src/dsp/effects/Delay.cpp
+    ${CMAKE_SOURCE_DIR}/src/dsp/effects/Reverb.cpp
+    ${CMAKE_SOURCE_DIR}/src/dsp/analysis/PitchDetector.cpp
     ${CMAKE_SOURCE_DIR}/src/dsp/OversampleSwitcher.cpp
 
     ${CMAKE_SOURCE_DIR}/src/gui/FontData.cpp
@@ -43,12 +47,21 @@ target_sources(sr_render PRIVATE
     ${CMAKE_SOURCE_DIR}/src/gui/SettingsPanel.cpp
     ${CMAKE_SOURCE_DIR}/src/gui/IRWaveformDisplay.cpp
     ${CMAKE_SOURCE_DIR}/src/gui/IRLoaderPanel.cpp
+    ${CMAKE_SOURCE_DIR}/src/gui/TunerBar.cpp
+    ${CMAKE_SOURCE_DIR}/src/gui/EffectsPanel.cpp
 )
 
 target_compile_definitions(sr_render PRIVATE
     JUCE_WEB_BROWSER=0
     JUCE_USE_CURL=0
     JUCE_STANDALONE_APPLICATION=1
+
+    # juce_add_plugin() synthesises the JucePlugin_* macros into the plugin's
+    # generated JuceLibraryCode header; juce_add_console_app() does not. The
+    # processor and the GUI files linked here reference them, so define them
+    # explicitly. Sourced from the project() version so they cannot drift.
+    JucePlugin_Name="Silent Riot"
+    JucePlugin_VersionString="${PROJECT_VERSION}"
 )
 
 target_include_directories(sr_render PRIVATE ${CMAKE_SOURCE_DIR}/src)

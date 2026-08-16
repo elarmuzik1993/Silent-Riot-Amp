@@ -16,10 +16,11 @@ namespace IDs {
     static const juce::String OVERSAMPLE  = "oversample";  // choice: 2x/4x/8x
     static const juce::String PRESET_IDX  = "presetIndex"; // int: 0–4
     static const juce::String IR_INDEX    = "irIndex";     // int: 0–N
+    static const juce::String TUNER_MUTE  = "tunerMute";   // bool: silence output while tuning
 
     // ── Effects module (all default OFF; tone-neutral when bypassed) ──
     // Pre-amp: noise gate + boost/tight-EQ. Post-cab: delay + reverb.
-    static const juce::String GATE_ON         = "gateOn";        // bool
+    // The noise gate has no on/off toggle — it self-gates: THRESHOLD 0 = off.
     static const juce::String GATE_THRESHOLD  = "gateThreshold"; // float dB
     static const juce::String BOOST_ON        = "boostOn";       // bool
     static const juce::String BOOST_LEVEL     = "boostLevel";    // float 0–1 → 0..+18 dB
@@ -36,6 +37,11 @@ namespace IDs {
     static const juce::String REVERB_MIX      = "reverbMix";     // float 0–1
     static const juce::String REVERB_SIZE     = "reverbSize";    // float 0–1
     static const juce::String REVERB_TONE     = "reverbTone";    // float 0–1 (loop damping)
+    static const juce::String WIDTH           = "width";         // float 0–1: 0=off (dry/mono), 1=wide
+
+    // ── Gain staging (utility trims, unity at knob centre 0.5) ──
+    static const juce::String INPUT_LEVEL  = "inputLevel";   // float 0–1: ±12 dB
+    static const juce::String OUTPUT_LEVEL = "outputLevel";  // float 0–1: silence..+12 dB
 }
 
 } // namespace sr::Params

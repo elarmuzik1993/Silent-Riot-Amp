@@ -7,8 +7,8 @@
 namespace sr {
 
 // Collapsible EFFECTS panel — 2×2 grid of effect "cards":
-//   [ NOISE GATE ] [ BOOST ]
-//   [ DELAY ]      [ REVERB ]
+//   [ UTILITY ] [ BOOST ]    UTILITY = noise gate + stereo width, both
+//   [ DELAY ]   [ REVERB ]   autonomous (no toggle; 0 = off/mono).
 // Owns the controls; the editor creates APVTS attachments via the accessors.
 class EffectsPanel : public juce::Component {
 public:
@@ -21,8 +21,7 @@ public:
     // card's sync row). Kept in sync with kCardH/kCardGap in EffectsPanel.cpp.
     static constexpr int panelHeight = 272;
 
-    // Toggles
-    ToggleSwitch& gateToggle()   { return gateTgl; }
+    // Toggles (the UTILITY card's gate/width knobs self-gate — no toggle)
     ToggleSwitch& boostToggle()  { return boostTgl; }
     ToggleSwitch& delayToggle()  { return delayTgl; }
     ToggleSwitch& reverbToggle() { return reverbTgl; }
@@ -30,6 +29,9 @@ public:
 
     // Knobs
     NotchKnob& gateThreshKnob()  { return gateThresh; }
+    NotchKnob& widthKnob()       { return width; }
+    NotchKnob& inputLevelKnob()  { return inputLevel; }
+    NotchKnob& outputLevelKnob() { return outputLevel; }
     NotchKnob& boostLevelKnob()  { return boostLevel; }
     NotchKnob& boostTightKnob()  { return boostTight; }
     NotchKnob& boostBrightKnob() { return boostBright; }
@@ -53,13 +55,15 @@ private:
     void layoutCard(juce::Rectangle<int> card, ToggleSwitch& tgl,
                     std::initializer_list<NotchKnob*> knobs);
 
-    ToggleSwitch gateTgl   { "ON" };
     ToggleSwitch boostTgl  { "ON" };
     ToggleSwitch delayTgl  { "ON" };
     ToggleSwitch reverbTgl { "ON" };
     ToggleSwitch delayPP   { "PP" };
 
     NotchKnob gateThresh { "THRESH", 0.0f };
+    NotchKnob width      { "WIDTH",  0.0f };   // 0=off (dry/mono), 10=wide
+    NotchKnob inputLevel { "INPUT",  0.5f };   // centre = unity, ±12 dB
+    NotchKnob outputLevel{ "OUTPUT", 0.5f };   // centre = unity, silence..+12 dB
     NotchKnob boostLevel { "LEVEL",  0.5f };
     NotchKnob boostTight { "TIGHT",  0.0f };
     NotchKnob boostBright{ "BRIGHT", 0.0f };

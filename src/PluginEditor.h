@@ -5,6 +5,7 @@
 #include "gui/VUMeter.h"
 #include "gui/ToggleSwitch.h"
 #include "gui/HeaderBar.h"
+#include "gui/TunerBar.h"
 #include "gui/FooterBar.h"
 #include "gui/SectionBar.h"
 #include "gui/AdvancedPanel.h"
@@ -53,6 +54,7 @@ private:
 
     // Layout
     sr::HeaderBar header;
+    sr::TunerBar  tuner;
     sr::FooterBar footer;
     sr::VUMeter vuIn{"IN"}, vuOut{"OUT"};
 
@@ -92,25 +94,31 @@ private:
     using SliderA = juce::AudioProcessorValueTreeState::SliderAttachment;
     using ButtonA = juce::AudioProcessorValueTreeState::ButtonAttachment;
     std::unique_ptr<SliderA> gainA, toneA, volA;
-    std::unique_ptr<ButtonA> halfPowerA, cabSimA, powerA;
+    std::unique_ptr<ButtonA> halfPowerA, cabSimA, powerA, tunerMuteA;
 
     // Effects module attachments
-    std::unique_ptr<ButtonA> gateOnA, boostOnA, delayOnA, reverbOnA, delayPingPongA;
+    std::unique_ptr<ButtonA> boostOnA, delayOnA, reverbOnA, delayPingPongA;
     std::unique_ptr<SliderA> gateThreshA, boostLevelA, boostTightA, boostBrightA,
                              delayTimeA, delayFbA, delayMixA, delayToneA,
-                             reverbMixA, reverbSizeA, reverbToneA;
+                             reverbMixA, reverbSizeA, reverbToneA, widthA;
+    std::unique_ptr<SliderA> inputLevelA, outputLevelA;
     std::unique_ptr<ChoiceSelectorAttachment> delaySyncA;
 
     static constexpr int kWindowW = 700;
     static constexpr int kHeaderH   = 38;
+    static constexpr int kTunerH    = sr::TunerBar::barHeight;  // always-visible live tuner
     static constexpr int kBodyH     = 232;
     static constexpr int kSectionH  = 26;
     static constexpr int kFooterH   = 30;
     // 3 section bars: EFFECTS, IR LOADER, ADVANCED
-    static constexpr int kBaseH     = kHeaderH + kBodyH + kSectionH * 3 + kFooterH;
+    static constexpr int kBaseH     = kHeaderH + kTunerH + kBodyH + kSectionH * 3 + kFooterH;
 
     float currentScale = 1.0f;
     bool compositorBypassed = false;
+    // Sample rate the tuner's detector is currently prepared for. 0 = not yet
+    // known (editor built before prepareToPlay); timerCallback re-prepares when
+    // this stops matching the processor's rate.
+    double preparedTunerSR = 0.0;
     void* x11Display = nullptr;   // cached Linux X11 connection (closed in dtor)
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(SilentRiotEditor)

@@ -2,13 +2,14 @@
   "_comment": "Tone sign-off gates + test matrix (docs/Tone_SignOff_Protocol.md §3-4). Targets marked TBM are ratified by the Calibration Pass (§5) against the real processBlock, then frozen. op: '<=','>=','band'[lo,hi],'==' with tol. 'null' target = report-only until calibrated.",
   "input_rms_dbfs": -18.0,
 
+  "_points_comment": "Knob positions rescaled by 1/GAIN_KNOB_HEADROOM (1/0.8 = 1.25) when the gain knob's full sweep was remapped onto the lower 80% of the drive curve. These gates test clean/edge/crank OPERATING POINTS, so when the knob->drive mapping changes by design the knob positions must follow, or the gates silently start measuring something else. P-CRANK is now the top of the knob (1.00) — which delivers what 0.80 used to.",
   "points": {
-    "P-CLEAN":     { "gain": 0.30, "volume": 0.50, "shape": 0.50, "7w": 0, "cab": 1 },
-    "P-EDGE":      { "gain": 0.50, "volume": 0.50, "shape": 0.50, "7w": 0, "cab": 1 },
-    "P-CRANK":     { "gain": 0.80, "volume": 0.70, "shape": 0.50, "7w": 0, "cab": 1 },
-    "P-7W":        { "gain": 0.60, "volume": 0.70, "shape": 0.50, "7w": 1, "cab": 1 },
-    "P-SHAPE-CCW": { "gain": 0.50, "volume": 0.50, "shape": 0.00, "7w": 0, "cab": 1 },
-    "P-SHAPE-CW":  { "gain": 0.50, "volume": 0.50, "shape": 1.00, "7w": 0, "cab": 1 }
+    "P-CLEAN":     { "gain": 0.375, "volume": 0.50, "shape": 0.50, "7w": 0, "cab": 1 },
+    "P-EDGE":      { "gain": 0.625, "volume": 0.50, "shape": 0.50, "7w": 0, "cab": 1 },
+    "P-CRANK":     { "gain": 1.00,  "volume": 0.70, "shape": 0.50, "7w": 0, "cab": 1 },
+    "P-7W":        { "gain": 0.75,  "volume": 0.70, "shape": 0.50, "7w": 1, "cab": 1 },
+    "P-SHAPE-CCW": { "gain": 0.625, "volume": 0.50, "shape": 0.00, "7w": 0, "cab": 1 },
+    "P-SHAPE-CW":  { "gain": 0.625, "volume": 0.50, "shape": 1.00, "7w": 0, "cab": 1 }
   },
 
   "renders": [

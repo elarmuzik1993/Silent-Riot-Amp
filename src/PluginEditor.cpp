@@ -32,7 +32,19 @@ SilentRiotEditor::SilentRiotEditor(SilentRiotProcessor& p)
     contentArea.setInterceptsMouseClicks(false, true);
 
     contentArea.addAndMakeVisible(header);
+    contentArea.addAndMakeVisible(tuner);
     contentArea.addAndMakeVisible(footer);
+
+    // Live tuner: pull DI windows straight from the processor's capture ring.
+    // getSampleRate() is 0 until prepareToPlay has run, and hosts differ on
+    // whether the editor is built before or after that — so this is only a
+    // provisional rate. timerCallback() re-prepares once the real rate is known
+    // and whenever it changes; see preparedTunerSR.
+    tuner.prepare(proc.getSampleRate() > 0.0 ? proc.getSampleRate() : 44100.0);
+    preparedTunerSR = proc.getSampleRate();
+    tuner.readSamples = [this](float* dest, int maxN) {
+        return proc.readLatestTunerSamples(dest, maxN);
+    };
     contentArea.addAndMakeVisible(vuIn);
     contentArea.addAndMakeVisible(vuOut);
     contentArea.addAndMakeVisible(gainKnob);
@@ -164,9 +176,9 @@ SilentRiotEditor::SilentRiotEditor(SilentRiotProcessor& p)
     halfPowerA = std::make_unique<ButtonA>(proc.apvts, IDs::HALF_POWER, halfPowerToggle.getButton());
     cabSimA    = std::make_unique<ButtonA>(proc.apvts, IDs::CAB_SIM,    cabSimToggle.getButton());
     powerA     = std::make_unique<ButtonA>(proc.apvts, IDs::POWER,      powerToggle.getButton());
+    tunerMuteA = std::make_unique<ButtonA>(proc.apvts, IDs::TUNER_MUTE, tuner.getMuteButton());
 
     // Effects module attachments
-    gateOnA      = std::make_unique<ButtonA>(proc.apvts, IDs::GATE_ON,        effectsPanel.gateToggle().getButton());
     gateThreshA  = std::make_unique<SliderA>(proc.apvts, IDs::GATE_THRESHOLD, effectsPanel.gateThreshKnob().getSlider());
     boostOnA     = std::make_unique<ButtonA>(proc.apvts, IDs::BOOST_ON,       effectsPanel.boostToggle().getButton());
     boostLevelA  = std::make_unique<SliderA>(proc.apvts, IDs::BOOST_LEVEL,    effectsPanel.boostLevelKnob().getSlider());
@@ -183,6 +195,11 @@ SilentRiotEditor::SilentRiotEditor(SilentRiotProcessor& p)
     reverbMixA   = std::make_unique<SliderA>(proc.apvts, IDs::REVERB_MIX,     effectsPanel.reverbMixKnob().getSlider());
     reverbSizeA  = std::make_unique<SliderA>(proc.apvts, IDs::REVERB_SIZE,    effectsPanel.reverbSizeKnob().getSlider());
     reverbToneA  = std::make_unique<SliderA>(proc.apvts, IDs::REVERB_TONE,    effectsPanel.reverbToneKnob().getSlider());
+    widthA       = std::make_unique<SliderA>(proc.apvts, IDs::WIDTH,          effectsPanel.widthKnob().getSlider());
+    inputLevelA  = std::make_unique<SliderA>(proc.apvts, IDs::INPUT_LEVEL,
+                                             effectsPanel.inputLevelKnob().getSlider());
+    outputLevelA = std::make_unique<SliderA>(proc.apvts, IDs::OUTPUT_LEVEL,
+                                             effectsPanel.outputLevelKnob().getSlider());
 
     // Keyboard focus and accessibility.
     // Knobs: the (invisible) slider is the focusable leaf. Toggles: the
@@ -218,7 +235,9 @@ SilentRiotEditor::SilentRiotEditor(SilentRiotProcessor& p)
     fxSectionBar.setExplicitFocusOrder(8);
     {
         int order = 9;
-        for (auto* k : { &effectsPanel.gateThreshKnob(), &effectsPanel.boostLevelKnob(),
+        for (auto* k : { &effectsPanel.gateThreshKnob(), &effectsPanel.widthKnob(),
+                         &effectsPanel.inputLevelKnob(), &effectsPanel.outputLevelKnob(),
+                         &effectsPanel.boostLevelKnob(),
                          &effectsPanel.boostTightKnob(), &effectsPanel.boostBrightKnob(),
                          &effectsPanel.delayTimeKnob(), &effectsPanel.delayFbKnob(),
                          &effectsPanel.delayMixKnob(), &effectsPanel.delayToneKnob(),
@@ -228,7 +247,6 @@ SilentRiotEditor::SilentRiotEditor(SilentRiotProcessor& p)
             k->getSlider().setWantsKeyboardFocus(true);
             k->getSlider().setExplicitFocusOrder(order++);
         }
-        effectsPanel.gateToggle().setExplicitFocusOrder(order++);
         effectsPanel.boostToggle().setExplicitFocusOrder(order++);
         effectsPanel.delayToggle().setExplicitFocusOrder(order++);
         effectsPanel.reverbToggle().setExplicitFocusOrder(order++);
@@ -236,8 +254,12 @@ SilentRiotEditor::SilentRiotEditor(SilentRiotProcessor& p)
         effectsPanel.delaySyncSelector().setExplicitFocusOrder(order++);
     }
 
-    irSectionBar.setExplicitFocusOrder(26);
-    advSectionBar.setExplicitFocusOrder(27);
+    // These two literals are NOT derived from the `order` variable above (which
+    // goes out of scope at the closing brace of that block) — they are hand-set
+    // to continue the sequence it produces. Adding INPUT/OUTPUT to the knob list
+    // shifted every order value after them by +2, so these must shift too.
+    irSectionBar.setExplicitFocusOrder(28);
+    advSectionBar.setExplicitFocusOrder(29);
 
     // Restore UI state
     loadUIState();
@@ -491,6 +513,22 @@ void SilentRiotEditor::timerCallback()
         vuOut.setLevel(0.0f);
     }
 
+    // Live tuner — detects from captured DI input (works even with PWR off).
+    // The detector converts lag to Hz using its assumed sample rate, so that
+    // rate MUST track the host's or every reading is transposed (a detector
+    // left at 44100 on a 48k host reports a true A4 as G#4 -47 cents). Re-prepare
+    // on any change: the editor can be built before prepareToPlay, and the host
+    // can switch rates while it is open.
+    {
+        const double hostSR = proc.getSampleRate();
+        if (hostSR > 0.0 && hostSR != preparedTunerSR)
+        {
+            tuner.prepare(hostSR);
+            preparedTunerSR = hostSR;
+        }
+    }
+    tuner.refresh();
+
     // Live footer stats
     {
         auto dspR = proc.getDSPReadout();
@@ -549,6 +587,7 @@ void SilentRiotEditor::layoutContent()
     auto area = contentArea.getLocalBounds();
 
     header.setBounds(area.removeFromTop(kHeaderH));
+    tuner.setBounds(area.removeFromTop(kTunerH));
 
     auto body = area.removeFromTop(kBodyH);
     int vuW = 40;

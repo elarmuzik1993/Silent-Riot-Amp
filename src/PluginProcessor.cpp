@@ -89,6 +89,9 @@ juce::AudioProcessorValueTreeState::ParameterLayout SilentRiotProcessor::createP
     params.push_back(std::make_unique<juce::AudioParameterBool>(
         juce::ParameterID{ Params::IDs::POWER, 1 }, "Power", true));
 
+    params.push_back(std::make_unique<juce::AudioParameterBool>(
+        juce::ParameterID{ Params::IDs::TUNER_MUTE, 1 }, "Tuner Mute", false));
+
     params.push_back(std::make_unique<juce::AudioParameterChoice>(
         juce::ParameterID{ Params::IDs::OVERSAMPLE, 1 }, "Oversample",
         juce::StringArray{ "2x", "4x", "8x" }, 1));
@@ -101,10 +104,9 @@ juce::AudioProcessorValueTreeState::ParameterLayout SilentRiotProcessor::createP
         0, sr::MAX_USER_IRS, 0));
 
     // ── Effects module — all default OFF / dry (tone-neutral when bypassed) ──
-    params.push_back(std::make_unique<juce::AudioParameterBool>(
-        juce::ParameterID{ Params::IDs::GATE_ON, 1 }, "Gate", false));
-    // Threshold is a 0–1 knob (maps 0..1 → GATE_THRESH_MIN..MAX dB in processBlock,
-    // so NotchKnob's 0–1 arc works). Default 0 = -80 dB (effectively open).
+    // Noise gate has no on/off toggle — it self-gates. Threshold is a 0–1 knob
+    // (maps 0..1 → GATE_THRESH_MIN..MAX dB in processBlock, so NotchKnob's 0–1
+    // arc works). Default 0 = gate OFF (true bypass — see NoiseGate::process).
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         juce::ParameterID{ Params::IDs::GATE_THRESHOLD, 1 }, "Gate Threshold",
         juce::NormalisableRange<float>(0.0f, 1.0f, 0.001f), 0.0f));
@@ -161,6 +163,24 @@ juce::AudioProcessorValueTreeState::ParameterLayout SilentRiotProcessor::createP
         juce::ParameterID{ Params::IDs::REVERB_TONE, 1 }, "Reverb Tone",
         juce::NormalisableRange<float>(0.0f, 1.0f, 0.001f), 0.5f));
 
+    // Stereo widener — autonomous (no ON toggle): 0 = off (dry/mono), 1 = wide.
+    // Defaults off, so it's tone-transparent until turned up.
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{ Params::IDs::WIDTH, 1 }, "Width",
+        juce::NormalisableRange<float>(0.0f, 1.0f, 0.001f), 0.0f));
+
+    // ── Gain staging (utility trims) ──
+    // APPEND-ONLY BELOW THIS POINT. Hosts that index automation positionally
+    // bind lanes by order, so inserting a parameter above this line shifts every
+    // later lane and breaks automation in sessions saved with an earlier build.
+    // Add new parameters at the end, never in the middle.
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{ Params::IDs::INPUT_LEVEL, 1 }, "Input Level",
+        juce::NormalisableRange<float>(0.0f, 1.0f, 0.001f), 0.5f));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{ Params::IDs::OUTPUT_LEVEL, 1 }, "Output Level",
+        juce::NormalisableRange<float>(0.0f, 1.0f, 0.001f), 0.5f));
+
     return { params.begin(), params.end() };
 }
 
@@ -195,9 +215,16 @@ void SilentRiotProcessor::resetDSPState()
     boost.reset();
     delay.reset();
     reverb.reset();
+    stereoWidth.reset();
+    widenerWasActive = false;
 
     lastShapeCoeffVal = -1.0f;   // force shape coeff recompute on first sample
     psuFrozen = false;
+
+    // Snap the gain-staging trims to their current targets so a re-prepare or
+    // sample-rate change doesn't audibly ramp from a stale value.
+    inputTrimSm.setCurrentAndTargetValue(inputTrimSm.getTargetValue());
+    outputTrimSm.setCurrentAndTargetValue(outputTrimSm.getTargetValue());
 }
 
 void SilentRiotProcessor::recalcRateDependentCoeffs()
@@ -260,6 +287,7 @@ void SilentRiotProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
     boost.prepare(baseSR);
     delay.prepare(sampleRate, samplesPerBlock, getTotalNumOutputChannels());
     reverb.prepare(sampleRate, samplesPerBlock, getTotalNumOutputChannels());
+    stereoWidth.prepare(baseSR);
 
     const double fxRampSec = 0.05;
     gateThreshSm.reset(sampleRate, fxRampSec);
@@ -278,6 +306,15 @@ void SilentRiotProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
         sanitizeUnitParam(apvts.getRawParameterValue(Params::IDs::BOOST_TIGHT)->load()));
     boostBrightSm.setCurrentAndTargetValue(
         sanitizeUnitParam(apvts.getRawParameterValue(Params::IDs::BOOST_BRIGHT)->load()));
+
+    inputTrimSm.reset(sampleRate, fxRampSec);
+    outputTrimSm.reset(sampleRate, fxRampSec);
+    // 0.5 (unity), not 0.0 — see ParamSanitize.h. A 0.0 fallback here would
+    // mean -12 dB in and silence out on the first block after a NaN.
+    inputTrimSm.setCurrentAndTargetValue(sanitizeUnitParamOr(
+        apvts.getRawParameterValue(Params::IDs::INPUT_LEVEL)->load(), 0.5f));
+    outputTrimSm.setCurrentAndTargetValue(sanitizeUnitParamOr(
+        apvts.getRawParameterValue(Params::IDs::OUTPUT_LEVEL)->load(), 0.5f));
 
     // Reload active user IR after prepare (convolution state was reset)
     int irIdx = static_cast<int>(apvts.getRawParameterValue(sr::Params::IDs::IR_INDEX)->load());
@@ -314,14 +351,20 @@ void SilentRiotProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     bool  is7W      = apvts.getRawParameterValue(Params::IDs::HALF_POWER)->load() > 0.5f;
     bool  cabOn     = apvts.getRawParameterValue(Params::IDs::CAB_SIM)->load() > 0.5f;
     bool  powerOn   = apvts.getRawParameterValue(Params::IDs::POWER)->load() > 0.5f;
+    bool  tunerMute = apvts.getRawParameterValue(Params::IDs::TUNER_MUTE)->load() > 0.5f;
     int   irIndex   = static_cast<int>(apvts.getRawParameterValue(Params::IDs::IR_INDEX)->load());
 
     // Effects module parameters (run at base SR, outside the amp loop).
     // Float reads are sanitized at this boundary — a misbehaving host could
     // report NaN via automation, which would otherwise silently poison the
     // gate/boost/delay/reverb filters' IIR state forever (see ParamSanitize.h).
-    bool  gateOn    = apvts.getRawParameterValue(Params::IDs::GATE_ON)->load() > 0.5f;
     float gateThr   = sanitizeUnitParam(apvts.getRawParameterValue(Params::IDs::GATE_THRESHOLD)->load());
+    // No on/off toggle: the gate is active whenever its threshold is off 0
+    // (knob at 0 = off). NoiseGate::process bypasses at the min threshold too.
+    // Keyed off the SMOOTHED value as well as the raw one, so turning the knob
+    // down to 0 lets the threshold ramp out instead of cutting the gate dead
+    // mid-attenuation — see gateShouldRun() in NoiseGate.h.
+    bool  gateOn    = gateShouldRun(gateThr, gateThreshSm.getCurrentValue());
     bool  boostOn   = apvts.getRawParameterValue(Params::IDs::BOOST_ON)->load() > 0.5f;
     float boostLvl  = sanitizeUnitParam(apvts.getRawParameterValue(Params::IDs::BOOST_LEVEL)->load());
     float boostTgt  = sanitizeUnitParam(apvts.getRawParameterValue(Params::IDs::BOOST_TIGHT)->load());
@@ -337,11 +380,33 @@ void SilentRiotProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     float reverbMix = sanitizeUnitParam(apvts.getRawParameterValue(Params::IDs::REVERB_MIX)->load());
     float reverbSz  = sanitizeUnitParam(apvts.getRawParameterValue(Params::IDs::REVERB_SIZE)->load());
     float reverbTn  = sanitizeUnitParam(apvts.getRawParameterValue(Params::IDs::REVERB_TONE)->load());
+    float widthParam= sanitizeUnitParam(apvts.getRawParameterValue(Params::IDs::WIDTH)->load());
+    float inTrimParam  = sanitizeUnitParamOr(
+        apvts.getRawParameterValue(Params::IDs::INPUT_LEVEL)->load(), 0.5f);
+    float outTrimParam = sanitizeUnitParamOr(
+        apvts.getRawParameterValue(Params::IDs::OUTPUT_LEVEL)->load(), 0.5f);
 
-    // Master power off — silence output
-    if (!powerOn) { buffer.clear(); return; }
+    // ── Live tuner capture ──
+    // Tap the raw DI input BEFORE any processing or the power-off return, so
+    // the tuner tracks pitch even when the amp is silenced (classic workflow).
+    if (buffer.getNumChannels() > 0)
+        pushTunerSamples(buffer.getReadPointer(0), buffer.getNumSamples());
+
+    // Master power off, or tuner mute engaged — silence output. Capture above
+    // still ran, so the tuner keeps tracking pitch while the amp is silent.
+    if (!powerOn || tunerMute) { buffer.clear(); return; }
 
     el84BaseBias = is7W ? PENTODE_BIAS_7W_N : PENTODE_BIAS_15W_N;
+
+    // Keep the sag reference locked to what the tube model actually idles at for
+    // this bias. 7W runs a hotter bias → higher idle current → different
+    // reference, so this has to follow the power-mode switch, not be a constant.
+    if (el84BaseBias != lastSagQuiescentBias) {
+        lastSagQuiescentBias = el84BaseBias;
+        sag.setQuiescent(pentodeQuiescentTotal(el84BaseBias,
+                                               V_POWER_NOMINAL_N, V_SCREEN_NOMINAL_N));
+    }
+
     cabSim.setEnabled(cabOn);
 
     // Detect IR parameter changes — defer actual loading to message thread
@@ -361,7 +426,26 @@ void SilentRiotProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     toneSmoother.setTarget(toneParam);
     volumeSmoother.setTarget(volParam);
 
-    // ── Input level metering (RMS before processing) ──
+    // ── INPUT trim (gain staging) ──
+    // Tone-neutral ±12 dB trim so the GAIN knob means roughly the same thing
+    // across pickups and interfaces. Sits AFTER the power/tuner-mute return
+    // (before it would be wasted work on a cleared buffer) and BEFORE the input
+    // meter, so the meter shows what the amp is actually being fed. The amp
+    // reads channel 0 only, so only channel 0 is trimmed — same convention as
+    // the gate/boost block below. Skipped entirely at unity to keep the dry
+    // path bit-identical.
+    inputTrimSm.setTargetValue(inTrimParam);
+    if (inputTrimSm.isSmoothing() || inputTrimGain(inputTrimSm.getCurrentValue()) != 1.0f)
+    {
+        const int n = buffer.getNumSamples();
+        float* ch0 = buffer.getWritePointer(0);
+        for (int i = 0; i < n; ++i)
+            ch0[i] *= inputTrimGain(inputTrimSm.getNextValue());
+    }
+
+    // ── Input level metering (RMS, post-trim) ──
+    // Post-trim on purpose: the meter has to show what the amp sees, or the
+    // INPUT knob can't be set by eye.
     {
         const int n = buffer.getNumSamples();
         if (n > 0)
@@ -409,6 +493,11 @@ void SilentRiotProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
         if (oversampleSwitcher.readyToSwitch()) {
             oversampleSwitcher.commitSwitch();
             recalcRateDependentCoeffs();
+            // recalcAll() rebuilds the shape EQ at noon (FilterBank.cpp), so the
+            // cached value must be invalidated or the per-sample guard below sees
+            // "shape hasn't moved" and never restores the knob's actual position —
+            // leaving Shape silently stuck at noon until the user touches it.
+            lastShapeCoeffVal = -1.0f;
         }
 
         // Request mode change → starts fade-out (actual switch deferred to next block)
@@ -432,6 +521,7 @@ void SilentRiotProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
         float gainVal = gainSmoother.tick();
         float volVal  = volumeSmoother.tick();
         float toneVal = toneSmoother.tick();
+        float gainDrive = gainDriveTaper(gainVal);
 
         // Update shape EQ only when value has changed enough to matter
         // (saves sin/cos/sqrt coefficient recalc on ~99% of samples)
@@ -463,7 +553,7 @@ void SilentRiotProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
         psu.reportPreampLevel(x);
 
         // ── Gain Pot Gang A (audio taper: Spec §3.3) ──
-        float gainA = audioTaper(gainVal);
+        float gainA = audioTaper(gainDrive);
         x *= gainA;
 
         // ── Stage 2: V1b ──
@@ -478,8 +568,12 @@ void SilentRiotProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
         x = v1b_miller.process(x, v1bGainEst, filterBank.effectiveSR);
         psu.reportPreampLevel(x);
 
-        // ── Gain Pot Gang B (audio taper: Spec §3.3) ──
-        x *= audioTaper(gainVal);
+        // ── Gain Pot Gang B (LINEAR — taper already applied on Gang A) ──
+        // The signal passes through both gangs, but the user knob is first
+        // remapped to a virtual pot position. After the EL84 current
+        // calibration, the raw x^3 law made knob 3 behave like edge/crank.
+        // gainDriveTaper() keeps knob 3 clean, knob 5 edge, and knob 10 full.
+        x *= gainDrive;
         x = filterBank.gainLoadingLP.process(x);
 
         // ── Stage 3: Phase Inverter (LTP) ──
@@ -499,7 +593,7 @@ void SilentRiotProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
         piB = (sum - outDiff) * 0.5f;
 
         // ── Master Volume ──
-        float vol = audioTaper(volVal);
+        float vol = volumeDriveTaper(volVal);
         piA *= vol;
         piB *= vol;
 
@@ -618,12 +712,62 @@ void SilentRiotProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
         reverb.process(buffer);
     }
 
+    // ── MONO/STEREO widener (stereo bus only) ──
+    // Skipped entirely (bit-exact dry) while the knob sits parked at 0 and the
+    // internal smoother has settled — see StereoWidth::isActive(). Meaningless
+    // on a mono bus, so guarded to two channels. On the OFF→on edge we clear the
+    // Haas tail: while skipped, the delay line stops being primed, so without
+    // this a re-engage could bleed ~12 ms of stale audio into the side voice.
+    const bool widenerActive =
+        buffer.getNumChannels() == 2 && (widthParam != 0.0f || stereoWidth.isActive());
+    if (widenerActive)
+    {
+        if (!widenerWasActive) stereoWidth.clearTail();
+        stereoWidth.process(buffer.getWritePointer(0), buffer.getWritePointer(1),
+                            buffer.getNumSamples(), widthParam);
+    }
+    widenerWasActive = widenerActive;
+
+    // ── OUTPUT trim (gain staging) ──
+    // Post-limiter master: it rides on top of OUTPUT_MAKEUP_GAIN and cannot add
+    // amp compression, because the amp's own tanh already ran. Runs on the full
+    // stereo bus (delay/reverb/widener are stereo), advancing the smoother once
+    // per SAMPLE rather than once per channel — per-channel advance would
+    // desynchronise L and R during a ramp. Skipped entirely at unity.
+    outputTrimSm.setTargetValue(outTrimParam);
+    const bool outputTrimActive =
+        outputTrimSm.isSmoothing() || outputTrimGain(outputTrimSm.getCurrentValue()) != 1.0f;
+    // Only boosting can push past full scale; at or below unity the amp's own
+    // tanh already guarantees ±1, so the dry path stays untouched. Tracked
+    // per-sample (not sampled once after the loop) because a 50ms ramp can
+    // cross down through unity mid-block on a large host buffer — sampling
+    // the smoother's value only after the loop would miss samples that were
+    // boosted earlier in the same block.
+    bool outputBoosting = false;
+    if (outputTrimActive)
+    {
+        const int n     = buffer.getNumSamples();
+        const int numCh = buffer.getNumChannels();
+        for (int i = 0; i < n; ++i)
+        {
+            const float g = outputTrimGain(outputTrimSm.getNextValue());
+            outputBoosting = outputBoosting || (g > 1.0f);
+            for (int ch = 0; ch < numCh; ++ch)
+                buffer.getWritePointer(ch)[i] *= g;
+        }
+    }
+
     // ── Post-effects safety limiter ──
-    // delay/reverb run AFTER the amp's output limiter, so their wet tails can
-    // sum past full-scale. Soft-clip the summed output back into ±1 (and scrub
-    // any non-finite sample). Runs ONLY when an effect is active, so the dry
-    // amp path stays bit-identical when the whole module is off.
-    if (delayOn || reverbOn)
+    // delay/reverb run AFTER the amp's output limiter (their wet tails can sum
+    // past full-scale), and the widener boosts one channel's peak above the
+    // input (it can exceed ±1 even when the mono sum is in range). Both land
+    // after the amp's own limiter, so soft-clip the finished bus back into ±1
+    // (and scrub any non-finite sample) as a last line of defence. Runs ONLY
+    // when an effect is active, so the dry amp path stays bit-identical when the
+    // whole module is off. NOTE: this per-channel clip is nonlinear, so on peaks
+    // that actually hit the knee it marginally perturbs the widener's exact
+    // mono-sum invariance — an accepted trade against hard DAC clipping.
+    if (delayOn || reverbOn || widenerActive || outputBoosting)
     {
         for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
         {
@@ -636,7 +780,7 @@ void SilentRiotProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
         }
     }
 
-    // ── GUI level metering (RMS of channel 0) ──
+    // ── GUI level metering (RMS of channel 0, post-trim) ──
     {
         const int n = buffer.getNumSamples();
         if (n > 0)
@@ -686,6 +830,35 @@ SilentRiotProcessor::DSPReadout SilentRiotProcessor::getDSPReadout() const
     r.osFactor = osFactorForGUI.load(std::memory_order_relaxed);
     r.is7W     = std::abs(baseBias - PENTODE_BIAS_7W_N) < 1e-6f;
     return r;
+}
+
+// ── Live tuner ring buffer ──
+void SilentRiotProcessor::pushTunerSamples(const float* data, int n)
+{
+    if (data == nullptr || n <= 0) return;
+
+    uint64_t pos = tunerWritePos.load(std::memory_order_relaxed);
+    for (int i = 0; i < n; ++i)
+        tunerRing[static_cast<size_t>((pos + static_cast<uint64_t>(i)) & kTunerRingMask)] = data[i];
+
+    // Publish the advanced write position last (release) so a concurrent reader
+    // that observes the new count also sees the samples written above.
+    tunerWritePos.store(pos + static_cast<uint64_t>(n), std::memory_order_release);
+}
+
+int SilentRiotProcessor::readLatestTunerSamples(float* dest, int maxN) const
+{
+    if (dest == nullptr || maxN <= 0) return 0;
+
+    const uint64_t pos = tunerWritePos.load(std::memory_order_acquire);
+    const int available = static_cast<int>(std::min<uint64_t>(pos, kTunerRingSize));
+    const int count = std::min(maxN, available);
+
+    // Copy the last `count` samples ending at the write position (oldest first).
+    const uint64_t start = pos - static_cast<uint64_t>(count);
+    for (int i = 0; i < count; ++i)
+        dest[i] = tunerRing[static_cast<size_t>((start + static_cast<uint64_t>(i)) & kTunerRingMask)];
+    return count;
 }
 
 // ── Boilerplate ──
@@ -845,6 +1018,13 @@ void SilentRiotProcessor::setStateInformation(const void* data, int sizeInBytes)
     {
         apvts.replaceState(juce::ValueTree::fromXml(*xml));
         loadUserIRsFromState();
+
+        // Tuner mute is a transient performance control, not a session setting:
+        // it silences the whole plugin, and its only affordance is a small pill
+        // in the tuner strip. Restoring it would reopen a saved session dead
+        // silent with no obvious cause, so it always loads OFF.
+        if (auto* p = apvts.getParameter(Params::IDs::TUNER_MUTE))
+            p->setValueNotifyingHost(0.0f);
     }
 }
 

@@ -49,4 +49,66 @@ inline float triodeWaveshaper(float vGrid_n, float vBias_n, float vSupply_n, flo
 
 inline float audioTaper(float x) { return x * x; }
 
+// User gain knob -> virtual pot position used by both physical gain gangs.
+// The EL84 recalibration made the old direct x^3 two-gang law hit edge/crank
+// behavior by knob 2-3, so the knob is remapped through a monotonic cubic.
+//
+// GAIN_KNOB_HEADROOM then compresses the knob's full sweep onto the lower part
+// of that curve: the old top end (knob 8-10) was past where the chain runs out
+// of headroom and contributed compression rather than usable drive, so knob 10
+// now lands where knob 8 used to. The full 270 deg arc covers the range that
+// actually sounds good, which also buys finer resolution through it.
+//
+// Anchors at HEADROOM = 0.8:  knob 0.30 -> drive 0.108,
+//                             knob 0.50 -> drive 0.156,
+//                             knob 1.00 -> drive 0.520 (= old knob 0.80).
+// The cubic is monotonic on [0,1] (its derivative 0.7167 - 3.1x + 5.5x^2 has a
+// negative discriminant), and scaling the input keeps it monotonic.
+inline float gainDriveTaper(float x) {
+    x = std::clamp(x, 0.0f, 1.0f) * GAIN_KNOB_HEADROOM;
+    return x * (0.7166667f + x * (-1.55f + x * 1.8333333f));
+}
+
+// User master-volume knob -> gain applied to the PI outputs feeding the EL84
+// grids. The volume control IS the power-stage drive control, and the chain
+// hands it far more drive than the tube can use, so the plain audioTaper() law
+// pushed the grids into permanent conduction from about knob 4 upward. Above
+// that the grid diode clamp set the level instead of the tube, which cost the
+// amp its touch sensitivity and left the top half of the knob adding grit
+// rather than loudness.
+//
+// VOLUME_KNOB_HEADROOM remaps the full sweep onto the part of the drive range
+// that stays out of permanent conduction, exactly as GAIN_KNOB_HEADROOM does
+// for the gain knob. Knob 10 now delivers what knob 2 used to.
+//
+// Anchors at HEADROOM = 0.21:  knob 0.50 -> 0.011025,
+//                              knob 1.00 -> 0.044100 (= old knob 0.21).
+inline float volumeDriveTaper(float x) {
+    return audioTaper(std::clamp(x, 0.0f, 1.0f) * VOLUME_KNOB_HEADROOM);
+}
+
+// ── Gain-staging trims (see Constants.h) ────────────────────
+// Both are unity at knob centre (0.5). The processor skips the multiply
+// entirely while a trim sits at unity, so the dry path stays bit-identical at
+// defaults — do not "simplify" these to always-on gain stages.
+
+// INPUT: -12 .. +12 dB, linear in dB across the whole sweep.
+inline float inputTrimGain(float x) {
+    x = std::clamp(x, 0.0f, 1.0f);
+    return std::pow(10.0f, ((x - 0.5f) * 2.0f * INPUT_TRIM_RANGE_DB) / 20.0f);
+}
+
+// OUTPUT: silence .. +12 dB. Steeper below the detent than above, so the bottom
+// half works as a master fade (knob 4 -> -12 dB, 2 -> -36 dB) while the top half
+// stays fine enough for mix trimming. Knob 0 is exact silence. The slope
+// discontinuity at the detent is intentional: this is a control curve, not a
+// waveshaper, so it has no audio consequence.
+inline float outputTrimGain(float x) {
+    x = std::clamp(x, 0.0f, 1.0f);
+    if (x <= 0.0f) return 0.0f;                 // exact silence, not just small
+    const float dB = (x >= 0.5f) ? (x - 0.5f) * 2.0f * OUTPUT_TRIM_BOOST_DB
+                                 : (x - 0.5f) * 2.0f * OUTPUT_TRIM_FADE_DB;
+    return std::pow(10.0f, dB / 20.0f);
+}
+
 } // namespace sr

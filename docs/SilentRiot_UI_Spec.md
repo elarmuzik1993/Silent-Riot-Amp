@@ -150,15 +150,21 @@ The plugin is a vertical stack of sections. Each section is full-width.
 │  HEADER BAR                                    h=38px   │
 ├─────────────────────────────────────────────────────────┤
 │  SETTINGS PANEL (overlay, absolute positioned)          │
+├─────────────────────────────────────────────────────────┤
+│  TUNER BAR (always visible, not collapsible)   h=34px   │
 ├─────────┬───────────────────────────────────┬───────────┤
 │  VU IN  │         KNOBS + TOGGLES           │  VU OUT   │
 │  w=40px │         (center area)             │  w=40px   │
 │         │                                   │           │
-│         │   [GAIN]    [TONE]   [VOLUME]     │           │
+│         │   [GAIN]   [SHAPE]   [VOLUME]     │           │
 │         │         ── separator ──            │           │
 │         │      [7W]  [CAB]  [PWR]           │           │
 │         │                                   │           │
 ├─────────┴───────────────────────────────────┴───────────┤
+│  EFFECTS SECTION BAR                         h=~26px    │
+├─────────────────────────────────────────────────────────┤
+│  EFFECTS PANEL (collapsible)                 h=0–320px  │
+├─────────────────────────────────────────────────────────┤
 │  IR LOADER SECTION BAR                       h=~26px    │
 ├─────────────────────────────────────────────────────────┤
 │  IR LOADER PANEL (collapsible)               h=0–400px  │
@@ -170,6 +176,9 @@ The plugin is a vertical stack of sections. Each section is full-width.
 │  FOOTER BAR                                  h=30px     │
 └─────────────────────────────────────────────────────────┘
 ```
+
+> The centre knob's parameter ID is `tone`, but it is labelled **SHAPE**
+> throughout the UI (it drives the 3-band Shape EQ, not a Vox-style cut).
 
 ### 4.1 Header Bar
 
@@ -206,7 +215,7 @@ The plugin is a vertical stack of sections. Each section is full-width.
 - Toggles row: 3 toggles, gap 32px
 **Column 3 (VU OUT)**: border-left 1px, centered VU meter, label "OUT"
 
-### 4.3 Section Bars (IR LOADER, ADVANCED)
+### 4.3 Section Bars (EFFECTS, IR LOADER, ADVANCED)
 
 - **Height**: ~26px (6px vertical padding + text)
 - **Background**: `panel` (closed) / `panelLight` (open)
@@ -229,6 +238,18 @@ Contents:
 
 **Left**: "4× OS", "LATENCY 2.9ms" — 9px `dim`, value in `text`  
 **Right**: "CPU 11.2%", "48kHz / 32bit" — 9px `dim`, value in `text`
+
+### 4.5 Tuner Bar
+
+Fixed strip directly below the header, **always visible** — it is not a
+collapsible section and has no toggle. Its height folds into the editor's base
+height (`kTunerH` in `PluginEditor.h`), so it shifts every section below it down.
+
+- **Height**: 34px
+- **Background**: `surface`
+- **Border**: bottom 1px `border` (matches the header seam)
+
+See §5.9 for the component itself.
 
 ---
 
@@ -523,6 +544,67 @@ Section heading: "ENGINE STATE", same style as Supply heading
 
 Each row: key-value pair, Space Mono 8px, key in `label`, value in `text`, space-between
 
+### 5.9 Tuner Bar
+
+Always-on monophonic tuner (`TunerBar.h/.cpp`). Passive display driven by the
+shared 30 Hz editor timer — it owns a `PitchDetector` (MPM/NSDF, pure C++) and
+pulls the most recent DI window from the processor's lock-free capture ring.
+Detection runs on the message thread, never the audio thread.
+
+Layout, left to right:
+
+| Element        | Spec |
+|----------------|------|
+| "TUNER" label  | Space Mono 9px bold, `label`, 16px from left |
+| Note + octave  | Space Mono 20px bold, right-aligned, `green` when in tune else `accent` |
+| ♭ marker       | Space Mono 11px bold, `dim`, left of the meter |
+| Cents meter    | 240px wide, centred; 1px track, ticks at 0/±25/±50, centre tick taller (8px vs 5px) |
+| In-tune zone   | Filled band around centre, ±5 cents, `green`/`muted` at 25% alpha |
+| Indicator      | 4×18px rounded bar, position = cents clamped to ±50 |
+| ♯ marker       | Space Mono 11px bold, `dim`, right of the meter |
+| Hz + cents     | Space Mono 10px, right-aligned, `text` |
+| MUTE button    | 42×20px pill at the right edge, `accent` when engaged |
+
+**Idle state**: note reads `--` in `dim`, readout reads `listening` in `muted`.
+
+**Sample rate**: the detector converts lag to Hz using its prepared rate, so the
+editor re-prepares it whenever the host rate changes (see USE-58). A stale rate
+transposes every reading — a 44.1k detector on a 48k host calls A4 "G#4 −47¢".
+
+**Mute**: `tunerMute` silences the plugin output while leaving capture running,
+so tuning works with the amp silent. It is deliberately **not** restored from
+saved state — a session saved with it engaged would reopen silent.
+
+> **Known issue**: with no instrument playing, the clarity/RMS gates are
+> permissive enough that interface noise can produce a confident (green,
+> "in tune") reading. The note name also snaps to the newest detection while the
+> cents and Hz readouts are eased, so during unstable detection the three fields
+> can disagree. Not yet addressed.
+
+### 5.10 Effects Panel
+
+Collapsible 2×2 grid of effect "cards" (`EffectsPanel.h/.cpp`), `panelHeight`
+320px:
+
+```
+┌ UTILITY ──────────┐ ┌ BOOST ──────── ON ┐
+│THRESH WIDTH IN OUT│ │ LEVEL TIGHT BRIGHT│
+└───────────────────┘ └───────────────────┘
+┌ DELAY ─── PP  ON ─┐ ┌ REVERB ─────── ON ┐
+│ [sync divisions]  │ │  MIX  SIZE  TONE  │
+│ TIME FBK MIX TONE │ │                   │
+└───────────────────┘ └───────────────────┘
+```
+
+- Cards stretch to fill the panel; 10px gap, title strip 16px.
+- **UTILITY** has **no ON/OFF toggle** — all of its knobs are autonomous.
+  THRESH and WIDTH self-gate at 0 (gate bypassed, widener skipped); INPUT and
+  OUTPUT are unity at centre. This is why the card is named UTILITY rather than
+  NOISE GATE — none of it is part of the amp's voice.
+- **DELAY** is bespoke: PP (ping-pong) and ON toggles share the title row, and a
+  sync-division `SegmentedSelector` sits above the knob row.
+- BOOST and REVERB use the standard title-strip-plus-ON-toggle card.
+
 ---
 
 ## 6. Animation Timing Reference
@@ -548,22 +630,59 @@ Each row: key-value pair, Space Mono 8px, key in `label`, value in `text`, space
 
 ### 7.1 AudioProcessorValueTreeState Parameters
 
+Knobs are 0.0–1.0 internally and displayed ×10. Mirrors `src/utils/Parameters.h`.
+
 ```
-PARAM ID        TYPE    RANGE        DEFAULT   STEP   LABEL
-────────────────────────────────────────────────────────────
-gain            float   0.0–10.0     6.0       0.1    Gain
-tone            float   0.0–10.0     5.0       0.1    Tone
-volume          float   0.0–10.0     5.0       0.1    Volume
-halfPower       bool    off/on       false     —      7W Mode
-cabSim          bool    off/on       true      —      Cabinet Sim
-power           bool    off/on       true      —      Power
-presetIndex     int     0–4          0         1      Preset
-irIndex         int     0–N          0         1      IR Selection
+PARAM ID        TYPE    RANGE        DEFAULT   LABEL
+──────────────────────────────────────────────────────────────
+── Amp ───────────────────────────────────────────────────────
+gain            float   0–1          0.6       Gain
+tone            float   0–1          0.5       Shape   (labelled SHAPE)
+volume          float   0–1          0.5       Volume
+halfPower       bool    off/on       false     7W Mode
+cabSim          bool    off/on       true      Cabinet Sim
+power           bool    off/on       true      Power
+oversample      choice  2x/4x/8x     4x        Oversample
+presetIndex     int     0–4          0         Preset
+irIndex         int     0–N          0         IR Selection
+tunerMute       bool    off/on       false     Tuner Mute  (never restored)
+
+── Effects: UTILITY (no ON toggle — knobs self-gate at 0 or unity at centre) ─
+gateThreshold   float   0–1          0.0       Gate Threshold (0 = off)
+width           float   0–1          0.0       Width (0 = off)
+inputLevel      float   0–1          0.5       Input Level  (centre = unity, ±12 dB)
+outputLevel     float   0–1          0.5       Output Level (centre = unity, silence..+12 dB)
+
+── Effects: BOOST ────────────────────────────────────────────
+boostOn         bool    off/on       false     Boost
+boostLevel      float   0–1          0.5       Boost Level  (0..+18 dB)
+boostTight      float   0–1          0.0       Boost Tight  (low-cut)
+boostBright     float   0–1          0.0       Boost Bright (high shelf)
+
+── Effects: DELAY ────────────────────────────────────────────
+delayOn         bool    off/on       false     Delay
+delayTime       float   0–1          —         Delay Time
+delayFeedback   float   0–1          —         Delay Feedback
+delayMix        float   0–1          —         Delay Mix
+delayTone       float   0–1          —         Delay Tone (0=dark, 1=bright)
+delayPingPong   bool    off/on       false     Ping-Pong
+delaySyncDiv    choice  MANUAL/…     MANUAL    Delay Sync Division
+
+── Effects: REVERB ───────────────────────────────────────────
+reverbOn        bool    off/on       false     Reverb
+reverbMix       float   0–1          0.0       Reverb Mix
+reverbSize      float   0–1          0.5       Reverb Size
+reverbTone      float   0–1          0.5       Reverb Tone (loop damping)
 ```
+
+**Removed**: `gateOn` — the noise gate lost its toggle and now self-gates via
+`gateThreshold` (0 = true bypass). Old sessions with `gateOn = false` and a
+non-zero threshold load with the gate **active**; accepted pre-1.0.
 
 ### 7.2 Non-Parameter UI State (save in XML, not automated)
 
 ```
+fxPanelOpen       bool    false     Effects section expanded
 irPanelOpen       bool    false     IR section expanded
 advPanelOpen      bool    false     Advanced section expanded
 settingsOpen      bool    false     Settings overlay open

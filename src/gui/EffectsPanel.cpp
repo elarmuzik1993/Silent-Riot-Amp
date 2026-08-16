@@ -6,7 +6,6 @@ namespace sr {
 
 EffectsPanel::EffectsPanel()
 {
-    addAndMakeVisible(gateTgl);
     addAndMakeVisible(boostTgl);
     addAndMakeVisible(delayTgl);
     addAndMakeVisible(reverbTgl);
@@ -14,7 +13,8 @@ EffectsPanel::EffectsPanel()
     addAndMakeVisible(delaySync);
     delaySync.setTitleText("Delay sync");
 
-    for (auto* k : { &gateThresh, &boostLevel, &boostTight, &boostBright,
+    for (auto* k : { &gateThresh, &width, &inputLevel, &outputLevel,
+                     &boostLevel, &boostTight, &boostBright,
                      &delayTime, &delayFb, &delayMix, &delayTone,
                      &reverbMix, &reverbSize, &reverbTone })
     {
@@ -50,7 +50,7 @@ void EffectsPanel::paint(juce::Graphics& g)
 {
     auto area = getLocalBounds().reduced(10);
 
-    static const char* titles[4] = { "NOISE GATE", "BOOST", "DELAY", "REVERB" };
+    static const char* titles[4] = { "UTILITY", "BOOST", "DELAY", "REVERB" };
     int idx = 0;
     for (int row = 0; row < 2; ++row)
         for (int col = 0; col < 2; ++col, ++idx)
@@ -103,7 +103,16 @@ void EffectsPanel::resized()
 {
     auto area = getLocalBounds().reduced(10);
 
-    layoutCard(cardBounds(area, 0, 0), gateTgl,   { &gateThresh });
+    // UTILITY card: no toggle — every knob self-gates or is unity-at-centre
+    // (THRESH 0 = gate off, WIDTH 0 = dry, INPUT/OUTPUT centre = unity).
+    // Four knobs take layoutKnobRow from 80 px to ~76 px each; that fits, but
+    // check the labels render if you add a fifth.
+    {
+        auto inner = cardBounds(area, 0, 0).reduced(10, 6);
+        inner.removeFromTop(16);   // title strip ("UTILITY")
+        inner.removeFromTop(4);
+        layoutKnobRow(inner, { &gateThresh, &width, &inputLevel, &outputLevel });
+    }
     layoutCard(cardBounds(area, 1, 0), boostTgl,  { &boostLevel, &boostTight, &boostBright });
     layoutCard(cardBounds(area, 1, 1), reverbTgl, { &reverbMix, &reverbSize, &reverbTone });
 
