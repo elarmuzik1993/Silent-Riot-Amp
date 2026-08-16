@@ -1,6 +1,7 @@
 #include "EffectsPanel.h"
 #include "ColourPalette.h"
 #include "FontData.h"
+#include "../utils/Constants.h"
 
 namespace sr {
 
@@ -23,6 +24,21 @@ EffectsPanel::EffectsPanel()
         k->setScale(0.5f);
         addAndMakeVisible(*k);
     }
+
+    // Readouts in real units where the parameter has one. TIME mirrors the
+    // 0–1 → ms mapping the processor applies (see PluginProcessor::processBlock),
+    // so the display cannot drift from what the delay line actually does.
+    // Note: with DELAY SYNC set to anything but MANUAL the host tempo drives
+    // delay time and this knob is inactive — the readout still shows its own value.
+    delayTime.setValueFormatter([](float v) {
+        float ms = DELAY_TIME_MIN_MS + v * (DELAY_TIME_MAX_MS - DELAY_TIME_MIN_MS);
+        return juce::String(juce::roundToInt(ms)) + "ms";
+    });
+
+    auto percent = [](float v) { return juce::String(juce::roundToInt(v * 100.0f)) + "%"; };
+    delayFb.setValueFormatter(percent);
+    delayMix.setValueFormatter(percent);
+    reverbMix.setValueFormatter(percent);
 }
 
 // Card geometry — kept in sync between paint() and resized(). Cards are a
@@ -33,7 +49,15 @@ namespace {
     constexpr int kCardGap = 12;
     constexpr int kCardW   = 290;  // floor set by the 8-division delay sync row
     constexpr int kCardH   = 120;  // title + (optional sync row) + one knob row
+
+    // Card chrome metrics, shared by paint() and resized(). Kept tight so the
+    // DELAY card can fit its sync row *and* a knob row inside kCardH.
+    constexpr int kCardPadY = 5;
+    constexpr int kTitleH   = 15;
+    constexpr int kRowGap   = 3;
+    constexpr int kSyncH    = 17;
 }
+
 
 static juce::Rectangle<int> cardBounds(juce::Rectangle<int> area, int col, int row)
 {
@@ -62,9 +86,9 @@ void EffectsPanel::paint(juce::Graphics& g)
             g.drawRoundedRectangle(card.toFloat(), 5.0f, 1.0f);
 
             g.setColour(Colours::accent);
-            g.setFont(Fonts::spaceMono(10.0f, true));
+            g.setFont(Fonts::spaceMono(Fonts::Sizes::body, true));
             g.drawText(titles[idx],
-                       card.reduced(10, 6).removeFromTop(14),
+                       card.reduced(10, kCardPadY).removeFromTop(kTitleH),
                        juce::Justification::centredLeft, false);
         }
 }
@@ -78,6 +102,10 @@ void EffectsPanel::layoutKnobRow(juce::Rectangle<int> row, std::initializer_list
     const int knobW = juce::jmin(50, row.getWidth() / n);
     const int totalW = knobW * n;
     int x = row.getCentreX() - totalW / 2;
+    // Never give a knob less than it needs to draw its name; centre it when the
+    // card has room to spare. 72 is the half-scale equivalent of
+    // NotchKnob::preferredHeight (which is the figure for a full-size knob) —
+    // go below it and the names are drawn past the bottom edge and vanish.
     const int h = juce::jmin(row.getHeight(), 72);
     const int y = row.getY() + (row.getHeight() - h) / 2;  // vertically centred
     for (auto* k : knobs)
@@ -91,11 +119,11 @@ void EffectsPanel::layoutCard(juce::Rectangle<int> card, ToggleSwitch& tgl,
                               std::initializer_list<NotchKnob*> knobs)
 {
     // Title strip at the top; toggle sits top-right of the card.
-    auto inner = card.reduced(10, 6);
-    auto titleRow = inner.removeFromTop(16);
-    tgl.setBounds(titleRow.removeFromRight(44).withSizeKeepingCentre(44, 16));
+    auto inner = card.reduced(10, kCardPadY);
+    auto titleRow = inner.removeFromTop(kTitleH);
+    tgl.setBounds(titleRow.removeFromRight(44).withSizeKeepingCentre(44, kTitleH));
 
-    inner.removeFromTop(4);
+    inner.removeFromTop(kRowGap);
     layoutKnobRow(inner, knobs);
 }
 
@@ -108,28 +136,29 @@ void EffectsPanel::resized()
     // Four knobs take layoutKnobRow from 80 px to ~76 px each; that fits, but
     // check the labels render if you add a fifth.
     {
-        auto inner = cardBounds(area, 0, 0).reduced(10, 6);
-        inner.removeFromTop(16);   // title strip ("UTILITY")
-        inner.removeFromTop(4);
+        auto inner = cardBounds(area, 0, 0).reduced(10, kCardPadY);
+        inner.removeFromTop(kTitleH);   // title strip ("UTILITY")
+        inner.removeFromTop(kRowGap);
         layoutKnobRow(inner, { &gateThresh, &width, &inputLevel, &outputLevel });
     }
     layoutCard(cardBounds(area, 1, 0), boostTgl,  { &boostLevel, &boostTight, &boostBright });
     layoutCard(cardBounds(area, 1, 1), reverbTgl, { &reverbMix, &reverbSize, &reverbTone });
 
     // DELAY card is bespoke: a second small toggle (PING-PONG) shares the
-    // title row with ON, and a sync-division row sits above the knobs. The
-    // knob row shrinks to fit (layoutKnobRow clamps to the available height).
+    // title row with ON, and a sync-division row sits above the knobs. That
+    // extra row is why panelHeight is sized off this card — what's left here
+    // must still clear NotchKnob::preferredHeight.
     auto delayCard  = cardBounds(area, 0, 1);
-    auto delayInner = delayCard.reduced(10, 6);
-    auto titleRow   = delayInner.removeFromTop(16);
-    delayTgl.setBounds(titleRow.removeFromRight(40).withSizeKeepingCentre(40, 16));
+    auto delayInner = delayCard.reduced(10, kCardPadY);
+    auto titleRow   = delayInner.removeFromTop(kTitleH);
+    delayTgl.setBounds(titleRow.removeFromRight(40).withSizeKeepingCentre(40, kTitleH));
     titleRow.removeFromRight(4);
-    delayPP.setBounds(titleRow.removeFromRight(40).withSizeKeepingCentre(40, 16));
+    delayPP.setBounds(titleRow.removeFromRight(40).withSizeKeepingCentre(40, kTitleH));
 
-    delayInner.removeFromTop(4);
-    delaySync.setBounds(delayInner.removeFromTop(18));
+    delayInner.removeFromTop(kRowGap);
+    delaySync.setBounds(delayInner.removeFromTop(kSyncH));
 
-    delayInner.removeFromTop(4);
+    delayInner.removeFromTop(kRowGap);
     layoutKnobRow(delayInner, { &delayTime, &delayFb, &delayMix, &delayTone });
 }
 

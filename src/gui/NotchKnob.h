@@ -1,5 +1,6 @@
 #pragma once
 #include <juce_gui_basics/juce_gui_basics.h>
+#include <functional>
 
 namespace sr {
 
@@ -12,11 +13,28 @@ public:
 
     void setKnobMode(int mode);  // 0=Linear (vertical drag), 1=Rotary (circular drag)
 
+    // Override the readout text. The argument is the raw 0–1 slider position;
+    // return whatever the knob should display (e.g. "350ms", "35%"). Unset =
+    // the default 0.0–10.0 scale.
+    void setValueFormatter(std::function<juce::String(float)> fn)
+    {
+        valueFormatter = std::move(fn);
+        repaint();
+    }
+
     // Visual scale relative to the default 80px knob. 1.0 = full size (main amp
     // knobs); 0.5 = half size (compact effect knobs). Scales the body, arc and
     // pointer; numbered 0–10 labels are hidden below 0.75 where they'd be
     // unreadable. Text readouts keep a legible floor.
     void setScale(float s);
+
+    // Vertical room a knob needs to render in full *at scale 1.0*: the knob
+    // graphic, the value readout box, and the name below it. Lay one out shorter
+    // than this and the name is drawn past the bottom edge and silently clipped —
+    // which is exactly what used to happen to the DELAY card's knobs. Scaled
+    // knobs need proportionally less; the effects cards size against their own
+    // compact figure rather than this one.
+    static constexpr int preferredHeight = 112;
 
 private:
     void drawSegmentedArc(juce::Graphics&, float cx, float cy, float pos) const;
@@ -47,6 +65,7 @@ private:
     KnobSlider slider;
     juce::String label;
     float defaultVal;
+    std::function<juce::String(float)> valueFormatter;
 
     // Base geometry (relative to the default 80px bounding box). The instance
     // members below are these values multiplied by `scale`.

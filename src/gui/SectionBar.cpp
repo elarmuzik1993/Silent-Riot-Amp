@@ -67,17 +67,18 @@ void SectionBar::paint(juce::Graphics& g)
     g.setColour(open ? Colours::panelLight : Colours::panel);
     g.fillRect(bounds);
 
-    // Label
-    g.setFont(Fonts::spaceMono(8.0f, true));
-    g.setColour(open ? Colours::accent : Colours::dim);
+    // Label — these bars are the plugin's primary navigation, so they carry
+    // body-weight type rather than the secondary scale.
+    g.setFont(Fonts::spaceMono(Fonts::Sizes::body, true));
+    g.setColour(open ? Colours::accent : Colours::text);
     g.drawText(label, juce::Rectangle<float>(16.0f, 0.0f, 200.0f, bounds.getHeight()),
                juce::Justification::centredLeft, false);
 
     // Hint text when closed
     if (!open && hintText.isNotEmpty())
     {
-        g.setFont(Fonts::spaceMono(8.0f));
-        g.setColour(Colours::muted);
+        g.setFont(Fonts::spaceMono(Fonts::Sizes::small));
+        g.setColour(Colours::dim);
         g.drawText(hintText, juce::Rectangle<float>(120.0f, 0.0f, bounds.getWidth() - 160.0f, bounds.getHeight()),
                    juce::Justification::centredLeft, false);
     }

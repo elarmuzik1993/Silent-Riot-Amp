@@ -13,4 +13,16 @@ juce::Font spaceMono(float size, bool bold = false);
 // weight: 400=Regular, 500=Medium, 600=SemiBold, 700=Bold
 juce::Font dmSans(float size, int weight = 400);
 
+// Type scale. These are JUCE font *heights* (ascent + descent), not CSS px — a
+// height of 9 renders with a cap height around 6.3px. The UI spec's size table
+// is written in CSS px, so these run larger than the numbers quoted there.
+namespace Sizes {
+    inline constexpr float micro = 9.0f;    // knob ring numbers, panel section heads
+    inline constexpr float small = 10.0f;   // secondary labels, toggles, meters, footer
+    inline constexpr float body  = 11.0f;   // knob names, section titles, list rows
+    inline constexpr float value = 12.5f;   // knob readouts, preset name, popup menus
+    inline constexpr float title = 14.0f;   // logo, settings header
+    inline constexpr float hero  = 22.0f;   // tuner note name
+}
+
 } // namespace sr::Fonts

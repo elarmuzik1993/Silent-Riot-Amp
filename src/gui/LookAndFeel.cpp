@@ -1,5 +1,6 @@
 #include "LookAndFeel.h"
 #include "ColourPalette.h"
+#include "FontData.h"
 
 namespace sr {
 
@@ -66,7 +67,7 @@ void SilentRiotLookAndFeel::drawToggleButton(juce::Graphics& g, juce::ToggleButt
 {
     auto bounds = btn.getLocalBounds().toFloat();
     g.setColour(Colours::label);
-    g.setFont(12.0f);
+    g.setFont(Fonts::spaceMono(Fonts::Sizes::value));
     g.drawText(btn.getButtonText(), bounds, juce::Justification::centred);
 }
 

@@ -19,6 +19,9 @@ public:
     // Two compact card rows sized to the half-scale effect knobs (knob + value
     // readout + label ≈ 64 px) plus each card's title strip (and the delay
     // card's sync row). Kept in sync with kCardH/kCardGap in EffectsPanel.cpp.
+    // The DELAY card is the binding constraint — it carries the sync-division
+    // row *and* a knob row, so it is the first place a too-short panel shows up
+    // as knob names drawn past the bottom edge and silently clipped.
     static constexpr int panelHeight = 272;
 
     // Toggles (the UTILITY card's gate/width knobs self-gate — no toggle)

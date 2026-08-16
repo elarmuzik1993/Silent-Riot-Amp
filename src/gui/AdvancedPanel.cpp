@@ -36,11 +36,11 @@ void AdvancedPanel::paint(juce::Graphics& g)
     float lx = 16.0f;
     float ly = 12.0f;
 
-    g.setFont(Fonts::spaceMono(7.0f, true));
+    g.setFont(Fonts::spaceMono(Fonts::Sizes::micro, true));
     g.setColour(Colours::accentLo);
-    g.drawText("SUPPLY RAILS", juce::Rectangle<float>(lx, ly, 120.0f, 12.0f),
+    g.drawText("SUPPLY RAILS", juce::Rectangle<float>(lx, ly, 120.0f, 14.0f),
                juce::Justification::centredLeft, false);
-    ly += 20.0f;
+    ly += 22.0f;
 
     // Rail bars
     struct Rail { const char* name; float voltage; float nominal; };
@@ -56,9 +56,9 @@ void AdvancedPanel::paint(juce::Graphics& g)
     for (auto& rail : rails)
     {
         // Label
-        g.setFont(Fonts::spaceMono(8.0f));
+        g.setFont(Fonts::spaceMono(Fonts::Sizes::small));
         g.setColour(Colours::label);
-        g.drawText(rail.name, juce::Rectangle<float>(lx, ly, 30.0f, 14.0f),
+        g.drawText(rail.name, juce::Rectangle<float>(lx, ly, 30.0f, 16.0f),
                    juce::Justification::centredLeft, false);
 
         // Bar background
@@ -68,22 +68,22 @@ void AdvancedPanel::paint(juce::Graphics& g)
         float fillW = fillRatio * barW;
 
         g.setColour(Colours::track);
-        g.fillRoundedRectangle(barX, ly + 5.0f, barW, 4.0f, 2.0f);
+        g.fillRoundedRectangle(barX, ly + 6.0f, barW, 4.0f, 2.0f);
 
         // Fill gradient tealDim → teal
         g.setGradientFill(juce::ColourGradient(
-            Colours::tealDim, barX, ly + 5.0f,
-            Colours::teal, barX + fillW, ly + 5.0f, false));
-        g.fillRoundedRectangle(barX, ly + 5.0f, fillW, 4.0f, 2.0f);
+            Colours::tealDim, barX, ly + 6.0f,
+            Colours::teal, barX + fillW, ly + 6.0f, false));
+        g.fillRoundedRectangle(barX, ly + 6.0f, fillW, 4.0f, 2.0f);
 
         // Voltage text
-        g.setFont(Fonts::spaceMono(8.0f));
+        g.setFont(Fonts::spaceMono(Fonts::Sizes::small));
         g.setColour(Colours::text);
         juce::String voltText = juce::String(static_cast<int>(rail.voltage)) + "V";
-        g.drawText(voltText, juce::Rectangle<float>(barX + barW + 6.0f, ly, 40.0f, 14.0f),
+        g.drawText(voltText, juce::Rectangle<float>(barX + barW + 6.0f, ly, 40.0f, 16.0f),
                    juce::Justification::centredLeft, false);
 
-        ly += 28.0f;
+        ly += 30.0f;
     }
 
     // ── Divider ──
@@ -94,11 +94,11 @@ void AdvancedPanel::paint(juce::Graphics& g)
     float rx = midX + 16.0f;
     float ry = 12.0f;
 
-    g.setFont(Fonts::spaceMono(7.0f, true));
+    g.setFont(Fonts::spaceMono(Fonts::Sizes::micro, true));
     g.setColour(Colours::accentLo);
-    g.drawText("ENGINE STATE", juce::Rectangle<float>(rx, ry, 120.0f, 12.0f),
+    g.drawText("ENGINE STATE", juce::Rectangle<float>(rx, ry, 120.0f, 14.0f),
                juce::Justification::centredLeft, false);
-    ry += 20.0f;
+    ry += 22.0f;
 
     // Key-value rows
     struct KV { const char* key; juce::String value; };
@@ -112,14 +112,14 @@ void AdvancedPanel::paint(juce::Graphics& g)
 
     for (auto& kv : rows)
     {
-        g.setFont(Fonts::spaceMono(8.0f));
+        g.setFont(Fonts::spaceMono(Fonts::Sizes::small));
         g.setColour(Colours::label);
-        g.drawText(kv.key, juce::Rectangle<float>(rx, ry, 60.0f, 14.0f),
+        g.drawText(kv.key, juce::Rectangle<float>(rx, ry, 60.0f, 16.0f),
                    juce::Justification::centredLeft, false);
         g.setColour(Colours::text);
-        g.drawText(kv.value, juce::Rectangle<float>(rx + 64.0f, ry, 100.0f, 14.0f),
+        g.drawText(kv.value, juce::Rectangle<float>(rx + 64.0f, ry, 100.0f, 16.0f),
                    juce::Justification::centredLeft, false);
-        ry += 22.0f;
+        ry += 24.0f;
     }
 }
 
