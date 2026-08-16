@@ -87,29 +87,4 @@ void NotchKnob::paint(juce::Graphics& g)
     g.drawText(label.toUpperCase(), labelBox, juce::Justification::centred, false);
 }
 
-void NotchKnob::KnobSlider::paint(juce::Graphics& g)
-{
-    juce::Slider::paint(g);
-
-    // Keyboard focus ring. The visible parameter name is a sibling of the
-    // slider rather than its label, so focus has to be indicated on the knob.
-    if (hasKeyboardFocus(false))
-    {
-        g.setColour(Colours::accent);
-        g.drawRoundedRectangle(getLocalBounds().toFloat().reduced(1.0f), 4.0f, 2.0f);
-    }
-}
-
-void NotchKnob::KnobSlider::focusGained(FocusChangeType c)
-{
-    juce::Slider::focusGained(c);
-    repaint();
-}
-
-void NotchKnob::KnobSlider::focusLost(FocusChangeType c)
-{
-    juce::Slider::focusLost(c);
-    repaint();
-}
-
 } // namespace sr
