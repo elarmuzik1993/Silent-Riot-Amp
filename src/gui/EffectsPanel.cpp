@@ -54,7 +54,7 @@ EffectsPanel::EffectsPanel()
 namespace {
     constexpr int kCardGap = 12;
     constexpr int kCardW   = 290;  // floor set by the 8-division delay sync row
-    constexpr int kCardH   = 129;  // title + (optional sync row) + one knob row
+    constexpr int kCardH   = 126;  // title + (optional sync row) + one knob row
 
     // Card chrome metrics, shared by paint() and resized(). Kept tight so the
     // DELAY card can fit its sync row *and* a knob row inside kCardH.
