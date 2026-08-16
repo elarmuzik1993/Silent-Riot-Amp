@@ -37,6 +37,12 @@ PentodeOutput pentodeWaveshaper(float vGrid_n, float vBias_n, float vPlate_n, fl
     return { ip, iScreen };
 }
 
+float pentodeQuiescentTotal(float vBias_n, float vPlate_n, float vScreen_n) {
+    // Both tubes idle at the same operating point, so the shared cathode
+    // resistor sees 2x a single tube's plate current.
+    return 2.0f * pentodeWaveshaper(0.0f, vBias_n, vPlate_n, vScreen_n).plateCurrent;
+}
+
 float softConductionCurve(float vGrid_n, float vBias_n) {
     // Spec §3.8: smooth Class A/AB crossover per EL84
     //

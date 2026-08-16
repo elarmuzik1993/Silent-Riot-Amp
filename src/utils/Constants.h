@@ -79,18 +79,47 @@ constexpr float SHAPE_HIGH_GAIN_MAX   =  4.0f;     // dB at shape=1 (bright)
 constexpr float PREAMP_RPLATE_N     = VS::R_100K;  // 100kΩ plate load for V1a/V1b
 
 // ── Pentode model (EL84) ───────────────────────────────────
+// Koren Kg1, calibrated against the EL84 datasheet operating point
+// (Va=250V, Vg2=250V, Vg1=-7.3V -> Ia=48 mA). The previous value of 820 put the
+// model at 13.5 mA there — 3.9x too little current — so the pair idled at 24 mA
+// instead of ~90 mA. With a 100R shared cathode resistor that tiny idle meant a
+// normal playing swing demanded a huge bias shift relative to it, and the sag
+// offset slammed into its cold clamp from GAIN 3 upward: the power-tube bias
+// froze at -12.6 V and stopped tracking the player's right hand.
+// Solve through the FULL pipeline (tanh knee + plate saturation), not the raw
+// Koren current, and RE-SOLVE if EL84_IP_MAX_N changes — the knee compresses the
+// result, so these two constants are coupled.
+constexpr float EL84_KG1            = 210.5f;
 constexpr float PENTODE_BIAS_15W_N  = VS::v(-9.6f);    // -0.032 normalized
 constexpr float PENTODE_BIAS_7W_N   = VS::v(-7.0f);    // -0.023 normalized
 constexpr float V_PLATE_KNEE_N      = VS::v(40.0f);
-constexpr float SCREEN_CURRENT_RATIO = 0.25f;
+// Ig2/Ia at the datasheet point: 5.5 mA / 48 mA = 0.115. Was 0.25, which drew
+// over twice the real screen current and made the screen node droop too hard.
+constexpr float SCREEN_CURRENT_RATIO = 0.115f;
 constexpr float SCREEN_REDIST_FACTOR = 0.15f;
 constexpr float R_SCREEN_N          = VS::r(470.0f);
 constexpr float EL84_CUTOFF_N       = VS::v(-10.0f);
-constexpr float EL84_IP_MAX_N       = VS::i(0.065f);   // 65.0 normalized
+// Soft ceiling on per-tube plate current (tanh knee). A real EL84 peaks around
+// 90-100 mA in class-AB push-pull; 65 mA sat below the datasheet-correct IDLE
+// point once the model was recalibrated, so the knee was compressing normal
+// operation instead of only catching peaks.
+constexpr float EL84_IP_MAX_N       = VS::i(0.095f);   // 95.0 normalized
 
 // ── Grid conduction ─────────────────────────────────────────
+// Signal level at which the grid starts drawing current. A grid conducts once
+// its voltage approaches the CATHODE, so the threshold sits near |bias| minus
+// the ~1 V of grid current that flows just before zero. The 12AX7 stages are
+// biased at -1.5 V -> 0.5 V, which follows that rule.
+//
+// The EL84 threshold used to be 0.0 V while the tube is biased at -9.6 V, i.e.
+// ~8.6 V too low: every positive excursion of amplified noise counted as grid
+// conduction, so the coupling-cap charge integrator (100 ms tau, no lower bound)
+// ratcheted to its MAX_BIAS_SHIFT_N rail even on SILENCE. That railed charge
+// modulated the bias, which modulated plate current, which drooped the supply,
+// which moved the operating point — a ~17.7 Hz motorboating limit cycle that
+// appeared at gain >= 9 with nothing plugged in.
 constexpr float GRID_CONDUCT_THRESH_N       = VS::v(0.5f);
-constexpr float GRID_CONDUCT_THRESH_EL84_N  = VS::v(0.0f);
+constexpr float GRID_CONDUCT_THRESH_EL84_N  = VS::v(8.6f);
 // Per-stage source impedances (real stage output Z)
 constexpr float GRID_SOURCE_R_V1B_N         = VS::Z_OUT_V1A;  // V1a Zout: 100K||62.5K ≈ 38.5KΩ
 constexpr float GRID_SOURCE_R_PI_N          = VS::Z_OUT_V1B;  // V1b Zout: (100K+68K)||62.5K ≈ 47KΩ
@@ -101,6 +130,13 @@ constexpr float GRID_R_V1A_N               = VS::R_300;              // 300Ω  (
 constexpr float GRID_R_V1B_N               = VS::r(11538.0f);        // ~11.5KΩ (source=38.5KΩ, ratio=0.3)
 constexpr float GRID_R_PI_N                = VS::r(14151.0f);        // ~14.2KΩ (source=47KΩ, ratio=0.3)
 constexpr float GRID_R_EL84_N              = VS::r(19231.0f);        // ~19.2KΩ (source=38.5KΩ, ratio=0.5)
+// Diode clamp knee for grid conduction, scaled per stage by that stage's static
+// loading ratio Rg/(Rg+Rs). Sets how many volts above the conduction threshold
+// the grid is allowed to sit when driven hard. Larger = looser clamp / more grid
+// swing. This is the constant that decides how much drive actually reaches the
+// next stage, so it is the primary gain-staging control — ear-tune it before
+// reaching for the gain taper.
+constexpr float GRID_CLAMP_KNEE_N           = VS::v(6.0f);
 constexpr float GRID_CHARGE_RATE            = 0.003f;   // was 0.01 → caused PI grid charge saturation at gain≥5 (pumping)
 constexpr float MAX_BIAS_SHIFT_N            = VS::v(-1.5f); // was -5V → excessive for 12AX7 (clips at ~-1.5V grid)
 // Coupling-cap charge-decay time constants (seconds) per stage
@@ -123,6 +159,11 @@ constexpr float PI_RPLATE_A_N       = VS::R_100K;          // non-inv plate load
 constexpr float PI_RPLATE_B_N       = VS::r(82000.0f);     // inv plate load (lower → less gain on B side)
 constexpr float PI_BIAS_REF_N       = VS::v(-1.5f);
 constexpr float PI_CATHODE_INIT_N   = VS::v(1.5f);
+// Softness of the plate-voltage lower bound (plate can't go below cathode).
+// Width of the compression knee as the plate approaches the cathode — a real
+// triode saturates smoothly over roughly this span. Ear-tune: larger = softer,
+// more compressed at high drive; 0 would restore the old hard clip.
+constexpr float PI_PLATE_KNEE_N     = VS::v(10.0f);
 
 // ── Dynamic Miller ──────────────────────────────────────────
 constexpr float CGP_12AX7           = 1.7e-12f;
@@ -151,8 +192,13 @@ constexpr float XCUR_WEIGHT_HF      = 0.0025f;  // (200/4000)^2 — HF excursion
 constexpr float XCUR_SENSITIVITY    = 2.0f;     // excursion-to-tanh scaling (ear-tune)
 
 // ── OT core saturation ─────────────────────────────────────
-constexpr float OT_CURRENT_SCALE    = 0.015f;
-constexpr float OT_SAT_DRIVE        = 400.0f;
+// Plate current -> OT primary voltage. Rescaled with the EL84 Kg1 calibration:
+// correcting the model raised plate currents ~3.9x, so this dropped by the same
+// factor, then trimmed empirically. A pure 1/3.9 scaling undershot, because the
+// current rise is not uniform — the IP_MAX tanh knee and plate saturation are
+// nonlinear, and the idle point moved more than the signal swing did.
+constexpr float OT_CURRENT_SCALE    = 0.00900f;
+constexpr float OT_SAT_DRIVE        = 190.0f;
 constexpr float OT_SAT_DC_FREQ      = 20.0f;
 // Hard rail on the flux integrator. Steady-state flux for a normalized input
 // is ~input/(2π·OT_SAT_DC_FREQ) ≈ 0.008·input, so this clamp is ~3 orders of
@@ -162,6 +208,82 @@ constexpr float OT_SAT_FLUX_MAX     = 10.0f;
 
 // ── Gain taper ──────────────────────────────────────────────
 constexpr float GAIN_TAPER_EXPONENT = 2.0f;
+// Fraction of the amp's full drive range the gain knob is allowed to reach.
+// The top of the old range (knob 8-10) ran the chain out of headroom — it added
+// no usable drive, only compression and grit — so the knob's full 0-10 sweep is
+// remapped onto 0-80% of it. Knob 10 now delivers what knob 8 used to, and the
+// whole 270 deg arc is spread across the range that actually sounds good.
+// Raise toward 1.0 to hand the top end back.
+constexpr float GAIN_KNOB_HEADROOM  = 0.8f;
+
+// ── Master volume taper ─────────────────────────────────────
+// The master volume sits directly in front of the EL84 grids, so it is the
+// power-stage drive control. The chain delivers 3-5x more drive than a tube
+// biased at -9.6 V can use: with a plain audioTaper() the grids crossed
+// GRID_CONDUCT_THRESH_EL84_N (8.6 V) around knob 4 and stayed in permanent
+// conduction above it, where the grid clamp rather than the tube sets the level.
+// The top half of the knob then added 1.15 dB of loudness for 3x the drive, and
+// the amp had no touch sensitivity left (36 dB of input -> 2.4 dB of output).
+//
+// Measured against the master volume at gain 10 (see handoff, D1):
+//   knob   EL84 grid   D1 sag   give over 36 dB of input
+//   0.30      5.67 V    1.59      8.7 dB   (4.1:1)
+//   0.50     15.68 V    0.60      4.6 dB   (7.9:1)
+//   0.70     30.28 V    0.38      2.4 dB  (14.8:1)
+//
+// This constant and OUTPUT_MAKEUP_GAIN below must be set TOGETHER. They control
+// two limiters in series — the EL84 grid clamp and the output tanh — and make-up
+// gain does not restore give, it relocates the compression from the first onto
+// the second. Headroom 0.30 with makeup 2.5 measured D1 = 0.98 at knob 10: in
+// band at the gate's volume 0.70, but not where the player actually is.
+//
+// 0.21 puts KNOB 10 (not the gate point) at the top of the range that stays out
+// of permanent grid conduction, which is the operating point that matters:
+//
+//   knob 10:   D1 1.98   give 9.5 dB (3.8:1)   peak -5.70 dBFS
+//   knob 0.70: D1 2.93   give 10.8 dB (3.3:1)  peak -10.76 dBFS  <- D1 gate
+//
+// Same fix, and same reason, as GAIN_KNOB_HEADROOM above; raise toward 1.0 to
+// hand the compressed top end back, and re-measure D1 AT KNOB 10 when you do.
+constexpr float VOLUME_KNOB_HEADROOM = 0.21f;
+
+// Output make-up, applied post-cab and pre-tanh (see outputGainCompensation).
+// VOLUME_KNOB_HEADROOM costs ~20 dB of level at every knob position, because the
+// drive it removes was being converted to loudness by the output tanh rather
+// than by the tube. Restoring dynamics therefore costs average level: the amp
+// now runs a much larger crest factor, so a given peak ceiling implies a lower
+// RMS than the old, permanently-limited chain produced. That is the trade, and
+// it cannot be undone with gain — see the note on VOLUME_KNOB_HEADROOM above.
+//
+// Calibrate this against a REALISTIC DI, not the D1 gate signal. The gate's
+// `note:110:0.5` is ~9 dB hotter than a nominal -18 dBFS DI, so tuning to it
+// over-weights the tanh and leaves the amp quiet in real use: at makeup 2.5 a
+// -18 dBFS DI produced only -17.0 LUFS at gain 10 / volume 10 with 6.3 dB of
+// peak headroom sitting unused.
+//
+// Measured at gain 10 / volume 10 (D1@10 is the column that binds):
+//   makeup   D1 gate   D1@10   give   DI LUFS   DI peak
+//     2.5      2.93     1.98   9.5     -17.01     -7.29
+//     3.5      2.77     1.66   8.6     -14.20     -4.89   <- chosen
+//     4.0      2.67     1.51   8.2     -13.10     -4.03   <- D1@10 on the band edge
+//
+// 3.5 lands in the -18..-12 LUFS window an amp sim is expected to hit while
+// keeping D1 off the band edge. Above ~4 the tanh becomes the dominant limiter,
+// which is the behaviour this whole change exists to remove — the remaining
+// headroom is crest factor and cannot be reclaimed without re-compressing.
+// A soft-knee limiter was tried instead and rejected: it bought 1.5 dB and cost
+// as much D1 as plain make-up did.
+constexpr float OUTPUT_MAKEUP_GAIN = 3.5f;
+
+// ── Input / output level trims (gain staging) ───────────────
+// Tone-neutral utility trims, unity at knob centre — NOT part of the amp's
+// voice. INPUT normalises pickup and interface level so the GAIN knob means
+// roughly the same thing across rigs, which matters now that the amp actually
+// responds to input level (36 dB in -> 10.8 dB out). OUTPUT is a post-limiter
+// master, so boosting it cannot add amp compression.
+constexpr float INPUT_TRIM_RANGE_DB  = 12.0f;  // +/- about unity
+constexpr float OUTPUT_TRIM_BOOST_DB = 12.0f;  // above unity
+constexpr float OUTPUT_TRIM_FADE_DB  = 60.0f;  // below unity, then true silence
 
 // ── Effects module (front-of-amp + post-cab) ───────────────
 // These live OUTSIDE the oversampled amp loop and never touch the frozen

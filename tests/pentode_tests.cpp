@@ -53,13 +53,18 @@ TEST_CASE("Pentode: lower screen voltage reduces plate current", "[pentode]") {
 }
 
 TEST_CASE("Pentode: screen voltage scales gain, not just clips", "[pentode]") {
-    // Even for small signals, screen affects the transfer curve
-    float vGrid = 0.05f;  // moderate drive
+    // Must be measured at a drive level the tube actually operates at. vGrid=0.05
+    // puts vg1 at +5.4 V — a POSITIVE grid, far outside normal operation — where
+    // both the nominal and half-screen cases sit at 99% of EL84_IP_MAX_N and the
+    // ratio collapses toward 1 simply because both are clamped. That measures the
+    // current ceiling, not the screen's effect on gain.
+    // vGrid=0.01 puts vg1 at -6.6 V: real operating territory, 69% of the ceiling.
+    float vGrid = 0.01f;
     float vPlate = V_POWER_NOMINAL_N;
-    
+
     PentodeOutput outNom  = pentodeWaveshaper(vGrid, PENTODE_BIAS_15W_N, vPlate, V_SCREEN_NOMINAL_N);
     PentodeOutput outHalf = pentodeWaveshaper(vGrid, PENTODE_BIAS_15W_N, vPlate, V_SCREEN_NOMINAL_N * 0.5f);
-    
+
     // Should be significantly different, not just clipped at a lower ceiling
     if (outNom.plateCurrent > 0.001f) {
         float ratio = outHalf.plateCurrent / outNom.plateCurrent;
@@ -99,17 +104,68 @@ TEST_CASE("Pentode: screen current ratio increases at low plate voltage", "[pent
     }
 }
 
-TEST_CASE("Pentode: screen current ratio near 0.25 at nominal plate", "[pentode]") {
+TEST_CASE("Pentode: screen current ratio matches the datasheet at nominal plate", "[pentode]") {
     float vGrid = 0.1f;
     PentodeOutput out = pentodeWaveshaper(vGrid, PENTODE_BIAS_15W_N,
                                            V_POWER_NOMINAL_N, V_SCREEN_NOMINAL_N);
-    
+
     if (out.plateCurrent > 0.001f) {
         float ratio = out.screenCurrent / out.plateCurrent;
-        // Spec: nominal ratio ~0.25, with plateLimit near 1.0 at full voltage
-        REQUIRE(ratio > 0.20f);
-        REQUIRE(ratio < 0.35f);
+        // EL84 datasheet: Ig2/Ia = 5.5 mA / 48 mA = 0.115 at the reference point.
+        // Was asserted at ~0.25, which drew over twice the real screen current and
+        // made the screen supply node droop far harder than it should.
+        REQUIRE(ratio > 0.09f);
+        REQUIRE(ratio < 0.15f);
     }
+}
+
+// ── Datasheet calibration (regression) ───────────────────────
+//
+// The model used to draw 3.9x too little current: 13.5 mA at the datasheet
+// reference point instead of 48 mA, so the EL84 pair idled at 24 mA instead of
+// ~90 mA. With a 100R shared cathode resistor that tiny idle meant an ordinary
+// playing swing demanded a huge bias shift relative to it, and the sag offset
+// slammed into its cold clamp from GAIN 3 upward — the power-tube bias froze at
+// -12.6 V and stopped responding to picking dynamics.
+//
+// These pin the operating point so the calibration cannot drift again. If
+// EL84_KG1 or EL84_IP_MAX_N is retuned, re-solve against the datasheet — the
+// tanh knee compresses the result, so the two constants are coupled.
+
+TEST_CASE("Pentode: matches the EL84 datasheet operating point", "[pentode][regression]") {
+    // EL84 datasheet: Va = 250 V, Vg2 = 250 V, Vg1 = -7.3 V -> Ia = 48 mA, Ig2 = 5.5 mA
+    PentodeOutput out = pentodeWaveshaper(0.0f, VS::v(-7.3f), VS::v(250.0f), VS::v(250.0f));
+
+    const float iaMa  = VS::toAmps(out.plateCurrent)  * 1000.0f;
+    const float ig2Ma = VS::toAmps(out.screenCurrent) * 1000.0f;
+
+    REQUIRE(iaMa  == Approx(48.0f).margin(2.0f));
+    REQUIRE(ig2Ma == Approx(5.5f).margin(1.0f));
+}
+
+TEST_CASE("Pentode: pair idles at a realistic cathode current", "[pentode][regression]") {
+    // A real EL84 pair cathode-biased around -9.6 V idles ~90-105 mA total.
+    // This is the reference the sag envelope subtracts, so getting it wrong
+    // desynchronises sag from the tube model.
+    const float pair15 = pentodeQuiescentTotal(PENTODE_BIAS_15W_N,
+                                               V_POWER_NOMINAL_N, V_SCREEN_NOMINAL_N);
+    const float mA15 = VS::toAmps(pair15) * 1000.0f;
+    REQUIRE(mA15 > 70.0f);
+    REQUIRE(mA15 < 120.0f);
+
+    // 7W runs a hotter (less negative) bias, so it must idle higher.
+    const float pair7 = pentodeQuiescentTotal(PENTODE_BIAS_7W_N,
+                                              V_POWER_NOMINAL_N, V_SCREEN_NOMINAL_N);
+    REQUIRE(pair7 > pair15);
+}
+
+TEST_CASE("Pentode: idle leaves headroom below the current ceiling", "[pentode][regression]") {
+    // EL84_IP_MAX_N is a soft ceiling for PEAKS. If idle sits near it, the tanh
+    // knee compresses normal operation and the screen-voltage/gain relationship
+    // collapses because everything is clamped.
+    const float perTubeIdle = pentodeQuiescentTotal(PENTODE_BIAS_15W_N,
+                                                    V_POWER_NOMINAL_N, V_SCREEN_NOMINAL_N) * 0.5f;
+    REQUIRE(perTubeIdle < 0.6f * EL84_IP_MAX_N);
 }
 
 // ── 15W vs 7W bias ───────────────────────────────────────────

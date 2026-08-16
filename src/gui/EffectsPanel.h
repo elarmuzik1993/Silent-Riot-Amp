@@ -16,9 +16,10 @@ public:
     void paint(juce::Graphics&) override;
     void resized() override;
 
-    // Two card rows tall enough to fully render NotchKnob (knob + value
-    // readout + label ≈ 112 px) plus each card's title strip.
-    static constexpr int panelHeight = 320;
+    // Two compact card rows sized to the half-scale effect knobs (knob + value
+    // readout + label ≈ 64 px) plus each card's title strip (and the delay
+    // card's sync row). Kept in sync with kCardH/kCardGap in EffectsPanel.cpp.
+    static constexpr int panelHeight = 272;
 
     // Toggles (the UTILITY card's gate/width knobs self-gate — no toggle)
     ToggleSwitch& boostToggle()  { return boostTgl; }
@@ -29,6 +30,8 @@ public:
     // Knobs
     NotchKnob& gateThreshKnob()  { return gateThresh; }
     NotchKnob& widthKnob()       { return width; }
+    NotchKnob& inputLevelKnob()  { return inputLevel; }
+    NotchKnob& outputLevelKnob() { return outputLevel; }
     NotchKnob& boostLevelKnob()  { return boostLevel; }
     NotchKnob& boostTightKnob()  { return boostTight; }
     NotchKnob& boostBrightKnob() { return boostBright; }
@@ -59,6 +62,8 @@ private:
 
     NotchKnob gateThresh { "THRESH", 0.0f };
     NotchKnob width      { "WIDTH",  0.0f };   // 0=off (dry/mono), 10=wide
+    NotchKnob inputLevel { "INPUT",  0.5f };   // centre = unity, ±12 dB
+    NotchKnob outputLevel{ "OUTPUT", 0.5f };   // centre = unity, silence..+12 dB
     NotchKnob boostLevel { "LEVEL",  0.5f };
     NotchKnob boostTight { "TIGHT",  0.0f };
     NotchKnob boostBright{ "BRIGHT", 0.0f };
