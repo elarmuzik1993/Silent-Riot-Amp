@@ -107,7 +107,7 @@ private:
     static constexpr int kWindowW = 700;
     static constexpr int kHeaderH   = 38;
     static constexpr int kTunerH    = sr::TunerBar::barHeight;  // always-visible live tuner
-    static constexpr int kBodyH     = 232;
+    static constexpr int kBodyH     = 198;
     static constexpr int kSectionH  = 26;
     static constexpr int kFooterH   = 30;
     // 3 section bars: EFFECTS, IR LOADER, ADVANCED
