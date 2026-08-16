@@ -125,7 +125,8 @@ TEST_CASE("DI chain trace: envelope at tap points", "[di_trace]") {
     otSat.recalcCoeffs(effectiveSR);
 
     // ── Settings: all noon, 7W ───────────────────────────────
-    constexpr float gainVal = 0.5f;
+    constexpr float gainKnob = 0.5f;
+    const float gainVal = gainDriveTaper(gainKnob);
     constexpr float volVal  = 0.5f;
     constexpr float toneVal = 0.5f;
     float el84BaseBias = PENTODE_BIAS_7W_N;
@@ -134,7 +135,7 @@ TEST_CASE("DI chain trace: envelope at tap points", "[di_trace]") {
     fb.updateShape(toneVal);
 
     // V1b Miller source R at gain=0.5
-    float gainPotR = (1.0f - gainVal) * GAIN_POT_R_REAL;
+    float gainPotR = (1.0f - sr::audioTaper(gainVal)) * GAIN_POT_R_REAL;
     v1b_miller.rSource_real = std::min(V1B_RSOURCE_BASE_REAL + gainPotR, V1B_RSOURCE_MAX_REAL);
 
     // ── Tap point buffers ────────────────────────────────────
@@ -188,8 +189,8 @@ TEST_CASE("DI chain trace: envelope at tap points", "[di_trace]") {
         x = v1b_miller.process(x, v1bGainEst, effectiveSR);
         psu.reportPreampLevel(x);
 
-        // Gain pot B (audio taper: Spec §3.3) + loading LP
-        x *= sr::audioTaper(gainVal);
+        // Gain pot B (linear; user knob already remapped, Gang A tapered) + loading LP
+        x *= gainVal;
         x = fb.gainLoadingLP.process(x);
         tapPreamp[i] = x;
 
@@ -316,7 +317,7 @@ TEST_CASE("DI chain trace: envelope at tap points", "[di_trace]") {
         float g2 = (std::abs(v1b_in) > 1e-8f) ? std::abs(x) / std::abs(v1b_in) : StageGains::V1B_GAIN;
         x = v1b_m2.process(x, g2, effectiveSR);
         psu2.reportPreampLevel(x);
-        x *= sr::audioTaper(gainVal);
+        x *= gainVal;   // Gang B linear; user knob already remapped
         x = fb2.gainLoadingLP.process(x);
         x = applyGridConduction(x, piG2);
         LTPOutput l = solveLTP(x, vPi, ltp2);
@@ -492,7 +493,8 @@ TEST_CASE("DI dynamics: PSU + sag at hard playing", "[di_dynamics]") {
     // ── Compare gain=0.4 vs gain=0.5 ──────────────────────────
     float gainSettings[] = {0.4f, 0.5f, 0.6f};
 
-    for (float gainVal : gainSettings) {
+    for (float gainKnob : gainSettings) {
+        const float gainVal = gainDriveTaper(gainKnob);
         FilterBank fb;
         fb.recalcAll(baseSR, osFactor);
         constexpr float toneVal = 0.5f;
@@ -560,7 +562,7 @@ TEST_CASE("DI dynamics: PSU + sag at hard playing", "[di_dynamics]") {
             float g2 = (std::abs(v1b_in) > 1e-8f) ? std::abs(x) / std::abs(v1b_in) : StageGains::V1B_GAIN;
             x = v1b_m.process(x, g2, effectiveSR);
             psu.reportPreampLevel(x);
-            x *= sr::audioTaper(gainVal);
+            x *= gainVal;   // Gang B linear; user knob already remapped
             x = fb.gainLoadingLP.process(x);
             preampBuf[i] = x;
 
@@ -616,7 +618,8 @@ TEST_CASE("DI dynamics: PSU + sag at hard playing", "[di_dynamics]") {
         auto envLTP    = rmsEnvelope(ltpBuf, envWin);
         auto envPreamp = rmsEnvelope(preampBuf, envWin);
 
-        printf("\n=== DYNAMICS @ GAIN=%.1f, INPUT x%.0f ===\n", gainVal * 10.0f, inputScale);
+        printf("\n=== DYNAMICS @ GAIN=%.1f (drive=%.3f), INPUT x%.0f ===\n",
+               gainKnob * 10.0f, gainVal, inputScale);
         printf("%-5s  %-7s  %-7s  %-7s  %-8s  %-8s  %-9s  %-10s\n",
                "Time", "Preamp", "LTP", "Final",
                "vPreamp", "vPi", "BiasOff", "PI_GridQ");

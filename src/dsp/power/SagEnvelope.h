@@ -12,9 +12,21 @@
 namespace sr {
 
 struct SagEnvelope {
+    // Reference idle current. MUST match what the pentode model actually draws
+    // at idle for the ACTIVE bias — see pentodeQuiescentTotal(). If it sits above
+    // the real idle current, excessI goes negative, biasOffset() goes POSITIVE and
+    // pins at the warm clamp, so the amp runs permanently hot and sag stops being
+    // a dynamic at all. The constant is only a fallback; the processor overrides
+    // it via setQuiescent() on prepare and whenever 15W/7W changes the bias.
+    float quiescentI   = SAG_QUIESCENT_I_N;
     float envelope     = SAG_QUIESCENT_I_N;  // init at idle cathode current
     float attackDecay  = 0.999f;
     float releaseDecay = 0.999f;
+
+    // Retarget the idle reference (bias-dependent). Leaves the envelope tracking
+    // the real current — only the reference point moves, so a 15W/7W switch
+    // doesn't punch a discontinuity into the envelope itself.
+    void setQuiescent(float idleTotalCurrent) { quiescentI = idleTotalCurrent; }
 
     void recalcCoeffs(float effectiveSR) {
         attackDecay  = std::exp(-1.0f / (SAG_ATTACK_MS  * 0.001f * effectiveSR));
@@ -22,7 +34,7 @@ struct SagEnvelope {
     }
 
     // Restore the envelope to idle cathode current (no sag offset)
-    void reset() { envelope = SAG_QUIESCENT_I_N; }
+    void reset() { envelope = quiescentI; }
 
     // Feed with TOTAL plate current: |ipA| + |ipB| (both tubes through shared cathode R)
     void update(float totalPlateCurrent) {
@@ -37,7 +49,7 @@ struct SagEnvelope {
     // At idle (envelope ≈ quiescent): offset ≈ 0
     // Under drive (envelope > quiescent): offset < 0 (colder)
     float biasOffset() const {
-        float excessI = envelope - SAG_QUIESCENT_I_N;
+        float excessI = envelope - quiescentI;
         float shift = -excessI * SAG_R_CATHODE_N;
         return std::clamp(shift, SAG_BIAS_CLAMP_COLD_N, SAG_BIAS_CLAMP_WARM_N);  // -3V cold, +1.5V warm
     }

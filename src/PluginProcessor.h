@@ -137,6 +137,10 @@ private:
     sr::StereoWidth         stereoWidth;   // final MONO↔STEREO widener (stereo only)
     // Boost level smoothed at base SR (avoids zipper on the make-up gain).
     juce::SmoothedValue<float> boostLevelSm, boostTightSm, boostBrightSm, gateThreshSm;
+    // Gain-staging trims, smoothed at base SR. processBlock skips the multiply
+    // entirely while a trim sits at unity and is not ramping, which is what keeps
+    // the dry path bit-identical at defaults.
+    juce::SmoothedValue<float> inputTrimSm, outputTrimSm;
 
     // Oversamples just the IR-path output limiter (tanh) so its harmonics
     // don't alias back into the band — the IIR path's limiter already runs
@@ -156,8 +160,9 @@ private:
 
     // State
     float el84BaseBias = sr::PENTODE_BIAS_15W_N;
+    float lastSagQuiescentBias = 0.0f;          // forces a sag-reference recompute on first block
     float lastShapeCoeffVal = -1.0f;            // shape coeff update threshold tracker
-    float outputGainCompensation = 1.0f;   // scales cab output into tanh soft-clip range
+    float outputGainCompensation = sr::OUTPUT_MAKEUP_GAIN;  // scales cab output into tanh soft-clip range
     bool  psuFrozen    = false;
     bool  widenerWasActive = false;   // edge-detect widener on/off for tail clear
     double baseSampleRate = 44100.0;

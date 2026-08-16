@@ -4,6 +4,7 @@
 #include "../../utils/VoltageScale.h"
 #include "../../utils/Constants.h"
 #include <cmath>
+#include <algorithm>
 
 namespace sr {
 
