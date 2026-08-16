@@ -112,10 +112,10 @@ cmake -B build -DSR_BUILD_TESTS=ON # Build with tests
 
 15 custom components in `src/gui/`, all in `namespace sr`:
 
-- **ColourPalette.h** — 23 inline colour constants (dark theme). Text tiers hold ≥4.5:1 against `panel`; `muted` (3.5:1) is decoration only, never a glyph
+- **ColourPalette.h** — 28 inline colour constants (dark theme), incl. the `knobBody`/`knobFace`/`knobTick` ramp. Text tiers hold ≥4.5:1 against `panel`; `muted` (3.5:1) is decoration only, never a glyph
 - **FontData.h/.cpp** — Embedded Space Mono + DM Sans fonts via BinaryData, plus the `Fonts::Sizes` type scale (micro 9 / small 10 / body 11 / value 12.5 / title 14 / hero 22). No bare numeric font sizes anywhere in `src/gui/` — tune type from that one block. Note these are JUCE font *heights* (ascent+descent), which render ~25% smaller than the same number in CSS px
-- **LookAndFeel.h/.cpp** — `SilentRiotLookAndFeel`
-- **NotchKnob.h/.cpp** — Segmented-arc rotary knob (20 segments over 270° sweep, numbered 0–10, notch pointer). `preferredHeight` (112px) is the vertical room needed for knob + readout + name — lay one out shorter and the name is drawn past the bottom edge and silently clipped. Optional `setValueFormatter()` overrides the default 0–10 readout (used for DELAY TIME's ms and the `%` knobs)
+- **LookAndFeel.h/.cpp** — `SilentRiotLookAndFeel`. Owns `drawRotarySlider` — the arc knob paint routine (five uniform ticks, value arc, body + face circles, indicator triangle inside the face). Every dimension is a ratio of `D = jmin(w,h)`, so one routine covers all knob sizes and `setScale` does not touch the graphic. `kRotaryStartAngle`/`kRotaryEndAngle` (225°→495°) define the 270° sweep — a slider painted with this LookAndFeel **must** call `setRotaryParameters()` with them, or its ticks won't line up with its value
+- **NotchKnob.h/.cpp** — Rotary knob shell: owns the slider, reserves the readout + label strip and centres a square knob in what's left, paints the value readout and parameter label, draws the keyboard focus ring. The knob face itself is painted by the LookAndFeel. Name is historical — the knob was a segmented arc with a notch pointer before the arc design. `setScale()` scales only the text strip (each metric floored — text stops being readable long before the knob does); `preferredHeight` (112px) is the room a scale-1.0 knob needs, and laying one out shorter clips the name. Optional `setValueFormatter()` overrides the default 0–10 readout (used for DELAY TIME's ms and the `%` knobs)
 - **VUMeter.h/.cpp** — 24-segment LED bar, 60Hz timer, green/yellow/red zones
 - **ToggleSwitch.h/.cpp** — iOS-style toggle wrapping `juce::ToggleButton` for APVTS attachment
 - **HeaderBar.h/.cpp** — Brand + PresetSelector + gear icon

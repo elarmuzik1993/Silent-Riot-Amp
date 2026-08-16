@@ -16,6 +16,15 @@ inline juce::Colour border     { 0xFF1A1A24 };
 inline juce::Colour borderHi   { 0xFF252533 };
 inline juce::Colour track      { 0xFF262635 };
 
+// Rotary knob ramp — body sits slightly darker than the inner face so the two
+// circles read apart at small sizes. Ticks are the only scale marking (there is
+// no inactive range track), so they carry more weight than a normal dim label.
+inline juce::Colour knobBody     { 0xFF15171E };
+inline juce::Colour knobBodyEdge { 0xFF272B36 };
+inline juce::Colour knobFace     { 0xFF191C24 };
+inline juce::Colour knobFaceEdge { 0xFF20242E };
+inline juce::Colour knobTick     { 0xFF6C7284 };
+
 // Text ramp, ordered muted < dim < label < text < bright < white. Every tier that
 // carries text clears 4.5:1 against `panel`; `muted` (3.5:1) is decoration only —
 // tick marks and meter grid, never a glyph.
@@ -56,6 +65,12 @@ inline void setTheme(int themeIndex)
         borderHi   = juce::Colour(0xFFBABAC8);
         track      = juce::Colour(0xFFD4D4DE);
 
+        knobBody     = juce::Colour(0xFFE9E9EF);
+        knobBodyEdge = juce::Colour(0xFFC8C8D4);
+        knobFace     = juce::Colour(0xFFF7F7FA);
+        knobFaceEdge = juce::Colour(0xFFDCDCE6);
+        knobTick     = juce::Colour(0xFF8A8A9C);
+
         muted      = juce::Colour(0xFF9494A4);
         dim        = juce::Colour(0xFF6E6E80);
         label      = juce::Colour(0xFF4E4E60);
@@ -85,6 +100,12 @@ inline void setTheme(int themeIndex)
         border     = juce::Colour(0xFF1A1A24);
         borderHi   = juce::Colour(0xFF252533);
         track      = juce::Colour(0xFF262635);
+
+        knobBody     = juce::Colour(0xFF15171E);
+        knobBodyEdge = juce::Colour(0xFF272B36);
+        knobFace     = juce::Colour(0xFF191C24);
+        knobFaceEdge = juce::Colour(0xFF20242E);
+        knobTick     = juce::Colour(0xFF6C7284);
 
         muted      = juce::Colour(0xFF6A6A80);
         dim        = juce::Colour(0xFF7E7E96);

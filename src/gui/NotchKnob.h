@@ -4,6 +4,15 @@
 
 namespace sr {
 
+// Rotary knob + value readout + parameter label.
+//
+// The knob face itself is painted by SilentRiotLookAndFeel::drawRotarySlider
+// (see LookAndFeel.cpp) — this component owns the slider, reserves the bottom
+// strip for the readout and label, and sizes the slider to a square so the
+// LookAndFeel's jmin(w,h) has no asymmetric padding to work with.
+//
+// The name is historical: the knob was a segmented arc with a notch pointer
+// before the five-tick arc design landed.
 class NotchKnob : public juce::Component {
 public:
     explicit NotchKnob(const juce::String& label, float defaultValue = 0.5f);
@@ -23,31 +32,32 @@ public:
     }
 
     // Visual scale relative to the default 80px knob. 1.0 = full size (main amp
-    // knobs); 0.5 = half size (compact effect knobs). Scales the body, arc and
-    // pointer; numbered 0–10 labels are hidden below 0.75 where they'd be
-    // unreadable. Text readouts keep a legible floor.
+    // knobs); 0.5 = half size (compact effect knobs).
+    //
+    // The knob graphic itself is NOT scaled here — drawRotarySlider derives every
+    // dimension from jmin(w,h), so shrinking the component shrinks the knob for
+    // free. What this scales is the reserved text strip, which does not shrink
+    // for free: readout and label stop being readable long before the knob does,
+    // so each metric below carries a floor.
     void setScale(float s);
 
-    // Vertical room a knob needs to render in full *at scale 1.0*: the knob
-    // graphic, the value readout box, and the name below it. Lay one out shorter
-    // than this and the name is drawn past the bottom edge and silently clipped —
-    // which is exactly what used to happen to the DELAY card's knobs. Scaled
-    // knobs need proportionally less; the effects cards size against their own
-    // compact figure rather than this one.
+    // Vertical room a knob needs to render in full *at scale 1.0*: the square
+    // knob plus the readout + label strip. Lay one out shorter and the name is
+    // drawn past the bottom edge and silently clipped — which is exactly what
+    // used to happen to the DELAY card's knobs. Scaled knobs need proportionally
+    // less; the effects cards size against their own compact figure.
     static constexpr int preferredHeight = 112;
 
 private:
-    void drawSegmentedArc(juce::Graphics&, float cx, float cy, float pos) const;
-    void drawNumberedLabels(juce::Graphics&, float cx, float cy) const;
-    void drawKnobBody(juce::Graphics&, float cx, float cy, float angle) const;
-    void drawNotchPointer(juce::Graphics&, float cx, float cy, float angle) const;
-
-    // Custom slider with keyboard step overrides
+    // Custom slider with keyboard step overrides and a focus ring.
     // Arrow: ±0.01 internal (±0.1 on 0-10 display)
     // PageUp/Down: ±0.1 internal (±1.0 on display)
     class KnobSlider : public juce::Slider {
     public:
         using Slider::Slider;
+        void paint(juce::Graphics&) override;
+        void focusGained(FocusChangeType) override;
+        void focusLost(FocusChangeType) override;
         bool keyPressed(const juce::KeyPress& key) override
         {
             if (key == juce::KeyPress::upKey || key == juce::KeyPress::rightKey)
@@ -62,31 +72,26 @@ private:
         }
     };
 
+    float stripH() const { return readoutH + readoutGap + labelH; }
+
     KnobSlider slider;
     juce::String label;
     float defaultVal;
     std::function<juce::String(float)> valueFormatter;
 
-    // Base geometry (relative to the default 80px bounding box). The instance
-    // members below are these values multiplied by `scale`.
-    static constexpr float kSizeBase  = 80.0f;
-    static constexpr float knobRBase  = 22.4f;  // body radius (28%)
-    static constexpr float arcRBase   = 28.8f;  // segment ring (36%)
-    static constexpr float labelRBase = 36.8f;  // number positions (46%)
+    // Bottom strip reserved out of the component bounds; whatever square is left
+    // over becomes the knob, so the knob scales with the component.
+    static constexpr float kReadoutHBase    = 16.0f;
+    static constexpr float kReadoutGapBase  =  4.0f;
+    static constexpr float kLabelHBase      = 14.0f;
+    static constexpr float kReadoutMinWBase = 44.0f;
 
-    // Scaled geometry (recomputed in setScale()).
-    float scale  = 1.0f;
-    float kSize  = kSizeBase;
-    float knobR  = knobRBase;
-    float arcR   = arcRBase;
-    float labelR = labelRBase;
-
-    static constexpr float startAngle = -135.0f; // degrees
-    static constexpr float endAngle   =  135.0f;
-    static constexpr float sweepDeg   = 270.0f;
-    static constexpr int   numSegments = 20;
-    static constexpr float segGapDeg   =  3.0f;
-    static constexpr int   numLabels   = 11;
+    // Scaled strip metrics (recomputed in setScale()).
+    float scale       = 1.0f;
+    float readoutH    = kReadoutHBase;
+    float readoutGap  = kReadoutGapBase;
+    float labelH      = kLabelHBase;
+    float readoutMinW = kReadoutMinWBase;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(NotchKnob)
 };
