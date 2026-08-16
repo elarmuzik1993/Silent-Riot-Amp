@@ -588,7 +588,7 @@ Collapsible 2×2 grid of effect "cards" (`EffectsPanel.h/.cpp`), `panelHeight`
 
 ```
 ┌ UTILITY ──────────┐ ┌ BOOST ──────── ON ┐
-│  THRESH   WIDTH   │ │ LEVEL TIGHT BRIGHT│
+│THRESH WIDTH IN OUT│ │ LEVEL TIGHT BRIGHT│
 └───────────────────┘ └───────────────────┘
 ┌ DELAY ─── PP  ON ─┐ ┌ REVERB ─────── ON ┐
 │ [sync divisions]  │ │  MIX  SIZE  TONE  │
@@ -597,9 +597,10 @@ Collapsible 2×2 grid of effect "cards" (`EffectsPanel.h/.cpp`), `panelHeight`
 ```
 
 - Cards stretch to fill the panel; 10px gap, title strip 16px.
-- **UTILITY** has **no ON/OFF toggle** — both of its knobs are autonomous and
-  self-gate at 0 (THRESH 0 = gate bypassed, WIDTH 0 = widener skipped). This is
-  why the card is named UTILITY rather than NOISE GATE.
+- **UTILITY** has **no ON/OFF toggle** — all of its knobs are autonomous.
+  THRESH and WIDTH self-gate at 0 (gate bypassed, widener skipped); INPUT and
+  OUTPUT are unity at centre. This is why the card is named UTILITY rather than
+  NOISE GATE — none of it is part of the amp's voice.
 - **DELAY** is bespoke: PP (ping-pong) and ON toggles share the title row, and a
   sync-division `SegmentedSelector` sits above the knob row.
 - BOOST and REVERB use the standard title-strip-plus-ON-toggle card.
@@ -646,9 +647,11 @@ presetIndex     int     0–4          0         Preset
 irIndex         int     0–N          0         IR Selection
 tunerMute       bool    off/on       false     Tuner Mute  (never restored)
 
-── Effects: UTILITY (no ON toggle — both knobs self-gate at 0) ─
+── Effects: UTILITY (no ON toggle — knobs self-gate at 0 or unity at centre) ─
 gateThreshold   float   0–1          0.0       Gate Threshold (0 = off)
 width           float   0–1          0.0       Width (0 = off)
+inputLevel      float   0–1          0.5       Input Level  (centre = unity, ±12 dB)
+outputLevel     float   0–1          0.5       Output Level (centre = unity, silence..+12 dB)
 
 ── Effects: BOOST ────────────────────────────────────────────
 boostOn         bool    off/on       false     Boost

@@ -13,7 +13,8 @@ EffectsPanel::EffectsPanel()
     addAndMakeVisible(delaySync);
     delaySync.setTitleText("Delay sync");
 
-    for (auto* k : { &gateThresh, &width, &boostLevel, &boostTight, &boostBright,
+    for (auto* k : { &gateThresh, &width, &inputLevel, &outputLevel,
+                     &boostLevel, &boostTight, &boostBright,
                      &delayTime, &delayFb, &delayMix, &delayTone,
                      &reverbMix, &reverbSize, &reverbTone })
         addAndMakeVisible(*k);
@@ -85,13 +86,15 @@ void EffectsPanel::resized()
 {
     auto area = getLocalBounds().reduced(10);
 
-    // UTILITY card: no toggle — both knobs self-gate (THRESH 0 = gate off,
-    // WIDTH centre = unity). Lay the title strip, then the two knobs.
+    // UTILITY card: no toggle — every knob self-gates or is unity-at-centre
+    // (THRESH 0 = gate off, WIDTH 0 = dry, INPUT/OUTPUT centre = unity).
+    // Four knobs take layoutKnobRow from 80 px to ~76 px each; that fits, but
+    // check the labels render if you add a fifth.
     {
         auto inner = cardBounds(area, 0, 0).reduced(10, 6);
         inner.removeFromTop(16);   // title strip ("UTILITY")
         inner.removeFromTop(4);
-        layoutKnobRow(inner, { &gateThresh, &width });
+        layoutKnobRow(inner, { &gateThresh, &width, &inputLevel, &outputLevel });
     }
     layoutCard(cardBounds(area, 1, 0), boostTgl,  { &boostLevel, &boostTight, &boostBright });
     layoutCard(cardBounds(area, 1, 1), reverbTgl, { &reverbMix, &reverbSize, &reverbTone });

@@ -13,3 +13,13 @@ compile_commands.json
 .idea/
 *.swp
 *~
+
+__pycache__/
+*.pyc
+
+.superpowers/
+
+# Steinberg ASIO SDK — licence-restricted, must never be committed.
+# Drop it here (or set SR_ASIO_SDK_DIR) to enable ASIO; see CMakeLists.txt.
+external/asiosdk/
+external/asiosdk*/
