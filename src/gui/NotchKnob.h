@@ -49,15 +49,16 @@ public:
     static constexpr int preferredHeight = 112;
 
 private:
-    // Custom slider with keyboard step overrides and a focus ring.
+    // Custom slider with keyboard step overrides.
     // Arrow: ±0.01 internal (±0.1 on 0-10 display)
     // PageUp/Down: ±0.1 internal (±1.0 on display)
+    //
+    // Deliberately paints no focus indicator: the knobs are still in the tab
+    // order and keyPressed still moves them, but focus is not shown. Don't add
+    // a ring back without asking — it was removed on purpose.
     class KnobSlider : public juce::Slider {
     public:
         using Slider::Slider;
-        void paint(juce::Graphics&) override;
-        void focusGained(FocusChangeType) override;
-        void focusLost(FocusChangeType) override;
         bool keyPressed(const juce::KeyPress& key) override
         {
             if (key == juce::KeyPress::upKey || key == juce::KeyPress::rightKey)
