@@ -14,6 +14,12 @@ EffectsPanel::EffectsPanel()
     addAndMakeVisible(delaySync);
     delaySync.setTitleText("Delay sync");
 
+    // Lamps, not pills: a pill per card is heavy chrome next to half-scale
+    // knobs. The amp row keeps its switches — see kCardToggleStyle, which the
+    // card layout sizes against.
+    for (auto* t : { &boostTgl, &delayTgl, &reverbTgl, &delayPP })
+        t->setStyle(ToggleSwitch::Style::Led);
+
     for (auto* k : { &gateThresh, &width, &inputLevel, &outputLevel,
                      &boostLevel, &boostTight, &boostBright,
                      &delayTime, &delayFb, &delayMix, &delayTone,
@@ -48,7 +54,7 @@ EffectsPanel::EffectsPanel()
 namespace {
     constexpr int kCardGap = 12;
     constexpr int kCardW   = 290;  // floor set by the 8-division delay sync row
-    constexpr int kCardH   = 120;  // title + (optional sync row) + one knob row
+    constexpr int kCardH   = 129;  // title + (optional sync row) + one knob row
 
     // Card chrome metrics, shared by paint() and resized(). Kept tight so the
     // DELAY card can fit its sync row *and* a knob row inside kCardH.
@@ -56,6 +62,20 @@ namespace {
     constexpr int kTitleH   = 15;
     constexpr int kRowGap   = 3;
     constexpr int kSyncH    = 17;
+
+    // Height reserved at the top of every card. This is NOT kTitleH: kTitleH
+    // only has to fit the title *text*, while a ToggleSwitch also has to fit its
+    // lamp below its own label, and JUCE clips the overflow away without a
+    // warning — the toggle then looks like a dead text label while its clicks
+    // still register. Every card reserves this much, toggle or not, so all four
+    // knob rows stay on the same baseline.
+    constexpr auto kCardToggleStyle = ToggleSwitch::Style::Led;
+    constexpr int  kToggleH = ToggleSwitch::minHeight(kCardToggleStyle);
+    static_assert(kToggleH >= ToggleSwitch::minHeight(kCardToggleStyle),
+                  "card toggle row is shorter than a ToggleSwitch can paint into: "
+                  "the lamp gets clipped and the toggle looks dead");
+    static_assert(kCardH >= 2 * kCardPadY + kToggleH + kRowGap + kSyncH + kRowGap + 72,
+                  "kCardH leaves the DELAY card too little for a full knob row");
 }
 
 
@@ -120,8 +140,8 @@ void EffectsPanel::layoutCard(juce::Rectangle<int> card, ToggleSwitch& tgl,
 {
     // Title strip at the top; toggle sits top-right of the card.
     auto inner = card.reduced(10, kCardPadY);
-    auto titleRow = inner.removeFromTop(kTitleH);
-    tgl.setBounds(titleRow.removeFromRight(44).withSizeKeepingCentre(44, kTitleH));
+    auto titleRow = inner.removeFromTop(kToggleH);
+    tgl.setBounds(titleRow.removeFromRight(44).withSizeKeepingCentre(44, kToggleH));
 
     inner.removeFromTop(kRowGap);
     layoutKnobRow(inner, knobs);
@@ -137,7 +157,9 @@ void EffectsPanel::resized()
     // check the labels render if you add a fifth.
     {
         auto inner = cardBounds(area, 0, 0).reduced(10, kCardPadY);
-        inner.removeFromTop(kTitleH);   // title strip ("UTILITY")
+        inner.removeFromTop(kToggleH);  // title strip ("UTILITY") — no toggle, but
+                                        // reserve the same height so this card's
+                                        // knobs line up with the others'
         inner.removeFromTop(kRowGap);
         layoutKnobRow(inner, { &gateThresh, &width, &inputLevel, &outputLevel });
     }
@@ -150,10 +172,10 @@ void EffectsPanel::resized()
     // must still clear NotchKnob::preferredHeight.
     auto delayCard  = cardBounds(area, 0, 1);
     auto delayInner = delayCard.reduced(10, kCardPadY);
-    auto titleRow   = delayInner.removeFromTop(kTitleH);
-    delayTgl.setBounds(titleRow.removeFromRight(40).withSizeKeepingCentre(40, kTitleH));
+    auto titleRow   = delayInner.removeFromTop(kToggleH);
+    delayTgl.setBounds(titleRow.removeFromRight(40).withSizeKeepingCentre(40, kToggleH));
     titleRow.removeFromRight(4);
-    delayPP.setBounds(titleRow.removeFromRight(40).withSizeKeepingCentre(40, kTitleH));
+    delayPP.setBounds(titleRow.removeFromRight(40).withSizeKeepingCentre(40, kToggleH));
 
     delayInner.removeFromTop(kRowGap);
     delaySync.setBounds(delayInner.removeFromTop(kSyncH));
