@@ -597,7 +597,10 @@ void SilentRiotEditor::layoutContent()
 
     int cx = body.getCentreX();
 
-    int knobW = 100, knobH = 120, knobGap = 36;
+    // knobH only reserves paint space: NotchKnob draws the dial (80px) plus the
+    // value readout and label, bottoming out at 108px. The slider hit area is
+    // the top 80px, so the extra rows below were pure dead space.
+    int knobW = 100, knobH = 110, knobGap = 36;
     int totalKnobW = knobW * 3 + knobGap * 2;
     int knobStartX = cx - totalKnobW / 2;
     int knobY = body.getY() + 16;
@@ -609,7 +612,9 @@ void SilentRiotEditor::layoutContent()
     int toggleW = 50, toggleH = 36, toggleGap = 32;
     int totalToggleW = toggleW * 3 + toggleGap * 2;
     int toggleStartX = cx - totalToggleW / 2;
-    int toggleY = knobY + knobH + 40;
+    // 16px below the knob's paint extent — ToggleSwitch draws its own label in
+    // the top 14px, so the visible gap between knob label and toggle label ~24px.
+    int toggleY = knobY + knobH + 16;
 
     halfPowerToggle.setBounds(toggleStartX, toggleY, toggleW, toggleH);
     cabSimToggle.setBounds(toggleStartX + toggleW + toggleGap, toggleY, toggleW, toggleH);
