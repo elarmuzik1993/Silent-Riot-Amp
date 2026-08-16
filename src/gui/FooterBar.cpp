@@ -14,7 +14,7 @@ void FooterBar::paint(juce::Graphics& g)
     g.setColour(Colours::border);
     g.fillRect(0.0f, 0.0f, bounds.getWidth(), 1.0f);
 
-    auto font = Fonts::spaceMono(9.0f);
+    auto font = Fonts::spaceMono(Fonts::Sizes::small);
     g.setFont(font);
 
     float y = 0.0f;

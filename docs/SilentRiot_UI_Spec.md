@@ -34,6 +34,12 @@
 
 All colours are sRGB hex. Use `juce::Colour::fromString()` or define as constants.
 
+**Contrast floor.** Every tier that carries text clears 4.5:1 against `panel` (#111118):
+`dim` 4.7:1, `label` 7.3:1, `text` 10.8:1, `bright` 14.2:1. `muted` sits at 3.5:1 and is
+therefore **decoration only** — tick marks and meter grid, never a glyph. The light theme in
+`ColourPalette.h::setTheme()` mirrors these ratios against #FFFFFF. Anything added to the
+ramp must hold this floor in both themes.
+
 ```
 ROLE              HEX        USAGE
 ─────────────────────────────────────────────────────────
@@ -44,13 +50,13 @@ panel             #111118    Header/footer bars, section bars
 panelLight        #14141C    Hovered/active section bar bg
 border            #1A1A24    All borders, dividers, 1px lines
 borderHi          #252533    Hover borders, drop zone dashed
-track             #1C1C28    Inactive arc segments, meter bg, toggle off
-muted             #2E2E3C    Minor ticks, inactive dots
-dim               #3C3C50    Major ticks, numbered scale, secondary text
-label             #4A4A5E    Knob labels, section labels, toggle labels
-text              #9898AE    Body text, IR list text, state values
-bright            #D0D0DC    Value readouts, preset name, active labels
-white             #EAEAF0    Knob pointer stroke
+track             #262635    Inactive arc segments, meter bg, toggle off
+muted             #6A6A80    Minor ticks, inactive dots — DECORATION ONLY
+dim               #7E7E96    Major ticks, numbered scale, secondary text
+label             #A0A0B8    Knob labels, section labels, toggle labels
+text              #C4C4D4    Body text, IR list text, state values
+bright            #E0E0EA    Value readouts, preset name, active labels
+white             #F5F5F9    Knob pointer stroke
 
 accent            #FF6600    Primary orange — active arcs, notch pointer,
                              toggles on, section labels active, gear icon
@@ -85,6 +91,34 @@ Two font stacks are used. Ship both as embedded resources in the JUCE binary.
 - Include Regular (400), Medium (500), SemiBold (600), Bold (700)
 
 ### Font size reference (at 100% scale)
+
+> **CSS px ≠ JUCE font size.** The sizes below are the CSS pixel sizes used by the React
+> prototype. JUCE's `Font::setHeight()` sets total ascent + descent, so passing the CSS
+> number directly renders roughly 25–30% smaller than intended — an 8px CSS label became a
+> ~5.5px cap height on screen, which is what made the original build hard to read. The
+> implementation therefore uses its own scale (below), not these numbers verbatim.
+
+**Implementation scale — `sr::Fonts::Sizes` in `src/gui/FontData.h`:**
+
+```
+TOKEN    HEIGHT   USED FOR
+────────────────────────────────────────────────────────────────────────
+micro     9.0     knob numbered scale, panel section headings (SUPPLY
+                  RAILS / ENGINE STATE), IR table headers, waveform ticks
+small    10.0     toggle labels, VU labels, footer stats, section-bar hint,
+                  segmented selector, settings rows, PSU rail label/value
+body     11.0     knob labels, section-bar titles, effect card titles,
+                  header title, IR list items, tuner frequency readout
+value    12.5     knob value readouts, preset display, popup menus,
+                  tuner cents markers
+title    14.0     logo "SR", settings panel header
+hero     22.0     tuner note name
+```
+
+All call sites reference these tokens — no bare numeric font sizes in `src/gui/`. Tune the
+whole UI from that one block.
+
+**Prototype reference (CSS px, for layout/tracking only):**
 
 ```
 CONTEXT                    SIZE    WEIGHT   TRACKING   FONT

@@ -132,7 +132,7 @@ void IRLoaderPanel::paint(juce::Graphics& g)
     float listH = static_cast<float>(listVisibleRows * listRowH);
 
     // Header
-    g.setFont(Fonts::spaceMono(7.0f, true));
+    g.setFont(Fonts::spaceMono(Fonts::Sizes::micro, true));
     g.setColour(Colours::dim);
     g.drawText("USER IMPULSE RESPONSES", juce::Rectangle<float>(8.0f, 6.0f, leftW - 16.0f, 14.0f),
                juce::Justification::centredLeft, false);
@@ -149,7 +149,7 @@ void IRLoaderPanel::paint(juce::Graphics& g)
     if (irList.empty())
     {
         // Empty state
-        g.setFont(Fonts::spaceMono(8.0f));
+        g.setFont(Fonts::spaceMono(Fonts::Sizes::small));
         g.setColour(Colours::dim);
         g.drawText("No IRs loaded", juce::Rectangle<float>(8.0f, y, leftW - 16.0f, listH),
                    juce::Justification::centred, false);
@@ -169,7 +169,7 @@ void IRLoaderPanel::paint(juce::Graphics& g)
                 g.fillRect(0.0f, rowY, leftW, static_cast<float>(listRowH));
             }
 
-            g.setFont(Fonts::spaceMono(8.0f));
+            g.setFont(Fonts::spaceMono(Fonts::Sizes::small));
             g.setColour(selected ? Colours::bright : Colours::text);
             g.drawText(entry.name, juce::Rectangle<float>(8.0f, rowY, leftW * 0.52f, static_cast<float>(listRowH)),
                        juce::Justification::centredLeft, true);
@@ -204,7 +204,7 @@ void IRLoaderPanel::paint(juce::Graphics& g)
     juce::PathStrokeType(1.0f).createDashedStroke(dashed, dropOutline, dashes, 2);
     g.strokePath(dashed, juce::PathStrokeType(1.0f));
 
-    g.setFont(Fonts::spaceMono(8.0f));
+    g.setFont(Fonts::spaceMono(Fonts::Sizes::small));
     g.setColour(Colours::label);
     g.drawText("DROP .WAV OR CLICK TO BROWSE", dropArea, juce::Justification::centred, false);
 
@@ -237,7 +237,7 @@ void IRLoaderPanel::paint(juce::Graphics& g)
 
         for (auto& d : details)
         {
-            g.setFont(Fonts::spaceMono(7.0f));
+            g.setFont(Fonts::spaceMono(Fonts::Sizes::micro));
             g.setColour(Colours::label);
             g.drawText(d.key, juce::Rectangle<float>(rx, ry, 56.0f, 13.0f),
                        juce::Justification::centredLeft, false);
@@ -249,7 +249,7 @@ void IRLoaderPanel::paint(juce::Graphics& g)
     }
     else if (irList.empty())
     {
-        g.setFont(Fonts::spaceMono(8.0f));
+        g.setFont(Fonts::spaceMono(Fonts::Sizes::small));
         g.setColour(Colours::dim);
         g.drawText("Drop a .wav impulse response\nto get started",
                    juce::Rectangle<float>(rx, ry, rw, 60.0f),

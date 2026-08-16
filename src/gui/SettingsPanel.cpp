@@ -83,13 +83,13 @@ void SettingsPanel::paint(juce::Graphics& g)
     float w = bounds.getWidth() - 32.0f;
 
     // Close X
-    g.setFont(Fonts::spaceMono(14.0f));
+    g.setFont(Fonts::spaceMono(Fonts::Sizes::title));
     g.setColour(Colours::label);
     g.drawText("X", juce::Rectangle<float>(bounds.getWidth() - 32.0f, 8.0f, 24.0f, 24.0f),
                juce::Justification::centred, false);
 
     // ── UI PREFERENCES ──
-    g.setFont(Fonts::spaceMono(8.0f, true));
+    g.setFont(Fonts::spaceMono(Fonts::Sizes::small, true));
     g.setColour(Colours::accent);
     g.drawText("UI PREFERENCES", juce::Rectangle<float>(px, y, w, 14.0f),
                juce::Justification::centredLeft, false);
@@ -97,7 +97,7 @@ void SettingsPanel::paint(juce::Graphics& g)
 
     // Row labels
     auto drawLabel = [&](float rowY, const juce::String& text) {
-        g.setFont(Fonts::spaceMono(8.0f));
+        g.setFont(Fonts::spaceMono(Fonts::Sizes::small));
         g.setColour(Colours::label);
         g.drawText(text, juce::Rectangle<float>(px, rowY, 100.0f, 20.0f),
                    juce::Justification::centredLeft, false);
@@ -120,7 +120,7 @@ void SettingsPanel::paint(juce::Graphics& g)
     g.setColour(Colours::border);
     g.fillRect(px, y - 10.0f, w, 1.0f);
 
-    g.setFont(Fonts::spaceMono(8.0f, true));
+    g.setFont(Fonts::spaceMono(Fonts::Sizes::small, true));
     g.setColour(Colours::accent);
     g.drawText("ABOUT", juce::Rectangle<float>(px, y, w, 14.0f),
                juce::Justification::centredLeft, false);
@@ -137,7 +137,7 @@ void SettingsPanel::paint(juce::Graphics& g)
 
     for (auto& row : info)
     {
-        g.setFont(Fonts::spaceMono(8.0f));
+        g.setFont(Fonts::spaceMono(Fonts::Sizes::small));
         g.setColour(Colours::label);
         g.drawText(row.key, juce::Rectangle<float>(px, y, 80.0f, 16.0f),
                    juce::Justification::centredLeft, false);
@@ -157,7 +157,7 @@ void SettingsPanel::paint(juce::Graphics& g)
     // Green dot
     g.setColour(Colours::green);
     g.fillEllipse(px + 10.0f, y + 10.0f, 8.0f, 8.0f);
-    g.setFont(Fonts::spaceMono(8.0f));
+    g.setFont(Fonts::spaceMono(Fonts::Sizes::small));
     g.setColour(Colours::text);
     g.drawText("Licensed — Full Version", juce::Rectangle<float>(px + 24.0f, y, w - 24.0f, 28.0f),
                juce::Justification::centredLeft, false);

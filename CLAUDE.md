@@ -112,10 +112,10 @@ cmake -B build -DSR_BUILD_TESTS=ON # Build with tests
 
 15 custom components in `src/gui/`, all in `namespace sr`:
 
-- **ColourPalette.h** — 23 inline colour constants (dark theme)
-- **FontData.h/.cpp** — Embedded Space Mono + DM Sans fonts via BinaryData
+- **ColourPalette.h** — 23 inline colour constants (dark theme). Text tiers hold ≥4.5:1 against `panel`; `muted` (3.5:1) is decoration only, never a glyph
+- **FontData.h/.cpp** — Embedded Space Mono + DM Sans fonts via BinaryData, plus the `Fonts::Sizes` type scale (micro 9 / small 10 / body 11 / value 12.5 / title 14 / hero 22). No bare numeric font sizes anywhere in `src/gui/` — tune type from that one block. Note these are JUCE font *heights* (ascent+descent), which render ~25% smaller than the same number in CSS px
 - **LookAndFeel.h/.cpp** — `SilentRiotLookAndFeel`
-- **NotchKnob.h/.cpp** — Segmented-arc rotary knob (20 segments over 270° sweep, numbered 0–10, notch pointer)
+- **NotchKnob.h/.cpp** — Segmented-arc rotary knob (20 segments over 270° sweep, numbered 0–10, notch pointer). `preferredHeight` (112px) is the vertical room needed for knob + readout + name — lay one out shorter and the name is drawn past the bottom edge and silently clipped. Optional `setValueFormatter()` overrides the default 0–10 readout (used for DELAY TIME's ms and the `%` knobs)
 - **VUMeter.h/.cpp** — 24-segment LED bar, 60Hz timer, green/yellow/red zones
 - **ToggleSwitch.h/.cpp** — iOS-style toggle wrapping `juce::ToggleButton` for APVTS attachment
 - **HeaderBar.h/.cpp** — Brand + PresetSelector + gear icon
@@ -128,6 +128,7 @@ cmake -B build -DSR_BUILD_TESTS=ON # Build with tests
 - **SettingsPanel.h/.cpp** — Overlay (340px) with UI preferences + About section
 - **IRLoaderPanel.h/.cpp** — Scrollable IR list, waveform display, drag-and-drop (category tabs per UI spec §5.7 not yet implemented — user-IR-only today)
 - **IRWaveformDisplay.h/.cpp** — Waveform plot with envelope fill
+- **EffectsPanel.h/.cpp** — 2×2 card grid (UTILITY / BOOST / DELAY / REVERB). `panelHeight` (352) is driven by the DELAY card, which is the tightest: it carries an extra sync-division row *and* a full `NotchKnob::preferredHeight` knob row. Shrink it and DELAY's knob names are the first thing to disappear
 
 **Window strategy**: Window set to max size (700×772 at 1× scale); X11 Shape Extension clips visible/input region to actual content height. Collapsible panels animate within the fixed-size window — `applyShapeMask()` updates the clip rect each frame. No `setSize()` during panel toggle = no compositor blink. Shape accounts for standalone wrapper title bar offset via `getTopLevelComponent()->getLocalPoint()`.
 

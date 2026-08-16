@@ -120,7 +120,7 @@ void IRWaveformDisplay::paint(juce::Graphics& g)
 
     // Labels
     float labelY = bounds.getHeight() - 18.0f;
-    g.setFont(Fonts::spaceMono(7.0f));
+    g.setFont(Fonts::spaceMono(Fonts::Sizes::micro));
     g.setColour(Colours::dim);
     g.drawText(irName, juce::Rectangle<float>(plotX + 4.0f, labelY, 120.0f, 14.0f),
                juce::Justification::centredLeft, false);

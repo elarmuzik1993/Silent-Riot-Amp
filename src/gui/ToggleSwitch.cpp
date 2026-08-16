@@ -82,7 +82,7 @@ void ToggleSwitch::paint(juce::Graphics& g)
     float labelH = 14.0f;
 
     // Label above
-    g.setFont(Fonts::spaceMono(8.0f));
+    g.setFont(Fonts::spaceMono(Fonts::Sizes::small));
     g.setColour(Colours::label);
     g.drawText(label.toUpperCase(), juce::Rectangle<float>(0, 0, bounds.getWidth(), labelH),
                juce::Justification::centred, false);
