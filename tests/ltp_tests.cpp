@@ -25,6 +25,99 @@ static LTPModel freshLTP() {
     return ltp;
 }
 
+// ── Plate lower bound: soft, and consistent with the iteration ───
+//
+// Regression. The solver used to bound the plate at 0.0 inside its iteration but
+// at vCathode for the final result, so it converged against one constraint and
+// then hard-clipped the answer to a tighter one — on >58% of samples at high
+// drive. std::clamp is a derivative discontinuity; a real triode compresses
+// smoothly as the plate nears the cathode. Both are now the same softplus knee.
+
+// Static transfer point: settle a fresh solver at a DC input.
+static LTPOutput settleAt(float vIn, float vSupply, int n = 64) {
+    auto ltp = freshLTP();
+    LTPOutput out{};
+    for (int i = 0; i < n; ++i) out = solveLTP(vIn, vSupply, ltp);
+    return out;
+}
+
+TEST_CASE("LTP: plate stays within the cathode/supply bounds", "[ltp][regression]") {
+    // Both bounds are now applied identically inside the iteration and to the
+    // final result. Previously the loop bounded at 0.0 and the output at
+    // vCathode, so the solver converged against one constraint and the answer was
+    // then clipped to a tighter one on >58% of samples at high drive.
+    //
+    // Weak inequality on the lower bound: the softplus knee is asymptotic, but at
+    // extreme overdrive exp() underflows and it reaches the bound exactly.
+    for (float vIn = 0.0f; vIn <= 0.6f; vIn += 0.01f) {
+        auto out = settleAt(vIn, V_PI_NOMINAL_N);
+        REQUIRE(out.piA >= out.vCathode);
+        REQUIRE(out.piB >= out.vCathode);
+        REQUIRE(out.piA <= V_PI_NOMINAL_N);
+        REQUIRE(out.piB <= V_PI_NOMINAL_N);
+    }
+}
+
+// Convergence — the acceptance test for the root-find solver.
+//
+// The previous relaxation settled into a period-2 limit cycle rather than a
+// fixed point: at a constant 1.5 V input piA alternated between 0.933 and 0.292
+// EVERY sample, synthesising a Nyquist-rate square wave out of DC which the
+// downstream nonlinearities folded back into the audio band. A constant input
+// must produce a constant output.
+TEST_CASE("LTP: constant input settles to a fixed point", "[ltp][regression]") {
+    for (float vIn : { 0.0f, 0.002f, 0.005f, 0.01f, 0.02f, 0.05f, 0.1f, 0.2f }) {
+        auto ltp = freshLTP();
+        for (int i = 0; i < 168; ++i) solveLTP(vIn, V_PI_NOMINAL_N, ltp);
+
+        float lo = 1e9f, hi = -1e9f;
+        for (int i = 0; i < 32; ++i) {
+            auto o = solveLTP(vIn, V_PI_NOMINAL_N, ltp);
+            lo = std::min(lo, o.piA);
+            hi = std::max(hi, o.piA);
+        }
+        INFO("vIn = " << vIn << " (" << VS::toVolts(vIn) << " V)");
+        REQUIRE((hi - lo) < 1e-5f);
+    }
+}
+
+TEST_CASE("LTP: solved cathode actually satisfies its own node equation", "[ltp][regression]") {
+    // vCathode must equal the tail current through the tail resistor. The old
+    // relaxation left a partially-converged iterate here, so solver error leaked
+    // into the signal as state.
+    for (float vIn : { 0.0f, 0.005f, 0.02f, 0.05f }) {
+        auto ltp = freshLTP();
+        LTPOutput out{};
+        for (int i = 0; i < 200; ++i) out = solveLTP(vIn, V_PI_NOMINAL_N, ltp);
+
+        // Re-solving must not move the answer: it is a genuine fixed point.
+        auto again = solveLTP(vIn, V_PI_NOMINAL_N, ltp);
+        INFO("vIn = " << vIn);
+        REQUIRE(again.vCathode == Approx(out.vCathode).margin(1e-6f));
+        REQUIRE(again.piA == Approx(out.piA).margin(1e-6f));
+        REQUIRE(again.piB == Approx(out.piB).margin(1e-6f));
+        REQUIRE(out.vCathode >= 0.0f);
+        REQUIRE(out.vCathode < V_PI_NOMINAL_N);   // no runaway past the rail
+    }
+}
+
+TEST_CASE("LTP: still inverts differentially after the rewrite", "[ltp][regression]") {
+    // Guard the thing that alpha=1.0 broke: a "stable" solver that has killed the
+    // stage also reports zero oscillation. Plates must move in OPPOSITE directions.
+    auto idle = freshLTP();
+    LTPOutput oIdle{};
+    for (int i = 0; i < 400; ++i) oIdle = solveLTP(0.0f, V_PI_NOMINAL_N, idle);
+
+    auto driven = freshLTP();
+    LTPOutput oDriven{};
+    for (int i = 0; i < 400; ++i) oDriven = solveLTP(0.004f, V_PI_NOMINAL_N, driven);
+
+    REQUIRE(oDriven.piA < oIdle.piA);        // driven grid pulls its plate down
+    REQUIRE(oDriven.piB > oIdle.piB);        // the other side rises
+    REQUIRE(oIdle.piA < V_PI_NOMINAL_N - 1e-3f);   // not cut off at idle
+    REQUIRE(oIdle.piB < V_PI_NOMINAL_N - 1e-3f);
+}
+
 // ── Zero input: near-symmetric ───────────────────────────────
 
 TEST_CASE("LTP: zero input produces quiescent plate voltages", "[ltp]") {

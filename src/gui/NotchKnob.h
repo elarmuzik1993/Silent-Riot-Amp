@@ -22,10 +22,18 @@ public:
         repaint();
     }
 
-    // Vertical room a knob needs to render in full: the knob graphic, the value
-    // readout box, and the name below it. Lay one out shorter than this and the
-    // name is drawn past the bottom edge and silently clipped — which is exactly
-    // what used to happen to the DELAY card's knobs.
+    // Visual scale relative to the default 80px knob. 1.0 = full size (main amp
+    // knobs); 0.5 = half size (compact effect knobs). Scales the body, arc and
+    // pointer; numbered 0–10 labels are hidden below 0.75 where they'd be
+    // unreadable. Text readouts keep a legible floor.
+    void setScale(float s);
+
+    // Vertical room a knob needs to render in full *at scale 1.0*: the knob
+    // graphic, the value readout box, and the name below it. Lay one out shorter
+    // than this and the name is drawn past the bottom edge and silently clipped —
+    // which is exactly what used to happen to the DELAY card's knobs. Scaled
+    // knobs need proportionally less; the effects cards size against their own
+    // compact figure rather than this one.
     static constexpr int preferredHeight = 112;
 
 private:
@@ -59,11 +67,20 @@ private:
     float defaultVal;
     std::function<juce::String(float)> valueFormatter;
 
-    // Geometry constants (relative to 80px bounding box)
-    static constexpr float kSize     = 80.0f;
-    static constexpr float knobR     = 22.4f;   // body radius (28%)
-    static constexpr float arcR      = 28.8f;   // segment ring (36%)
-    static constexpr float labelR    = 36.8f;   // number positions (46%)
+    // Base geometry (relative to the default 80px bounding box). The instance
+    // members below are these values multiplied by `scale`.
+    static constexpr float kSizeBase  = 80.0f;
+    static constexpr float knobRBase  = 22.4f;  // body radius (28%)
+    static constexpr float arcRBase   = 28.8f;  // segment ring (36%)
+    static constexpr float labelRBase = 36.8f;  // number positions (46%)
+
+    // Scaled geometry (recomputed in setScale()).
+    float scale  = 1.0f;
+    float kSize  = kSizeBase;
+    float knobR  = knobRBase;
+    float arcR   = arcRBase;
+    float labelR = labelRBase;
+
     static constexpr float startAngle = -135.0f; // degrees
     static constexpr float endAngle   =  135.0f;
     static constexpr float sweepDeg   = 270.0f;

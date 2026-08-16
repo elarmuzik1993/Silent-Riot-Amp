@@ -196,6 +196,10 @@ SilentRiotEditor::SilentRiotEditor(SilentRiotProcessor& p)
     reverbSizeA  = std::make_unique<SliderA>(proc.apvts, IDs::REVERB_SIZE,    effectsPanel.reverbSizeKnob().getSlider());
     reverbToneA  = std::make_unique<SliderA>(proc.apvts, IDs::REVERB_TONE,    effectsPanel.reverbToneKnob().getSlider());
     widthA       = std::make_unique<SliderA>(proc.apvts, IDs::WIDTH,          effectsPanel.widthKnob().getSlider());
+    inputLevelA  = std::make_unique<SliderA>(proc.apvts, IDs::INPUT_LEVEL,
+                                             effectsPanel.inputLevelKnob().getSlider());
+    outputLevelA = std::make_unique<SliderA>(proc.apvts, IDs::OUTPUT_LEVEL,
+                                             effectsPanel.outputLevelKnob().getSlider());
 
     // Keyboard focus and accessibility.
     // Knobs: the (invisible) slider is the focusable leaf. Toggles: the
@@ -232,6 +236,7 @@ SilentRiotEditor::SilentRiotEditor(SilentRiotProcessor& p)
     {
         int order = 9;
         for (auto* k : { &effectsPanel.gateThreshKnob(), &effectsPanel.widthKnob(),
+                         &effectsPanel.inputLevelKnob(), &effectsPanel.outputLevelKnob(),
                          &effectsPanel.boostLevelKnob(),
                          &effectsPanel.boostTightKnob(), &effectsPanel.boostBrightKnob(),
                          &effectsPanel.delayTimeKnob(), &effectsPanel.delayFbKnob(),
@@ -249,8 +254,12 @@ SilentRiotEditor::SilentRiotEditor(SilentRiotProcessor& p)
         effectsPanel.delaySyncSelector().setExplicitFocusOrder(order++);
     }
 
-    irSectionBar.setExplicitFocusOrder(26);
-    advSectionBar.setExplicitFocusOrder(27);
+    // These two literals are NOT derived from the `order` variable above (which
+    // goes out of scope at the closing brace of that block) — they are hand-set
+    // to continue the sequence it produces. Adding INPUT/OUTPUT to the knob list
+    // shifted every order value after them by +2, so these must shift too.
+    irSectionBar.setExplicitFocusOrder(28);
+    advSectionBar.setExplicitFocusOrder(29);
 
     // Restore UI state
     loadUIState();

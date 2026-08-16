@@ -38,6 +38,10 @@ namespace IDs {
     static const juce::String REVERB_SIZE     = "reverbSize";    // float 0–1
     static const juce::String REVERB_TONE     = "reverbTone";    // float 0–1 (loop damping)
     static const juce::String WIDTH           = "width";         // float 0–1: 0=off (dry/mono), 1=wide
+
+    // ── Gain staging (utility trims, unity at knob centre 0.5) ──
+    static const juce::String INPUT_LEVEL  = "inputLevel";   // float 0–1: ±12 dB
+    static const juce::String OUTPUT_LEVEL = "outputLevel";  // float 0–1: silence..+12 dB
 }
 
 } // namespace sr::Params

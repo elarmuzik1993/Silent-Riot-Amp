@@ -16,6 +16,7 @@
 #include "test_helpers.h"
 #include "dsp/power/PowerSupplyModel.h"
 #include "dsp/power/SagEnvelope.h"
+#include "dsp/tubes/PentodeWaveshaper.h"
 
 using namespace sr;
 using namespace sr::test;
@@ -213,6 +214,88 @@ TEST_CASE("Sag: reset restores quiescent envelope", "[sag]") {
     sag.reset();
     REQUIRE(sag.envelope == Approx(SAG_QUIESCENT_I_N));
     REQUIRE(sag.biasOffset() == Approx(0.0f).margin(1e-6f));
+}
+
+// ── Sag reference must match the tube model (regression) ─────
+//
+// The tests above are self-consistent: envelope and reference both start from
+// the same constant, so they pass no matter what that constant is. They never
+// checked it against the PENTODE MODEL. It was wrong — SAG_QUIESCENT_I_N was
+// 96.0 while the model idles at ~28, so biasOffset() went POSITIVE and pinned at
+// the warm clamp, biasing the amp permanently ~1.5 V hot and flattening sag into
+// a constant offset across most of the gain knob.
+//
+// Physical invariant: cathode current can only RISE above idle under drive, so
+// the bias can only ever go COLDER. biasOffset() must never be positive.
+
+TEST_CASE("Sag: reference matches the pentode model's real idle current", "[sag][regression]") {
+    for (float bias : { PENTODE_BIAS_15W_N, PENTODE_BIAS_7W_N }) {
+        const float idle = pentodeQuiescentTotal(bias, V_POWER_NOMINAL_N, V_SCREEN_NOMINAL_N);
+
+        SagEnvelope sag;
+        sag.recalcCoeffs(TEST_SR);
+        sag.setQuiescent(idle);
+        sag.reset();
+
+        // Settle at the model's true idle current — offset must be zero, not railed.
+        for (int i = 0; i < 20000; ++i) sag.update(idle);
+        REQUIRE(sag.biasOffset() == Approx(0.0f).margin(1e-6f));
+    }
+}
+
+TEST_CASE("Sag: bias only goes colder once current is at or above idle", "[sag][regression]") {
+    // A push-pull pair's TOTAL cathode current never falls below its idle value —
+    // the two tubes swing differentially, so the sum rises under drive. Across
+    // that physical range the bias may only go colder (offset <= 0). Below idle
+    // is unphysical here, and the warm clamp exists only to bound that case.
+    for (float bias : { PENTODE_BIAS_15W_N, PENTODE_BIAS_7W_N }) {
+        const float idle = pentodeQuiescentTotal(bias, V_POWER_NOMINAL_N, V_SCREEN_NOMINAL_N);
+
+        SagEnvelope sag;
+        sag.recalcCoeffs(TEST_SR);
+        sag.setQuiescent(idle);
+        sag.reset();
+
+        for (float drive : { 1.0f, 1.5f, 2.0f, 3.0f, 4.0f }) {
+            for (int i = 0; i < 5000; ++i) sag.update(idle * drive);
+            REQUIRE(sag.biasOffset() <= 1e-6f);
+        }
+    }
+}
+
+TEST_CASE("Sag: drive produces a real dynamic, not a railed constant", "[sag][regression]") {
+    // The old failure mode was a CONSTANT offset: pinned at the warm clamp at idle
+    // and across most of the gain knob, so sag stopped being a dynamic at all.
+    // Distinct drive levels must give distinct bias offsets.
+    const float idle = pentodeQuiescentTotal(PENTODE_BIAS_15W_N,
+                                             V_POWER_NOMINAL_N, V_SCREEN_NOMINAL_N);
+    SagEnvelope sag;
+    sag.recalcCoeffs(TEST_SR);
+    sag.setQuiescent(idle);
+    sag.reset();
+
+    for (int i = 0; i < 5000; ++i) sag.update(idle * 1.2f);
+    const float light = sag.biasOffset();
+    for (int i = 0; i < 5000; ++i) sag.update(idle * 2.5f);
+    const float heavy = sag.biasOffset();
+
+    REQUIRE(heavy < light);                 // harder drive => colder bias
+    REQUIRE(light < 0.0f);                  // and it actually moved off zero
+}
+
+TEST_CASE("Sag: idle reference is not pinned to the warm clamp", "[sag][regression]") {
+    // The specific failure: reference above real idle current parks biasOffset()
+    // at SAG_BIAS_CLAMP_WARM_N forever.
+    const float idle = pentodeQuiescentTotal(PENTODE_BIAS_15W_N,
+                                             V_POWER_NOMINAL_N, V_SCREEN_NOMINAL_N);
+    SagEnvelope sag;
+    sag.recalcCoeffs(TEST_SR);
+    sag.setQuiescent(idle);
+    sag.reset();
+    for (int i = 0; i < 20000; ++i) sag.update(idle);
+
+    REQUIRE(sag.biasOffset() < SAG_BIAS_CLAMP_WARM_N - 1e-6f);
+    REQUIRE(idle > 0.0f);
 }
 
 TEST_CASE("Sag: envelope tracks total plate current", "[sag]") {

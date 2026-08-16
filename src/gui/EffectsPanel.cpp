@@ -14,10 +14,16 @@ EffectsPanel::EffectsPanel()
     addAndMakeVisible(delaySync);
     delaySync.setTitleText("Delay sync");
 
-    for (auto* k : { &gateThresh, &width, &boostLevel, &boostTight, &boostBright,
+    for (auto* k : { &gateThresh, &width, &inputLevel, &outputLevel,
+                     &boostLevel, &boostTight, &boostBright,
                      &delayTime, &delayFb, &delayMix, &delayTone,
                      &reverbMix, &reverbSize, &reverbTone })
+    {
+        // Effect knobs render at half the size of the main amp knobs so the
+        // effects section reads as compact.
+        k->setScale(0.5f);
         addAndMakeVisible(*k);
+    }
 
     // Readouts in real units where the parameter has one. TIME mirrors the
     // 0–1 → ms mapping the processor applies (see PluginProcessor::processBlock),
@@ -35,22 +41,33 @@ EffectsPanel::EffectsPanel()
     reverbMix.setValueFormatter(percent);
 }
 
-// Card chrome metrics, shared by paint() and resized(). Kept tight so the
-// DELAY card can fit its sync row *and* a full-height knob row.
-static constexpr int kCardPadY = 5;
-static constexpr int kTitleH   = 15;
-static constexpr int kRowGap   = 3;
-static constexpr int kSyncH    = 17;
+// Card geometry — kept in sync between paint() and resized(). Cards are a
+// fixed compact size (sized to hug the half-scale knobs + the delay sync row)
+// and the 2×2 grid is centred in the panel, rather than stretched to fill it —
+// otherwise the small knobs float in oversized boxes.
+namespace {
+    constexpr int kCardGap = 12;
+    constexpr int kCardW   = 290;  // floor set by the 8-division delay sync row
+    constexpr int kCardH   = 120;  // title + (optional sync row) + one knob row
 
-// Card geometry — kept in sync between paint() and resized().
+    // Card chrome metrics, shared by paint() and resized(). Kept tight so the
+    // DELAY card can fit its sync row *and* a knob row inside kCardH.
+    constexpr int kCardPadY = 5;
+    constexpr int kTitleH   = 15;
+    constexpr int kRowGap   = 3;
+    constexpr int kSyncH    = 17;
+}
+
+
 static juce::Rectangle<int> cardBounds(juce::Rectangle<int> area, int col, int row)
 {
-    const int gap = 10;
-    const int cardW = (area.getWidth() - gap) / 2;
-    const int cardH = (area.getHeight() - gap) / 2;
-    return { area.getX() + col * (cardW + gap),
-             area.getY() + row * (cardH + gap),
-             cardW, cardH };
+    const int gridW = kCardW * 2 + kCardGap;
+    const int gridH = kCardH * 2 + kCardGap;
+    const int ox = area.getCentreX() - gridW / 2;
+    const int oy = area.getCentreY() - gridH / 2;
+    return { ox + col * (kCardW + kCardGap),
+             oy + row * (kCardH + kCardGap),
+             kCardW, kCardH };
 }
 
 void EffectsPanel::paint(juce::Graphics& g)
@@ -80,13 +97,17 @@ void EffectsPanel::layoutKnobRow(juce::Rectangle<int> row, std::initializer_list
 {
     const int n = static_cast<int>(knobs.size());
     if (n == 0) return;
-    const int knobW = juce::jmin(80, row.getWidth() / n);
+    // Effect knobs are sized at half the main amp knobs (100x120) so the
+    // effects section reads as compact next to the amp controls.
+    const int knobW = juce::jmin(50, row.getWidth() / n);
     const int totalW = knobW * n;
     int x = row.getCentreX() - totalW / 2;
-    // Never give a knob less than it needs to draw its name (see
-    // NotchKnob::preferredHeight); centre it when the card has room to spare.
-    const int h = juce::jmin(row.getHeight(), NotchKnob::preferredHeight);
-    const int y = row.getY() + (row.getHeight() - h) / 2;
+    // Never give a knob less than it needs to draw its name; centre it when the
+    // card has room to spare. 72 is the half-scale equivalent of
+    // NotchKnob::preferredHeight (which is the figure for a full-size knob) —
+    // go below it and the names are drawn past the bottom edge and vanish.
+    const int h = juce::jmin(row.getHeight(), 72);
+    const int y = row.getY() + (row.getHeight() - h) / 2;  // vertically centred
     for (auto* k : knobs)
     {
         k->setBounds(x, y, knobW, h);
@@ -110,13 +131,15 @@ void EffectsPanel::resized()
 {
     auto area = getLocalBounds().reduced(10);
 
-    // UTILITY card: no toggle — both knobs self-gate (THRESH 0 = gate off,
-    // WIDTH centre = unity). Lay the title strip, then the two knobs.
+    // UTILITY card: no toggle — every knob self-gates or is unity-at-centre
+    // (THRESH 0 = gate off, WIDTH 0 = dry, INPUT/OUTPUT centre = unity).
+    // Four knobs take layoutKnobRow from 80 px to ~76 px each; that fits, but
+    // check the labels render if you add a fifth.
     {
         auto inner = cardBounds(area, 0, 0).reduced(10, kCardPadY);
         inner.removeFromTop(kTitleH);   // title strip ("UTILITY")
         inner.removeFromTop(kRowGap);
-        layoutKnobRow(inner, { &gateThresh, &width });
+        layoutKnobRow(inner, { &gateThresh, &width, &inputLevel, &outputLevel });
     }
     layoutCard(cardBounds(area, 1, 0), boostTgl,  { &boostLevel, &boostTight, &boostBright });
     layoutCard(cardBounds(area, 1, 1), reverbTgl, { &reverbMix, &reverbSize, &reverbTone });

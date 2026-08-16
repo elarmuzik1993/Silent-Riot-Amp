@@ -14,12 +14,19 @@
 
 namespace sr {
 
-// 0.0f is the safe fallback for every one of these params — it's already
-// this project's "neutral/bypassed" value (gate threshold 0 = always-open,
-// boost/delay/reverb knobs at 0 = no effect).
+// Most params in this project are "0 = neutral/bypassed" (gate threshold 0 =
+// always-open, boost/delay/reverb knobs at 0 = no effect), so 0.0f is the right
+// fallback for them. Centre-detented trims are NOT: for those, 0.0f means full
+// cut — and on the output trim, silence — so a single NaN from a host would mute
+// the plugin. Those callers pass their own neutral value via the overload.
+inline float sanitizeUnitParamOr(float v, float fallback)
+{
+    return std::isfinite(v) ? std::clamp(v, 0.0f, 1.0f) : fallback;
+}
+
 inline float sanitizeUnitParam(float v)
 {
-    return std::isfinite(v) ? std::clamp(v, 0.0f, 1.0f) : 0.0f;
+    return sanitizeUnitParamOr(v, 0.0f);
 }
 
 } // namespace sr

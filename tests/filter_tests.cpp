@@ -16,6 +16,7 @@
 #include "dsp/filters/OnePole.h"
 #include "dsp/filters/Biquad.h"
 #include "dsp/filters/DynamicMillerLP.h"
+#include "dsp/filters/FilterBank.h"
 
 using namespace sr;
 using namespace sr::test;
@@ -293,8 +294,40 @@ TEST_CASE("Biquad: reset clears state", "[filter]") {
     Biquad b;
     b.makeLowPass(1000.0f, 0.707f, TEST_SR);
     for (int i = 0; i < 100; ++i) b.process(1.0f);
-    
+
     b.reset();
     REQUIRE(b.z1 == 0.0f);
     REQUIRE(b.z2 == 0.0f);
+}
+
+// ── recalcAll resets the shape EQ to noon (regression) ───────
+//
+// FilterBank::recalcAll ends with updateShape(0.5f), so ANY rate/oversample
+// recalc silently discards the knob's actual shape position. processBlock only
+// re-applies the shape when the smoothed value has moved by >0.001, so after an
+// oversample switch the caller MUST invalidate its cached shape value or Shape
+// stays stuck at noon until the user touches the knob. This test pins the
+// behaviour that makes that invalidation necessary — see the
+// `lastShapeCoeffVal = -1.0f` reset in PluginProcessor's oversample commit.
+
+TEST_CASE("FilterBank: recalcAll resets shape EQ to noon", "[filter][regression]") {
+    FilterBank fb;
+    fb.recalcAll(48000.0f, 4);
+
+    // Park the shape hard away from noon and capture the coefficients.
+    fb.updateShape(0.0f);
+    const float midGainAtZero = fb.shapeMidBell.gainDb;
+
+    fb.updateShape(0.5f);
+    const float midGainAtNoon = fb.shapeMidBell.gainDb;
+    REQUIRE(midGainAtZero != Approx(midGainAtNoon));
+
+    // Now set it away from noon again and trigger a rate recalc.
+    fb.updateShape(0.0f);
+    REQUIRE(fb.shapeMidBell.gainDb == Approx(midGainAtZero));
+
+    fb.recalcAll(48000.0f, 8);   // e.g. an oversample switch
+
+    // recalcAll clobbered the shape back to noon — the caller must re-apply it.
+    REQUIRE(fb.shapeMidBell.gainDb == Approx(midGainAtNoon));
 }

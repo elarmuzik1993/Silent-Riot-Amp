@@ -26,6 +26,26 @@
 // Params (displayed 0..10 for knobs, mapped to internal 0..1 here as 0..1):
 //   --gain 0..1  --shape 0..1  --volume 0..1
 //   --7w 0|1  --cab 0|1  --power 0|1  --os 0|1|2 (2x/4x/8x)
+//   --in-trim 0..1  --out-trim 0..1   (INPUT/OUTPUT gain-staging trims, Task 3
+//                                       of the I/O level trims plan; default 0.5
+//                                       = unity on both, matching the params'
+//                                       own default so existing invocations,
+//                                       including signoff.py, are unaffected.
+//                                       Taper is sr::inputTrimGain/outputTrimGain
+//                                       in TriodeWaveshaper.h: input is linear
+//                                       +/-12dB; output is unity at 0.5, exact
+//                                       silence at 0.0, +12dB at 1.0, and steeper
+//                                       below 0.5 than above -- e.g. 0.4 = -12dB,
+//                                       0.25 = -30dB. To sanity-check the trims
+//                                       are actually wired end-to-end, render at
+//                                       unity and away from it and compare
+//                                       measured level, e.g.:
+//                                         sr_render --out /tmp/unity --signal note:110:0.5:2.0 --out-trim 0.5
+//                                         sr_render --out /tmp/cut   --signal note:110:0.5:2.0 --out-trim 0.4
+//                                         python tools/sr_analyze.py level /tmp/unity.f32
+//                                         python tools/sr_analyze.py level /tmp/cut.f32
+//                                       peak_dbfs/rms_dbfs should differ by
+//                                       ~12 dB.)
 //   --ir FILE              load a user IR (enables IR convolution path)
 //   --sr 44100  --block 512  --warmup-ms 250
 // ═══════════════════════════════════════════════════════════════════════════
@@ -225,6 +245,12 @@ int main(int argc, char** argv)
     setParam(proc.apvts, sr::Params::IDs::CAB_SIM, a.num("cab", 1.0f));
     setParam(proc.apvts, sr::Params::IDs::POWER, a.num("power", 1.0f));
     setParam(proc.apvts, sr::Params::IDs::OVERSAMPLE, a.num("os", 1.0f));  // 0=2x 1=4x 2=8x
+    // Gain-staging trims (Task 3, USE-59). Both default to 0.5 = unity, same as
+    // the parameter's own default, so a caller that never passes these flags
+    // (e.g. every existing signoff.py invocation) renders bit-identically to
+    // before these flags existed.
+    setParam(proc.apvts, sr::Params::IDs::INPUT_LEVEL, a.num("in-trim", 0.5f));
+    setParam(proc.apvts, sr::Params::IDs::OUTPUT_LEVEL, a.num("out-trim", 0.5f));
 
     if (a.str("ir").isNotEmpty())
         proc.loadUserIR(juce::File(a.str("ir")));  // synchronous; enables IR path

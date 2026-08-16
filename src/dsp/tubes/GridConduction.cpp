@@ -13,15 +13,35 @@ float applyGridConduction(float vGrid, GridConductionModel& model) {
         return vGrid - model.couplingCapCharge;
     }
 
-    // Grid conducts — impedance loading
-    float conductionDepth = std::tanh(vAbove * 3.0f);
-    float effectiveGridR  = model.gridResistance / (conductionDepth + 1e-10f);
-    float loadingFactor   = effectiveGridR / (effectiveGridR + model.sourceResistance);
+    // ── Grid conducts: DIODE clamp, not a resistive divider ──────────────────
+    //
+    // The grid-cathode junction is a diode. Once the grid swings positive its
+    // current rises exponentially, so the driving stage's source impedance pins
+    // the grid a couple of volts above the conduction threshold no matter how
+    // hard it is driven. Inverting an exponential I-V gives a LOGARITHMIC law.
+    //
+    // The old model was a fixed resistive divider,
+    //     vLoaded = threshold + vAbove * Rg/(Rg+Rs)
+    // which can only ever ATTENUATE — it never clamps. At the PI that ratio is
+    // 0.23, so a ~520 V swing still delivered a 121 V grid on a 12AX7 biased at
+    // -1.5 V. That is what left the whole power section overdriven at every knob
+    // position and flattened the amp's dynamics.
+    //
+    // log1p is transparent below the knee (slope 1 at vAbove = 0, so this is C1
+    // continuous with the non-conducting branch above) and grows only as log()
+    // above it. The knee scales with the stage's static loading ratio, so a
+    // low-impedance source (V1a: 100R) clamps loosely and a high-impedance one
+    // (PI: 47K) clamps hard — the same per-stage character the divider had.
+    const float loadingFactor = model.gridResistance
+                              / (model.gridResistance + model.sourceResistance);
+    const float knee = std::max(GRID_CLAMP_KNEE_N * loadingFactor, 1.0e-9f);
 
-    float vLoaded = model.conductionThreshold + vAbove * loadingFactor;
+    float vLoaded = model.conductionThreshold + knee * std::log1p(vAbove / knee);
 
-    // Coupling cap charge (bias shift)
-    float gridCurrent = vAbove * (1.0f - loadingFactor);
+    // Coupling cap charge (bias shift). Driven by what the source impedance has
+    // to absorb — the same quantity the divider fed it, so GRID_CHARGE_RATE and
+    // MAX_BIAS_SHIFT_N keep their calibrated meaning.
+    float gridCurrent = vGrid - vLoaded;
     model.lastGridCurrent = gridCurrent;
     model.couplingCapCharge += gridCurrent * GRID_CHARGE_RATE;
     float maxCharge = std::abs(MAX_BIAS_SHIFT_N);

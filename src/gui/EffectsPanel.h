@@ -16,12 +16,13 @@ public:
     void paint(juce::Graphics&) override;
     void resized() override;
 
-    // Two card rows tall enough to fully render NotchKnob
-    // (NotchKnob::preferredHeight) plus each card's title strip — and, in the
-    // DELAY card, its extra sync-division row. That card is the binding
-    // constraint: at the old 320 its knob row came out 21px short and the knob
-    // names were drawn past the bottom edge, so they never appeared.
-    static constexpr int panelHeight = 352;
+    // Two compact card rows sized to the half-scale effect knobs (knob + value
+    // readout + label ≈ 64 px) plus each card's title strip (and the delay
+    // card's sync row). Kept in sync with kCardH/kCardGap in EffectsPanel.cpp.
+    // The DELAY card is the binding constraint — it carries the sync-division
+    // row *and* a knob row, so it is the first place a too-short panel shows up
+    // as knob names drawn past the bottom edge and silently clipped.
+    static constexpr int panelHeight = 272;
 
     // Toggles (the UTILITY card's gate/width knobs self-gate — no toggle)
     ToggleSwitch& boostToggle()  { return boostTgl; }
@@ -32,6 +33,8 @@ public:
     // Knobs
     NotchKnob& gateThreshKnob()  { return gateThresh; }
     NotchKnob& widthKnob()       { return width; }
+    NotchKnob& inputLevelKnob()  { return inputLevel; }
+    NotchKnob& outputLevelKnob() { return outputLevel; }
     NotchKnob& boostLevelKnob()  { return boostLevel; }
     NotchKnob& boostTightKnob()  { return boostTight; }
     NotchKnob& boostBrightKnob() { return boostBright; }
@@ -62,6 +65,8 @@ private:
 
     NotchKnob gateThresh { "THRESH", 0.0f };
     NotchKnob width      { "WIDTH",  0.0f };   // 0=off (dry/mono), 10=wide
+    NotchKnob inputLevel { "INPUT",  0.5f };   // centre = unity, ±12 dB
+    NotchKnob outputLevel{ "OUTPUT", 0.5f };   // centre = unity, silence..+12 dB
     NotchKnob boostLevel { "LEVEL",  0.5f };
     NotchKnob boostTight { "TIGHT",  0.0f };
     NotchKnob boostBright{ "BRIGHT", 0.0f };
