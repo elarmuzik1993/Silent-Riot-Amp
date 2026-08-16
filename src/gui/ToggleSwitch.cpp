@@ -111,7 +111,7 @@ void ToggleSwitch::paintLed(juce::Graphics& g, juce::Rectangle<float> bounds)
     // same animation the pill uses to slide its thumb.
     if (thumbPos > 0.01f)
     {
-        g.setColour(activeColor.withAlpha(0.30f * thumbPos));
+        g.setColour(activeColor.withAlpha(0.20f * thumbPos));
         g.fillRoundedRectangle(led.expanded(kLedGlow), r + kLedGlow);
     }
 
