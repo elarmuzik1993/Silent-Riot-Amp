@@ -56,9 +56,12 @@ private:
     static constexpr float trackW    = 34.0f;
     static constexpr float trackH    = 16.0f;
     static constexpr float thumbD    = 12.0f;
+    // A hairline, not a pill. kLedH + kLedGlow is deliberately chosen to make
+    // minHeight() land on a whole number — it truncates, so a fractional sum
+    // would leave the bar half a pixel short of its own reserved space.
     static constexpr float kLedW     = 16.0f;  // flat bar, not a round lamp
-    static constexpr float kLedH     =  3.0f;
-    static constexpr float kLedGlow  =  3.0f;  // halo radius, lit state only
+    static constexpr float kLedH     =  1.5f;
+    static constexpr float kLedGlow  =  1.5f;  // halo radius, lit state only
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(ToggleSwitch)
 };
