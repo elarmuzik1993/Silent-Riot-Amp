@@ -16,9 +16,10 @@ public:
     void paint(juce::Graphics&) override;
     void resized() override;
 
-    // Two card rows tall enough to fully render NotchKnob (knob + value
-    // readout + label ≈ 112 px) plus each card's title strip.
-    static constexpr int panelHeight = 320;
+    // Two compact card rows sized to the half-scale effect knobs (knob + value
+    // readout + label ≈ 64 px) plus each card's title strip (and the delay
+    // card's sync row). Kept in sync with kCardH/kCardGap in EffectsPanel.cpp.
+    static constexpr int panelHeight = 272;
 
     // Toggles (the UTILITY card's gate/width knobs self-gate — no toggle)
     ToggleSwitch& boostToggle()  { return boostTgl; }

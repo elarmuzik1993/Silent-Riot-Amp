@@ -17,18 +17,33 @@ EffectsPanel::EffectsPanel()
                      &boostLevel, &boostTight, &boostBright,
                      &delayTime, &delayFb, &delayMix, &delayTone,
                      &reverbMix, &reverbSize, &reverbTone })
+    {
+        // Effect knobs render at half the size of the main amp knobs so the
+        // effects section reads as compact.
+        k->setScale(0.5f);
         addAndMakeVisible(*k);
+    }
 }
 
-// Card geometry — kept in sync between paint() and resized().
+// Card geometry — kept in sync between paint() and resized(). Cards are a
+// fixed compact size (sized to hug the half-scale knobs + the delay sync row)
+// and the 2×2 grid is centred in the panel, rather than stretched to fill it —
+// otherwise the small knobs float in oversized boxes.
+namespace {
+    constexpr int kCardGap = 12;
+    constexpr int kCardW   = 290;  // floor set by the 8-division delay sync row
+    constexpr int kCardH   = 120;  // title + (optional sync row) + one knob row
+}
+
 static juce::Rectangle<int> cardBounds(juce::Rectangle<int> area, int col, int row)
 {
-    const int gap = 10;
-    const int cardW = (area.getWidth() - gap) / 2;
-    const int cardH = (area.getHeight() - gap) / 2;
-    return { area.getX() + col * (cardW + gap),
-             area.getY() + row * (cardH + gap),
-             cardW, cardH };
+    const int gridW = kCardW * 2 + kCardGap;
+    const int gridH = kCardH * 2 + kCardGap;
+    const int ox = area.getCentreX() - gridW / 2;
+    const int oy = area.getCentreY() - gridH / 2;
+    return { ox + col * (kCardW + kCardGap),
+             oy + row * (kCardH + kCardGap),
+             kCardW, kCardH };
 }
 
 void EffectsPanel::paint(juce::Graphics& g)
@@ -58,11 +73,13 @@ void EffectsPanel::layoutKnobRow(juce::Rectangle<int> row, std::initializer_list
 {
     const int n = static_cast<int>(knobs.size());
     if (n == 0) return;
-    const int knobW = juce::jmin(80, row.getWidth() / n);
+    // Effect knobs are sized at half the main amp knobs (100x120) so the
+    // effects section reads as compact next to the amp controls.
+    const int knobW = juce::jmin(50, row.getWidth() / n);
     const int totalW = knobW * n;
     int x = row.getCentreX() - totalW / 2;
-    const int y = row.getY();
-    const int h = juce::jmin(row.getHeight(), 112);
+    const int h = juce::jmin(row.getHeight(), 72);
+    const int y = row.getY() + (row.getHeight() - h) / 2;  // vertically centred
     for (auto* k : knobs)
     {
         k->setBounds(x, y, knobW, h);
