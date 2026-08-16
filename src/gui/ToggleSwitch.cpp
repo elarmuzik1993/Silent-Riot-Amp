@@ -76,20 +76,62 @@ void ToggleSwitch::timerCallback()
     repaint();
 }
 
+void ToggleSwitch::setStyle(Style s)
+{
+    if (style == s)
+        return;
+    style = s;
+    repaint();
+}
+
 void ToggleSwitch::paint(juce::Graphics& g)
 {
     auto bounds = getLocalBounds().toFloat();
-    float labelH = 14.0f;
 
-    // Label above
+    // Label above — shared by both styles
     g.setFont(Fonts::spaceMono(Fonts::Sizes::small));
     g.setColour(Colours::label);
-    g.drawText(label.toUpperCase(), juce::Rectangle<float>(0, 0, bounds.getWidth(), labelH),
+    g.drawText(label.toUpperCase(), juce::Rectangle<float>(0, 0, bounds.getWidth(), kLabelH),
                juce::Justification::centred, false);
 
+    if (style == Style::Led)
+        paintLed(g, bounds);
+    else
+        paintSwitch(g, bounds);
+}
+
+void ToggleSwitch::paintLed(juce::Graphics& g, juce::Rectangle<float> bounds)
+{
+    const auto led = juce::Rectangle<float>(kLedW, kLedH)
+                         .withCentre({ bounds.getWidth() * 0.5f,
+                                       kLabelH + kLabelGap + kLedH * 0.5f });
+    const float r = kLedH * 0.5f;   // fully rounded caps
+
+    // Halo only once lit, and scaled by thumbPos so the bar fades up on the
+    // same animation the pill uses to slide its thumb.
+    if (thumbPos > 0.01f)
+    {
+        g.setColour(activeColor.withAlpha(0.30f * thumbPos));
+        g.fillRoundedRectangle(led.expanded(kLedGlow), r + kLedGlow);
+    }
+
+    // Unlit stays a visible dark bar, not an empty gap — an absent indicator and
+    // an off one have to look different or the control reads as missing.
+    g.setColour(Colours::track.interpolatedWith(activeColor, thumbPos));
+    g.fillRoundedRectangle(led, r);
+
+    if (hasKeyboardFocus(false))
+    {
+        g.setColour(Colours::accent.withAlpha(0.7f));
+        g.drawRoundedRectangle(led.expanded(kLedGlow + 1.5f), r + kLedGlow + 1.5f, 1.0f);
+    }
+}
+
+void ToggleSwitch::paintSwitch(juce::Graphics& g, juce::Rectangle<float> bounds)
+{
     // Track
     float trackX = (bounds.getWidth() - trackW) * 0.5f;
-    float trackY = labelH + 4.0f;
+    float trackY = kLabelH + kLabelGap;
     float trackRadius = trackH * 0.5f;
 
     juce::Colour trackColour = button.getToggleState()
