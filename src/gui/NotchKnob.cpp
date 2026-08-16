@@ -1,21 +1,22 @@
 #include "NotchKnob.h"
 #include "ColourPalette.h"
 #include "FontData.h"
+#include "LookAndFeel.h"
 
 namespace sr {
-
-static float degToRad(float deg) { return deg * juce::MathConstants<float>::pi / 180.0f; }
 
 NotchKnob::NotchKnob(const juce::String& l, float defaultValue)
     : label(l), defaultVal(defaultValue)
 {
     slider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
     slider.setTextBoxStyle(juce::Slider::NoTextBox, true, 0, 0);
+    // JUCE's default rotary sweep is not 270° — set ours explicitly so the
+    // ticks in drawRotarySlider land where the value actually does.
+    slider.setRotaryParameters(kRotaryStartAngle, kRotaryEndAngle, true);
     slider.setRange(0.0, 1.0, 0.001);
     slider.setMouseDragSensitivity(160);
     slider.setDoubleClickReturnValue(true, defaultVal);
-    // Make slider invisible — we paint custom graphics
-    slider.setAlpha(0.0f);
+    // Repaints this component's readout; the slider repaints itself.
     slider.onValueChange = [this] { repaint(); };
     addAndMakeVisible(slider);
 }
@@ -29,51 +30,49 @@ void NotchKnob::setKnobMode(int mode)
 
 void NotchKnob::setScale(float s)
 {
-    scale  = juce::jmax(0.1f, s);
-    kSize  = kSizeBase  * scale;
-    knobR  = knobRBase  * scale;
-    arcR   = arcRBase   * scale;
-    labelR = labelRBase * scale;
+    scale = juce::jmax(0.1f, s);
+    // Floors, not plain products — the strip carries text. At scale 0.5 an
+    // unfloored label row is 7px and the name disappears, which is the exact
+    // failure preferredHeight exists to warn about.
+    readoutH    = juce::jmax(13.0f, kReadoutHBase    * scale);
+    readoutGap  = juce::jmax( 2.0f, kReadoutGapBase  * scale);
+    labelH      = juce::jmax(12.0f, kLabelHBase      * scale);
+    readoutMinW = juce::jmax(28.0f, kReadoutMinWBase * scale);
     resized();
     repaint();
 }
 
 void NotchKnob::resized()
 {
-    // Slider occupies the knob area (top kSize px)
-    auto knobArea = getLocalBounds().removeFromTop(static_cast<int>(kSize));
-    slider.setBounds(knobArea);
+    // Reserve the readout + label strip, then centre a square knob in what's
+    // left — drawRotarySlider takes jmin(w,h), so a non-square slider would
+    // just pad one axis.
+    auto area = getLocalBounds();
+    area.removeFromBottom(juce::roundToInt(stripH()));
+    const int side = juce::jmin(area.getWidth(), area.getHeight());
+    slider.setBounds(area.withSizeKeepingCentre(side, side));
 }
 
 void NotchKnob::paint(juce::Graphics& g)
 {
-    auto bounds = getLocalBounds();
-    float cx = bounds.getWidth() * 0.5f;
-    float cy = kSize * 0.5f;
+    auto bounds     = getLocalBounds().toFloat();
+    auto labelBox   = bounds.removeFromBottom(labelH);
+    bounds.removeFromBottom(readoutGap);
+    auto readoutRow = bounds.removeFromBottom(readoutH);
 
-    float pos = static_cast<float>(slider.getValue());
-    float angleDeg = startAngle + pos * sweepDeg;
-    float angleRad = degToRad(angleDeg);
-
-    drawSegmentedArc(g, cx, cy, pos);
-    if (scale >= 0.75f)          // numbers become unreadable on compact knobs
-        drawNumberedLabels(g, cx, cy);
-    drawKnobBody(g, cx, cy, angleRad);
-    drawNotchPointer(g, cx, cy, angleRad);
-
-    // Value readout — text keeps a legible floor so compact knobs stay readable
-    juce::String valText = valueFormatter ? valueFormatter(pos)
-                                          : juce::String(pos * 10.0f, 1);
+    // Value readout — knobs are 0..1 internally, displayed ×10 unless the owner
+    // supplied a formatter (DELAY TIME's ms, the % knobs).
+    const float pos = static_cast<float>(slider.getValue());
+    const juce::String valText = valueFormatter ? valueFormatter(pos)
+                                                : juce::String(pos * 10.0f, 1);
     auto valFont = Fonts::spaceMono(juce::jmax(Fonts::Sizes::micro,
                                                Fonts::Sizes::value * scale));
     g.setFont(valFont);
 
-    float valW = valFont.getStringWidthFloat(valText) + juce::jmax(12.0f, 20.0f * scale);
-    float valH = juce::jmax(13.0f, 16.0f * scale);
-    float valX = cx - valW * 0.5f;
-    float valY = cy + kSize * 0.5f - 6.0f * scale;
+    const float valW = juce::jmax(readoutMinW,
+                                  valFont.getStringWidthFloat(valText) + 20.0f * scale);
+    auto valBox = readoutRow.withSizeKeepingCentre(valW, readoutRow.getHeight());
 
-    juce::Rectangle<float> valBox(valX, valY, valW, valH);
     g.setColour(Colours::surface);
     g.fillRoundedRectangle(valBox, 3.0f);
     g.setColour(Colours::border);
@@ -81,118 +80,36 @@ void NotchKnob::paint(juce::Graphics& g)
     g.setColour(Colours::bright);
     g.drawText(valText, valBox, juce::Justification::centred, false);
 
-    // Label below readout
-    auto labelFont = Fonts::spaceMono(juce::jmax(Fonts::Sizes::micro,
-                                                 Fonts::Sizes::body * scale), true);
-    g.setFont(labelFont);
+    // Parameter name
+    g.setFont(Fonts::spaceMono(juce::jmax(Fonts::Sizes::micro,
+                                          Fonts::Sizes::body * scale), true));
     g.setColour(Colours::label);
-    float labelY = valY + valH + juce::jmax(2.0f, 4.0f * scale);
-    juce::Rectangle<float> labelBox(0.0f, labelY, static_cast<float>(bounds.getWidth()),
-                                    juce::jmax(12.0f, 14.0f * scale));
     g.drawText(label.toUpperCase(), labelBox, juce::Justification::centred, false);
 }
 
-void NotchKnob::drawSegmentedArc(juce::Graphics& g, float cx, float cy, float pos) const
+void NotchKnob::KnobSlider::paint(juce::Graphics& g)
 {
-    // 20 segments evenly distributed across the 270° sweep (CW from -135° to +135°)
-    float slotDeg = sweepDeg / static_cast<float>(numSegments); // 13.5° per slot
-    float activeSegments = pos * static_cast<float>(numSegments);
+    juce::Slider::paint(g);
 
-    for (int i = 0; i < numSegments; ++i)
+    // Keyboard focus ring. The visible parameter name is a sibling of the
+    // slider rather than its label, so focus has to be indicated on the knob.
+    if (hasKeyboardFocus(false))
     {
-        // Knob degrees: -135 (label "0") to +135 (label "10"), CW in screen space
-        float segStartDeg = startAngle + static_cast<float>(i) * slotDeg;
-        float segEndDeg   = segStartDeg + slotDeg - segGapDeg;
-
-        // JUCE addArc uses clockwise radians where 0 = top (12 o'clock).
-        // Our knob degrees already use 0 = top convention, so just convert to radians.
-        float segStartRad = degToRad(segStartDeg);
-        float segEndRad   = degToRad(segEndDeg);
-
-        juce::Path seg;
-        seg.addArc(cx - arcR, cy - arcR, arcR * 2.0f, arcR * 2.0f,
-                   segStartRad, segEndRad, true);
-
-        bool active = (static_cast<float>(i) < activeSegments);
-        if (active)
-        {
-            g.setColour(Colours::accent);
-            g.strokePath(seg, juce::PathStrokeType(juce::jmax(1.5f, 3.0f * scale),
-                                                    juce::PathStrokeType::curved,
-                                                    juce::PathStrokeType::rounded));
-        }
-        else
-        {
-            // 0.9 alpha, not 0.5 — the inactive track has to stay visible as a
-            // track, otherwise the knob reads as having no travel left to give.
-            g.setColour(Colours::track.withAlpha(0.9f));
-            g.strokePath(seg, juce::PathStrokeType(juce::jmax(1.0f, 2.0f * scale),
-                                                    juce::PathStrokeType::curved,
-                                                    juce::PathStrokeType::rounded));
-        }
+        g.setColour(Colours::accent);
+        g.drawRoundedRectangle(getLocalBounds().toFloat().reduced(1.0f), 4.0f, 2.0f);
     }
 }
 
-void NotchKnob::drawNumberedLabels(juce::Graphics& g, float cx, float cy) const
+void NotchKnob::KnobSlider::focusGained(FocusChangeType c)
 {
-    auto font = Fonts::spaceMono(Fonts::Sizes::micro);
-    g.setFont(font);
-    g.setColour(Colours::dim);
-
-    for (int i = 0; i < numLabels; ++i)
-    {
-        float t = static_cast<float>(i) / static_cast<float>(numLabels - 1);
-        float angleDeg = startAngle + t * sweepDeg;
-        float angleRad = degToRad(angleDeg - 90.0f);
-
-        float lx = cx + labelR * std::cos(angleRad);
-        float ly = cy + labelR * std::sin(angleRad);
-
-        juce::String numText = juce::String(i);
-        juce::Rectangle<float> numBox(lx - 8.0f, ly - 6.0f, 16.0f, 12.0f);
-        g.drawText(numText, numBox, juce::Justification::centred, false);
-    }
+    juce::Slider::focusGained(c);
+    repaint();
 }
 
-void NotchKnob::drawKnobBody(juce::Graphics& g, float cx, float cy, float /*angle*/) const
+void NotchKnob::KnobSlider::focusLost(FocusChangeType c)
 {
-    // Filled circle
-    g.setColour(Colours::surface);
-    g.fillEllipse(cx - knobR, cy - knobR, knobR * 2.0f, knobR * 2.0f);
-    g.setColour(Colours::border);
-    g.drawEllipse(cx - knobR, cy - knobR, knobR * 2.0f, knobR * 2.0f, 1.0f);
-}
-
-void NotchKnob::drawNotchPointer(juce::Graphics& g, float cx, float cy, float angleRad) const
-{
-    // Filled triangle — tip at knobR+1, base at knobR-7, ±8° spread (scaled)
-    float tipDist = knobR + 1.0f * scale;
-    float baseDist = knobR - 7.0f * scale;
-    float spreadRad = degToRad(8.0f);
-
-    // Tip point (along angle direction, using screen coords where 0=top)
-    float dirX = std::cos(angleRad - juce::MathConstants<float>::halfPi);
-    float dirY = std::sin(angleRad - juce::MathConstants<float>::halfPi);
-
-    float tipX = cx + dirX * tipDist;
-    float tipY = cy + dirY * tipDist;
-
-    // Base points (spread perpendicular to angle)
-    float baseAngleL = angleRad - juce::MathConstants<float>::halfPi - spreadRad;
-    float baseAngleR = angleRad - juce::MathConstants<float>::halfPi + spreadRad;
-    float baseX1 = cx + std::cos(baseAngleL) * baseDist;
-    float baseY1 = cy + std::sin(baseAngleL) * baseDist;
-    float baseX2 = cx + std::cos(baseAngleR) * baseDist;
-    float baseY2 = cy + std::sin(baseAngleR) * baseDist;
-
-    juce::Path notch;
-    notch.startNewSubPath(tipX, tipY);
-    notch.lineTo(baseX1, baseY1);
-    notch.lineTo(baseX2, baseY2);
-    notch.closeSubPath();
-
-    g.setColour(Colours::accent.withAlpha(0.9f));
-    g.fillPath(notch);
+    juce::Slider::focusLost(c);
+    repaint();
 }
 
 } // namespace sr
