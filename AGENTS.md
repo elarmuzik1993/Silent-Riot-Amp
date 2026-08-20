@@ -1,5 +1,7 @@
 # Silent Riot Project Instructions
 
+Obsidian: [[Silent Riot]]
+
 ## Project Overview
 
 Silent Riot is a JUCE 7 amp simulator plugin built with C++17, CMake, and Ninja on Ubuntu Linux. The product target is `SilentRiot`; the plugin/product name is `Silent Riot`.
@@ -26,8 +28,10 @@ Silent Riot is a JUCE 7 amp simulator plugin built with C++17, CMake, and Ninja 
 ## GUI Rules
 
 - Follow the existing custom JUCE component style in `src/gui/`.
-- Use the project colour palette, font helpers, and `SilentRiotLookAndFeel`.
-- Preserve the fixed-size window plus X11 shape-mask strategy for collapsible panels.
+- Use the project colour palette and font helpers — take type sizes from `Fonts::Sizes`, never a bare numeric font size.
+- Knob faces are painted by `SilentRiotLookAndFeel::drawRotarySlider`, not by the component. Any rotary slider using this LookAndFeel must call `setRotaryParameters(kRotaryStartAngle, kRotaryEndAngle, true)` or its ticks won't match its value.
+- The window is sized to content height by `applyShapeMask()` (the X11 shape-mask approach it replaced is gone). Note it does **not** clamp to the display work area, so tall panel combinations can exceed the screen.
+- **Size a child against what it needs to paint, not against the row it sits in.** JUCE clips `paint()` to a component's own bounds and reports nothing, so an under-sized control loses part of its graphic while still handling clicks — it looks broken but keeps changing the parameter. `ToggleSwitch::minHeight(Style)` exists for this reason and `EffectsPanel` static_asserts against it; follow that pattern for new controls.
 - Keep UI state in the APVTS `ValueTree` when it needs to persist with plugin state.
 
 ## Build And Test
