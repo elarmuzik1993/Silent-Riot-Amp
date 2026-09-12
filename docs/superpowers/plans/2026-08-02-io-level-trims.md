@@ -20,7 +20,9 @@
   - vcvars: `C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\VC\Auxiliary\Build\vcvars64.bat`
   - cmake: `...\18\BuildTools\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe`
   - Build tree is already configured at `build-win/` with `SR_BUILD_TESTS=ON` and `SR_BUILD_TOOLS=ON`.
-- Commit messages include `Refs USE-59` and end with the `Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>` trailer.
+- Commit messages include `Refs USE-59`. They carry **no AI attribution** — no
+  `Co-Authored-By:` trailer, no session link, no generated-with footer. See
+  **Commit & PR conventions** in `AGENTS.md`, which governs this.
 
 **Build helper** — create `build.bat` once (outside the repo, e.g. in your temp dir) and reuse it for every task:
 
@@ -226,9 +228,7 @@ volume tapers. Both unity at knob centre. OUTPUT is deliberately steeper
 below the detent than above so the bottom half works as a master fade,
 and returns exact zero at knob 0.
 
-Refs USE-59
-
-Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
+Refs USE-59"
 ```
 
 ---
@@ -332,9 +332,7 @@ output trim, silence -- one NaN from a host would mute the plugin.
 
 sanitizeUnitParam is unchanged in behaviour, now delegating with 0.0.
 
-Refs USE-59
-
-Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
+Refs USE-59"
 ```
 
 ---
@@ -570,9 +568,7 @@ render.
 Parameters are appended at the end of the layout so positional host
 automation indexing is preserved.
 
-Refs USE-59
-
-Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
+Refs USE-59"
 ```
 
 ---
@@ -668,9 +664,7 @@ Third and fourth knobs in the card that already hosts the non-voice utility
 controls. No ON toggle, consistent with the card's convention that centre or
 zero is a no-op.
 
-Refs USE-59
-
-Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
+Refs USE-59"
 ```
 
 ---
@@ -775,9 +769,7 @@ the trims must stay unity-transparent, and new APVTS params are append-only.
 
 Verified D1 2.77 / B2 7.86 / B3 20.5 / A2 -6.00 unchanged.
 
-Refs USE-59
-
-Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
+Refs USE-59"
 ```
 
 ---
