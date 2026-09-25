@@ -15,7 +15,10 @@
 //   sr_render --out OUT [--in FILE | --signal SPEC] [params...]
 //
 // Inputs:
-//   --in FILE              WAV/AIFF, or raw float32 mono with --in-sr / --in-raw
+//   --in FILE              WAV/AIFF (rendered at the file's own rate), or raw
+//                          float32 mono with --in-raw [--in-sr RATE]. A raw file
+//                          has no header, so pass its rate — the repo's
+//                          tests/di_sample_82hz.raw is 48000.
 //   --signal SPEC          generated; one of:
 //                            sine:FREQ:AMP:SECONDS
 //                            sweep:F0:F1:SECONDS      (log chirp, amp 0.5)
@@ -48,6 +51,10 @@
 //                                       ~12 dB.)
 //   --ir FILE              load a user IR (enables IR convolution path)
 //   --sr 44100  --block 512  --warmup-ms 250
+//                          (--sr is the render rate for --signal. With --in it
+//                          defaults to the input's rate, and a mismatch is an
+//                          error — the input is never resampled, so rendering
+//                          at another rate would silently transpose it.)
 // ═══════════════════════════════════════════════════════════════════════════
 
 #include "PluginProcessor.h"
@@ -84,7 +91,9 @@ Args parseArgs(int argc, char** argv)
     for (int i = 1; i < argc; ++i)
     {
         juce::String tok(argv[i]);
-        if (tok.startsWith("--") && i + 1 < argc)
+        // A bare flag (--in-raw) followed by another option must not swallow
+        // that option as its value.
+        if (tok.startsWith("--") && i + 1 < argc && !juce::String(argv[i + 1]).startsWith("--"))
             a.kv[tok.substring(2)] = juce::String(argv[++i]);
         else if (tok.startsWith("--"))
             a.kv[tok.substring(2)] = "1";
@@ -105,7 +114,7 @@ std::vector<float> genSignal(const juce::String& s, double sr)
     auto p = spec(s);
     auto kind = p[0];
     auto secs = [&](int idx, float def) { return p.size() > idx ? p[idx].getFloatValue() : def; };
-    auto frames = [&](float seconds) { return static_cast<int>(seconds * sr); };
+    auto frames = [&](float seconds) { return static_cast<size_t>(seconds * sr); };
     std::vector<float> out;
 
     if (kind == "sine")
@@ -179,11 +188,14 @@ std::vector<float> genSignal(const juce::String& s, double sr)
     return out;
 }
 
-std::vector<float> loadInput(const Args& a, double sr)
+// inputSR is set to the input's own sample rate, or 0 when it is unknown (a raw
+// file with no --in-sr).
+std::vector<float> loadInput(const Args& a, double& inputSR)
 {
     auto inFile = a.str("in");
     if (a.has("in-raw"))
     {
+        inputSR = a.has("in-sr") ? (double) a.num("in-sr", 0.0f) : 0.0;
         juce::File f(inFile);
         juce::MemoryBlock mb;
         f.loadFileAsData(mb);
@@ -200,6 +212,7 @@ std::vector<float> loadInput(const Args& a, double sr)
         std::fprintf(stderr, "could not read input '%s'\n", inFile.toRawUTF8());
         std::exit(2);
     }
+    inputSR = reader->sampleRate;
     juce::AudioBuffer<float> buf((int) reader->numChannels, (int) reader->lengthInSamples);
     reader->read(&buf, 0, (int) reader->lengthInSamples, 0, true, true);
     std::vector<float> out((size_t) buf.getNumSamples());
@@ -226,12 +239,34 @@ int main(int argc, char** argv)
         return 1;
     }
 
-    const double sr = a.num("sr", 44100.0f);
+    double sr = a.num("sr", 44100.0f);
     const int block = (int) a.num("block", 512.0f);
 
-    std::vector<float> input = a.str("signal").isNotEmpty()
-                                   ? genSignal(a.str("signal"), sr)
-                                   : loadInput(a, sr);
+    std::vector<float> input;
+    if (a.str("signal").isNotEmpty())
+    {
+        input = genSignal(a.str("signal"), sr);
+    }
+    else
+    {
+        // Render at the input's own rate. The samples are fed to processBlock
+        // as-is, so any other rate would play the DI back at the wrong speed —
+        // transposed, with every frequency-dependent measurement shifted.
+        double inputSR = 0.0;
+        input = loadInput(a, inputSR);
+        if (inputSR > 0.0)
+        {
+            if (a.has("sr") && std::abs(inputSR - sr) > 0.5)
+            {
+                std::fprintf(stderr, "--sr %d does not match the input's %d Hz; "
+                                     "sr_render does not resample. Drop --sr or "
+                                     "convert the input.\n",
+                             (int) sr, (int) inputSR);
+                return 2;
+            }
+            sr = inputSR;
+        }
+    }
 
     SilentRiotProcessor proc;
     proc.setPlayConfigDetails(2, 2, sr, block);
