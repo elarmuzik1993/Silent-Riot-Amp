@@ -81,6 +81,7 @@ target_sources(SilentRiot
         # Cabinet — speaker coupling, cab sim, IR loader
         src/dsp/cabinet/SpeakerCoupling.h
         src/dsp/cabinet/SpeakerCoupling.cpp
+        src/dsp/cabinet/OTSaturation.h
         src/dsp/cabinet/CabinetSim.h
         src/dsp/cabinet/CabinetSim.cpp
         src/dsp/cabinet/IRLibrary.h
@@ -96,6 +97,8 @@ target_sources(SilentRiot
         src/dsp/effects/SpringReverb.h
         src/dsp/effects/Reverb.h
         src/dsp/effects/Reverb.cpp
+        src/dsp/effects/StereoWidth.h
+        src/dsp/effects/TempoSync.h
 
         # Analysis — live-tuner pitch detection
         src/dsp/analysis/PitchDetector.h
