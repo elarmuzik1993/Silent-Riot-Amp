@@ -1,7 +1,10 @@
-# Handoff — LTP `reset()` does not restore `vCathode` (audit #5)
+# Handoff — LTP `reset()` does not restore `vCathode` (audit #5) — RESOLVED
 
-**Component:** `LTPModel::reset()` (`src/dsp/power/LTPSolver.h:18`)
-**Status:** confirmed, measured. Not yet fixed.
+**Component:** `LTPModel::reset()` (`src/dsp/power/LTPSolver.h:20`)
+**Status:** Fixed in `093fddf` — `reset()` now restores `vCathode` to
+`PI_CATHODE_INIT_N`, matching `init()`. Pinned by
+`"LTP: reset restores idle cathode + clears plate cache"` in
+`tests/ltp_tests.cpp`. Kept as a record of the measurement.
 **Severity:** **Cosmetic / correctness only — NOT an audible issue** (measured).
 **Audience:** DSP maintainer on the "DSP audit / sound polish" branch.
 
