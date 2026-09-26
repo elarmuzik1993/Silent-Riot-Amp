@@ -15,6 +15,11 @@ env:
   # Persist FetchContent (JUCE 7.0.12 + Catch2) across runs so they aren't
   # cloned fresh every job — slow and network-flaky (roadmap P3).
   FETCHCONTENT_BASE_DIR: ${{ github.workspace }}/.deps
+  # Days to keep each run's uploaded builds. Without it they default to up to
+  # 90 days, and four per run filled the account's artifact storage quota —
+  # every upload then failed ("Artifact storage quota has been hit"). Tagged
+  # releases are unaffected: release.yml attaches them to a GitHub Release.
+  ARTIFACT_RETENTION_DAYS: 6
 
 jobs:
   # ── Linux Release: the artifact we actually ship ──────────────────────
@@ -47,12 +52,14 @@ jobs:
           name: SilentRiot-Linux-VST3
           path: "build/SilentRiot_artefacts/Release/VST3/"
           if-no-files-found: error
+          retention-days: ${{ env.ARTIFACT_RETENTION_DAYS }}
       - name: Upload Standalone
         uses: actions/upload-artifact@v4
         with:
           name: SilentRiot-Linux-Standalone
           path: "build/SilentRiot_artefacts/Release/Standalone/"
           if-no-files-found: error
+          retention-days: ${{ env.ARTIFACT_RETENTION_DAYS }}
 
   # ── Windows Release ───────────────────────────────────────────────────
   build-windows:
@@ -105,12 +112,14 @@ jobs:
           name: SilentRiot-Windows-VST3
           path: "build/SilentRiot_artefacts/Release/VST3/"
           if-no-files-found: error
+          retention-days: ${{ env.ARTIFACT_RETENTION_DAYS }}
       - name: Upload Standalone
         uses: actions/upload-artifact@v4
         with:
           name: SilentRiot-Windows-Standalone
           path: "build/SilentRiot_artefacts/Release/Standalone/"
           if-no-files-found: error
+          retention-days: ${{ env.ARTIFACT_RETENTION_DAYS }}
 
   # ── Tests run against a Release configuration ─────────────────────────
   # (roadmap P3 — validate the shipped Release config, not a separate Debug
