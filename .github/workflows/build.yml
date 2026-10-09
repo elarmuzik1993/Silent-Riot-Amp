@@ -17,8 +17,11 @@ env:
   FETCHCONTENT_BASE_DIR: ${{ github.workspace }}/.deps
   # Days to keep each run's uploaded builds. Without it they default to up to
   # 90 days, and four per run filled the account's artifact storage quota —
-  # every upload then failed ("Artifact storage quota has been hit"). Tagged
-  # releases are unaffected: release.yml attaches them to a GitHub Release.
+  # every upload then failed ("Artifact storage quota has been hit").
+  # release.yml shares that quota and sets the same retention on its packages.
+  # A run's builds are gone after this many days, so re-running pluginval on
+  # an older run needs "Re-run all jobs" (which rebuilds), not "Re-run failed
+  # jobs".
   ARTIFACT_RETENTION_DAYS: 6
 
 jobs:
