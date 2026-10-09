@@ -49,7 +49,7 @@ src/
 │   └── cabinet/     SpeakerCoupling, CabinetSim, IRLibrary, OTSaturation
 ├── gui/             17 custom components (see GUI Architecture below)
 ├── PluginProcessor  Full signal chain (§2.5 processBlock)
-└── PluginEditor     GUI shell (shape-clipped dynamic window)
+└── PluginEditor     GUI shell (window sized to content height)
 ```
 
 ## Build

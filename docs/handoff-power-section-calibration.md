@@ -246,8 +246,9 @@ tone at equivalent operating points is unchanged.
   rescale this time: old P-CLEAN (volume 0.50) maps to 1.67, i.e. off the knob,
   because that operating point was inside permanent grid conduction. Needs a
   Calibration Pass (§5), not a constant tweak.
-- **B1 clean THD 0.968%** vs a 1.0% floor — slipped from 1.034% with defect 8.
-  Marginal and not must-pass; re-ratify alongside A1.
+- **B1 clean THD 0.99%** vs a 1.0% floor — slipped from 1.034% with defect 8
+  (read 0.968% when this was written; 0.99% re-measured with `tools/signoff.py`
+  on `f8f0b3d`). Marginal and not must-pass; re-ratify alongside A1.
 - **Startup thump**: ~0.5 s at −17 dBFS on silence at gain 10 while the PSU
   settles from initial conditions. Audible on plugin load. `E1`'s "idle noise
   floor −47 dBFS" is this transient being averaged in, *not* steady noise — the

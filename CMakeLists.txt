@@ -55,6 +55,7 @@ target_sources(SilentRiot
         src/utils/Constants.h
         src/utils/Parameters.h
         src/utils/ParamSmoother.h
+        src/utils/ParamSanitize.h
 
         # Filters — OnePole, Biquad, FilterBank, DynamicMiller
         src/dsp/filters/OnePole.h
