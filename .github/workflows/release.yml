@@ -27,6 +27,8 @@ env:
   # storage quota with build.yml, and a full quota fails "Upload package", so
   # publish never runs. publish attaches them to the GitHub Release (kept
   # permanently) minutes later; the window is for inspecting dry-run packages.
+  # Once they expire, retrying a failed publish needs "Re-run all jobs" (which
+  # rebuilds them), not "Re-run failed jobs".
   ARTIFACT_RETENTION_DAYS: 6
 
 jobs:

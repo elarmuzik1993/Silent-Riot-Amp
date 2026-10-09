@@ -14,8 +14,8 @@
 //
 //   sr_render --out OUT [--in FILE | --signal SPEC] [params...]
 //
-// Every option takes a value except the --in-raw flag; a missing value, a
-// stray argument, or a sample rate outside 8000..768000 Hz is an error.
+// Every option takes a value except the --in-raw flag (and --help); a missing
+// value, a stray argument, or a sample rate outside 8000..768000 Hz is an error.
 //
 // Inputs:
 //   --in FILE              WAV/AIFF (rendered at the file's own rate), or raw
@@ -89,6 +89,9 @@ struct Args
     bool has(const char* k) const { return kv.count(k) > 0; }
 };
 
+const char* const kUsage = "usage: sr_render --out OUT (--in FILE | --signal SPEC) [params]\n"
+                          "options: see the header of tools/sr_render.cpp or tools/README.md\n";
+
 // The only option that takes no value. Deciding by name, not by whether the next
 // token looks like an option, keeps `--in-raw di.raw` from swallowing the file
 // and `--sr --out x` from silently reading --sr as "1".
@@ -100,9 +103,14 @@ Args parseArgs(int argc, char** argv)
     for (int i = 1; i < argc; ++i)
     {
         juce::String tok(argv[i]);
+        if (tok == "--help" || tok == "-h")
+        {
+            std::fputs(kUsage, stdout);
+            std::exit(0);
+        }
         if (!tok.startsWith("--"))
         {
-            std::fprintf(stderr, "unexpected argument '%s'\n", tok.toRawUTF8());
+            std::fprintf(stderr, "unexpected argument '%s'\n%s", tok.toRawUTF8(), kUsage);
             std::exit(1);
         }
         auto name = tok.substring(2);
@@ -112,7 +120,7 @@ Args parseArgs(int argc, char** argv)
             a.kv[name] = juce::String(argv[++i]);
         else
         {
-            std::fprintf(stderr, "--%s needs a value\n", name.toRawUTF8());
+            std::fprintf(stderr, "--%s needs a value\n%s", name.toRawUTF8(), kUsage);
             std::exit(1);
         }
     }
@@ -148,11 +156,12 @@ std::vector<float> genSignal(const juce::String& s, double sr)
     auto p = spec(s);
     auto kind = p[0];
     auto secs = [&](int idx, float def) { return p.size() > idx ? p[idx].getFloatValue() : def; };
-    // Clamp before the cast: a negative, NaN or infinite double converted to
-    // size_t is undefined. The empty signal that results is rejected in main.
+    // Bound before the cast: a negative, NaN or out-of-range double converted to
+    // size_t is undefined, and main indexes the render with an int. The empty
+    // signal that results is rejected in main.
     auto frames = [&](float seconds) {
         double n = seconds * sr;
-        return std::isfinite(n) && n > 0.0 ? static_cast<size_t>(n) : size_t(0);
+        return n > 0.0 && n < 2147483647.0 ? static_cast<size_t>(n) : size_t(0);
     };
     std::vector<float> out;
 
@@ -297,7 +306,7 @@ int main(int argc, char** argv)
 
     if (a.str("out").isEmpty() || (a.str("in").isEmpty() && a.str("signal").isEmpty()))
     {
-        std::fprintf(stderr, "usage: sr_render --out OUT (--in FILE | --signal SPEC) [params]\n");
+        std::fputs(kUsage, stderr);
         return 1;
     }
 
@@ -350,7 +359,8 @@ int main(int argc, char** argv)
     if (input.empty())
     {
         if (a.str("signal").isNotEmpty())
-            std::fprintf(stderr, "--signal '%s' has no samples; its duration must be > 0\n",
+            std::fprintf(stderr, "--signal '%s' has no samples; its duration must be > 0 "
+                                 "and under 2^31 samples\n",
                          a.str("signal").toRawUTF8());
         else
             std::fprintf(stderr, "input '%s' has no samples\n", a.str("in").toRawUTF8());

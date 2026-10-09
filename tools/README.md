@@ -117,9 +117,14 @@ python3 tools/signoff.py --render-bin build/.../sr_render --out-dir /tmp/signoff
 `sweep:F0:F1:SECS` (log chirp), `pink:AMP:SECS`, `silence:SECS`, `step:AMP:SECS`.
 Or a real DI via `--in file.wav`, rendered at the file's own sample rate (or
 `--in di.raw --in-raw --in-sr 48000` for the repo's `tests/di_sample_82hz.raw` —
-a raw file has no header, so without `--in-sr` it falls back to `--sr`, default
-44100, and plays back transposed). The input is never resampled: an explicit
-`--sr` that disagrees with a WAV's rate is an error.
+a raw file has no header, so its rate is required, from `--in-sr` or `--sr`;
+without either sr_render exits with an error rather than guess 44100 and play
+it back transposed). `--in-sr` only applies with `--in-raw`. The input is never
+resampled: an explicit `--sr` that disagrees with the input's rate is an error.
+
+Every option takes a value except the `--in-raw` flag. A missing value, a stray
+argument, a sample rate outside 8000..768000 Hz, a `--block` outside 1..65536 or
+an empty input is an error, never a quiet render.
 
 Knobs `--gain/--shape/--volume` are internal `0..1`. Toggles `--7w/--cab/--power`
 are `0|1`. `--os 0|1|2` = 2×/4×/8×. `--ir file.wav` enables the convolution path.
