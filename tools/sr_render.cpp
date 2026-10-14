@@ -14,8 +14,14 @@
 //
 //   sr_render --out OUT [--in FILE | --signal SPEC] [params...]
 //
+// Every option takes a value except the --in-raw flag (and --help); a missing
+// value, a stray argument, or a sample rate outside 8000..768000 Hz is an error.
+//
 // Inputs:
-//   --in FILE              WAV/AIFF, or raw float32 mono with --in-sr / --in-raw
+//   --in FILE              WAV/AIFF (rendered at the file's own rate), or raw
+//                          float32 mono with --in-raw --in-sr RATE. A raw file
+//                          has no header, so its rate is required (--in-sr, or
+//                          --sr) — the repo's tests/di_sample_82hz.raw is 48000.
 //   --signal SPEC          generated; one of:
 //                            sine:FREQ:AMP:SECONDS
 //                            sweep:F0:F1:SECONDS      (log chirp, amp 0.5)
@@ -48,12 +54,17 @@
 //                                       ~12 dB.)
 //   --ir FILE              load a user IR (enables IR convolution path)
 //   --sr 44100  --block 512  --warmup-ms 250
+//                          (--sr is the render rate for --signal. With --in it
+//                          defaults to the input's rate, and a mismatch is an
+//                          error — the input is never resampled, so rendering
+//                          at another rate would silently transpose it.)
 // ═══════════════════════════════════════════════════════════════════════════
 
 #include "PluginProcessor.h"
 
 #include <juce_audio_formats/juce_audio_formats.h>
 #include <cmath>
+#include <cstring>
 #include <map>
 #include <random>
 #include <string>
@@ -78,18 +89,58 @@ struct Args
     bool has(const char* k) const { return kv.count(k) > 0; }
 };
 
+const char* const kUsage = "usage: sr_render --out OUT (--in FILE | --signal SPEC) [params]\n"
+                          "options: see the header of tools/sr_render.cpp or tools/README.md\n";
+
+// The only option that takes no value. Deciding by name, not by whether the next
+// token looks like an option, keeps `--in-raw di.raw` from swallowing the file
+// and `--sr --out x` from silently reading --sr as "1".
+bool isFlag(const juce::String& name) { return name == "in-raw"; }
+
 Args parseArgs(int argc, char** argv)
 {
     Args a;
     for (int i = 1; i < argc; ++i)
     {
         juce::String tok(argv[i]);
-        if (tok.startsWith("--") && i + 1 < argc)
-            a.kv[tok.substring(2)] = juce::String(argv[++i]);
-        else if (tok.startsWith("--"))
-            a.kv[tok.substring(2)] = "1";
+        if (tok == "--help" || tok == "-h")
+        {
+            std::fputs(kUsage, stdout);
+            std::exit(0);
+        }
+        if (!tok.startsWith("--"))
+        {
+            std::fprintf(stderr, "unexpected argument '%s'\n%s", tok.toRawUTF8(), kUsage);
+            std::exit(1);
+        }
+        auto name = tok.substring(2);
+        if (isFlag(name))
+            a.kv[name] = "1";
+        else if (i + 1 < argc && !juce::String(argv[i + 1]).startsWith("--"))
+            a.kv[name] = juce::String(argv[++i]);
+        else
+        {
+            std::fprintf(stderr, "--%s needs a value\n%s", name.toRawUTF8(), kUsage);
+            std::exit(1);
+        }
     }
     return a;
+}
+
+// --key as a sample rate. The rate sets every filter, smoother and the warm-up
+// length, so a typo must not render: 0 or a bare flag used to fall back to
+// 44100 or become 1 Hz without a word.
+double rateArg(const Args& a, const char* key)
+{
+    auto s = a.str(key);
+    double r = s.getDoubleValue();
+    if (!s.containsOnly("0123456789.") || r < 8000.0 || r > 768000.0)
+    {
+        std::fprintf(stderr, "--%s '%s' is not a sample rate (8000..768000 Hz)\n",
+                     key, s.toRawUTF8());
+        std::exit(2);
+    }
+    return r;
 }
 
 // Split "sine:220:0.5:1.0" -> ["sine","220","0.5","1.0"]
@@ -105,7 +156,13 @@ std::vector<float> genSignal(const juce::String& s, double sr)
     auto p = spec(s);
     auto kind = p[0];
     auto secs = [&](int idx, float def) { return p.size() > idx ? p[idx].getFloatValue() : def; };
-    auto frames = [&](float seconds) { return static_cast<int>(seconds * sr); };
+    // Bound before the cast: a negative, NaN or out-of-range double converted to
+    // size_t is undefined, and main indexes the render with an int. The empty
+    // signal that results is rejected in main.
+    auto frames = [&](float seconds) {
+        double n = seconds * sr;
+        return n > 0.0 && n < 2147483647.0 ? static_cast<size_t>(n) : size_t(0);
+    };
     std::vector<float> out;
 
     if (kind == "sine")
@@ -179,14 +236,40 @@ std::vector<float> genSignal(const juce::String& s, double sr)
     return out;
 }
 
-std::vector<float> loadInput(const Args& a, double sr)
+// inputSR is set to the input's own sample rate: the WAV/AIFF header's, or for a
+// raw file the --in-sr (else --sr) the caller must pass.
+std::vector<float> loadInput(const Args& a, double& inputSR)
 {
     auto inFile = a.str("in");
     if (a.has("in-raw"))
     {
+        // No header, so no rate to fall back on: guessing 44100 is what played
+        // the 48 kHz DI back transposed (82.4 Hz low E rendered at 75.6 Hz).
+        if (a.has("in-sr"))
+            inputSR = rateArg(a, "in-sr");
+        else if (a.has("sr"))
+            inputSR = rateArg(a, "sr");
+        else
+        {
+            std::fprintf(stderr, "raw input '%s' has no header; pass its rate with "
+                                 "--in-sr (tests/di_sample_82hz.raw is 48000)\n",
+                         inFile.toRawUTF8());
+            std::exit(2);
+        }
         juce::File f(inFile);
         juce::MemoryBlock mb;
-        f.loadFileAsData(mb);
+        if (!f.existsAsFile() || !f.loadFileAsData(mb))
+        {
+            std::fprintf(stderr, "could not read input '%s'\n", inFile.toRawUTF8());
+            std::exit(2);
+        }
+        if (mb.getSize() % sizeof(float) != 0)
+        {
+            std::fprintf(stderr, "'%s' is %d bytes, not a whole number of float32 "
+                                 "samples\n",
+                         inFile.toRawUTF8(), (int) mb.getSize());
+            std::exit(2);
+        }
         auto n = mb.getSize() / sizeof(float);
         std::vector<float> out(n);
         std::memcpy(out.data(), mb.getData(), n * sizeof(float));
@@ -195,11 +278,12 @@ std::vector<float> loadInput(const Args& a, double sr)
     juce::AudioFormatManager mgr;
     mgr.registerBasicFormats();
     std::unique_ptr<juce::AudioFormatReader> reader(mgr.createReaderFor(juce::File(inFile)));
-    if (!reader)
+    if (!reader || reader->sampleRate <= 0.0)
     {
         std::fprintf(stderr, "could not read input '%s'\n", inFile.toRawUTF8());
         std::exit(2);
     }
+    inputSR = reader->sampleRate;
     juce::AudioBuffer<float> buf((int) reader->numChannels, (int) reader->lengthInSamples);
     reader->read(&buf, 0, (int) reader->lengthInSamples, 0, true, true);
     std::vector<float> out((size_t) buf.getNumSamples());
@@ -222,16 +306,66 @@ int main(int argc, char** argv)
 
     if (a.str("out").isEmpty() || (a.str("in").isEmpty() && a.str("signal").isEmpty()))
     {
-        std::fprintf(stderr, "usage: sr_render --out OUT (--in FILE | --signal SPEC) [params]\n");
+        std::fputs(kUsage, stderr);
         return 1;
     }
 
-    const double sr = a.num("sr", 44100.0f);
-    const int block = (int) a.num("block", 512.0f);
+    // --in-raw and --in-sr describe a raw --in file. With --signal (which wins
+    // over --in) or a WAV/AIFF input they would be silently ignored.
+    if ((a.has("in-raw") || a.has("in-sr")) && a.str("signal").isNotEmpty())
+    {
+        std::fprintf(stderr, "--in-raw and --in-sr do not apply to --signal\n");
+        return 1;
+    }
+    if (a.has("in-sr") && !a.has("in-raw"))
+    {
+        std::fprintf(stderr, "--in-sr only applies with --in-raw; a WAV/AIFF input "
+                             "renders at its header's rate\n");
+        return 1;
+    }
 
-    std::vector<float> input = a.str("signal").isNotEmpty()
-                                   ? genSignal(a.str("signal"), sr)
-                                   : loadInput(a, sr);
+    double sr = a.has("sr") ? rateArg(a, "sr") : 44100.0;
+    const float blockArg = a.num("block", 512.0f);
+    if (!(blockArg >= 1.0f && blockArg <= 65536.0f))  // 0 would never advance the render loop
+    {
+        std::fprintf(stderr, "--block must be 1..65536\n");
+        return 2;
+    }
+    const int block = (int) blockArg;
+
+    std::vector<float> input;
+    if (a.str("signal").isNotEmpty())
+    {
+        input = genSignal(a.str("signal"), sr);
+    }
+    else
+    {
+        // Render at the input's own rate. The samples are fed to processBlock
+        // as-is, so any other rate would play the DI back at the wrong speed —
+        // transposed, with every frequency-dependent measurement shifted.
+        double inputSR = 0.0;
+        input = loadInput(a, inputSR);
+        if (a.has("sr") && std::abs(inputSR - sr) > 0.5)
+        {
+            std::fprintf(stderr, "--sr %d does not match the input's %d Hz; "
+                                 "sr_render does not resample. Drop --sr or "
+                                 "convert the input.\n",
+                         (int) sr, (int) inputSR);
+            return 2;
+        }
+        sr = inputSR;
+    }
+
+    if (input.empty())
+    {
+        if (a.str("signal").isNotEmpty())
+            std::fprintf(stderr, "--signal '%s' has no samples; its duration must be > 0 "
+                                 "and under 2^31 samples\n",
+                         a.str("signal").toRawUTF8());
+        else
+            std::fprintf(stderr, "input '%s' has no samples\n", a.str("in").toRawUTF8());
+        return 2;
+    }
 
     SilentRiotProcessor proc;
     proc.setPlayConfigDetails(2, 2, sr, block);

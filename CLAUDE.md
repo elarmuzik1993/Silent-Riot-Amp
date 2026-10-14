@@ -49,9 +49,9 @@ src/
 │   ├── tubes/       TriodeWaveshaper, PentodeWaveshaper, GridConduction
 │   ├── power/       PowerSupplyModel, SagEnvelope, LTPSolver
 │   └── cabinet/     SpeakerCoupling, CabinetSim, IRLibrary, OTSaturation
-├── gui/             14 custom components (see GUI Architecture below)
+├── gui/             17 custom components (see GUI Architecture below)
 ├── PluginProcessor  Full signal chain (§2.5 processBlock)
-└── PluginEditor     GUI shell (shape-clipped dynamic window)
+└── PluginEditor     GUI shell (window sized to content height)
 ```
 
 ## Build
@@ -84,7 +84,7 @@ cmake -B build -DSR_BUILD_TESTS=ON # Build with tests
   - Shape EQ silently reset to noon after any oversample change
   - Result: all three tone sign-off THD bands pass together for the first time (clean 1.03%, edge 9.44%, crank 30.1%)
 - **Power-Stage Drive / "give"** (done, USE-59): D1 sag depth 0.38 → **2.93 dB** at the gate point and **1.98 dB** at knob 10 (target 1.5–4.0); touch sensitivity 2.4 → **10.8 dB** over a 36 dB input span (14.8:1 → 3.3:1); the volume knob's top half now spreads 12.2 dB of level instead of 1.15 dB. Root cause was *not* `MAX_BIAS_SHIFT_N`: the sag offset never rails, it is **starved** — average plate current was flat (78.4 → 79.5 mA, +1.4%) at every gain and across a 100× input range, so B+ drooped 0.20% where a real amp droops 10–20%. The master volume sits in front of the EL84 grids and the chain hands it 3–5× more drive than a −9.6 V-biased tube can use, so the grids passed `GRID_CONDUCT_THRESH_EL84_N` around knob 4 and the diode clamp set the level from there up. Fixed with `VOLUME_KNOB_HEADROOM` + `volumeDriveTaper()`, mirroring `GAIN_KNOB_HEADROOM`. B4 (even-harmonic warmth) now passes as a side effect. See defect 8 in `docs/handoff-power-section-calibration.md`
-- **Next**: A1 clean loudness + the P-\* volume sign-off positions need re-ratification (Calibration Pass §5) — the volume knob's meaning changed by design, and A1 failed on the *loud* side before this change and the quiet side after; B1 clean THD 0.968% vs a 1.0% floor; IR-path aliasing (E3, −37.8 dBc vs ≤ −85, MUST-PASS); ~0.5 s startup thump while the PSU settles (this is what E1's "idle noise floor" is averaging in)
+- **Next**: A1 clean loudness + the P-\* volume sign-off positions need re-ratification (Calibration Pass §5) — the volume knob's meaning changed by design, and A1 failed on the *loud* side before this change and the quiet side after; B1 clean THD 0.99% vs a 1.0% floor; IR-path aliasing (E3, −37.8 dBc vs ≤ −85, MUST-PASS); ~0.5 s startup thump while the PSU settles (this is what E1's "idle noise floor" is averaging in)
 - **Neural model**: On hold until ear-tuning is finalized — training against DSP output that's still changing produces a model that must be retrained after every constant tweak. Finalize the DSP first, then capture and train against a stable target.
 
 ## Conventions
@@ -96,8 +96,8 @@ cmake -B build -DSR_BUILD_TESTS=ON # Build with tests
 - Parameter smoothing per-sample at oversampled rate (target/tick model in ParamSmoother)
 - CMake target is `SilentRiot`; product name is `Silent Riot`
 - Tests use Catch2 v3 — one test file per DSP module, two test targets:
-  - `SilentRiotTests` — 177 pure C++ tests (no JUCE dependency)
-  - `SilentRiotJuceTests` — 13 JUCE-dependent tests (cabinet IR, convolution, user IR loading)
+  - `SilentRiotTests` — 270 pure C++ test cases (no JUCE dependency)
+  - `SilentRiotJuceTests` — 38 JUCE-dependent test cases (cabinet IR, convolution, user IR loading, oversample switcher, delay/reverb)
 
 ## Cabinet IR Loader Architecture
 
@@ -112,7 +112,7 @@ cmake -B build -DSR_BUILD_TESTS=ON # Build with tests
 
 ## GUI Architecture
 
-15 custom components in `src/gui/`, all in `namespace sr`:
+17 custom components in `src/gui/`, all in `namespace sr`:
 
 - **ColourPalette.h** — 28 inline colour constants (dark theme), incl. the `knobBody`/`knobFace`/`knobTick` ramp. Text tiers hold ≥4.5:1 against `panel`; `muted` (3.5:1) is decoration only, never a glyph
 - **FontData.h/.cpp** — Embedded Space Mono + DM Sans fonts via BinaryData, plus the `Fonts::Sizes` type scale (micro 9 / small 10 / body 11 / value 12.5 / title 14 / hero 22). No bare numeric font sizes anywhere in `src/gui/` — tune type from that one block. Note these are JUCE font *heights* (ascent+descent), which render ~25% smaller than the same number in CSS px
@@ -132,7 +132,7 @@ cmake -B build -DSR_BUILD_TESTS=ON # Build with tests
 - **IRWaveformDisplay.h/.cpp** — Waveform plot with envelope fill
 - **EffectsPanel.h/.cpp** — 2×2 card grid (UTILITY / BOOST / DELAY / REVERB). `panelHeight` (352) is driven by the DELAY card, which is the tightest: it carries an extra sync-division row *and* a full `NotchKnob::preferredHeight` knob row. Shrink it and DELAY's knob names are the first thing to disappear
 
-**Window strategy**: Window set to max size (700×772 at 1× scale); X11 Shape Extension clips visible/input region to actual content height. Collapsible panels animate within the fixed-size window — `applyShapeMask()` updates the clip rect each frame. No `setSize()` during panel toggle = no compositor blink. Shape accounts for standalone wrapper title bar offset via `getTopLevelComponent()->getLocalPoint()`.
+**Window strategy**: The window is sized to its content height (`kWindowW` 700 × `getContentHeight()`, times the UI scale) on every platform. `applyShapeMask()` — the name is historical — runs each animation frame and calls `setSize()` whenever the animated panel heights change; the size guard makes the steady state a no-op. The old approach (a max-height window clipped with the X11 Shape Extension) is gone: the compositor used the true window geometry for move constraints, so a window taller than the screen got pinned to the top edge and could not be dragged. Sizing to content does **not** clamp to the display work area, so tall panel combinations can still exceed the screen. On Linux the editor still keeps one cached X11 connection (`getX11Display()`) for `setWindowBackground()` and the compositor bypass.
 
 **Live tuner**: `src/dsp/analysis/PitchDetector.h/.cpp` (pure C++, MPM/NSDF) tracks the DI fundamental. The audio thread writes raw channel-0 input into a lock-free ring (`SilentRiotProcessor::pushTunerSamples`) **before** the power-off early-return, so tuning works with the amp silenced; `TunerBar` pulls the latest window via `readLatestTunerSamples` on the editor timer and runs detection off the audio thread. Detection ≥ ±5¢ accuracy on open strings (verified in `pitch_detector_tests.cpp`).
 
@@ -145,8 +145,8 @@ cmake -B build -DSR_BUILD_TESTS=ON # Build with tests
 ## DSP Implementation Details
 
 - **Triode model**: Koren with iterative load-line solve. Standard 12AX7 parameters (mu=100, ex=1.4, Kg1=1060, Kp=600, Kvb=300 — matches Guitarix/industry reference). `TriodeState` caches converged plate voltage between samples → 4 iterations sufficient (was 8). Stateless overload available for tests.
-- **Pentode model**: Koren pentode equations (mu=19.5, ex=1.35, Kg1=820, Kp=84, Kvb=300) — screen grid acts as virtual anode in the Koren formula. Softplus cutoff, tanh IP clamp, plate saturation knee, screen redistribution.
-- **LTP solver**: Asymmetric plate loads (100K/82K). Caches plate voltages A/B between samples. 4 iterations with alpha=0.25 damping.
+- **Pentode model**: Koren pentode equations (mu=19.5, ex=1.35, Kg1=`EL84_KG1` 210.5, Kp=84, Kvb=300) — screen grid acts as virtual anode in the Koren formula. Softplus cutoff, tanh IP clamp, plate saturation knee, screen redistribution. Kg1 was 820 until USE-59 (3.9× too little current); see the datasheet pin under DSP Audit Status.
+- **LTP solver**: Asymmetric plate loads (100K/82K). Root-finds the shared cathode node — secant seeded from the previous sample's `vCathode`, bisection over `[0, vSupply]` as the fallback, tolerance 1e-5 — with 4 inner plate iterations per residual evaluation. Caches plate voltages A/B and `vCathode` between samples; `reset()` restores both to their `init()` values. See `docs/handoff-ltp-convergence.md`.
 - **Oversample switching**: Crossfade state machine (FadingOut → Reconfiguring → FadingIn), 128-sample fade at base SR. PSU frozen during transition to prevent voltage recovery pop.
 - **Sag model**: Cathode resistor physics — `biasOffset = -(Itotal - Iquiescent) × R_cathode`. Fed with raw `|ipA| + |ipB|` before OT scaling. Cold clamp is -0.01 (-3V) — keeps effective bias from going past -12.6V (cutoff is -10V); prevents deep Class C signal loss at high volume.
 - **Stereo widener** (`StereoWidth.h`): final-stage widener knob (`width` param, autonomous — no toggle; 0=off/dry, 1=wide, defaults off), runs LAST on the finished stereo bus (after delay/reverb). Additive: Mid/Side scale (sideGain 1→MAX) plus a Haas+all-pass decorrelator injected into the SIDE only (0→MAX), with a slow LFO-modulated fractional read tap that micro-detunes the side voice ~±5 cents (doubler shimmer). `L+R = 2·Mid` stays invariant at any setting → perfect mono compatibility, and width appears even on the dual-mono dry amp (NeuralDSP-doubler style). Never narrows below the input. Stereo-only (no-op on a mono bus); skipped entirely (bit-exact dry) when parked at 0 (`isActive()`). Width value one-pole smoothed (50ms). Lives in the EFFECTS panel's **UTILITY** card, which also hosts the noise gate and the INPUT/OUTPUT level trims — all four knobs are autonomous (gate and width self-gate at 0, INPUT/OUTPUT are unity at centre), no ON/OFF toggle.
@@ -211,7 +211,7 @@ and `EL84_IP_MAX_N` are coupled through the tanh knee, so re-solve if either mov
 - `reportPreampLevel()` takes SIGNAL level, NOT current
 - ParamSmoother runs per-sample at oversampled rate (NOT block rate) — init with effectiveSR
 - `sag.update()` must be called with raw plate current BEFORE `OT_CURRENT_SCALE` multiplication
-- OT saturation: `OT_SAT_DRIVE=400`, `OT_SAT_DC_FREQ=20Hz` — DC block prevents integrator blowup from asymmetric tube DC
+- OT saturation: `OT_SAT_DRIVE=190` (was 400 — retuned with `tools/sr_thump.py` after the current-scale recalibration), `OT_SAT_DC_FREQ=20Hz` — DC block prevents integrator blowup from asymmetric tube DC
 - LTP plate loads are asymmetric: `PI_RPLATE_A_N` (100K) / `PI_RPLATE_B_N` (82K)
 - Speaker coupling uses a complementary 3-way OnePole crossover (`bass + mid + hf == powerOut` always) for impedance-weighted reflection — NOT a `makeBandPass`/`makePeakEQ` extraction (see `SpeakerCoupling::process`)
 - `softConductionCurve` biasFactor: `PENTODE_BIAS_15W_N / vBias_n` (NOT the inverse — 7W must get wider overlap)

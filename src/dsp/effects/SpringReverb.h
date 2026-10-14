@@ -31,11 +31,11 @@ struct DispersionChain {
     void reset() { z.fill(0.0f); }
 
     float process(float x) {
-        for (int i = 0; i < SPRING_DISP_STAGES; ++i) {
+        for (float& zi : z) {
             // Direct-form II first-order all-pass.
-            float w = x - a * z[i];
-            float y = a * w + z[i];
-            z[i] = w + ANTI_DENORMAL;
+            float w = x - a * zi;
+            float y = a * w + zi;
+            zi = w + ANTI_DENORMAL;
             x = y;
         }
         return x;
