@@ -1,5 +1,7 @@
 # Silent Riot — CLAUDE.md
 
+@AGENTS.md
+
 ## Project Overview
 
 **Silent Riot** (v0.3.4) is a JUCE 7 amp simulator plugin (VST3/Standalone) by Monolit Beatz. Built with C++17, CMake, and Ninja on Ubuntu Linux.
