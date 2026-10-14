@@ -122,9 +122,11 @@ without either sr_render exits with an error rather than guess 44100 and play
 it back transposed). `--in-sr` only applies with `--in-raw`. The input is never
 resampled: an explicit `--sr` that disagrees with the input's rate is an error.
 
-Every option takes a value except the `--in-raw` flag. A missing value, a stray
-argument, a sample rate outside 8000..768000 Hz, a `--block` outside 1..65536 or
-an empty input is an error, never a quiet render.
+Every option takes a value except the `--in-raw` flag. An unknown (e.g.
+misspelled) option, a missing value, a stray argument, `--in` together with
+`--signal`, a sample rate outside 8000..768000 Hz (from an argument or the input
+file's header), a `--block` outside 1..65536 or an empty input is an error,
+never a quiet render.
 
 Knobs `--gain/--shape/--volume` are internal `0..1`. Toggles `--7w/--cab/--power`
 are `0|1`. `--os 0|1|2` = 2×/4×/8×. `--ir file.wav` enables the convolution path.
