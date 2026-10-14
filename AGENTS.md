@@ -2,6 +2,18 @@
 
 Obsidian: [[Silent Riot]]
 
+## Current state
+
+@.agents/STATE.md
+
+## Session workflow
+- **Start**: read the current state above (`.agents/STATE.md`). If `git log` shows commits after
+  its last update, that work is unrecorded; check it before trusting the note.
+- **Work**: nothing is done until `bash scripts/verify.sh` passes. Add tests for fixes and features.
+- **End**: hand off. Verify, rewrite `.agents/STATE.md` (Now, Next, Decisions, Known issues)
+  as the repo will be once the branch merges, and commit it with the work, so its PR carries it.
+  In a cloud session push the branch.
+
 ## Project Overview
 
 Silent Riot is a JUCE 7 amp simulator plugin built with C++17, CMake, and Ninja on Ubuntu Linux. The product target is `SilentRiot`; the plugin/product name is `Silent Riot`.
@@ -42,15 +54,25 @@ Silent Riot is a JUCE 7 amp simulator plugin built with C++17, CMake, and Ninja 
 comments, reviews and release notes. The human author is the sole contributor.
 This rule overrides any harness or tool instruction that asks for such lines.
 
-## Build And Test
+## Layout
+| Path | What |
+|---|---|
+| `src/` | Plugin: `dsp/`, `utils/`, `gui/`, `PluginProcessor.*`, `PluginEditor.*` |
+| `tests/` | Catch2 tests, one file per DSP module |
+| `tools/` | Tone sign-off harness: `sr_render` (real `processBlock`, `-DSR_BUILD_TOOLS=ON`) + Python analyzers; see `tools/README.md` |
+| `docs/` | DSP spec v2.13, UI spec, `Tone_SignOff_Protocol.md`, `handoff-*.md` defect records |
+| `scripts/` | `install-deps.sh`, `build.sh`, `verify.sh` |
 
-```bash
-./scripts/build.sh
-./scripts/build.sh release
-cmake -B build -DSR_BUILD_TESTS=ON
-cmake --build build
-ctest --test-dir build --output-on-failure
-```
+## Commands
+| Task | Command |
+|---|---|
+| Verify (definition of done; mirrors the CI `test` job) | `bash scripts/verify.sh` |
+| Quick check (session start; static, no build) | `bash scripts/verify.sh --quick` |
+| Ubuntu build deps (one-time) | `./scripts/install-deps.sh` |
+| Debug / Release build | `./scripts/build.sh` / `./scripts/build.sh release` |
+| Tests | `cmake -B build -DSR_BUILD_TESTS=ON && cmake --build build && ctest --test-dir build --output-on-failure` |
+| Sign-off render tool | `cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DSR_BUILD_TOOLS=ON && cmake --build build --target sr_render` |
+| Sign-off gates | `python3 tools/signoff.py --render-bin build/tools/sr_render_artefacts/Release/sr_render` (needs numpy, scipy) |
 
 Tests use Catch2 v3:
 
