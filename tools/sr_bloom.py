@@ -26,7 +26,7 @@ def render(gain):
     subprocess.run([RENDER, "--out", str(tag), "--signal", "note:110:0.6:2.5",
                     "--gain", f"{gain}", "--volume", "0.7", "--shape", "0.5", "--cab", "1"],
                    capture_output=True, check=True)
-    sr = json.loads(tag.with_suffix(".json").read_text()).get("sample_rate", 44100)
+    sr = json.loads(tag.with_suffix(".json").read_text())["sampleRate"]
     x = np.fromfile(str(tag) + ".f32", dtype=np.float32)
     if x.size % 2 == 0:
         x = x.reshape(-1, 2)[:, 0]
