@@ -14,8 +14,9 @@
 //
 //   sr_render --out OUT [--in FILE | --signal SPEC] [params...]
 //
-// Every option takes a value except the --in-raw flag (and --help); a missing
-// value, a stray argument, or a sample rate outside 8000..768000 Hz is an error.
+// Every option takes a value except the --in-raw flag (and --help); an unknown
+// option, a missing value, a stray argument, --in with --signal, or a sample
+// rate (argument or input header) outside 8000..768000 Hz is an error.
 //
 // Inputs:
 //   --in FILE              WAV/AIFF (rendered at the file's own rate), or raw
@@ -97,6 +98,21 @@ const char* const kUsage = "usage: sr_render --out OUT (--in FILE | --signal SPE
 // and `--sr --out x` from silently reading --sr as "1".
 bool isFlag(const juce::String& name) { return name == "in-raw"; }
 
+// Every option main() reads. An unknown name used to be stored and never looked
+// up, so `--volum 0.9` rendered at the default volume and exited 0. Add new
+// options here as well as where they are read.
+bool isKnownOption(const juce::String& name)
+{
+    static const char* const known[] = {
+        "out", "in", "in-raw", "in-sr", "signal", "ir", "sr", "block", "warmup-ms",
+        "gain", "shape", "volume", "7w", "cab", "power", "os", "in-trim", "out-trim",
+    };
+    for (auto* k : known)
+        if (name == k)
+            return true;
+    return false;
+}
+
 Args parseArgs(int argc, char** argv)
 {
     Args a;
@@ -114,6 +130,11 @@ Args parseArgs(int argc, char** argv)
             std::exit(1);
         }
         auto name = tok.substring(2);
+        if (!isKnownOption(name))
+        {
+            std::fprintf(stderr, "unknown option '--%s'\n%s", name.toRawUTF8(), kUsage);
+            std::exit(1);
+        }
         if (isFlag(name))
             a.kv[name] = "1";
         else if (i + 1 < argc && !juce::String(argv[i + 1]).startsWith("--"))
@@ -127,6 +148,10 @@ Args parseArgs(int argc, char** argv)
     return a;
 }
 
+// The render rates sr_render accepts, from an argument or a WAV/AIFF header.
+// Below 8 kHz the amp's 5-7 kHz lowpasses sit above Nyquist.
+bool isRenderRate(double r) { return r >= 8000.0 && r <= 768000.0; }
+
 // --key as a sample rate. The rate sets every filter, smoother and the warm-up
 // length, so a typo must not render: 0 or a bare flag used to fall back to
 // 44100 or become 1 Hz without a word.
@@ -134,7 +159,7 @@ double rateArg(const Args& a, const char* key)
 {
     auto s = a.str(key);
     double r = s.getDoubleValue();
-    if (!s.containsOnly("0123456789.") || r < 8000.0 || r > 768000.0)
+    if (!s.containsOnly("0123456789.") || !isRenderRate(r))
     {
         std::fprintf(stderr, "--%s '%s' is not a sample rate (8000..768000 Hz)\n",
                      key, s.toRawUTF8());
@@ -284,6 +309,12 @@ std::vector<float> loadInput(const Args& a, double& inputSR)
         std::exit(2);
     }
     inputSR = reader->sampleRate;
+    if (!isRenderRate(inputSR))
+    {
+        std::fprintf(stderr, "input '%s' is %g Hz; sr_render needs 8000..768000 Hz\n",
+                     inFile.toRawUTF8(), inputSR);
+        std::exit(2);
+    }
     juce::AudioBuffer<float> buf((int) reader->numChannels, (int) reader->lengthInSamples);
     reader->read(&buf, 0, (int) reader->lengthInSamples, 0, true, true);
     std::vector<float> out((size_t) buf.getNumSamples());
@@ -310,8 +341,15 @@ int main(int argc, char** argv)
         return 1;
     }
 
-    // --in-raw and --in-sr describe a raw --in file. With --signal (which wins
-    // over --in) or a WAV/AIFF input they would be silently ignored.
+    // --signal would win over --in, silently dropping the input file.
+    if (a.has("in") && a.has("signal"))
+    {
+        std::fprintf(stderr, "pass --in or --signal, not both\n");
+        return 1;
+    }
+
+    // --in-raw and --in-sr describe a raw --in file. With --signal or a WAV/AIFF
+    // input they would be silently ignored.
     if ((a.has("in-raw") || a.has("in-sr")) && a.str("signal").isNotEmpty())
     {
         std::fprintf(stderr, "--in-raw and --in-sr do not apply to --signal\n");
