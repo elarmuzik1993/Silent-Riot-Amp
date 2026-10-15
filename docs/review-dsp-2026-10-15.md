@@ -51,6 +51,44 @@ B4–B6 and B8 are what a user notices in a DAW session.
 | S7 | Suggestion | Tempo-synced delay silently clamps at 1000 ms | `TempoSync.h:47` |
 | S8 | Suggestion | Triode load-line solve diverges under extreme input (from ~+21.6 dBFS at the amp) | `TriodeWaveshaper.cpp:29` |
 
+## Suggested fix order
+
+Fix the bugs that leave the settled sound alone first, then the ones that change
+the tone, so the amp is re-calibrated once rather than after every fix. One PR
+per step, each with a test.
+
+**Phase 1 — the amp's settled sound at 44.1 kHz / 4× does not change**
+
+1. **B5 + B4** — oversample mode at prepare and the latency report. Same code;
+   B1's fix needs the right mode at prepare.
+2. **B1 + S1** — startup burst, plus seeding the knob smoothers at prepare.
+   Clears E1. Solve the idle operating point once at prepare and seed the filter
+   and supply states from it, rather than hard-coding today's values, so the fix
+   stays right after B2 moves the idle point.
+3. **B7** — grid-charge rate. Scale it so 44.1 kHz / 4× is unchanged; sign-off
+   numbers stay put and every other rate starts matching them.
+4. **B6 + B8** — stale effect tails and the delay runaway. Independent of the
+   amp core.
+
+**Phase 2 — changes the tone, then one re-calibration**
+
+5. **B2 + B3** back to back, then a single pass over D1 / A1 / B1 and the
+   pending P-* re-ratification, with a listening check by the owner.
+6. **S8**, together with E3 step 2 — both touch the triode solver.
+7. **E3** last: its measurement depends on the drive levels phase 2 changes.
+
+**Phase 3 — small items, batched:** S2 + S4 (IR restore and IR samples),
+S3 + S6 (readouts), S5 + S7 (reverb zipper, sync clamp).
+
+**Owner decisions**, asked at the start of the step that needs them:
+
+- **B8:** should the delay never self-oscillate, or keep it as an effect at the
+  top of the FEEDBACK knob?
+- **B2 / B3:** approve the new sound by ear before the sign-off targets are
+  re-set.
+- **S7:** raise the 1000 ms limit (more delay-line memory) or show when sync is
+  clamped?
+
 ---
 
 ## Blocking

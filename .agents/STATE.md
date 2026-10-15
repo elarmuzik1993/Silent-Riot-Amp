@@ -17,9 +17,9 @@ _Updated 2026-10-15_
 ## Next
 1. Owner: GitHub Actions is down: every run since 2026-10-09 (main too) fails in ~5 s with no
    logs, i.e. jobs never start. Check Actions billing / spending limit. Until fixed, verify locally.
-2. Fix the review's blocking findings, one PR each with a test: B1 (startup burst; also clears
-   E1), B7 (charge rate vs sample rate), B2 (moves the calibration: re-measure D1/A1 after),
-   B3, B4+B5, B6, B8.
+2. Fix the review's findings in its *Suggested fix order*, one PR per step with a test: B5+B4,
+   B1+S1 (clears E1), B7, B6+B8 leave the settled tone alone; then B2+B3 and one re-calibration
+   pass (D1/A1/B1, P-*), then S8 with E3 step 2. Owner decides B8, B2/B3 by ear, and S7.
 3. Owner: confirm the E3 plan, "repoint the gate, then fix the engine" (proposed, not agreed).
 4. E3, step 1: give `alias_crank` in `tools/signoff_gates.json` a real bright IR (today it is the
    `OPTIONAL_BRIGHT_IR` placeholder, which `signoff.py` skips, so E3 runs the IIR path). The repo
