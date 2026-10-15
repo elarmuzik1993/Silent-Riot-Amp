@@ -3,7 +3,7 @@
      Keep it under ~40 lines; the SessionStart hook warns past 60. -->
 # State
 
-_Updated 2026-10-14_
+_Updated 2026-10-15_
 
 ## Now
 - Silent Riot v0.3.4 (JUCE 7 VST3/Standalone). `bash scripts/verify.sh` passes on `main`: static
@@ -11,24 +11,29 @@ _Updated 2026-10-14_
 - Docs match the code (CLAUDE.md stale-facts pass done). `sr_render` refuses every bad input it
   used to render silently (unknown option, `--in` with `--signal`, out-of-range rate).
 - Tone sign-off still open: E3 (MUST-PASS) diagnosed but not fixed; A1/B1 need re-ratifying.
+- DSP review done, nothing fixed yet: `docs/review-dsp-2026-10-15.md` (8 blocking, 8 suggestions,
+  each measured and independently re-checked; refs against `b8e20a9`).
 
 ## Next
 1. Owner: GitHub Actions is down: every run since 2026-10-09 (main too) fails in ~5 s with no
    logs, i.e. jobs never start. Check Actions billing / spending limit. Until fixed, verify locally.
-2. Owner: confirm the E3 plan, "repoint the gate, then fix the engine" (proposed, not agreed).
-3. E3, step 1: give `alias_crank` in `tools/signoff_gates.json` a real bright IR (today it is the
+2. Fix the review's blocking findings, one PR each with a test: B1 (startup burst; also clears
+   E1), B7 (charge rate vs sample rate), B2 (moves the calibration: re-measure D1/A1 after),
+   B3, B4+B5, B6, B8.
+3. Owner: confirm the E3 plan, "repoint the gate, then fix the engine" (proposed, not agreed).
+4. E3, step 1: give `alias_crank` in `tools/signoff_gates.json` a real bright IR (today it is the
    `OPTIONAL_BRIGHT_IR` placeholder, which `signoff.py` skips, so E3 runs the IIR path). The repo
    has no IR WAVs: owner supplies one, or commit a synthetic bright IR as a fixture. Gate IR vs
    IIR parity; move whole-engine aliasing to its own report-only gate with a ratified target.
-4. E3, step 2: measure harmonic fall-off of each nonlinearity in isolation; smooth the sharpest
+5. E3, step 2: measure harmonic fall-off of each nonlinearity in isolation; smooth the sharpest
    corner. Suspects: hard plate `std::clamp` (`TriodeWaveshaper.cpp:28`), C1-only grid clamp
    (`GridConduction.cpp:39`), OT flux clamp (`OTSaturation.h:43`). Re-measure P-CRANK after.
-5. Owner: delete or mark done `docs/superpowers/plans/2026-08-02-io-level-trims.md` (the trims
+6. Owner: delete or mark done `docs/superpowers/plans/2026-08-02-io-level-trims.md` (the trims
    shipped; its boxes were never ticked), and tick the done items in `COMPETITIVE_ROADMAP.md` Phase A.
-6. Owner: delete stale remote branches: all but `main` and `claude/neural-learning-path-slider-kt8dy7`
+7. Owner: delete stale remote branches: all but `main` and `claude/neural-learning-path-slider-kt8dy7`
    (unique hybrid-blend design sketch). `fix/effects-toggle-rendering-use-60` never had a PR; its
    fix looks superseded by the LED-toggle work (unverified), so check it before deleting.
-7. Owner: adopt the kit template's *Rules* section (git, branch naming, secrets) in AGENTS.md?
+8. Owner: adopt the kit template's *Rules* section (git, branch naming, secrets) in AGENTS.md?
 
 ## Decisions
 - `verify.sh` builds into `build-verify/` so it never clobbers `build/` from `scripts/build.sh`.
@@ -44,4 +49,7 @@ _Updated 2026-10-14_
 - `signoff.py` on `d2315b4` (2026-10-14): A1 −31.6 LUFS (band −17.5…−14.5), B1 0.99% (floor
   1.0%), E1 −70.4 dBFS (≤ −90), E3 −37.9; the other 8 gates pass. The handoff doc's A1 −28.1 /
   E1 −47 are older readings. A1 and the P-* volume positions need re-ratification.
-- ~0.5 s startup thump while the PSU settles; it pollutes E1's idle noise floor (unverified here).
+- E1 is the startup transient, not a noise floor: settled, the amp idles at −269 dBFS. The burst
+  after every prepare (up to −5 dBFS at crank) has two causes, the preamp filter reset and the
+  PSU reset to nominal (review B1); fixing either alone leaves E1 near −68 dBFS.
+- Sign-off numbers hold only at 44.1 kHz / 4×: grid-charge blocking scales with the rate (B7).
