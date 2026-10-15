@@ -15,9 +15,16 @@
 //
 // Modes:
 //   /tmp/sr_probe idle          B2: PSU rails, idle current and sag offset after 3 s of silence
-//   /tmp/sr_probe thump         B1: startup burst per 10 ms window, with the PSU/preamp isolated
+//   /tmp/sr_probe thump         B1: startup burst per 10 ms window
 //   /tmp/sr_probe e1            B1: E1-style RMS at P-CRANK after a 250 ms warm-up
 //   /tmp/sr_probe miller [amp]  B3: V1b Miller cutoff swing on a 110 Hz sine (default amp 0.125)
+//
+// B1 caveats: knobs are fixed values here, so "thump" and "e1" model a RE-prepare
+// (a fresh plugin instance ramps GAIN/VOLUME in from 0 and is ~13 dB quieter at
+// first). Their "PSU frozen" variants hold the PSU at NOMINAL, which removes the
+// preamp-rail step entirely — they isolate the filter-reset cause only. The
+// review's B1 table, including the PSU-reset share, was measured on the real
+// processBlock.
 
 #include "dsp/tubes/TriodeWaveshaper.h"
 #include "dsp/tubes/PentodeWaveshaper.h"

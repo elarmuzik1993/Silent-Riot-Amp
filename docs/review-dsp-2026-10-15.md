@@ -13,25 +13,30 @@ what a user notices in a DAW session.
 ## How the findings were checked
 
 - Two review passes (a reviewer read and an automated correctness pass), then
-  every finding re-checked by an independent skeptic told to refute it.
+  every finding handed to an independent skeptic told to refute it. The
+  corrections they found are folded in; where a claim was not independently
+  re-checked, its section says so.
 - The headline numbers come from measurement, not reading:
   - **Amp-loop probe** — [`review-dsp-2026-10-15-probe.cpp`](review-dsp-2026-10-15-probe.cpp)
     replicates `processBlock`'s per-sample amp loop with the repo's own DSP
     classes, minus the oversampling filters (input is fed at the oversampled
-    rate directly). Build and modes are in its header comment.
-  - **`sr_render`** — the real `processBlock`, for the startup burst (B1).
-  - **JUCE 7.0.12 `dsp::Oversampling`** compiled standalone, for the latency
-    numbers in B4.
+    rate directly). Build, modes and caveats are in its header comment. Used for
+    B2 and B3.
+  - **`sr_render`** and a probe around the real `processBlock` (snapshot and
+    restore of processor state around `prepareToPlay`) for B1.
+  - **JUCE 7.0.12** compiled standalone: `dsp::Oversampling` and
+    `dsp::Convolution` latency for B4; the VST3 wrapper's latency path read for
+    B5.
 
 ## Summary
 
 | ID | Severity | Finding | Where |
 |---|---|---|---|
-| B1 | Blocking | Burst on silence after every `prepareToPlay`; it is also the whole E1 failure | `PluginProcessor.cpp:187` |
+| B1 | Blocking | Burst on silence after every `prepareToPlay` (preamp filters and PSU reset out of equilibrium); it is the whole E1 failure | `PluginProcessor.cpp:192`, `:197` |
 | B2 | Blocking | Sag reference taken at nominal supply voltages, so the bias idles warm | `PluginProcessor.cpp:406` |
 | B3 | Blocking | V1b Miller cutoff swings every cycle; its gain-pot dependence is dead code | `PluginProcessor.cpp:551`, `:565` |
-| B4 | Blocking | Reported latency is ~3.6 samples too high in the default IIR-cab mode | `PluginProcessor.cpp:255` |
-| B5 | Blocking | Saved oversample setting ignored at prepare | `OversampleSwitcher.cpp:13` |
+| B4 | Blocking | Reported latency is ~3.6 samples too high whenever the IR path is inactive (the default) | `PluginProcessor.cpp:255` |
+| B5 | Blocking | Saved oversample setting ignored at prepare: dropout on the first blocks, wrong latency at 2× | `OversampleSwitcher.cpp:13` |
 | B6 | Blocking | Delay / reverb / IR freeze while off and replay stale audio when re-enabled | `PluginProcessor.cpp:687` |
 | S1 | Suggestion | GAIN/TONE/VOLUME/OVERSAMPLE skip `ParamSanitize`; NaN on OVERSAMPLE indexes out of bounds | `PluginProcessor.cpp:348`, `:504` |
 | S2 | Suggestion | Restoring state with an out-of-range IR index can leave the previous IR playing | `PluginProcessor.cpp:996` |
@@ -47,44 +52,59 @@ what a user notices in a DAW session.
 
 ### B1 — Burst on silence after every `prepareToPlay`
 
-**Where:** `resetDSPState()`, `src/PluginProcessor.cpp:187-228`;
-`PowerSupplyModel::reset()`, `src/dsp/power/PowerSupplyModel.cpp:17-24`.
+**Where:** `resetDSPState()`, `src/PluginProcessor.cpp:187-228` — specifically
+`filterBank.resetAll()` (`:192`) and `psu.reset()` (`:197`).
 
-**What happens.** `resetDSPState()` zeroes every preamp filter
-(`FilterBank::resetAll`) and the triode plate cache (`TriodeState::vPlate = -1`).
-The first samples therefore see each triode's plate DC — about 150 V — as a step,
-and the zeroed coupling high-passes pass it straight through. Separately, the
-PSU restarts at its nominal 300 V although the model idles at ~282 V, which adds
-a slower tail as the rails and the sag envelope settle.
+**What happens.** Two resets each leave the amp out of equilibrium:
 
-**Evidence** (probe, 44.1 kHz, 4×, silence, peak per 10 ms window):
+1. `FilterBank::resetAll()` zeroes the V1a/V1b cathode-bypass and coupling
+   high-pass state while each 12AX7 plate sits at ~194 V DC (203.5 V on the
+   nominal 250 V rail). The first samples see that DC as a step and the zeroed
+   high-passes pass it on. V1b's 7 Hz coupling high-pass alone reproduces most of
+   it.
+2. `PowerSupplyModel::reset()` puts every supply node back at nominal, but the
+   model idles lower (B+ 282.2 V, screen 258.0 V, PI 262.3 V, preamp 232.4 V).
+   The preamp rail then falls 250 → 232 V, which moves every preamp operating
+   point at once.
 
-| Run | 0–10 ms | 10–20 | 20–30 | … | 90–100 ms |
-|---|---|---|---|---|---|
-| As shipped (gain 0.6, vol 0.5, 15W) | −8.9 dBFS | −17.8 | −17.8 | | −51.7 |
-| PSU frozen at nominal, sag off | −9.2 | −17.8 | −17.8 | | −50.2 |
-| Preamp settled first | −79.8 | −90.2 | −101.2 | | −161.4 |
+Resetting `TriodeState` (the plate-voltage cache) is not a cause.
 
-So the initial burst comes from the preamp, not from the PSU.
+**Evidence** — real `processBlock` (44.1 kHz, 4×, 512-sample blocks, silence),
+peak in the first 10 ms:
 
-**E1 is this transient.** The E1 gate renders 5 s of silence at P-CRANK after
-`sr_render`'s 250 ms warm-up and gets −70.4 dBFS (target ≤ −90). The probe
-reproduces it: −70.1 dBFS RMS after a 250 ms warm-up, with the last 3 s at
-digital silence. The preamp tail alone leaves −72.2 dBFS, the PSU settling alone
-−67.8 dBFS, and with the whole chain settled for 1 s first the output is digital
-silence. The amp has no idle noise floor to speak of; E1 is measuring how long
-the startup transient lasts.
+| Case | Default knobs | P-CRANK |
+|---|---|---|
+| Fresh instance (`sr_render --warmup-ms 0`) | −22.5 dBFS¹ | −7.3 dBFS (at 30–40 ms) |
+| Re-prepare of a settled instance | −9.1 | −5.0 |
+| Re-prepare, only the preamp filters reset | −9.4 | −5.6 |
+| Re-prepare, only PSU + sag reset | −19.5 | −6.5 |
+| Re-prepare, only `TriodeState` reset | −118.8 | −79.0 |
+
+¹ Still −21.2 dBFS at 20–40 ms and −50.7 at 90–100 ms. A fresh instance is
+quieter than a re-prepare because the GAIN/VOLUME/TONE `ParamSmoother`s start at
+0 and ramp in (5 ms); `resetDSPState()` leaves them alone, so a re-prepare runs
+at full knob values. The re-prepare rows come from a probe that snapshots and
+restores processor state around `prepareToPlay`; the fresh-instance row
+reproduces with `sr_render --out /tmp/b1 --signal silence:5.25 --warmup-ms 0`.
+
+**E1 is this transient.** The E1 gate (5 s of silence at P-CRANK after
+`sr_render`'s 250 ms warm-up) reads −70.42 dBFS against a target of ≤ −90. The
+same render with `--warmup-ms 1000` reads −200 dBFS — `measure_noise`'s floor;
+the true RMS is −268.9 dBFS, a constant ~4e-14 residual. Each cause alone fails
+E1: the preamp-filter reset alone leaves −68.5 to −69.5 dBFS, the PSU reset alone
+−67.1 to −67.8 dBFS.
 
 **Why it matters.** Every prepare — opening a session, changing sample rate or
-buffer size, many hosts' offline bounce — starts with a thump of up to −9 dBFS.
-STATE.md and CLAUDE.md attribute the thump to the PSU, which would send a fix to
-the wrong place.
+buffer size, many hosts' offline bounce — starts with a thump, up to −5 dBFS at
+high gain. STATE.md attributes it to the PSU alone; fixing only the PSU (or only
+the filters) leaves E1 near −68 dBFS.
 
-**Fix direction.** Start the state at its idle operating point instead of zero:
-seed `TriodeState::vPlate` with the stage's quiescent plate voltage, set the
-cathode-bypass and coupling-filter states to match that DC, and start the PSU
-nodes and the sag envelope at their idle fixed point (see B2). A short silent
-warm-up inside `prepareToPlay` is the blunt alternative. Then re-run E1 and E2.
+**Fix direction.** Start at the idle operating point instead of zero: seed the
+cathode-bypass and coupling-filter states with each stage's quiescent DC, and
+start the PSU nodes and the sag envelope at their idle fixed point (B2 needs that
+fixed point anyway). A few hundred ms of silent warm-up inside `prepareToPlay`
+is the blunt alternative. Decide separately whether the smoother fade-in on a
+fresh instance is wanted. Then re-run E1 and E2 at the default 250 ms warm-up.
 
 ### B2 — Sag reference is taken at nominal voltages, so the bias idles warm
 
@@ -93,22 +113,28 @@ warm-up inside `prepareToPlay` is the blunt alternative. Then re-run E1 and E2.
 
 **What happens.** The sag reference is `pentodeQuiescentTotal(bias,
 V_POWER_NOMINAL_N, V_SCREEN_NOMINAL_N)` — the idle current at 300 V / 280 V. But
-at idle the PSU model droops through `SOURCE_IMPEDANCE_N` and `R_SCREEN_N`, so
-the tubes actually idle on lower rails and draw less than the reference.
-`SagEnvelope::biasOffset()` then rests positive, i.e. warm.
+at idle the PSU droops through `SOURCE_IMPEDANCE_N` (200 Ω) and `R_SCREEN_N`
+(470 Ω), so the tubes idle on lower rails and draw less than the reference. The
+pentode current follows the screen voltage (the Koren model treats the screen as
+the virtual anode), so `SagEnvelope::biasOffset()` rests positive, i.e. warm.
 
-**Evidence** (probe, after 3 s of silence):
+**Evidence** — the idle fixed point, solved by hand from `Constants.h` and
+matched by the probe after 3 s of silence (probe values in brackets; it reads
+~6 mV low because the float envelope stalls just above the plate current):
 
 | Mode | B+ | Screen | Idle plate current | Reference | `biasOffset()` |
 |---|---|---|---|---|---|
-| 15W | 282.2 V | 258.0 V | 79.75 mA | 87.50 mA | **+0.77 V** |
-| 7W | 274.4 V | 248.3 V | 114.64 mA | 124.95 mA | **+1.02 V** |
+| 15W | 282.2 V | 257.9 V | 79.75 mA | 87.50 mA | **+0.774 V** (+0.768) |
+| 7W | 274.4 V | 248.2 V | 114.65 mA | 124.95 mA | **+1.030 V** (+1.024) |
 
-This breaks the invariant documented at `PentodeWaveshaper.h:40-47` and
-`SagEnvelope.h:15-20` (`biasOffset()` must be ≤ 0). The regression test at
-`tests/psu_sag_tests.cpp:230` still passes because it feeds the nominal voltages
-straight into the sag envelope instead of running the PSU loop — the same
-self-consistency trap that test's own comment warns about.
+Both sit inside the +1.5 V warm clamp: a resting warm offset, not a railed one.
+This breaks the invariant stated at `PentodeWaveshaper.h:44-45` and
+`tests/psu_sag_tests.cpp:228-229` (`biasOffset()` must be ≤ 0). The regression
+test `tests/psu_sag_tests.cpp:231-244` still passes because it feeds the
+nominal-supply reference current itself back into the envelope
+(`sag.update(idle)`); it never evaluates the pentode at the drooped voltages the
+PSU loop produces. The sibling sag tests have the same shape, and no test runs
+the PSU loop and checks the sign.
 
 **Why it matters.** The tubes idle hotter than designed, and the first ~8 mA
 (15W) / ~10 mA (7W) of extra current under drive only cancels the warm offset
@@ -121,17 +147,21 @@ that runs the real PSU loop on silence and asserts `biasOffset() <= 0`.
 
 ### B3 — The V1b Miller cutoff swings every cycle; its gain-pot dependence is dead
 
-**Where:** `src/PluginProcessor.cpp:551` (V1a) and `:565-567` (V1b);
-`src/dsp/filters/DynamicMillerLP.h:29-35`.
+**Where:** `src/PluginProcessor.cpp:551-552` (V1a), `:565-568` (V1b);
+`src/dsp/filters/DynamicMillerLP.h:29-35` (1 ms cutoff smoothing,
+`MILLER_FC_SMOOTH_MS`).
 
 **What happens.** The Miller gain estimate is `|out| / |in|`, sample by sample.
-It explodes near every input zero crossing and collapses toward 0 where the
-stage clips, so the Miller capacitance — and with it the low-pass cutoff — is
-modulated at twice the note frequency. The 1 ms smoothing on the cutoff does not
-remove it.
+It spikes toward infinity at every *input* zero crossing and collapses toward 0
+at every *output* zero crossing — the coupling high-pass and cathode shelf shift
+the output a few degrees from the input — even on clean settings where V1b does
+not clip. At heavy drive it also collapses on the clipped peaks (≈ 4) and
+inflates in the grid-clamped half-cycle. The cutoff therefore swings at twice
+the note frequency; the collapse side drives it up, and the 1 ms smoothing does
+not remove it.
 
 **Evidence** (probe, 110 Hz sine, V1b smoothed cutoff over the second half of a
-1 s run; design value with the nominal gain of 60 is 10.1 kHz):
+1 s run, the same swing in every cycle):
 
 | Input amplitude | Gain knob | Cutoff min / mean / max | Gain estimate max |
 |---|---|---|---|
@@ -139,63 +169,90 @@ remove it.
 | 0.125 | 0.6 | 14.0 / 15.8 / 25.6 kHz | 7.2e4 |
 | 0.5 | 1.0 | 8.2 / 57.5 / 97.1 kHz | 1.0e6 |
 
-So the stage is brighter than designed and its tone is modulated every cycle.
+At clean settings the stage's real small-signal gain is ~42.5, which puts a
+steady cutoff at ~14.0 kHz — the floor in the table. The swing above that floor
+is the estimator. The 10.1 kHz "design" value assumes `StageGains::V1B_GAIN = 60`
+(`Constants.h:15`), which this Koren stage never reaches.
 
 Two related facts:
 
 - **V1b's source resistance never moves.** `rSource_real = min(38.5k +
-  (1 − gainA)·500k, 150k)`. `gainDriveTaper()` tops out at 0.52, so `gainA`
-  (its square) never exceeds 0.27 and the unclamped value never drops below
-  403 kΩ. The 150 kΩ clamp (`V1B_RSOURCE_MAX_REAL`) is engaged at every knob
-  position, including 0, so the gain-pot term is dead code.
-- **V1a's Miller filter is inaudible.** With a 10 kΩ source its cutoff sits at
-  237–906 kHz, far above Nyquist at any oversampling factor, so only V1b matters.
+  (1 − gainA)·500k, 150k)`. `gainDriveTaper()` (`TriodeWaveshaper.h:67-70`) tops
+  out at 0.52, so `gainA` (its square) never exceeds 0.2704 and the unclamped
+  value never drops below 403 kΩ. The 150 kΩ clamp (`V1B_RSOURCE_MAX_REAL`) is
+  engaged at every knob position, including 0; it would only release with
+  `GAIN_KNOB_HEADROOM` ≳ 0.96. The gain-pot term is dead code.
+- **V1a's Miller filter is inaudible.** With a 10 kΩ source its cutoff parameter
+  is 205 kHz–1.3 MHz. `OnePoleLP::setFreqFast` (`OnePole.h:26-32`) skips
+  pre-warping, so the realised cutoff lands below Nyquist (40–43.5 kHz at
+  2×/44.1 kHz), but its effect at 20 kHz is at most −0.06 dB.
 
 **Fix direction.** Use a slow estimate of stage gain (e.g. the ratio of
-smoothed RMS levels, or simply the nominal `StageGains` value) instead of an
-instantaneous ratio, and clamp it. Decide whether the gain-pot dependence should
-exist; if so, re-derive `V1B_RSOURCE_MAX_REAL` against the new gain taper.
+smoothed RMS levels) or a fixed per-stage value, clamped to a sane range, and
+re-derive `StageGains::V1B_GAIN` from the stage's real small-signal gain. Decide
+whether the gain-pot dependence should exist; if so, re-derive
+`V1B_RSOURCE_MAX_REAL` against the current gain taper.
 
 ### B4 — Reported latency is too high in the default IIR-cab mode
 
-**Where:** `src/PluginProcessor.cpp:255-262`.
+**Where:** `src/PluginProcessor.cpp:255-262`; the limiter oversampler only runs
+inside `if (irMode)` at `:655-674`.
 
 **What happens.** The IR-path limiter oversampler's latency is always added to
-`setLatencySamples`, so that latency stays constant across cab modes. But in
-IIR-cab mode — the default, `IR_INDEX = 0` — the signal never passes through
-that oversampler, and nothing delays the IIR path to match.
+`setLatencySamples`. That is deliberate — the comment at `:255-258` and
+`docs/handoff-IR-limiter-aliasing.md:143-144` choose a constant latency across
+cab modes — but nothing delays the IIR path to match. So whenever the IR path is
+not active (IIR cab, the default `IR_INDEX = 0`, or the cab switched off) the
+report is too high.
 
-**Evidence** (JUCE 7.0.12 polyphase-IIR `dsp::Oversampling`):
+**Evidence** (JUCE 7.0.12 polyphase-IIR `dsp::Oversampling`, compiled
+standalone; `useIntegerLatency` defaults to false):
 
-| Factor | `getLatencyInSamples()` | Reported as `int` |
-|---|---|---|
-| 2× | 3.137 | 3 |
-| 4× | 4.433 | 4 |
-| 8× | 4.951 | 4 |
+| Factor | `getLatencyInSamples()` | Reported as `int` | Reported total | Real IIR-path delay |
+|---|---|---|---|---|
+| 2× | 3.137 | 3 | 7 | 3.14 |
+| 4× | 4.433 | 4 | 8 | 4.43 |
+| 8× | 4.951 | 4 | 8 | 4.95 |
 
-At the default 4× the plugin reports 4 + 4 = 8 samples while the IIR path is
-~4.4 samples late, so the host shifts the amp ~3.6 samples too early (~75 µs at
-48 kHz). Blended 50/50 with a parallel DI or dry track that comb-filters, with
-the first notch near 6.7 kHz. The `static_cast<int>` also truncates (8× reports
-4 for 4.95).
+At the default 4× the host shifts the amp ~3.6 samples too early (~74 µs at
+48 kHz). For a linear path blended 50/50 with a delay-compensated copy (a null
+test, or a parallel blend) the first comb notch lands at ≈ 6.9–7.0 kHz at 48 kHz
+(≈ 6.4 kHz at 44.1 kHz) — slightly above the naive fs / (2 · 3.57) because the
+polyphase IIR's phase delay rises with frequency. In IR mode the report is
+roughly right but truncated: 8 reported against a measured 8.8 (4×) and 9.3 (8×);
+the default `juce::dsp::Convolution` is zero-latency.
 
-**Fix direction.** Either delay the IIR path by the limiter oversampler's
-latency so the constant report is true, or report only the active path's latency.
-Round instead of truncating, or use `Oversampling::setUsingIntegerLatency(true)`.
+**Fix direction.** Keep the constant report and delay the IIR path by the
+limiter oversampler's latency, or report only the active path's latency. Round
+instead of truncating, or use `Oversampling::setUsingIntegerLatency(true)`.
 
 ### B5 — The saved oversample setting is ignored at prepare
 
 **Where:** `src/dsp/OversampleSwitcher.cpp:13`; `src/PluginProcessor.cpp:269`,
-`:279`, `:504-507`.
+`:279`, `:493-511`, `:652`.
 
 **What happens.** `OversampleSwitcher::init()` always sets `currentMode = 1`
-(4×), and `prepareToPlay` never applies the saved `OVERSAMPLE` parameter. A
-session saved at 2× or 8× therefore reports the 4× latency at prepare. Its first
-block then fades out (128 samples, silence for the rest of the block), commits
-the switch on the next block and fades back in, changing the latency again from
-the audio thread. `init()` also leaves `state`, `fadeCounter` and `pendingMode`
-untouched, so a prepare that arrives mid-transition inherits a half-finished
-switch.
+(4×) and never resets `state`, `fadeCounter` or `pendingMode`; nothing applies
+the saved `OVERSAMPLE` parameter at prepare (its only reader is `processBlock`).
+A session saved at 2× or 8× therefore starts every prepare at 4× and switches
+on its first blocks:
+
+- **Blocks > 128 samples** (e.g. 512): block 1 fades out over 128 samples and is
+  silent for the rest; block 2 commits the switch and fades back in.
+- **Blocks ≤ 128 samples:** the fade-out spans ⌈128/N⌉ blocks, then one fully
+  silent block, then the commit and fade-in (64-sample blocks: blocks 1–2 fade
+  out, block 3 silent, blocks 4–5 fade in).
+
+The PSU is frozen throughout, which also delays B1's settling.
+
+The latency report is visibly wrong only at **2×**: prepare reports 8, the
+commit block then calls `setLatencySamples(7)` from the audio thread. (At 8×
+the truncated value is also 8, so nothing changes.) JUCE 7.0.12's VST3 wrapper
+defers the resulting `restartComponent(kLatencyChanged)` to the message thread,
+but a host that follows the VST3 rule and deactivates/reactivates on that flag
+re-runs `prepareToPlay`, which resets to 4× again — a 2× session could then cycle
+fade-out → silence → fade-in on every reactivation (not reproduced in a real
+host).
 
 **Fix direction.** In `prepareToPlay`, set `currentMode` from the parameter
 (clamped to 0..2) and reset the transition state before
@@ -320,7 +377,9 @@ the next review should start:
 
 ## Consequences for STATE.md
 
-- The startup thump's first burst is the preamp, not the PSU (B1).
-- E1's −70.4 dBFS is the startup transient outlasting the 250 ms warm-up; once
-  settled the amp idles at digital silence. Fixing B1 should be checked against
-  E1 before E1's target or the warm-up is touched.
+- The startup thump has two causes, not one: the preamp filter reset (dominant
+  at default knobs) and the PSU reset to nominal. The triode plate cache is not
+  a cause (B1).
+- E1's −70.4 dBFS is that transient outlasting the 250 ms warm-up; settled, the
+  amp idles at −269 dBFS. Fix both causes before touching E1's target or the
+  warm-up length.
