@@ -1,7 +1,7 @@
 # DSP code review — 2026-10-15
 
 **Status:** open; it is the work list for the fixes. Fixed so far: **B5, B4**
-(branch `fix/oversample-prepare-latency`), **B1, S1** (branch `fix/startup-burst`), **B7** (branch `fix/grid-charge-rate`), **B6, B8** (branch `fix/effects-stale-tails`), **S2, S4** (branch `fix/ir-restore-and-samples`). Line references are against `main` at
+(branch `fix/oversample-prepare-latency`), **B1, S1** (branch `fix/startup-burst`), **B7** (branch `fix/grid-charge-rate`), **B6, B8** (branch `fix/effects-stale-tails`), **S2, S4, S3, S6, S5, S7** (branch `fix/ir-restore-and-samples`). Line references are against `main` at
 `b8e20a9`.
 
 **Scope:** `src/dsp/**`, `src/utils/**`, and the signal chain in
@@ -462,7 +462,7 @@ itself: `IR_INDEX` is automatable to 32 regardless of the IR count, and
 the out-of-range case call `cabSim.setIRIndex(0)` explicitly (both here and in
 `prepareToPlay`).
 
-### S3 — GRID I readout is ~7.8× too low
+### S3 — GRID I readout is ~7.8× too low — *fixed*
 
 **Where:** `src/dsp/tubes/GridConduction.cpp:44-45`; `src/PluginProcessor.cpp:829`.
 
@@ -491,7 +491,7 @@ limiter oversampler's state may stay NaN until the next prepare (code-read).
 IR is re-saved with the project. Fix: reject (or zero) non-finite samples on
 both paths.
 
-### S5 — Reverb SIZE zippers while it is turned
+### S5 — Reverb SIZE zippers while it is turned — *fixed*
 
 **Where:** `src/dsp/effects/SpringReverb.h:86-89`; `src/dsp/effects/Reverb.cpp:39-44`.
 
@@ -504,7 +504,7 @@ smoothed length. A fast turn (0 → 1 in 0.25 s) jumps 42 samples per block and
 clicks (peaks ≈ −30 dBFS). The LFO already reads at a fractional delay, so a
 smoothed float loop length removes it.
 
-### S6 — Tuner mute freezes the meters, which keep looking live
+### S6 — Tuner mute freezes the meters, which keep looking live — *fixed*
 
 **Where:** `src/PluginProcessor.cpp:397`; `src/PluginEditor.cpp:517-528`.
 
@@ -514,7 +514,7 @@ the VU meters only when POWER is off. With tuner mute on, both meters hold their
 last level — and because `VUMeter` adds ±0.02 jitter, they keep flickering as if
 live while the plugin outputs silence.
 
-### S7 — Tempo-synced delay silently clamps at 1000 ms
+### S7 — Tempo-synced delay silently clamps at 1000 ms — *fixed*
 
 **Where:** `src/dsp/effects/TempoSync.h:46-47`; `DELAY_TIME_MAX_MS`,
 `src/utils/Constants.h:334`.
