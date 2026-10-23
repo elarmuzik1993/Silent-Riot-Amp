@@ -36,6 +36,9 @@ struct SagEnvelope {
     // Restore the envelope to idle cathode current (no sag offset)
     void reset() { envelope = quiescentI; }
 
+    // Start the envelope settled on a constant cathode current (review B1).
+    void settle(float totalPlateCurrent) { envelope = std::abs(totalPlateCurrent); }
+
     // Feed with TOTAL plate current: |ipA| + |ipB| (both tubes through shared cathode R)
     void update(float totalPlateCurrent) {
         float level = std::abs(totalPlateCurrent);

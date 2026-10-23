@@ -1,4 +1,5 @@
 #include "PluginProcessor.h"
+#include "dsp/IdleOperatingPoint.h"
 #include "PluginEditor.h"
 
 #include <cmath>
@@ -70,15 +71,15 @@ juce::AudioProcessorValueTreeState::ParameterLayout SilentRiotProcessor::createP
     // Knobs: internal 0–1, UI displays 0–10 (see UI spec §7.1)
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         juce::ParameterID{ Params::IDs::GAIN, 1 }, "Gain",
-        juce::NormalisableRange<float>(0.0f, 1.0f, 0.001f), 0.6f));
+        juce::NormalisableRange<float>(0.0f, 1.0f, 0.001f), Params::Defaults::GAIN));
 
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         juce::ParameterID{ Params::IDs::TONE, 1 }, "Shape",
-        juce::NormalisableRange<float>(0.0f, 1.0f, 0.001f), 0.5f));
+        juce::NormalisableRange<float>(0.0f, 1.0f, 0.001f), Params::Defaults::TONE));
 
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         juce::ParameterID{ Params::IDs::VOLUME, 1 }, "Volume",
-        juce::NormalisableRange<float>(0.0f, 1.0f, 0.001f), 0.5f));
+        juce::NormalisableRange<float>(0.0f, 1.0f, 0.001f), Params::Defaults::VOLUME));
 
     params.push_back(std::make_unique<juce::AudioParameterBool>(
         juce::ParameterID{ Params::IDs::HALF_POWER, 1 }, "7W Mode", false));
@@ -222,10 +223,31 @@ void SilentRiotProcessor::resetDSPState()
     lastShapeCoeffVal = -1.0f;   // force shape coeff recompute on first sample
     psuFrozen = false;
 
+    // Start on the idle operating point, not on zeroed filters and a nominal
+    // supply: those replayed ~0.5 s of settling as a burst on silence after
+    // every prepare (review B1; see dsp/IdleOperatingPoint.h). Needs the rate-
+    // dependent coefficients, which prepareToPlay sets before calling this.
+    setEl84Bias(apvts.getRawParameterValue(Params::IDs::HALF_POWER)->load() > 0.5f
+                    ? PENTODE_BIAS_7W_N : PENTODE_BIAS_15W_N);
+    sr::settlePowerStageAtIdle(el84BaseBias, psu, sag);
+    sr::seedPreampAtIdle(filterBank, v1aTriode, v1bTriode, ltpModel, psu);
+
     // Snap the gain-staging trims to their current targets so a re-prepare or
     // sample-rate change doesn't audibly ramp from a stale value.
     inputTrimSm.setCurrentAndTargetValue(inputTrimSm.getTargetValue());
     outputTrimSm.setCurrentAndTargetValue(outputTrimSm.getTargetValue());
+}
+
+float SilentRiotProcessor::readAmpKnob(const juce::String& id, float fallback) const
+{
+    return sanitizeUnitParamOr(apvts.getRawParameterValue(id)->load(), fallback);
+}
+
+void SilentRiotProcessor::setEl84Bias(float bias)
+{
+    el84BaseBias = bias;
+    lastSagQuiescentBias = bias;
+    sag.setQuiescent(pentodeQuiescentTotal(bias, V_POWER_NOMINAL_N, V_SCREEN_NOMINAL_N));
 }
 
 void SilentRiotProcessor::recalcRateDependentCoeffs()
@@ -286,6 +308,13 @@ void SilentRiotProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
     iirPathAlign.setDelay(limiterLatency);
 
     recalcRateDependentCoeffs();
+
+    // Seed the amp-knob smoothers at the knobs' values. They were never seeded,
+    // so a fresh instance ramped GAIN/VOLUME in from 0 and a smoother that once
+    // held NaN stayed NaN through every later prepare (review S1).
+    gainSmoother.setImmediate(readAmpKnob(Params::IDs::GAIN, Params::Defaults::GAIN));
+    toneSmoother.setImmediate(readAmpKnob(Params::IDs::TONE, Params::Defaults::TONE));
+    volumeSmoother.setImmediate(readAmpKnob(Params::IDs::VOLUME, Params::Defaults::VOLUME));
 
     // Cabinet IR convolution engine (runs at base SR, after downsample)
     cabSim.prepare(sampleRate, samplesPerBlock, getTotalNumOutputChannels());
@@ -353,10 +382,12 @@ void SilentRiotProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
 {
     juce::ScopedNoDenormals noDenormals;
 
-    // Read parameters
-    float gainParam = apvts.getRawParameterValue(Params::IDs::GAIN)->load();
-    float toneParam = apvts.getRawParameterValue(Params::IDs::TONE)->load();
-    float volParam  = apvts.getRawParameterValue(Params::IDs::VOLUME)->load();
+    // Read parameters. The amp knobs are sanitized like the effects below: a
+    // single host NaN on GAIN or VOLUME used to lock its ParamSmoother at NaN
+    // and silence the plugin for the life of the instance (review S1).
+    float gainParam = readAmpKnob(Params::IDs::GAIN,   Params::Defaults::GAIN);
+    float toneParam = readAmpKnob(Params::IDs::TONE,   Params::Defaults::TONE);
+    float volParam  = readAmpKnob(Params::IDs::VOLUME, Params::Defaults::VOLUME);
     bool  is7W      = apvts.getRawParameterValue(Params::IDs::HALF_POWER)->load() > 0.5f;
     bool  cabOn     = apvts.getRawParameterValue(Params::IDs::CAB_SIM)->load() > 0.5f;
     bool  powerOn   = apvts.getRawParameterValue(Params::IDs::POWER)->load() > 0.5f;
@@ -405,15 +436,12 @@ void SilentRiotProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     // still ran, so the tuner keeps tracking pitch while the amp is silent.
     if (!powerOn || tunerMute) { buffer.clear(); return; }
 
-    el84BaseBias = is7W ? PENTODE_BIAS_7W_N : PENTODE_BIAS_15W_N;
-
     // Keep the sag reference locked to what the tube model actually idles at for
     // this bias. 7W runs a hotter bias → higher idle current → different
     // reference, so this has to follow the power-mode switch, not be a constant.
-    if (el84BaseBias != lastSagQuiescentBias) {
-        lastSagQuiescentBias = el84BaseBias;
-        sag.setQuiescent(pentodeQuiescentTotal(el84BaseBias,
-                                               V_POWER_NOMINAL_N, V_SCREEN_NOMINAL_N));
+    {
+        const float bias = is7W ? PENTODE_BIAS_7W_N : PENTODE_BIAS_15W_N;
+        if (bias != lastSagQuiescentBias) setEl84Bias(bias);
     }
 
     cabSim.setEnabled(cabOn);

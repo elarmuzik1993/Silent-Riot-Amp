@@ -1,7 +1,7 @@
 # DSP code review — 2026-10-15
 
 **Status:** open; it is the work list for the fixes. Fixed so far: **B5, B4**
-(branch `fix/oversample-prepare-latency`). Line references are against `main` at
+(branch `fix/oversample-prepare-latency`), **B1, S1** (branch `fix/startup-burst`). Line references are against `main` at
 `b8e20a9`.
 
 **Scope:** `src/dsp/**`, `src/utils/**`, and the signal chain in
@@ -94,7 +94,7 @@ S3 + S6 (readouts), S5 + S7 (reverb zipper, sync clamp).
 
 ## Blocking
 
-### B1 — Burst on silence after every `prepareToPlay`
+### B1 — Burst on silence after every `prepareToPlay` — *fixed*
 
 **Where:** `resetDSPState()`, `src/PluginProcessor.cpp:187-228` — specifically
 `filterBank.resetAll()` (`:192`) and `psu.reset()` (`:197`).
@@ -411,7 +411,7 @@ test that repeats decay at `DELAY_MAX_FEEDBACK`.
 
 ## Suggestions
 
-### S1 — A NaN on GAIN or VOLUME silences the plugin for the rest of the session
+### S1 — A NaN on GAIN or VOLUME silences the plugin for the rest of the session — *fixed*
 
 **Where:** `src/PluginProcessor.cpp:348-350`; `src/utils/ParamSmoother.h:13-16`.
 

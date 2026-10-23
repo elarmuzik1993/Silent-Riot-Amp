@@ -44,6 +44,14 @@ namespace IDs {
     static const juce::String OUTPUT_LEVEL = "outputLevel";  // float 0–1: silence..+12 dB
 }
 
+// Defaults of the amp knobs, shared by the parameter layout and by
+// processBlock's NaN fallback, so a bad host value reads as the default knob.
+namespace Defaults {
+    constexpr float GAIN   = 0.6f;
+    constexpr float TONE   = 0.5f;
+    constexpr float VOLUME = 0.5f;
+}
+
 } // namespace sr::Params
 
 namespace sr::Presets {

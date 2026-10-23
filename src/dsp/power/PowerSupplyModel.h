@@ -36,6 +36,11 @@ struct PowerSupplyModel {
     void init();
     void recalcDecayCoeffs(float effectiveSR);
     void reset();   // restore node voltages to nominal, clear current draw
+    // Put every node at the voltage it settles to under a constant power-stage
+    // draw with the preamp and PI at rest (no signal, so no reported current).
+    // The PSU idles below nominal; starting it at nominal made the preamp rail
+    // fall ~18 V on the first samples after every prepare (review B1).
+    void settle(float totalPlate, float totalScreen);
     void update();
     void resetCurrentDraw();
     void reportPreampLevel(float plateSwing);

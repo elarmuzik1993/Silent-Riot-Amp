@@ -165,6 +165,11 @@ private:
     // Parameter smoothers
     sr::ParamSmoother gainSmoother, toneSmoother, volumeSmoother;
 
+    // Amp knob read, NaN → fallback, clamped to 0..1 (review S1).
+    float readAmpKnob(const juce::String& id, float fallback) const;
+    // Sets the EL84 base bias and re-derives the sag reference from it.
+    void setEl84Bias(float bias);
+
     // State
     float el84BaseBias = sr::PENTODE_BIAS_15W_N;
     float lastSagQuiescentBias = 0.0f;          // forces a sag-reference recompute on first block

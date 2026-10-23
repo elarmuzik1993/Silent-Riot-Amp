@@ -4,11 +4,13 @@ _Updated 2026-10-23_
 
 ## Now
 - Silent Riot v0.3.4 (JUCE 7 VST3/Standalone). `bash scripts/verify.sh` passes: static checks +
-  Release build + 318/318 ctest. Cloud sessions provision via `.agents/bootstrap.sh`.
+  Release build + 326/326 ctest. Cloud sessions provision via `.agents/bootstrap.sh`.
 - Two work lists, **one combined order below**:
   - DSP review `docs/review-dsp-2026-10-15.md`: B1–B8 blocking, S1–S8 suggestions, measured and
     re-checked. Line refs against `b8e20a9`. **B5 + B4 fixed**: saved OVERSAMPLE mode applied at
     prepare; integer-latency oversamplers + `iirPathAlign` make the report exact (10/12/12).
+    **B1 + S1 fixed**: prepare seeds the solved idle point (`dsp/IdleOperatingPoint.h`), silence
+    is silent from sample 1 (was up to −5 dBFS); amp knobs sanitized, smoothers seeded.
   - Power-section plan `docs/superpowers/plans/2026-10-23-power-section-fixes.md`, Tasks 0–5.
     Written without the review; its *Coordination with the DSP review* section maps the overlap.
     Tasks 0–1 done: baseline in `docs/handoff-power-section-fixes.md` (+ `-probe.cpp`).
@@ -21,8 +23,7 @@ _Updated 2026-10-23_
    `VOLUME_KNOB_HEADROOM` = 0.21 keeps their grids small. Yes → re-balance headroom vs. grid clamp
    before plan Tasks 3–4; no → descope Tasks 3–4 to cleanup, Task 2 reduces to B2.
 3. Phase 1, settled tone unchanged at 44.1k/4×:
-   a. B1 + S1: seed filters/PSU/sag from a solved idle point (clears E1); sanitize + seed smoothers.
-   b. B7 (grid-charge rate × 176400/effectiveSR), then B6 + B8 (owner: delay self-oscillation?).
+   a. B7 (grid-charge rate × 176400/effectiveSR), then B6 + B8 (owner: delay self-oscillation?).
 4. Phase 2, changes the tone, then ONE re-calibration and an owner listening check:
    Plan Task 2 **with** B2 (one idle fixed-point solve, shared with B1; replace the tautological
    idle test with one running the real PSU loop), B3, Tasks 3–4 per item 2 (Task 4 with S8:
@@ -39,7 +40,8 @@ _Updated 2026-10-23_
 - DSP spec v2.13 is background, not authoritative; code, CLAUDE.md and handoff docs win.
   `COMPETITIVE_ROADMAP.md` is the live plan.
 - Fix order: tone-neutral fixes first, tone-changing ones together, so the amp is re-calibrated
-  once. B1 seeds the solved idle point, not hard-coded values, so B2/Task 2 can't break it.
+  once. B1 seeds the solved idle point, not hard-coded values, so B2/Task 2 can't break it
+  (B2 must update the pinned idle numbers in `idle_operating_point_tests.cpp`).
 - PSU's one-sample current lag is intended (spec §3.11); not a power-section defect.
 - Latency: exact integer report (Thiran-rounded, +2–4 samples vs. the old truncated 7/8/8) over a
   smaller but wrong one. Constant across cab modes; the IIR path is padded, not the report split.
@@ -50,8 +52,6 @@ _Updated 2026-10-23_
 ## Known issues
 - `signoff.py` on `d2315b4`: A1 −31.6 LUFS (band −17.5…−14.5), B1 0.99% (floor 1.0%), E1
   −70.4 dBFS (≤ −90), E3 −37.9 dBc (≤ −85, MUST-PASS); the other 8 pass. Valid only at 44.1k/4× (B7).
-- E1 is the startup burst (B1: preamp filter reset + PSU reset), not a noise floor; settled, the
-  amp idles at −269 dBFS. `CLAUDE.md`'s *Next* line still blames the PSU alone; fix with B1.
 - E3 is engine aliasing (16th harmonic of 11 kHz folding at 176.4k); 8× OS only reaches −43.5.
 - Sag idles warm: +0.77 V (15W) / +1.03 V (7W), reference taken at nominal rails (B2), and never
   reaches the cold side: average plate current *falls* slightly under drive.
