@@ -6,6 +6,8 @@
 //   - Delay TONE darkens the repeats; modulation stays finite at max feedback
 //   - Delay loop gain is FEEDBACK: repeats decay even at DELAY_MAX_FEEDBACK (B8)
 //   - Delay/Reverb restart() drop the tail frozen while off, ramp mix in (B6)
+//   - Delay holds a tempo-synced 2000 ms, past the knob's 1000 ms (S7)
+//   - Reverb SIZE glides when turned, no block-rate zipper; restart lands it (S5)
 //   - Reverb mix=0 is bit-exact dry
 //   - Reverb mix>0 adds energy / a decaying tail
 // ═══════════════════════════════════════════════════════════════
@@ -14,7 +16,10 @@
 #include <catch2/catch_approx.hpp>
 #include "dsp/effects/Delay.h"
 #include "dsp/effects/Reverb.h"
+#include "dsp/filters/Biquad.h"
+#include <algorithm>
 #include <cmath>
+#include <vector>
 
 using namespace sr;
 
@@ -507,4 +512,168 @@ TEST_CASE("Reverb restart() drops the frozen tail and ramps the wet in (review B
     auto step = makeBuffer(2, 1, 1.0f);
     r.process(step);
     REQUIRE(step.getSample(0, 0) == Catch::Approx(1.0f).margin(1e-3f));
+}
+
+// ── Review S7: a tempo-synced time runs past the TIME knob's 1000 ms ──
+// TempoSync now clamps at DELAY_SYNC_MAX_MS (2000 ms, a 1/2 note at 60 BPM).
+// The delay used to clamp every time to the knob's 1000 ms and size its line
+// for it, so a synced 2000 ms repeat came back at 1000 ms. Run at 192 kHz: the
+// line is sized in samples, so the highest common host rate is where an
+// undersized line shows.
+
+TEST_CASE("Delay plays a synced 2000 ms repeat at 192 kHz (review S7)", "[delay]")
+{
+    constexpr double fs = 192000.0;
+    Delay d;
+    d.prepare(fs, kBlock, 1);
+    d.setParameters(DELAY_SYNC_MAX_MS, 0.0f, 1.0f, 1.0f);   // fully wet, one repeat
+    d.restart();                                            // snap TIME, no glide
+
+    const int total = static_cast<int>(2.2 * fs);
+    std::vector<float> out(static_cast<size_t>(total));
+    auto buf = makeBuffer(1, kBlock);
+    for (int start = 0; start < total; start += kBlock)
+    {
+        const int n = std::min(kBlock, total - start);
+        buf.setSize(1, n, false, false, true);
+        buf.clear();
+        if (start == 0) buf.setSample(0, 0, 1.0f);
+        d.process(buf);
+        for (int i = 0; i < n; ++i) out[static_cast<size_t>(start + i)] = buf.getSample(0, i);
+    }
+
+    int peakAt = 1;
+    for (int i = 1; i < total; ++i)
+        if (std::abs(out[static_cast<size_t>(i)]) > std::abs(out[static_cast<size_t>(peakAt)])) peakAt = i;
+
+    // The wow/flutter sway moves the tap by at most 0.36 ms.
+    const double peakMs = 1000.0 * peakAt / fs;
+    REQUIRE(std::abs(out[static_cast<size_t>(peakAt)]) > 0.2f);
+    REQUIRE(peakMs == Catch::Approx(2000.0).margin(0.5));
+    // Nothing earlier — in particular no repeat at the old 1000 ms clamp.
+    float early = 0.0f;
+    for (int i = 1; i < static_cast<int>(1.99 * fs); ++i)
+        early = std::max(early, std::abs(out[static_cast<size_t>(i)]));
+    REQUIRE(early < 1e-6f);
+}
+
+// ── Review S5: SIZE glides instead of jumping the loop length per block ──
+// SIZE reaches the reverb once per host block. It used to snap each spring's
+// loop to the new whole-sample length, so turning the knob jumped the read tap
+// 3–5 samples per block (moderate turn) or 42 (fast turn): a block-rate zipper
+// and, on a fast turn, clicks. Measured as in the review: 44.1 kHz, 512-sample
+// blocks, a 220 Hz tone into a fully wet reverb. The loop's damping caps the
+// wet at a few kHz, so energy above 8 kHz is the zipper.
+
+namespace {
+struct SweepStats { double hfEnergy; float maxStep; };
+
+// sweepSec > 0 turns SIZE 0 → 1 over sweepSec (one setParameters per block, as
+// the processor does) after 1 s at SIZE 0; sweepSec == 0 holds `staticSize`.
+// Measures from the start of the sweep to 0.1 s after it ends.
+SweepStats reverbSizeSweep(double sweepSec, float staticSize, double windowSec)
+{
+    constexpr double fs = 44100.0;
+    constexpr int    block = 512;
+    const bool sweep = sweepSec > 0.0;
+    Reverb r;
+    r.prepare(fs, block, 2);
+    r.setParameters(1.0f, sweep ? 0.0f : staticSize, 0.5f);
+    r.restart();
+
+    Biquad hp1, hp2;
+    hp1.makeHighPass(8000.0f, 0.707f, static_cast<float>(fs));
+    hp2.makeHighPass(8000.0f, 0.707f, static_cast<float>(fs));
+
+    const int warm  = static_cast<int>(1.0 * fs);
+    const int total = warm + static_cast<int>(windowSec * fs);
+    SweepStats st { 0.0, 0.0f };
+    float prev = 0.0f;
+    auto buf = makeBuffer(2, block);
+    for (int start = 0; start < total; start += block)
+    {
+        if (sweep && start >= warm)
+            r.setParameters(1.0f, static_cast<float>(std::min(1.0, (start - warm) / (sweepSec * fs))), 0.5f);
+        const int n = std::min(block, total - start);
+        buf.setSize(2, n, false, false, true);
+        for (int i = 0; i < n; ++i)
+        {
+            const float x = 0.25f * std::sin(2.0f * PI_F * 220.0f * static_cast<float>(start + i) / static_cast<float>(fs));
+            buf.setSample(0, i, x);
+            buf.setSample(1, i, x);
+        }
+        r.process(buf);
+        for (int i = 0; i < n; ++i)
+        {
+            const float y  = buf.getSample(0, i);
+            const float hf = hp2.process(hp1.process(y));
+            if (start + i >= warm)
+            {
+                st.hfEnergy += static_cast<double>(hf) * hf;
+                st.maxStep = std::max(st.maxStep, std::abs(y - prev));
+            }
+            prev = y;
+        }
+    }
+    return st;
+}
+} // namespace
+
+TEST_CASE("Reverb SIZE turned fast or slow adds no block-rate zipper (review S5)", "[reverb]")
+{
+    for (const double sweepSec : { 0.25, 2.5 })   // 0 → 1 in 0.25 s; 0.4 of the range per second
+    {
+        CAPTURE(sweepSec);
+        const double window = sweepSec + 0.1;
+        const auto swept = reverbSizeSweep(sweepSec, 0.0f, window);
+        const auto lo    = reverbSizeSweep(0.0, 0.0f, window);
+        const auto hi    = reverbSizeSweep(0.0, 1.0f, window);
+        const double refHf  = std::max(lo.hfEnergy, hi.hfEnergy);
+        const float refStep = std::max(lo.maxStep, hi.maxStep);
+
+        // Snapping the loop: +56.7 dB (fast) / +34.7 dB (slow) above 8 kHz over
+        // a static SIZE. Gliding it: +1.5 / -0.4 dB.
+        const double hfDb = 10.0 * std::log10(swept.hfEnergy / refHf);
+        CAPTURE(hfDb);
+        REQUIRE(hfDb < 6.0);
+        // The fast turn's clicks: steps 10.6x a static SIZE's largest; gliding, 1.5x.
+        if (sweepSec < 1.0)
+            REQUIRE(swept.maxStep < 2.5f * refStep);
+    }
+}
+
+TEST_CASE("Reverb restart() lands a SIZE glide on its target (review S5)", "[reverb]")
+{
+    // Re-enabled after SIZE moved while the reverb was off, the tank must start
+    // at the new size, not sweep in from the old one: restart() then has to give
+    // exactly what a reverb prepared at the new size gives.
+    auto impulseAfter = [](Reverb& r) {
+        auto buf = makeBuffer(2, static_cast<int>(0.3 * kSR));
+        buf.setSample(0, 0, 1.0f);
+        buf.setSample(1, 0, 1.0f);
+        r.process(buf);
+        return buf;
+    };
+
+    Reverb fresh;
+    fresh.prepare(kSR, kBlock, 2);
+    fresh.setParameters(1.0f, 1.0f, 0.5f);
+    fresh.restart();
+    const auto want = impulseAfter(fresh);
+
+    Reverb r;
+    r.prepare(kSR, kBlock, 2);
+    r.setParameters(1.0f, 0.0f, 0.5f);
+    r.restart();
+    auto tone = makeBuffer(2, kBlock, 0.1f);
+    r.process(tone);
+    r.setParameters(1.0f, 1.0f, 0.5f);   // SIZE 0 → 1: a glide starts...
+    r.process(tone);                     // ...and is mid-way when the reverb stops
+    r.restart();
+    const auto got = impulseAfter(r);
+
+    for (int ch = 0; ch < 2; ++ch)
+        for (int i = 0; i < want.getNumSamples(); ++i)
+            if (got.getSample(ch, i) != want.getSample(ch, i))
+                FAIL("channel " << ch << " differs at sample " << i);
 }

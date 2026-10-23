@@ -43,7 +43,9 @@ void Reverb::setParameters(float mix, float size, float tone)
     mixSm.setTargetValue(mix);
 
     // SIZE/TONE change loop length & filter cutoffs — recompute only when they
-    // actually move (avoids needless work and loop-length resets every block).
+    // actually move. A new SIZE sets each spring's target; the loop length and
+    // feedback glide to it per sample (SpringReverb.h, review S5), and
+    // restart() lands the glide.
     if (std::abs(size - lastSize) > 1e-4f)
     {
         coreL.setSize(size);

@@ -47,10 +47,24 @@ struct Spring {
     std::vector<float> buf;   // ring buffer (sized in prepare)
     int   bufSize  = 0;
     int   writePtr = 0;
-    int   loopLen  = 1;       // current delay length (samples)
     float baseMs   = 28.0f;   // base loop length before SIZE scaling
-    float feedback = 0.7f;
     float sampleRate = 44100.0f;
+
+    // Loop length (samples) and feedback glide per sample toward what SIZE
+    // asks for (review S5). SIZE arrives once per block, and snapping the loop
+    // to each new length jumped the read tap several samples per block — a
+    // block-rate zipper, and clicks on a fast turn. Each glide is a one-pole
+    // (the ParamSmoother law), held as an offset from its target that decays
+    // to 0: a one-pole run on the length itself stalls in float a fraction of
+    // a sample short (~2 samples at 192 kHz), the offset form does not. The
+    // length target stays a whole number of samples, so once a glide lands the
+    // read is exactly what the old integer loop read: a static SIZE sounds as
+    // before, bit for bit.
+    float lenTarget   = 1.0f; // whole samples
+    float lenOffset   = 0.0f; // read length = lenTarget + lenOffset
+    float fbTarget    = 0.7f;
+    float fbOffset    = 0.0f; // loop gain = fbTarget + fbOffset
+    float glideDecay  = 0.0f; // per-sample one-pole decay (SPRING_SIZE_GLIDE_MS)
 
     // Slow LFO modulating the loop delay a few samples — the "living" spring
     // wobble that breaks up metallic ringing and animates the chirp.
@@ -71,9 +85,13 @@ struct Spring {
         bufSize = static_cast<int>(std::ceil(SPRING_MAX_LOOP_MS * 0.001f * sr)) + 2;
         buf.assign(static_cast<size_t>(bufSize), 0.0f);
         loopHP.setFreq(SPRING_LOOP_HP_HZ, sr);
+        glideDecay = std::exp(-1.0f / (SPRING_SIZE_GLIDE_MS * 0.001f * sr));
         reset();
     }
 
+    // Clears the tank and lands any SIZE glide on its target: with the buffer
+    // empty there is nothing to glide, and a restart must not sweep the loop
+    // in from a stale length (review B6).
     void reset() {
         std::fill(buf.begin(), buf.end(), 0.0f);
         writePtr = 0;
@@ -81,11 +99,35 @@ struct Spring {
         dispersion.reset();
         loopLP.reset();
         loopHP.reset();
+        lenOffset = 0.0f;
+        fbOffset  = 0.0f;
     }
 
+    // A new target carries the current read length over into the offset, so
+    // the read glides from where it is rather than jumping.
     void setLength(float sr, float lenScale) {
         int len = static_cast<int>(std::lround(baseMs * 0.001f * sr * lenScale));
-        loopLen = std::clamp(len, 1, bufSize - 1);
+        const float newTarget = static_cast<float>(std::clamp(len, 1, bufSize - 1));
+        lenOffset += lenTarget - newTarget;
+        lenTarget  = newTarget;
+    }
+
+    void setFeedback(float fb) {
+        fbOffset += fbTarget - fb;
+        fbTarget  = fb;
+    }
+
+    // Lands each glide exactly once it is inaudibly close (the zero offset is
+    // what makes a settled loop bit-identical to the old integer one).
+    void tickGlides() {
+        if (lenOffset != 0.0f) {
+            lenOffset *= glideDecay;
+            if (std::abs(lenOffset) < SPRING_GLIDE_SNAP_SAMP) lenOffset = 0.0f;
+        }
+        if (fbOffset != 0.0f) {
+            fbOffset *= glideDecay;
+            if (std::abs(fbOffset) < SPRING_GLIDE_SNAP_FB) fbOffset = 0.0f;
+        }
     }
 
     void setTone(float sr, float cutoffHz) {
@@ -93,10 +135,12 @@ struct Spring {
     }
 
     float process(float x) {
+        tickGlides();
+
         // Modulated fractional read position (linear interpolation).
         modPhase += modInc;
         if (modPhase >= 2.0f * PI_F) modPhase -= 2.0f * PI_F;
-        float delaySamps = static_cast<float>(loopLen) + modDepth * std::sin(modPhase);
+        float delaySamps = (lenTarget + lenOffset) + modDepth * std::sin(modPhase);
         delaySamps = std::clamp(delaySamps, 1.0f, static_cast<float>(bufSize - 2));
 
         float readPos = static_cast<float>(writePtr) - delaySamps;
@@ -116,7 +160,7 @@ struct Spring {
         float damped = loopLP.process(disp);
         damped       = loopHP.process(damped);
 
-        buf[static_cast<size_t>(writePtr)] = x + feedback * damped + ANTI_DENORMAL;
+        buf[static_cast<size_t>(writePtr)] = x + (fbTarget + fbOffset) * damped + ANTI_DENORMAL;
         if (++writePtr >= bufSize) writePtr = 0;
 
         return damped;
@@ -137,6 +181,7 @@ struct SpringReverbCore {
             springs[static_cast<size_t>(i)].prepare(sampleRate, baseMs[i % 2], detune, modRate[i % 2]);
         setSize(0.5f);
         setTone(0.5f);
+        reset();   // start on the default SIZE, not gliding to it
     }
 
     void reset() {
@@ -150,7 +195,7 @@ struct SpringReverbCore {
         curFeedback = SPRING_FB_MIN + size01 * (SPRING_FB_MAX - SPRING_FB_MIN);
         for (auto& s : springs) {
             s.setLength(sr, lenScale);
-            s.feedback = curFeedback;
+            s.setFeedback(curFeedback);
         }
     }
 
@@ -170,10 +215,11 @@ struct SpringReverbCore {
 
     float feedbackGain() const { return curFeedback; }
 
+    // Settled (target) loop length, for the tail estimate.
     float loopSeconds() const {
-        int longest = 1;
-        for (const auto& s : springs) longest = std::max(longest, s.loopLen);
-        return static_cast<float>(longest) / sr;
+        float longest = 1.0f;
+        for (const auto& s : springs) longest = std::max(longest, s.lenTarget);
+        return longest / sr;
     }
 };
 

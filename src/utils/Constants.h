@@ -337,7 +337,16 @@ constexpr float SAFETY_LIMIT_THRESH = 0.9f;
 
 // Delay (post-cab)
 constexpr float DELAY_TIME_MIN_MS   = 20.0f;
-constexpr float DELAY_TIME_MAX_MS   = 1000.0f;
+// Two different ceilings on purpose (review S7). The TIME knob maps 0..1 →
+// MIN..DELAY_TIME_KNOB_MAX_MS, and saved sessions and automation store that 0..1,
+// so the knob range must not move. Tempo sync reaches further: a 1/2 note at
+// 60 BPM is 2000 ms, and the old shared 1000 ms clamp silently cut every slow
+// division short. The delay line is sized for the longer of the two.
+constexpr float DELAY_TIME_KNOB_MAX_MS = 1000.0f;
+constexpr float DELAY_SYNC_MAX_MS      = 2000.0f;
+constexpr float DELAY_LINE_MAX_MS      = DELAY_SYNC_MAX_MS;   // longest time Delay accepts
+static_assert(DELAY_LINE_MAX_MS >= DELAY_TIME_KNOB_MAX_MS && DELAY_LINE_MAX_MS >= DELAY_SYNC_MAX_MS,
+              "the delay line must hold every time the knob or tempo sync can ask for");
 constexpr float DELAY_MAX_FEEDBACK  = 0.95f;    // longest repeats; the loop's small-signal gain (see below)
 // Analog/tape voicing — feedback-path tone shaping + wow/flutter modulation.
 // The high-cut sits IN the feedback loop, so each repeat is darkened again →
@@ -377,6 +386,13 @@ constexpr float SPRING_MAX_LOOP_MS   = 60.0f;   // ring-buffer sizing headroom (
 constexpr float SPRING_MOD_DEPTH_SAMP = 2.0f;   // ± samples of loop-length sway
 constexpr float SPRING_MOD_RATE1_HZ   = 0.7f;   // spring 1 LFO rate
 constexpr float SPRING_MOD_RATE2_HZ   = 1.1f;   // spring 2 LFO rate (decorrelated)
+// SIZE glide (review S5): SIZE arrives once per host block, so the loop length
+// and feedback one-pole toward it per sample. The time constant must outlast a
+// block (11.6 ms at 44.1 kHz / 512) or the steps still come through as a
+// block-rate zipper; 20 ms lands a turn in ~60 ms, like the 50 ms mix ramps.
+constexpr float SPRING_SIZE_GLIDE_MS   = 20.0f;
+constexpr float SPRING_GLIDE_SNAP_SAMP = 1e-4f; // land the length glide (samples)
+constexpr float SPRING_GLIDE_SNAP_FB   = 1e-6f; // land the feedback glide
 
 // ── Debug assertions ────────────────────────────────────────
 #ifdef DEBUG

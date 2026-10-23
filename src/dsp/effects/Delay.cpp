@@ -9,9 +9,10 @@ void Delay::prepare(double sampleRate, int samplesPerBlock, int numChannels)
     sr       = sampleRate;
     channels = std::max(1, numChannels);
 
-    // Room for the longest delay plus the wow+flutter sway and a few samples
-    // of Lagrange3rd interpolation headroom.
-    const double maxMs = DELAY_TIME_MAX_MS + DELAY_WOW_DEPTH_MS + DELAY_FLUTTER_DEPTH_MS + 2.0;
+    // Room for the longest delay (a synced 2000 ms, past the knob's 1000) plus
+    // the wow+flutter sway and a few samples of Lagrange3rd interpolation
+    // headroom. Allocates; prepare-time only.
+    const double maxMs = DELAY_LINE_MAX_MS + DELAY_WOW_DEPTH_MS + DELAY_FLUTTER_DEPTH_MS + 2.0;
     const int maxDelay = static_cast<int>(std::ceil(maxMs * 0.001 * sr)) + 4;
     line.setMaximumDelayInSamples(maxDelay);
 
@@ -63,7 +64,7 @@ void Delay::restart()
 
 void Delay::setParameters(float timeMs, float feedback, float mix, float tone, bool pingPong)
 {
-    currentTimeMs   = juce::jlimit(DELAY_TIME_MIN_MS, DELAY_TIME_MAX_MS, timeMs);
+    currentTimeMs   = juce::jlimit(DELAY_TIME_MIN_MS, DELAY_LINE_MAX_MS, timeMs);
     currentFeedback = juce::jlimit(0.0f, DELAY_MAX_FEEDBACK, feedback);
     pingPongOn      = pingPong;
 

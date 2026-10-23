@@ -38,7 +38,9 @@ public:
     bool fadedOut() const { return !mixSm.isSmoothing(); }
 
     // Per-block parameter update (called before processBlock).
-    // timeMs / feedback / mix / tone are the raw parameter values.
+    // timeMs is in ms, clamped to DELAY_TIME_MIN_MS..DELAY_LINE_MAX_MS (the
+    // knob's 1000 ms or a tempo-synced time up to 2000 ms).
+    // feedback / mix / tone are the raw parameter values.
     // tone is 0..1 (0 = dark/tape, 1 = bright/digital) → feedback high-cut.
     // pingPong cross-feeds the two channels (bouncing L/R repeats) instead of
     // independent dual-mono; no-op on mono buffers.

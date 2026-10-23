@@ -149,7 +149,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout SilentRiotProcessor::createP
 
     params.push_back(std::make_unique<juce::AudioParameterBool>(
         juce::ParameterID{ Params::IDs::DELAY_ON, 1 }, "Delay", false));
-    // Time is a 0–1 knob (maps 0..1 → DELAY_TIME_MIN..MAX ms in processBlock).
+    // Time is a 0–1 knob (maps 0..1 → DELAY_TIME_MIN..KNOB_MAX ms in processBlock).
     // Default ~0.34 ≈ 350 ms.
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         juce::ParameterID{ Params::IDs::DELAY_TIME, 1 }, "Delay Time",
@@ -857,7 +857,7 @@ void SilentRiotProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
         {
             // MANUAL — map time knob 0..1 → ms
             delayMs = DELAY_TIME_MIN_MS
-                + delayTime * (DELAY_TIME_MAX_MS - DELAY_TIME_MIN_MS);
+                + delayTime * (DELAY_TIME_KNOB_MAX_MS - DELAY_TIME_MIN_MS);
         }
         else
         {
