@@ -209,6 +209,7 @@ void SilentRiotProcessor::resetDSPState()
 
     if (limiterOversampler != nullptr)
         limiterOversampler->reset();
+    iirPathAlign.reset();
 
     // Effects module
     noiseGate.reset();
@@ -255,10 +256,12 @@ void SilentRiotProcessor::recalcRateDependentCoeffs()
     // Report oversampler latency to DAW. The limiter oversampler's latency is
     // included unconditionally (not just when IR mode is active) so total
     // latency stays constant across cab/IR mode switches instead of requiring
-    // a host renegotiation every time irMode flips.
-    int totalLatency = static_cast<int>(oversampleSwitcher.active()->getLatencyInSamples());
+    // a host renegotiation every time irMode flips; iirPathAlign delays the
+    // IIR path by the same amount so the report holds there too (review B4).
+    // Both oversamplers use integer latency, so these are exact, not truncated.
+    int totalLatency = static_cast<int>(std::lround(oversampleSwitcher.active()->getLatencyInSamples()));
     if (limiterOversampler != nullptr)
-        totalLatency += static_cast<int>(limiterOversampler->getLatencyInSamples());
+        totalLatency += static_cast<int>(std::lround(limiterOversampler->getLatencyInSamples()));
     setLatencySamples(totalLatency);
 }
 
@@ -266,15 +269,21 @@ void SilentRiotProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 {
     baseSampleRate = sampleRate;
 
-    oversampleSwitcher.init(getTotalNumOutputChannels(), samplesPerBlock);
+    // Start in the saved oversample mode — otherwise every prepare starts at 4x
+    // and a 2x/8x session fades out, goes silent and fades back in on its first
+    // blocks (review B5). A choice parameter's raw value is its index.
+    const float osRaw = apvts.getRawParameterValue(Params::IDs::OVERSAMPLE)->load();
+    const int osMode = std::isfinite(osRaw) ? static_cast<int>(std::lround(osRaw)) : 1;
+    oversampleSwitcher.init(getTotalNumOutputChannels(), samplesPerBlock, osMode);
 
     // 4x polyphase-IIR oversampler dedicated to the IR-path output limiter
     // (see docs/handoff-IR-limiter-aliasing.md). Runs at base SR -> 4x base SR,
     // independent of the main engine's oversample factor.
-    limiterOversampler = std::make_unique<juce::dsp::Oversampling<float>>(
-        getTotalNumOutputChannels(), 2,
-        juce::dsp::Oversampling<float>::filterHalfBandPolyphaseIIR);
-    limiterOversampler->initProcessing(static_cast<size_t>(samplesPerBlock));
+    limiterOversampler = sr::makeIntegerLatencyOversampler(getTotalNumOutputChannels(), 2,
+                                                           samplesPerBlock);
+    const int limiterLatency = static_cast<int>(std::lround(limiterOversampler->getLatencyInSamples()));
+    jassert(limiterLatency <= 16);   // iirPathAlign's capacity
+    iirPathAlign.setDelay(limiterLatency);
 
     recalcRateDependentCoeffs();
 
@@ -680,6 +689,15 @@ void SilentRiotProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
                 if (!std::isfinite(samples[i])) samples[i] = 0.0f;
         }
     }
+    else
+    {
+        // Match the IR path's limiter-oversampler latency (review B4). Cleared
+        // on an IR -> IIR switch so it never replays a stale few samples.
+        if (lastIrMode) iirPathAlign.reset();
+        iirPathAlign.process(buffer.getArrayOfWritePointers(), buffer.getNumChannels(),
+                             buffer.getNumSamples());
+    }
+    lastIrMode = irMode;
 
     // ── Post-cab effects (delay → reverb) at base SR, after the amp/cab ──
     // Operate per channel: a stereo bus picks up reverb/delay width; mono

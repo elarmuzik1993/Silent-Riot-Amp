@@ -17,6 +17,7 @@
 
 #include "dsp/filters/FilterBank.h"
 #include "dsp/filters/DynamicMillerLP.h"
+#include "dsp/filters/IntegerDelay.h"
 #include "dsp/tubes/TriodeWaveshaper.h"
 #include "dsp/tubes/PentodeWaveshaper.h"
 #include "dsp/tubes/GridConduction.h"
@@ -148,6 +149,12 @@ private:
     // docs/handoff-IR-limiter-aliasing.md). Fixed 4x, independent of the
     // main engine's switchable oversample factor.
     std::unique_ptr<juce::dsp::Oversampling<float>> limiterOversampler;
+
+    // Delays the IIR cab path by limiterOversampler's latency, so the latency
+    // reported to the host (main + limiter) is true in both cab modes (review
+    // B4). Mono/stereo bus only, hence 2 channels.
+    sr::IntegerDelay<2, 16> iirPathAlign;
+    bool lastIrMode = false;          // clear iirPathAlign on IR -> IIR switches
 
     // Triode plate voltage cache (inter-sample)
     sr::TriodeState v1aTriode, v1bTriode;

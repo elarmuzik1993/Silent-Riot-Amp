@@ -1,7 +1,8 @@
 # DSP code review — 2026-10-15
 
-**Status:** open. Nothing in this review has been fixed yet; it is the work list
-for the fixes. Line references are against `main` at `b8e20a9`.
+**Status:** open; it is the work list for the fixes. Fixed so far: **B5, B4**
+(branch `fix/oversample-prepare-latency`). Line references are against `main` at
+`b8e20a9`.
 
 **Scope:** `src/dsp/**`, `src/utils/**`, and the signal chain in
 `src/PluginProcessor.cpp` (`prepareToPlay`, `resetDSPState`,
@@ -236,7 +237,7 @@ re-derive `StageGains::V1B_GAIN` from the stage's real small-signal gain. Decide
 whether the gain-pot dependence should exist; if so, re-derive
 `V1B_RSOURCE_MAX_REAL` against the current gain taper.
 
-### B4 — Reported latency is too high in the default IIR-cab mode
+### B4 — Reported latency is too high in the default IIR-cab mode — *fixed*
 
 **Where:** `src/PluginProcessor.cpp:255-262`; the limiter oversampler only runs
 inside `if (irMode)` at `:655-674`.
@@ -269,7 +270,7 @@ the default `juce::dsp::Convolution` is zero-latency.
 limiter oversampler's latency, or report only the active path's latency. Round
 instead of truncating, or use `Oversampling::setUsingIntegerLatency(true)`.
 
-### B5 — The saved oversample setting is ignored at prepare
+### B5 — The saved oversample setting is ignored at prepare — *fixed*
 
 **Where:** `src/dsp/OversampleSwitcher.cpp:13`; `src/PluginProcessor.cpp:269`,
 `:279`, `:493-511`, `:652`.
