@@ -703,7 +703,8 @@ TEST_CASE("Reverb SIZE turned fast follows the same path at 512- and 2048-sample
     // loop length at every sample, so they give the same output. Gliding a
     // per-block step instead made each block size its own staircase — at 2048
     // samples a read-speed kick at every boundary, a ~21 Hz pitch warble.
-    // Block boundaries sit on the sweep's corners (all multiples of 2048).
+    // Both runs' block boundaries sit on the sweep's corners (multiples of 2048 for
+    // the big blocks, of 512 for the small ones).
     constexpr int big = 2048, small = 512;
     const int sweepStart = 11 * big;   // ~0.5 s at SIZE 0
     const int sweepLen   = 6 * big;    // 0 → 1 in 0.28 s

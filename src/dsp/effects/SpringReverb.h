@@ -254,8 +254,6 @@ struct SpringReverbCore {
         return wet * (1.0f / static_cast<float>(SPRING_NUM));
     }
 
-    float feedbackGain() const { return curFeedback; }
-
     // Settled (target) loop length, for the tail estimate.
     float loopSeconds() const {
         float longest = 1.0f;
