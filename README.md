@@ -2,8 +2,8 @@
 
 **Silent Riot** is a JUCE 7 VST3/Standalone amp simulator plugin by Monolit Beatz.
 It models an original fictional amplifier design built around ECC83/12AX7 preamp tubes
-and EL84 push-pull power tubes, with three controls (Gain, Shape, Volume) and a
-switchable 15W/7W power mode.
+and EL84 push-pull power tubes, with three amp controls (Gain, Shape, Volume), a
+switchable 15W/7W power mode, a built-in effects section and a live tuner.
 
 ## Licensing
 
@@ -28,6 +28,8 @@ others). See `CREDITS.md` for the full originality statement and attribution det
 - **Power amp**: Push-pull EL84 pair, cathode biased, 15W/7W switchable
 - **Dynamics**: PSU droop model, cathode sag envelope, grid conduction
 - **Cabinet**: IIR cab sim (presence/rolloff/notch) or user IR convolution
+- **Effects** (EFFECTS panel): noise gate, boost (level/tight/bright), tempo-syncable delay, spring reverb, stereo widener, and INPUT/OUTPUT level trims
+- **Tuner**: always-visible live tuner on the DI input, works with the amp muted
 
 ## Build
 
@@ -41,7 +43,7 @@ others). See `CREDITS.md` for the full originality statement and attribution det
 
 | File | Purpose |
 |---|---|
-| `docs/Silent Riot DSP Model Spec v2.13.md` | Authoritative DSP math, signal chain, constants |
+| `docs/Silent Riot DSP Model Spec v2.13.md` | Original DSP design rationale — background only; superseded where it disagrees with the code (see its status banner) |
 | `docs/SilentRiot_UI_Spec.md` | GUI layout, components, colours |
 | `CREDITS.md` | Originality statement, attribution, third-party licenses |
 | `LICENSE` | GNU GPL v3.0 |

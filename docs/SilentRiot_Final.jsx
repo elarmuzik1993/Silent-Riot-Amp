@@ -1,3 +1,6 @@
+/*  STATUS (2026-10-23): early visual reference, frozen since 2026-06. NOT the current UI.
+    It predates the arc knob, the live tuner, the EFFECTS panel (utility/boost/delay/reverb)
+    and the INPUT/OUTPUT trims. The C++ GUI in src/gui/ is the source of truth.            */
 import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 
 /*══════════════════════════════════════════════════════════

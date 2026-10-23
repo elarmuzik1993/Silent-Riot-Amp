@@ -2,6 +2,9 @@
 
 _Created: 2026-06-24 · Version at planning: v0.3.4 · Branch: `claude/plugin-audit-rating-ngbq53`_
 
+_Checkboxes last checked against the code: 2026-10-23. `[~]` = partial. This is the live
+plan; `ROADMAP.md` is archived._
+
 This roadmap takes the project from "excellent engine, unfinished product" (audit
 rating **7.5/10**) into **competitive, paid territory**. It is scoped to three
 deliberate decisions:
@@ -42,7 +45,9 @@ The differentiation bet is "perfect one amp." Until the tone is frozen, nothing
 downstream (cabs, presets, marketing demos, the parked neural model) can be finalized —
 they all train/tune against a moving target.
 
-- [ ] **[H] Define a tone sign-off protocol.** Pick reference material (DI clips at
+- [x] **[H] Define a tone sign-off protocol.** _(done: `docs/Tone_SignOff_Protocol.md` +
+  `tools/signoff.py` / `signoff_gates.json`. The gates still fail on A1/B1/E1/E3; see
+  `.agents/STATE.md`.)_ Pick reference material (DI clips at
   clean / edge-of-breakup / crank; a real AC30/Orange reference or target artist clips).
   Standardize gain-staging and A/B method. Without a written target, "ear-tuning" never
   terminates.
@@ -50,8 +55,8 @@ they all train/tune against a moving target.
   `outputGainCompensation` (1.0), `V1B_RSOURCE_MAX_REAL` (150KΩ), `XCUR_SENSITIVITY`
   (2.0), the Shape EQ gain ranges, and the dynamics feel (sag clamp, grid charge).
   _(CLAUDE.md "Next" + ROADMAP Parked.)_
-- [ ] **[H] Fix the two known DSP defects that affect the sound** (currently sitting in
-  open PRs):
+- [x] **[H] Fix the two known DSP defects that affect the sound** _(done: IR-path limiter
+  now runs 4× oversampled, `508c842`; `LTPModel::reset()` restores `vCathode`, `093fddf`)_:
   - **IR-path limiter aliasing** (PR #7/#9): the output `tanh` runs at base SR in the IR
     convolution path (`PluginProcessor.cpp:398-414`) but oversampled in the IIR path —
     folds harmonics back to **-28 dBc** under drive through a bright IR. Fix: surgically
@@ -59,12 +64,16 @@ they all train/tune against a moving target.
     must land before cabs are finalized.
   - **LTP `reset()` stale `vCathode`** (PR #8): a sample-rate change mid-playback leaves
     the phase-inverter solver half-reset. Real-time correctness bug; merge the fix.
-- [ ] **[H] Lock the tone with a golden/null regression** — the one open item from
+- [~] **[H] Lock the tone with a golden/null regression** _(partial: `sr_render` now drives
+  the real `processBlock` and `tests/regression_tests.cpp` checks invariants, but no golden
+  renders are committed and no CI job compares against them; see `tools/README.md`
+  "How this becomes the golden lock")_ — the one open item from
   ROADMAP P4. Build a true render test against the real `processBlock` (needs a small
   plugin-host test target) so that **once frozen, the tone cannot silently drift** with
   later refactors. This is the safety net that makes "frozen" mean something.
-- [ ] **[M] Document the frozen voicing** in the spec (final constants + the reference
-  clips that signed it off) so it's reproducible.
+- [ ] **[M] Document the frozen voicing** in a handoff doc + `CLAUDE.md` (final constants +
+  the reference clips that signed it off) so it's reproducible. _(Not in the DSP spec: that
+  is background-only since 2026-10-23.)_
 
 **Exit criteria:** tone constants frozen and documented; both DSP defects fixed; a golden
 test guards the rendered output; you can A/B against your reference and sign off.
@@ -109,7 +118,8 @@ not enterprise.
 - [ ] **[H] Installers.** Windows: NSIS or Inno Setup placing the VST3 in the standard
   dir + Standalone. Linux: `.deb` + the existing tarball. Currently the release pipeline
   ships raw archives only — fine for devs, not for paying customers.
-- [ ] **[H] Licensing / activation.** Decide the model (offline license file/serial is
+- [ ] **[H] Licensing / activation.** _(Note: Settings → About currently paints a hard-coded
+  "Licensed — Full Version" label, `SettingsPanel.cpp:162`, with no licensing behind it.)_ Decide the model (offline license file/serial is
   the indie-friendly default; avoid heavy DRM that hurts UX). Implement a gate +
   **time-limited or noise-burst trial** — non-negotiable for a paid plugin; most sales
   come after a trial.
@@ -129,9 +139,9 @@ The finishing layer that separates "works" from "feels premium."
 - [ ] **[H] Curated factory presets** built on the _frozen_ tone + real cabs. Today's 5
   presets are "starter values" (ROADMAP P2). For a boutique amp, presets are a primary
   sales tool — they demo the sound instantly. Name them by use-case/feel.
-- [ ] **[M] Front-of-amp essentials** (kept minimal, per depth-over-breadth):
-  - **Noise gate** — near-essential for high-gain guitar; its absence is conspicuous.
-  - **Boost / tight EQ** in front — very on-brand for an EL84 amp (everyone runs a
+- [x] **[M] Front-of-amp essentials** (kept minimal, per depth-over-breadth):
+  - [x] **Noise gate** _(done: `NoiseGate.h`, UTILITY card)_ — near-essential for high-gain guitar; its absence is conspicuous.
+  - [x] **Boost / tight EQ** _(done: `Boost.h`, level/tight/bright)_ in front — very on-brand for an EL84 amp (everyone runs a
     Tubescreamer into a Vox/Orange). High value, low scope. _Optional but recommended._
 - [ ] **[M] GUI finish.** Fine-tune the light theme (functional but not polished),
   complete the deferred keyboard/accessibility coverage (IRLoaderPanel list/drop-zone,

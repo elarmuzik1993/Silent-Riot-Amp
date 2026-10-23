@@ -1,5 +1,13 @@
 # Silent Riot — Engineering Roadmap
 
+> **Archived (2026-10-23). Do not plan from this file.** It is the June 2026 engineering audit;
+> its P0–P4 work is merged and several of its findings are no longer true (the `docs/` files
+> exist, the test count is 308, the X11 shape-mask window strategy it audits is gone).
+> The live plan is **`COMPETITIVE_ROADMAP.md`**, and current status is in `.agents/STATE.md`.
+> Open items here that the competitive roadmap already carries: stock-IR browser, real cabinet
+> IRs, ear-tuning, golden render lock, signing, neural model. Small leftovers it does not:
+> GUI layout magic numbers (`PluginEditor.cpp`), `.clang-format`/`.clang-tidy`, dead-code sweep.
+
 _Audit date: 2026-06-16 · Version at audit: v0.3.4 · Branch: `claude/plugin-audit-roadmap-0f43q6`_
 
 This roadmap is the output of a full read-only audit of the codebase (DSP core, GUI,

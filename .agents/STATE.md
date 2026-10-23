@@ -23,8 +23,10 @@ _Updated 2026-10-14_
 4. E3, step 2: measure harmonic fall-off of each nonlinearity in isolation; smooth the sharpest
    corner. Suspects: hard plate `std::clamp` (`TriodeWaveshaper.cpp:28`), C1-only grid clamp
    (`GridConduction.cpp:39`), OT flux clamp (`OTSaturation.h:43`). Re-measure P-CRANK after.
-5. Owner: delete or mark done `docs/superpowers/plans/2026-08-02-io-level-trims.md` (the trims
-   shipped; its boxes were never ticked), and tick the done items in `COMPETITIVE_ROADMAP.md` Phase A.
+5. Docs cleanup (done 2026-10-23, on `docs/power-section-fix-plan`): `ROADMAP.md` archived,
+   JSX prototype and io-level-trims plan marked stale/done, `COMPETITIVE_ROADMAP.md` ticked
+   against the code. Next for the power section: `docs/superpowers/plans/2026-10-23-power-section-fixes.md`
+   (owner to pick the 7W option, Task 5).
 6. Owner: delete stale remote branches: all but `main` and `claude/neural-learning-path-slider-kt8dy7`
    (unique hybrid-blend design sketch). `fix/effects-toggle-rendering-use-60` never had a PR; its
    fix looks superseded by the LED-toggle work (unverified), so check it before deleting.
@@ -35,6 +37,8 @@ _Updated 2026-10-14_
 - `bootstrap.sh` omits `libwebkit2gtk-4.1-dev` (in CI's list): `JUCE_WEB_BROWSER=0`, and the full
   verify builds and passes without it.
 - sr_render is not built by CI or verify (`-DSR_BUILD_TOOLS=ON`); build it when touching tools/.
+- DSP spec v2.13 is background only, not authoritative (2026-10-23): code, CLAUDE.md and handoff
+  docs win. It carries a status banner listing the superseded designs; it is not kept in sync.
 
 ## Known issues
 - E3 = −37.9 dBc (gate ≤ −85, MUST-PASS), reproduced with `sr_render` at P-CRANK, 44.1k, 4× OS.
