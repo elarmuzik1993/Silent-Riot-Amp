@@ -20,6 +20,11 @@ public:
     // from 0, so re-enabling doesn't replay the tail they froze with (review B6).
     void restart();
 
+    // On→off edge: ramp MIX down to 0 (50 ms) rather than cutting the wet and
+    // stepping the dry. Keep calling process() until fadedOut() (review B6).
+    void fadeOut() { mixSm.setTargetValue(0.0f); }
+    bool fadedOut() const { return !mixSm.isSmoothing(); }
+
     // mix / size / tone are the raw 0..1 parameter values.
     void setParameters(float mix, float size, float tone);
 

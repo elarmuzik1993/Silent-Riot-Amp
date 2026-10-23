@@ -221,7 +221,9 @@ void SilentRiotProcessor::resetDSPState()
     widenerWasActive = false;
     delayWasOn  = false;
     reverbWasOn = false;
+    delayFading = reverbFading = false;
     tailsStale  = false;
+    bypassDelay.reset();
     lastIrMode  = false;
 
     lastShapeCoeffVal = -1.0f;   // force shape coeff recompute on first sample
@@ -312,6 +314,7 @@ void SilentRiotProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
     iirPathAlign.setDelay(limiterLatency);
 
     recalcRateDependentCoeffs();
+    syncBypassDelay();
 
     // Seed the amp-knob smoothers at the knobs' values. They were never seeded,
     // so a fresh instance ramped GAIN/VOLUME in from 0 and a smoother that once
@@ -384,6 +387,33 @@ void SilentRiotProcessor::reset()
     tailsStale = true;
 }
 
+void SilentRiotProcessor::syncBypassDelay()
+{
+    // setDelay clears the line, so only on a change. Allocation-free.
+    const int latency = getLatencySamples();
+    jassert(latency <= 32);   // bypassDelay's capacity
+    if (latency != bypassDelay.getDelay()) bypassDelay.setDelay(latency);
+}
+
+void SilentRiotProcessor::processBlockBypassed(juce::AudioBuffer<float>& buffer, juce::MidiBuffer&)
+{
+    // Host bypass. processBlock doesn't run, so delay, reverb, IR convolution
+    // and widener freeze holding their tails, exactly as under power-off: flag
+    // them so the first processed block after un-bypass starts them clean
+    // (review B6). The tuner keeps getting the DI, as it does under power-off
+    // and tuner mute — tuning with the plugin bypassed is a normal workflow.
+    tailsStale = true;
+    const int n = buffer.getNumSamples();
+    if (buffer.getNumChannels() > 0)
+        pushTunerSamples(buffer.getReadPointer(0), n);
+
+    // Dry input, delayed by the latency the host is compensating for (JUCE's
+    // default passes it through undelayed and asserts the latency is 0).
+    // processBlock primes the line, so entering bypass is seamless.
+    syncBypassDelay();
+    bypassDelay.process(buffer.getArrayOfWritePointers(), buffer.getNumChannels(), n);
+}
+
 bool SilentRiotProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const {
     auto mainIn  = layouts.getMainInputChannelSet();
     auto mainOut = layouts.getMainOutputChannelSet();
@@ -446,6 +476,12 @@ void SilentRiotProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     if (buffer.getNumChannels() > 0)
         pushTunerSamples(buffer.getReadPointer(0), buffer.getNumSamples());
 
+    // Keep the host-bypass passthrough primed with the raw input, so a bypass
+    // engaged after this block continues from it without a gap.
+    syncBypassDelay();
+    bypassDelay.write(buffer.getArrayOfReadPointers(), buffer.getNumChannels(),
+                      buffer.getNumSamples());
+
     // Master power off, or tuner mute engaged — silence output. Capture above
     // still ran, so the tuner keeps tracking pitch while the amp is silent.
     // The effects below stop running here and freeze holding their tails, so
@@ -459,6 +495,7 @@ void SilentRiotProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     if (tailsStale.exchange(false))
     {
         delayWasOn = reverbWasOn = widenerWasActive = lastIrMode = false;
+        delayFading = reverbFading = false;
         iirPathAlign.reset();
     }
 
@@ -768,7 +805,11 @@ void SilentRiotProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     // Operate per channel: a stereo bus picks up reverb/delay width; mono
     // stays mono. Skipped entirely (bit-exact dry) when toggled off. On each
     // off→on edge restart() clears the tail the effect froze with while skipped,
-    // snaps its smoothers and ramps its mix in from 0 (review B6).
+    // snaps its smoothers and ramps its mix in from 0; on each on→off edge the
+    // effect keeps running for one mix ramp down to 0 before it is skipped, so
+    // switching it off doesn't cut the wet and step the dry (review B6).
+    // Switched back on mid-fade, it never stopped running, so its tail is live
+    // and the mix ramp simply reverses — no restart.
     if (delayOn)
     {
         float delayMs;
@@ -789,16 +830,33 @@ void SilentRiotProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
             delayMs = computeSyncMs(delaySync, bpm);
         }
         delay.setParameters(delayMs, delayFb, delayMix, delayTone, delayPP);
-        if (!delayWasOn) delay.restart();
-        delay.process(buffer);
+        if (!delayWasOn && !delayFading) delay.restart();
+        delayFading = false;
     }
+    else if (delayWasOn)
+    {
+        delay.fadeOut();
+        delayFading = !delay.fadedOut();   // mix already at 0: nothing to fade
+    }
+    const bool delayRan = delayOn || delayFading;
+    if (delayRan) delay.process(buffer);
+    if (delayFading && delay.fadedOut()) delayFading = false;
     delayWasOn = delayOn;
+
     if (reverbOn)
     {
         reverb.setParameters(reverbMix, reverbSz, reverbTn);
-        if (!reverbWasOn) reverb.restart();
-        reverb.process(buffer);
+        if (!reverbWasOn && !reverbFading) reverb.restart();
+        reverbFading = false;
     }
+    else if (reverbWasOn)
+    {
+        reverb.fadeOut();
+        reverbFading = !reverb.fadedOut();   // mix already at 0: nothing to fade
+    }
+    const bool reverbRan = reverbOn || reverbFading;
+    if (reverbRan) reverb.process(buffer);
+    if (reverbFading && reverb.fadedOut()) reverbFading = false;
     reverbWasOn = reverbOn;
 
     // ── MONO/STEREO widener (stereo bus only) ──
@@ -852,11 +910,12 @@ void SilentRiotProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     // input (it can exceed ±1 even when the mono sum is in range). Both land
     // after the amp's own limiter, so soft-clip the finished bus back into ±1
     // (and scrub any non-finite sample) as a last line of defence. Runs ONLY
-    // when an effect is active, so the dry amp path stays bit-identical when the
-    // whole module is off. NOTE: this per-channel clip is nonlinear, so on peaks
-    // that actually hit the knee it marginally perturbs the widener's exact
-    // mono-sum invariance — an accepted trade against hard DAC clipping.
-    if (delayOn || reverbOn || widenerActive || outputBoosting)
+    // while an effect runs (fading out included), so the dry amp path stays
+    // bit-identical when the whole module is off. NOTE: this per-channel clip
+    // is nonlinear, so on peaks that actually hit the knee it marginally
+    // perturbs the widener's exact mono-sum invariance — an accepted trade
+    // against hard DAC clipping.
+    if (delayRan || reverbRan || widenerActive || outputBoosting)
     {
         for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
         {

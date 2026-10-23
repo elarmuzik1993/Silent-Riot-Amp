@@ -342,6 +342,13 @@ tuner-mute), `reset()` it and ramp its mix from 0 — the `widenerWasActive`
 pattern — or keep processing it with the wet level ramped to 0 if tails should
 ring out. Override `AudioProcessor::reset()` to clear the tails.
 
+**Fixed** (`fix/effects-stale-tails`): restart on every off→on edge, after
+power-off / tuner mute, the host's `reset()` and host bypass
+(`processBlockBypassed`, which also passes the input through delayed by the
+reported latency); on→off, delay and reverb run one 50 ms mix ramp down to 0
+before being skipped, and reverse it if switched back on mid-fade. The wiring is
+tested on the real processor (`tests/processor_effects_tests.cpp`).
+
 ### B7 — Grid-conduction charge rate is per sample, so tone and level depend on the sample rate — *fixed*
 
 **Where:** `src/dsp/tubes/GridConduction.cpp:46`; the rate-aware decay at

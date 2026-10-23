@@ -70,3 +70,32 @@ TEST_CASE("IntegerDelay: setDelay clamps to capacity, reset clears the line", "[
     d.process(ch2, 1, 4);
     REQUIRE(y == std::vector<float>(4, 0.0f));   // nothing stale replayed
 }
+
+TEST_CASE("IntegerDelay: write() primes the line, so process() continues seamlessly", "[delay][latency]") {
+    // The host-bypass passthrough: processBlock write()s every input block, so
+    // the first bypassed block plays the previous block's tail, not a gap.
+    IntegerDelay<2, 16> primed, reference;
+    primed.setDelay(5);
+    reference.setDelay(5);
+
+    std::vector<float> a(12), b(12);
+    for (int i = 0; i < 12; ++i) {
+        a[static_cast<size_t>(i)] = 0.1f * static_cast<float>(i + 1);
+        b[static_cast<size_t>(i)] = -0.05f * static_cast<float>(i + 1);
+    }
+
+    std::vector<float> aRef = a;
+    const float* in[] = { a.data() };
+    primed.write(in, 1, 12);       // input untouched
+    REQUIRE(a == aRef);
+    float* refCh[] = { aRef.data() };
+    reference.process(refCh, 1, 12);
+
+    std::vector<float> bPrimed = b, bRef = b;
+    float* p[] = { bPrimed.data() };
+    float* r[] = { bRef.data() };
+    primed.process(p, 1, 12);
+    reference.process(r, 1, 12);
+    REQUIRE(bPrimed == bRef);
+    REQUIRE(bPrimed[0] == a[7]);   // the last 5 samples of the primed block lead
+}
