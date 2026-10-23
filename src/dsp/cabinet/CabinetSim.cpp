@@ -104,8 +104,8 @@ void CabinetSim::loadIRFromFile(const juce::File& file)
     juce::AudioBuffer<float> irBuffer(static_cast<int>(reader->numChannels), numSamples);
     reader->read(&irBuffer, 0, numSamples, 0, true, true);
 
-    if (!hasOnlyFiniteSamples(irBuffer))
-        return; // NaN/Inf sample would silence IR mode (review S4)
+    if (!isNormalisableIR(irBuffer))
+        return; // NaN/Inf or overflowing samples would silence IR mode (review S4)
 
     currentIRLengthSamples = numSamples;
     irNativeSampleRate = reader->sampleRate;

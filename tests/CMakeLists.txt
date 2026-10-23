@@ -111,6 +111,7 @@ catch_discover_tests(SilentRiotJuceTests)
 # the processor through tests/processor_harness.h.
 add_executable(SilentRiotProcessorTests
     processor_effects_tests.cpp
+    processor_ir_tests.cpp
 )
 
 target_link_libraries(SilentRiotProcessorTests PRIVATE

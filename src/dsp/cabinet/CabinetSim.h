@@ -13,6 +13,7 @@
 #include <juce_audio_formats/juce_audio_formats.h>
 #include <atomic>
 #include <cmath>
+#include <limits>
 
 namespace sr {
 
@@ -61,18 +62,34 @@ private:
 
 inline constexpr int MAX_USER_IR_SAMPLES = 8192;
 
-// True when every sample is finite. A NaN/Inf inside an IR's body survives
-// Convolution's normalisation and silences IR mode (review S4), so each
-// user-IR entry point (file load, state restore) rejects such an IR outright
-// rather than altering it.
-inline bool hasOnlyFiniteSamples(const juce::AudioBuffer<float>& buffer)
+// Ceiling on one IR channel's energy (float sum of squares) — see
+// isNormalisableIR(). A real cabinet IR sits around 1–100; this is ~3e32.
+// JUCE sums the IR *after* resampling it to the session rate, which scales
+// the energy by up to the rate ratio (96x for an 8 kHz IR in a 768 kHz
+// session), so the ceiling keeps 2^20 of headroom below FLT_MAX rather than
+// sitting on it: an IR accepted here must still normalise at any rate.
+inline constexpr float MAX_IR_CHANNEL_ENERGY =
+    std::numeric_limits<float>::max() / 1048576.0f;
+
+// True when juce::dsp::Convolution can normalise this IR (Normalise::yes).
+// Its normaliseImpulseResponse() (juce_Convolution.cpp) takes the largest
+// per-channel FLOAT sum of squares and scales by 0.125/sqrt(sum). A NaN/Inf
+// sample (review S4), or finite samples large enough that the sum overflows
+// to Inf, turn that gain into 0 or NaN and silence IR mode. So the energy is
+// accumulated here exactly as JUCE does it — in float, sample by sample — and
+// a NaN/Inf sample needs no separate test: it carries the sum to NaN/Inf,
+// which fails the comparison. Each user-IR entry point (file load, state
+// restore) rejects a failing IR outright rather than altering it.
+inline bool isNormalisableIR(const juce::AudioBuffer<float>& buffer)
 {
     for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
     {
         const float* data = buffer.getReadPointer(ch);
+        float energy = 0.0f;
         for (int i = 0; i < buffer.getNumSamples(); ++i)
-            if (!std::isfinite(data[i]))
-                return false;
+            energy += data[i] * data[i];
+        if (!(energy <= MAX_IR_CHANNEL_ENERGY))  // also false for NaN
+            return false;
     }
     return true;
 }

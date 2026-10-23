@@ -116,6 +116,28 @@ TEST_CASE("Missing audioData property is rejected", "[cabinet][ir][state]")
     REQUIRE(userIRsFromValueTree(tree).empty());
 }
 
+TEST_CASE("A non-IR child stops parsing instead of being skipped", "[cabinet][ir][state]")
+{
+    // The writer emits only "IR" children, so a foreign child is corruption —
+    // e.g. an IR node whose type was mangled. Skipping it would shift every
+    // later IR down one slot, so IR_INDEX would play the wrong IR.
+    std::vector<UserIREntry> in;
+    in.push_back(makeEntry("ok", 1, 256));
+    in.push_back(makeEntry("mangled", 1, 256));
+    in.push_back(makeEntry("after_mangled", 1, 256));
+
+    auto tree = userIRsToValueTree(in);
+    auto mangled = tree.getChild(1).createCopy();
+    tree.removeChild(1, nullptr);
+    juce::ValueTree foreign("Iq");
+    foreign.copyPropertiesFrom(mangled, nullptr);
+    tree.addChild(foreign, 1, nullptr);
+
+    auto out = userIRsFromValueTree(tree);
+    REQUIRE(out.size() == 1);
+    REQUIRE(out[0].name == "ok");
+}
+
 TEST_CASE("Entry count is capped at MAX_USER_IRS", "[cabinet][ir][state]")
 {
     std::vector<UserIREntry> in;
@@ -159,15 +181,17 @@ TEST_CASE("isValidUserIRFormat rejects out-of-range formats", "[cabinet][ir][sta
 }
 
 // ═══════════════════════════════════════════════════════════════
-// Non-finite samples (review S4) — rejected on both paths
+// Samples JUCE can't normalise (review S4) — NaN/Inf, or energy that
+// overflows its float sum of squares — rejected on both paths
 // ═══════════════════════════════════════════════════════════════
 
-TEST_CASE("Restored entry with a NaN/Inf sample is rejected and stops parsing",
+TEST_CASE("Restored entry with a NaN/Inf or overflowing sample is rejected and stops parsing",
           "[cabinet][ir][state]")
 {
     for (float bad : { std::numeric_limits<float>::quiet_NaN(),
                        std::numeric_limits<float>::infinity(),
-                       -std::numeric_limits<float>::infinity() })
+                       -std::numeric_limits<float>::infinity(),
+                       1.0e20f })   // finite, but its square overflows a float
     {
         std::vector<UserIREntry> in;
         in.push_back(makeEntry("ok", 1, 256));
@@ -182,6 +206,24 @@ TEST_CASE("Restored entry with a NaN/Inf sample is rejected and stops parsing",
         REQUIRE(out.size() == 1);
         REQUIRE(out[0].name == "ok");
     }
+}
+
+TEST_CASE("Restored entry whose channel energy overflows is rejected and stops parsing",
+          "[cabinet][ir][state]")
+{
+    // Every sample is finite and so is every square (1e36), but the float sum
+    // of squares JUCE's Convolution normalises by overflows to Inf, which
+    // silences IR mode exactly as a NaN would.
+    std::vector<UserIREntry> in;
+    in.push_back(makeEntry("ok", 1, 256));
+    in.push_back(makeEntry("too_hot", 2, 4096));
+    in.push_back(makeEntry("after_too_hot", 1, 256));
+    for (int s = 0; s < 4096; ++s)
+        in[1].audioData.setSample(1, s, (s % 2) ? 1.0e18f : -1.0e18f);
+
+    auto out = userIRsFromValueTree(userIRsToValueTree(in));
+    REQUIRE(out.size() == 1);
+    REQUIRE(out[0].name == "ok");
 }
 
 namespace {
@@ -202,7 +244,7 @@ juce::File writeFloatWav(const juce::String& fileName, const juce::AudioBuffer<f
 
 } // namespace
 
-TEST_CASE("readUserIRFromFile loads a clean float WAV and rejects NaN/Inf",
+TEST_CASE("readUserIRFromFile loads a clean float WAV and rejects ones JUCE can't normalise",
           "[cabinet][ir][state]")
 {
     auto clean = makeEntry("src", 2, 300, 44100.0);
@@ -220,10 +262,11 @@ TEST_CASE("readUserIRFromFile loads a clean float WAV and rejects NaN/Inf",
         f.deleteFile();
     }
 
-    SECTION("NaN or Inf inside the body is rejected")
+    SECTION("NaN, Inf or an overflowing sample inside the body is rejected")
     {
         for (float bad : { std::numeric_limits<float>::quiet_NaN(),
-                           std::numeric_limits<float>::infinity() })
+                           std::numeric_limits<float>::infinity(),
+                           1.0e20f })
         {
             auto poisoned = clean.audioData;
             poisoned.setSample(0, 150, bad);
@@ -232,6 +275,17 @@ TEST_CASE("readUserIRFromFile loads a clean float WAV and rejects NaN/Inf",
             REQUIRE_FALSE(readUserIRFromFile(f, e));
             f.deleteFile();
         }
+    }
+
+    SECTION("finite samples whose channel energy overflows are rejected")
+    {
+        auto tooHot = clean.audioData;
+        for (int s = 0; s < tooHot.getNumSamples(); ++s)
+            tooHot.setSample(0, s, 1.0e18f);   // 300 × 1e36 > FLT_MAX
+        auto f = writeFloatWav("sr_user_ir_hot.wav", tooHot, 44100.0);
+        UserIREntry e;
+        REQUIRE_FALSE(readUserIRFromFile(f, e));
+        f.deleteFile();
     }
 
     SECTION("unreadable file is rejected")

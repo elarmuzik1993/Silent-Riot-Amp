@@ -52,9 +52,14 @@ std::vector<UserIREntry> userIRsFromValueTree(const juce::ValueTree& irsNode)
         if (static_cast<int>(result.size()) >= MAX_USER_IRS)
             break;
 
+        // The writer emits only "IR" children, so anything else is corruption —
+        // most plausibly an IR node whose type was mangled. Skipping it would
+        // shift every later IR down one slot, and IR_INDEX would play the wrong
+        // IR with no sign of it; stopping leaves those indices past the list,
+        // which applyUserIRIndex() turns into IIR mode. Same rule as below.
         auto irNode = irsNode.getChild(i);
         if (!irNode.hasType("IR"))
-            continue;
+            break;
 
         UserIREntry entry;
         entry.name = irNode.getProperty("name").toString();
@@ -83,9 +88,10 @@ std::vector<UserIREntry> userIRsFromValueTree(const juce::ValueTree& irsNode)
             entry.audioData.copyFrom(ch, 0, rawData + ch * entry.numSamples,
                                      entry.numSamples);
 
-        // A NaN/Inf inside the body would silence IR mode and be re-saved with
-        // the project (review S4). Same stop-at-first-invalid rule as above.
-        if (!hasOnlyFiniteSamples(entry.audioData))
+        // A NaN/Inf, or samples whose energy overflows JUCE's normalisation,
+        // would silence IR mode and be re-saved with the project (review S4).
+        // Same stop-at-first-invalid rule as above.
+        if (!isNormalisableIR(entry.audioData))
             break;
 
         result.push_back(std::move(entry));
@@ -122,9 +128,10 @@ bool readUserIRFromFile(const juce::File& file, UserIREntry& out)
     if (!reader->read(&out.audioData, 0, numSamples, 0, true, true))
         return false;
 
-    // Float WAVs can carry NaN/Inf; the restore path would drop such an entry
-    // anyway, so reject it here instead of loading a silent IR (review S4).
-    return hasOnlyFiniteSamples(out.audioData);
+    // Float WAVs can carry NaN/Inf or absurdly large samples; the restore path
+    // would drop such an entry anyway, so reject it here instead of loading a
+    // silent IR (review S4).
+    return isNormalisableIR(out.audioData);
 }
 
 bool applyUserIRIndex(CabinetSim& cab, const std::vector<UserIREntry>& irs, int irIndex)

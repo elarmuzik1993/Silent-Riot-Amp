@@ -55,14 +55,22 @@ void SilentRiotProcessor::applyIRIndexParam()
     // Message thread (state restore) or prepareToPlay. Syncs the convolution to
     // IR_INDEX now — including disabling it when the index is past the IR list,
     // which processBlock can't catch when the index equals cachedIRIndex
-    // (review S2) — then marks the index seen so processBlock doesn't queue it
-    // again. Drops any async load still pending: it would select from the old
-    // list by an old index.
-    pendingIRIndex.store(-1);
+    // (review S2). Drops any async load still pending: it would select from
+    // the old list by an old index.
+    //
+    // The index is marked seen BEFORE the pending slot is cleared (both are
+    // seq_cst atomics, so the audio thread observes the writes in this order):
+    // once the slot is empty, processBlock already compares against the new
+    // index and won't queue a redundant reload of it. A block that compared
+    // just before the cache write can still queue an index; handleAsyncUpdate()
+    // applies that against the current list on this thread, and the next block
+    // re-queues the parameter's value if it differs — so a stale index never
+    // sticks.
     const int irIdx = static_cast<int>(
         apvts.getRawParameterValue(sr::Params::IDs::IR_INDEX)->load());
-    sr::applyUserIRIndex(cabSim, userIRs, irIdx);
     cachedIRIndex = irIdx;
+    pendingIRIndex.store(-1);
+    sr::applyUserIRIndex(cabSim, userIRs, irIdx);
 }
 
 juce::AudioProcessorValueTreeState::ParameterLayout SilentRiotProcessor::createParameterLayout()
@@ -509,7 +517,7 @@ void SilentRiotProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     {
         cachedIRIndex = irIndex;
         pendingIRIndex.store(irIndex);
-        triggerAsyncUpdate();  // handleAsyncUpdate() calls cabSim.setIRIndex() on message thread
+        triggerAsyncUpdate();  // handleAsyncUpdate() applies it via applyUserIRIndex() on message thread
     }
 
     // IR mode: cab on AND convolution has an active IR.
