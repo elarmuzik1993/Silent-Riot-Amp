@@ -4,7 +4,7 @@ _Updated 2026-10-23_
 
 ## Now
 - Silent Riot v0.3.4 (JUCE 7 VST3/Standalone). `bash scripts/verify.sh` passes: static checks +
-  Release build + 340/340 ctest. Cloud sessions provision via `.agents/bootstrap.sh`.
+  Release build + 349/349 ctest. Cloud sessions provision via `.agents/bootstrap.sh`.
 - Two work lists, **one combined order below**:
   - DSP review `docs/review-dsp-2026-10-15.md`: B1–B8 blocking, S1–S8 suggestions, measured and
     re-checked. Line refs against `b8e20a9`. **B5 + B4 fixed**: saved OVERSAMPLE mode applied at
@@ -12,8 +12,8 @@ _Updated 2026-10-23_
     **B1 + S1 fixed**: prepare seeds the solved idle point (`dsp/IdleOperatingPoint.h`), silence
     is silent from sample 1 (was up to −5 dBFS); amp knobs sanitized, smoothers seeded.
     **B7 fixed**: grid-charge increment × `GRID_CHARGE_REF_SR`/effectiveSR (176.4k bit-exact).
-    **B6 + B8 fixed**: effects restart clean on off→on, unmute and host `reset()`; delay loop gain =
-    FEEDBACK, never self-oscillates (owner); at 0.35 each repeat is −9.0 dB on the last (was −3.4).
+    **B6 + B8 fixed**: effects restart clean (off→on, unmute, `reset()`, bypass), fade out on→off,
+    tested on the real processor (`tests/processor_harness.h`); delay loop gain = FEEDBACK (owner).
     **S2 + S4 fixed**: restore/prepare disable the IR when `IR_INDEX` is past the IR list
     (`applyUserIRIndex`); IRs with NaN/Inf samples are rejected on file load and state restore.
   - Power plan `docs/superpowers/plans/2026-10-23-power-section-fixes.md`, Tasks 0–5; 0–1 done.

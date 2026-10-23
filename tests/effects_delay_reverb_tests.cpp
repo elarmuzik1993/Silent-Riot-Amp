@@ -428,15 +428,16 @@ TEST_CASE("Delay restart() starts fully dry and snaps TIME (review B6)", "[delay
 {
     Delay d;
     d.prepare(kSR, kBlock, 1);
-    d.setParameters(50.0f, 0.0f, 1.0f, 1.0f);
+    d.setParameters(400.0f, 0.0f, 1.0f, 1.0f);
     runAndPeak(d, 1, 0.2, 0.0, 0.2, [](int) { return 0.0f; });
 
-    // TIME moved while off: 50 → 400 ms.
-    const float timeMs = 400.0f;
+    // TIME moved DOWN while off: 400 → 20 ms. (Moving it up can't show the snap:
+    // a tap gliding longer only ever reads the region restart() just cleared.)
+    const float timeMs = 20.0f;
     d.setParameters(timeMs, 0.0f, 1.0f, 1.0f);
     d.restart();
 
-    const int n = static_cast<int>(0.6 * kSR);
+    const int n = static_cast<int>(0.2 * kSR);
     auto buf = makeBuffer(1, n);
     buf.setSample(0, 0, 1.0f);
     d.process(buf);
@@ -444,13 +445,39 @@ TEST_CASE("Delay restart() starts fully dry and snaps TIME (review B6)", "[delay
     // MIX ramps in from 0, so the first sample is (almost exactly) the dry input,
     // not the fully-wet mix's silence.
     REQUIRE(buf.getSample(0, 0) == Catch::Approx(1.0f).margin(1e-3f));
-    // The tap is at 400 ms from the first sample — no 50 ms glide from 50 ms
-    // that would smear the impulse across the early part of the buffer.
+    // The repeat lands at 20 ms. Without the snap the tap glides 400 → 20 ms over
+    // 50 ms and meets the impulse at ~46 ms instead, with nothing at 20 ms.
     const int expected = static_cast<int>(timeMs * 0.001 * kSR);
-    const float atTap = buf.getMagnitude(0, expected - 200, 400);
-    const float early = buf.getMagnitude(0, 1, expected - 200 - 1);
-    REQUIRE(atTap > 0.2f);
-    REQUIRE(early < 1e-6f);
+    int peakAt = 1;
+    for (int i = 1; i < n; ++i)
+        if (std::abs(buf.getSample(0, i)) > std::abs(buf.getSample(0, peakAt))) peakAt = i;
+    REQUIRE(std::abs(peakAt - expected) <= 4);
+    REQUIRE(buf.getMagnitude(0, 1, expected - 20) < 1e-6f);   // nothing before the tap
+}
+
+TEST_CASE("Delay restart() snaps FEEDBACK (review B6)", "[delay]")
+{
+    // FEEDBACK turned from 0.9 to 0 while off. Without the snap it glides down
+    // over 50 ms, so the first repeat (at 20 ms) recirculates at ~0.5 and a
+    // second repeat sounds at 40 ms.
+    Delay d;
+    d.prepare(kSR, kBlock, 1);
+    d.setParameters(20.0f, 0.9f, 1.0f, 1.0f);
+    runAndPeak(d, 1, 0.2, 0.0, 0.2, [](int) { return 0.0f; });
+
+    d.setParameters(20.0f, 0.0f, 1.0f, 1.0f);
+    d.restart();
+
+    const int n = static_cast<int>(0.1 * kSR);
+    auto buf = makeBuffer(1, n);
+    buf.setSample(0, 0, 1.0f);
+    d.process(buf);
+
+    const int t = static_cast<int>(0.02 * kSR);
+    const float first  = buf.getMagnitude(0, t - 20, 40);
+    const float second = buf.getMagnitude(0, 2 * t - 20, 40);
+    REQUIRE(first > 0.01f);
+    REQUIRE(second < 1e-6f);
 }
 
 TEST_CASE("Reverb restart() drops the frozen tail and ramps the wet in (review B6)", "[reverb]")

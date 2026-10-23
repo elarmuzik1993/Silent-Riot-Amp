@@ -102,3 +102,32 @@ target_include_directories(SilentRiotJuceTests PRIVATE
 target_compile_features(SilentRiotJuceTests PRIVATE cxx_std_17)
 
 catch_discover_tests(SilentRiotJuceTests)
+
+# ── Processor-level tests (the real SilentRiotProcessor) ──
+# Links the plugin's SharedCode target (`SilentRiot`, made by juce_add_plugin),
+# so these tests run exactly the code that ships — processor, editor and the
+# JUCE modules compiled with the plugin's own settings — with no third
+# hand-copied source list to drift. A new test file goes in this list; drive
+# the processor through tests/processor_harness.h.
+add_executable(SilentRiotProcessorTests
+    processor_effects_tests.cpp
+)
+
+target_link_libraries(SilentRiotProcessorTests PRIVATE
+    SilentRiot
+    Catch2::Catch2WithMain
+)
+
+# The SharedCode target links its JUCE modules PRIVATE, so their headers and
+# config defines do not propagate; compile against the plugin's own.
+target_include_directories(SilentRiotProcessorTests PRIVATE
+    $<TARGET_PROPERTY:SilentRiot,INCLUDE_DIRECTORIES>
+    ${CMAKE_SOURCE_DIR}/tests
+)
+target_compile_definitions(SilentRiotProcessorTests PRIVATE
+    $<TARGET_PROPERTY:SilentRiot,COMPILE_DEFINITIONS>
+)
+
+target_compile_features(SilentRiotProcessorTests PRIVATE cxx_std_17)
+
+catch_discover_tests(SilentRiotProcessorTests)

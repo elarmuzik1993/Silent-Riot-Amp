@@ -50,6 +50,10 @@ public:
     bool isBusesLayoutSupported(const BusesLayout& layouts) const override;
     using juce::AudioProcessor::processBlock;
     void processBlock(juce::AudioBuffer<float>&, juce::MidiBuffer&) override;
+    // Host bypass: dry input delayed by the reported latency; flags the effect
+    // tails stale, since processBlock (and so every effect) stops running.
+    using juce::AudioProcessor::processBlockBypassed;
+    void processBlockBypassed(juce::AudioBuffer<float>&, juce::MidiBuffer&) override;
 
     juce::AudioProcessorEditor* createEditor() override;
     bool hasEditor() const override;
@@ -158,6 +162,12 @@ private:
     sr::IntegerDelay<2, 16> iirPathAlign;
     bool lastIrMode = false;          // clear iirPathAlign on IR -> IIR switches
 
+    // Host-bypass passthrough: the dry input delayed by the reported latency, so
+    // a bypassed plugin stays time-aligned. processBlock write()s every input
+    // block into it, so the first bypassed block continues without a gap.
+    sr::IntegerDelay<2, 32> bypassDelay;
+    void syncBypassDelay();           // follow latency changes (oversample switch)
+
     // Triode plate voltage cache (inter-sample)
     sr::TriodeState v1aTriode, v1bTriode;
 
@@ -181,8 +191,10 @@ private:
     bool  widenerWasActive = false;   // edge-detect widener on/off for tail clear
     bool  delayWasOn  = false;        // edge-detect delay/reverb off→on for restart() (review B6)
     bool  reverbWasOn = false;
-    // Set by reset() and by the power-off / tuner-mute return; the next audible
-    // block clears every effect tail on the audio thread (review B6).
+    bool  delayFading  = false;       // switched off, wet still ramping to 0 (review B6)
+    bool  reverbFading = false;
+    // Set by reset(), the power-off / tuner-mute return and host bypass; the next
+    // audible block clears every effect tail on the audio thread (review B6).
     std::atomic<bool> tailsStale { false };
     double baseSampleRate = 44100.0;
     std::atomic<int> cachedIRIndex { 0 };   // last IR index seen by audio thread (written msg+audio)

@@ -4,6 +4,7 @@
 // Used to delay the IIR cab path by the IR-path limiter oversampler's latency,
 // so the latency the processor reports holds in both cab modes (review B4).
 // Without it the IIR path — the default — ran ahead of the reported latency.
+// Also delays the dry signal by the reported latency under host bypass.
 #include <algorithm>
 #include <array>
 #include <cstddef>
@@ -41,6 +42,25 @@ struct IntegerDelay {
                 const float out = line[static_cast<size_t>(pos)];
                 line[static_cast<size_t>(pos)] = x[i];
                 x[i] = out;
+                if (++pos == delay) pos = 0;
+            }
+        }
+        writePos = pos;
+    }
+
+    // Feeds the line without reading from it, so a passthrough that is only
+    // switched in now and then (the host-bypass path) is always primed with the
+    // last `delay` samples and continues seamlessly when process() takes over.
+    void write(const float* const* channels, int numChannels, int numSamples) {
+        if (delay == 0) return;
+        const int n = std::min(numChannels, MaxChannels);
+        int pos = writePos;
+        for (int ch = 0; ch < n; ++ch) {
+            auto& line = lines[static_cast<size_t>(ch)];
+            const float* x = channels[ch];
+            pos = writePos;
+            for (int i = 0; i < numSamples; ++i) {
+                line[static_cast<size_t>(pos)] = x[i];
                 if (++pos == delay) pos = 0;
             }
         }
