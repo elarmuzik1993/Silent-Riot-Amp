@@ -332,63 +332,116 @@ TEST_CASE("loadIRFromFile rejects a WAV JUCE's -80 dBFS trim cuts to nothing", "
     }
 }
 
-TEST_CASE("isNormalisableIR flags NaN, Inf and overflowing energy in any channel", "[cabinet][ir]")
+TEST_CASE("loadIRFromFile rejects a dead channel among the two it convolves, not past them",
+          "[cabinet][ir]")
+{
+    // Stereo::yes convolves with the first two channels only, so a dead
+    // channel 0 or 1 is refused but a dead third channel is never looked at.
+    struct Case { int numChannels; int deadChannel; bool loads; };
+    for (const auto c : { Case { 2, 0, false }, Case { 2, 1, false }, Case { 3, 2, true } })
+    {
+        auto tempFile = juce::File::getSpecialLocation(
+            juce::File::tempDirectory).getChildFile("test_ir_dead_channel.wav");
+        tempFile.deleteFile();
+        {
+            juce::WavAudioFormat wav;
+            std::unique_ptr<juce::AudioFormatWriter> writer(
+                wav.createWriterFor(new juce::FileOutputStream(tempFile), 48000.0,
+                                    static_cast<unsigned int>(c.numChannels), 32, {}, 0));
+            REQUIRE(writer != nullptr);
+
+            juce::AudioBuffer<float> ir(c.numChannels, 256);
+            for (int ch = 0; ch < c.numChannels; ++ch)
+                for (int i = 0; i < 256; ++i)
+                    ir.setSample(ch, i, ch == c.deadChannel
+                                            ? 0.0f : std::exp(-0.02f * static_cast<float>(i)));
+            writer->writeFromAudioSampleBuffer(ir, 0, 256);
+        }
+
+        CabinetSim cab;
+        cab.prepare(48000.0, 512, 2);
+        cab.loadIRFromFile(tempFile);
+        REQUIRE(cab.useIR.load() == c.loads);
+
+        tempFile.deleteFile();
+    }
+}
+
+TEST_CASE("isSafeToNormaliseIR flags NaN, Inf and overflowing energy in any channel", "[cabinet][ir]")
 {
     juce::AudioBuffer<float> b(2, 64);
     b.clear();
     b.setSample(0, 0, 1.0f);
-    REQUIRE(isNormalisableIR(b));
+    REQUIRE(isSafeToNormaliseIR(b));   // channel 1 is silent: harmless, not unsafe
 
     b.setSample(1, 63, std::numeric_limits<float>::quiet_NaN());
-    REQUIRE_FALSE(isNormalisableIR(b));
+    REQUIRE_FALSE(isSafeToNormaliseIR(b));
 
     b.setSample(1, 63, 0.0f);
     b.setSample(0, 10, -std::numeric_limits<float>::infinity());
-    REQUIRE_FALSE(isNormalisableIR(b));
+    REQUIRE_FALSE(isSafeToNormaliseIR(b));
 
     // Finite, but its square alone overflows a float.
     b.setSample(0, 10, -1.0e20f);
-    REQUIRE_FALSE(isNormalisableIR(b));
+    REQUIRE_FALSE(isSafeToNormaliseIR(b));
 
     // No single square overflows (1e38 < FLT_MAX), but the channel's sum does.
     b.clear();
     for (int i = 0; i < 64; ++i)
         b.setSample(1, i, 1.0e19f);
-    REQUIRE_FALSE(isNormalisableIR(b));
+    REQUIRE_FALSE(isSafeToNormaliseIR(b));
 
     // A loud but sane IR (+60 dB over full scale, both channels) passes.
     for (int ch = 0; ch < 2; ++ch)
         for (int i = 0; i < 64; ++i)
             b.setSample(ch, i, 1000.0f);
-    REQUIRE(isNormalisableIR(b));
+    REQUIRE(isSafeToNormaliseIR(b));
 }
 
-TEST_CASE("isNormalisableIR rejects an IR JUCE's -80 dBFS trim cuts to nothing", "[cabinet][ir]")
+TEST_CASE("isAudibleOnEveryChannel needs a sample at or above JUCE's -80 dBFS trim in each channel",
+          "[cabinet][ir]")
 {
     // juce::dsp::Convolution (Trim::yes) keeps only the span between the first
     // and last sample with |x| >= -80 dBFS over all channels — an ABSOLUTE
-    // threshold — and an IR with none plays silence.
-    REQUIRE(IR_TRIM_THRESHOLD == juce::Decibels::decibelsToGain(-80.0f));
-    REQUIRE_THAT(IR_TRIM_THRESHOLD, Catch::Matchers::WithinRel(1.0e-4f, 1.0e-5f));
-
+    // threshold — and an IR with none plays silence. Each IR channel then
+    // plays on its own output channel, so a dead channel is a silent side (and
+    // on a mono bus, where only channel 0 plays, a dead channel 0 is silence).
     juce::AudioBuffer<float> b(2, 64);
     b.clear();
-    REQUIRE_FALSE(isNormalisableIR(b));          // all zero
+    REQUIRE_FALSE(isAudibleOnEveryChannel(b));   // all zero
+    REQUIRE(isSafeToNormaliseIR(b));             // ...but harmless: restore keeps it
 
     // Every sample just below the threshold, both channels: trimmed to nothing.
     const float below = std::nextafter(IR_TRIM_THRESHOLD, 0.0f);
     for (int ch = 0; ch < 2; ++ch)
         for (int i = 0; i < 64; ++i)
             b.setSample(ch, i, (i % 2) ? below : -below);
-    REQUIRE_FALSE(isNormalisableIR(b));
+    REQUIRE_FALSE(isAudibleOnEveryChannel(b));
 
-    // One sample AT the threshold (JUCE's test is >=), in either channel, keeps it.
+    // One sample AT the threshold (JUCE's test is >=) in channel 1 only:
+    // JUCE's union trim keeps the IR, but channel 0 is still dead.
     b.setSample(1, 40, -IR_TRIM_THRESHOLD);
-    REQUIRE(isNormalisableIR(b));
+    REQUIRE_FALSE(isAudibleOnEveryChannel(b));
+    REQUIRE_FALSE(isLoadableIR(b));
 
-    // An empty buffer has nothing to survive the trim either.
+    // ...and in channel 0 too: every channel survives.
+    b.setSample(0, 3, IR_TRIM_THRESHOLD);
+    REQUIRE(isAudibleOnEveryChannel(b));
+    REQUIRE(isLoadableIR(b));
+
+    // Mono: its one channel feeds every output channel.
+    juce::AudioBuffer<float> mono(1, 16);
+    mono.clear();
+    mono.setSample(0, 8, 0.5f);
+    REQUIRE(isAudibleOnEveryChannel(mono));
+
+    // An empty buffer is rejected too. (JUCE would not play silence for it:
+    // fixNumChannels() turns a 0-sample buffer into a unity impulse, i.e.
+    // pass-through — but that is no IR either.)
     juce::AudioBuffer<float> empty(1, 0);
-    REQUIRE_FALSE(isNormalisableIR(empty));
+    REQUIRE_FALSE(isAudibleOnEveryChannel(empty));
+    juce::AudioBuffer<float> noChannels(0, 16);
+    REQUIRE_FALSE(isAudibleOnEveryChannel(noChannels));
 }
 
 namespace {
@@ -433,11 +486,11 @@ bool settledOutputIsAudible(CabinetSim& cab)
 
 } // namespace
 
-TEST_CASE("IRs JUCE can't trim or normalise silence IR mode (why they are rejected)",
+TEST_CASE("IRs JUCE can't trim or normalise silence IR mode (why loads reject them)",
           "[cabinet][ir]")
 {
     // loadIRFromBuffer() does not validate (callers pass entries that already
-    // passed isNormalisableIR()), so it shows what JUCE does without the check.
+    // passed the checks), so it shows what JUCE does without them.
     auto makeIR = [](float headLevel, float bodyLevel) {
         juce::AudioBuffer<float> ir(1, 2048);
         ir.clear();
@@ -455,7 +508,7 @@ TEST_CASE("IRs JUCE can't trim or normalise silence IR mode (why they are reject
         // 0.125/sqrt(energy), so the sine must come out at that gain times the
         // IR's response at 1 kHz — about 0.06, an eighth of pass-through.
         auto ir = makeIR(1.0f, 0.01f);
-        REQUIRE(isNormalisableIR(ir));
+        REQUIRE(isLoadableIR(ir));
 
         double energy = 0.0, re = 0.0, im = 0.0;
         const double w = 2.0 * juce::MathConstants<double>::pi * 1000.0 / 48000.0;
@@ -481,7 +534,7 @@ TEST_CASE("IRs JUCE can't trim or normalise silence IR mode (why they are reject
         CabinetSim cab;
         cab.prepare(48000.0, 512, 1);
         auto ir = makeIR(1.0f, 1.0e18f);   // each square 1e36 is finite; the sum is not
-        REQUIRE_FALSE(isNormalisableIR(ir));
+        REQUIRE_FALSE(isSafeToNormaliseIR(ir));
         cab.loadIRFromBuffer(std::move(ir), 48000.0);
         REQUIRE(cab.useIR.load());   // IR mode is on...
         REQUIRE_FALSE(settledOutputIsAudible(cab));   // ...and dead
@@ -493,7 +546,25 @@ TEST_CASE("IRs JUCE can't trim or normalise silence IR mode (why they are reject
         cab.prepare(48000.0, 512, 1);
         const float below = 0.5f * IR_TRIM_THRESHOLD;
         auto ir = makeIR(below, below);   // normalisation alone would have raised it
-        REQUIRE_FALSE(isNormalisableIR(ir));
+        REQUIRE_FALSE(isAudibleOnEveryChannel(ir));
+        cab.loadIRFromBuffer(std::move(ir), 48000.0);
+        REQUIRE(cab.useIR.load());
+        REQUIRE_FALSE(settledOutputIsAudible(cab));
+    }
+
+    SECTION("a stereo IR with a dead channel 0 plays silence on a mono bus")
+    {
+        // JUCE's trim is a union over channels, so channel 1 keeps this IR
+        // alive — but on a mono bus MultichannelEngine convolves only IR
+        // channel 0 and ignores channel 1.
+        CabinetSim cab;
+        cab.prepare(48000.0, 512, 1);
+        auto mono = makeIR(1.0f, 0.01f);
+        juce::AudioBuffer<float> ir(2, mono.getNumSamples());
+        ir.clear();
+        ir.copyFrom(1, 0, mono, 0, 0, mono.getNumSamples());
+        REQUIRE(isSafeToNormaliseIR(ir));
+        REQUIRE_FALSE(isAudibleOnEveryChannel(ir));
         cab.loadIRFromBuffer(std::move(ir), 48000.0);
         REQUIRE(cab.useIR.load());
         REQUIRE_FALSE(settledOutputIsAudible(cab));

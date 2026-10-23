@@ -69,7 +69,8 @@ std::vector<UserIREntry> userIRsFromValueTree(const juce::ValueTree& irsNode)
 
         // All fields are untrusted (state comes from DAW project files).
         // isValidUserIRFormat() is the same gate loadUserIR() applies, so every
-        // restorable entry could also have been loaded fresh, and vice versa.
+        // restorable entry's FORMAT could also have been loaded fresh, and vice
+        // versa. (The sample checks differ on purpose — see below.)
         const bool dimsValid =
             isValidUserIRFormat(entry.numChannels, entry.numSamples, entry.sampleRate);
 
@@ -88,10 +89,15 @@ std::vector<UserIREntry> userIRsFromValueTree(const juce::ValueTree& irsNode)
             entry.audioData.copyFrom(ch, 0, rawData + ch * entry.numSamples,
                                      entry.numSamples);
 
-        // A NaN/Inf, samples whose energy overflows JUCE's normalisation, or
-        // an IR JUCE's -80 dBFS trim cuts to nothing would silence IR mode and be re-saved with the project (review S4).
-        // Same stop-at-first-invalid rule as above.
-        if (!isNormalisableIR(entry.audioData))
+        // A NaN/Inf, or samples whose energy overflows JUCE's normalisation,
+        // would poison or silence IR mode and be re-saved with the project
+        // (review S4). Same stop-at-first-invalid rule as above.
+        //
+        // Only the SAFETY check, not the load-time audibility one: a silent
+        // IR (or one with a dead channel) is harmless — it plays silence, as
+        // it did when it was saved — and refusing it here would drop it and
+        // every later slot, which the next save then deletes for good.
+        if (!isSafeToNormaliseIR(entry.audioData))
             break;
 
         result.push_back(std::move(entry));
@@ -128,11 +134,12 @@ bool readUserIRFromFile(const juce::File& file, UserIREntry& out)
     if (!reader->read(&out.audioData, 0, numSamples, 0, true, true))
         return false;
 
-    // Float WAVs can carry NaN/Inf or absurdly large samples, and any file can
-    // be silent (all below JUCE's -80 dBFS trim); the restore path
-    // would drop such an entry anyway, so reject it here instead of loading a
-    // silent IR (review S4).
-    return isNormalisableIR(out.audioData);
+    // Float WAVs can carry NaN/Inf or absurdly large samples (the restore path
+    // would drop such an entry anyway), and any file can be silent, or silent
+    // in one channel, below JUCE's -80 dBFS trim — which plays silence on that
+    // channel's output (on a mono bus, a dead channel 0 silences the amp).
+    // Stricter than restore on purpose: refusing a load loses nothing (review S4).
+    return isLoadableIR(out.audioData);
 }
 
 bool applyUserIRIndex(CabinetSim& cab, const std::vector<UserIREntry>& irs, int irIndex)

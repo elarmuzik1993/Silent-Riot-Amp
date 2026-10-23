@@ -2,6 +2,8 @@
 // Requires JUCE (separate test target: SilentRiotJuceTests)
 
 #include <catch2/catch_test_macros.hpp>
+#include <cstdint>
+#include <cstring>
 #include <limits>
 #include <vector>
 
@@ -181,10 +183,24 @@ TEST_CASE("isValidUserIRFormat rejects out-of-range formats", "[cabinet][ir][sta
 }
 
 // ═══════════════════════════════════════════════════════════════
-// Samples JUCE can't trim or normalise (review S4) — NaN/Inf, energy that
-// overflows its float sum of squares, or nothing at or above its -80 dBFS
-// trim — rejected on both paths
+// Samples JUCE can't normalise (review S4) — NaN/Inf, or energy that
+// overflows its float sum of squares — rejected on both paths. A channel
+// with nothing at or above JUCE's -80 dBFS trim is rejected on LOAD only:
+// restore keeps it (harmless silence) rather than drop it and later slots.
 // ═══════════════════════════════════════════════════════════════
+
+TEST_CASE("IR_TRIM_THRESHOLD is the very float JUCE's Convolution trims at", "[cabinet][ir][state]")
+{
+    // Computed at run time in this TU (volatile: no constant folding), so it
+    // is JUCE's own decibelsToGain(-80.0f) against the constexpr literal in
+    // CabinetSim.h, compared bit for bit.
+    volatile float minus80 = -80.0f;
+    const float juceThreshold = juce::Decibels::decibelsToGain(static_cast<float>(minus80));
+    std::uint32_t a = 0, b = 0;
+    std::memcpy(&a, &juceThreshold, sizeof a);
+    std::memcpy(&b, &IR_TRIM_THRESHOLD, sizeof b);
+    REQUIRE(a == b);
+}
 
 TEST_CASE("Restored entry with a NaN/Inf or overflowing sample is rejected and stops parsing",
           "[cabinet][ir][state]")
@@ -227,11 +243,13 @@ TEST_CASE("Restored entry whose channel energy overflows is rejected and stops p
     REQUIRE(out[0].name == "ok");
 }
 
-TEST_CASE("Restored entry JUCE's -80 dBFS trim would cut to nothing is rejected and stops parsing",
-          "[cabinet][ir][state]")
+TEST_CASE("Restored silent or dead-channel entry is kept in its slot", "[cabinet][ir][state]")
 {
-    // JUCE's Convolution trims every sample below an absolute -80 dBFS before
-    // normalising; an IR with nothing at or above it plays silence.
+    // A load refuses these (isAudibleOnEveryChannel), but a project saved
+    // before that check can hold one. It is harmless — JUCE trims it to
+    // silence, the same silence it played when saved — so restore keeps it:
+    // dropping it would stop parsing and lose every later slot, and the next
+    // save would delete them for good.
     for (float level : { 0.0f, 0.5f * IR_TRIM_THRESHOLD })
     {
         std::vector<UserIREntry> in;
@@ -241,20 +259,28 @@ TEST_CASE("Restored entry JUCE's -80 dBFS trim would cut to nothing is rejected 
         for (int ch = 0; ch < 2; ++ch)
             for (int s = 0; s < 512; ++s)
                 in[1].audioData.setSample(ch, s, (s % 2) ? level : -level);
+        REQUIRE_FALSE(isAudibleOnEveryChannel(in[1].audioData));
 
         auto out = userIRsFromValueTree(userIRsToValueTree(in));
-        REQUIRE(out.size() == 1);
-        REQUIRE(out[0].name == "ok");
+        REQUIRE(out.size() == 3);
+        REQUIRE(out[1].name == "silent");
+        REQUIRE(out[1].audioData.getSample(1, 511) == in[1].audioData.getSample(1, 511));
+        REQUIRE(out[2].name == "after_silent");   // still on IR_INDEX 3
     }
 
-    // Quiet but above the threshold in one channel only: kept, like JUCE keeps it.
+    // Quiet but above the threshold in one channel only, the other dead:
+    // refused at load (on a mono bus only channel 0 plays, so this one would be
+    // pure silence there), kept at restore.
     std::vector<UserIREntry> in;
-    in.push_back(makeEntry("quiet", 2, 512));
+    in.push_back(makeEntry("one_dead_channel", 2, 512));
+    in.push_back(makeEntry("after", 1, 256));
     in[0].audioData.clear();
     in[0].audioData.setSample(1, 100, 2.0f * IR_TRIM_THRESHOLD);
+    REQUIRE_FALSE(isAudibleOnEveryChannel(in[0].audioData));
     auto out = userIRsFromValueTree(userIRsToValueTree(in));
-    REQUIRE(out.size() == 1);
-    REQUIRE(out[0].name == "quiet");
+    REQUIRE(out.size() == 2);
+    REQUIRE(out[0].name == "one_dead_channel");
+    REQUIRE(out[1].name == "after");
 }
 
 namespace {
@@ -275,7 +301,7 @@ juce::File writeFloatWav(const juce::String& fileName, const juce::AudioBuffer<f
 
 } // namespace
 
-TEST_CASE("readUserIRFromFile loads a clean float WAV and rejects ones JUCE can't normalise",
+TEST_CASE("readUserIRFromFile loads a clean float WAV, rejects unsafe, silent or dead-channel ones",
           "[cabinet][ir][state]")
 {
     auto clean = makeEntry("src", 2, 300, 44100.0);
@@ -328,6 +354,23 @@ TEST_CASE("readUserIRFromFile loads a clean float WAV and rejects ones JUCE can'
                 for (int s = 0; s < 300; ++s)
                     silent.setSample(ch, s, (s % 2) ? level : -level);
             auto f = writeFloatWav("sr_user_ir_silent.wav", silent, 44100.0);
+            UserIREntry e;
+            REQUIRE_FALSE(readUserIRFromFile(f, e));
+            f.deleteFile();
+        }
+    }
+
+    SECTION("a stereo file with one dead channel is rejected")
+    {
+        // JUCE's trim keeps it (the trim is a union over channels), but each
+        // IR channel plays on its own output channel, and on a mono bus only
+        // channel 0 is convolved — so either dead channel silences a side,
+        // and a dead channel 0 silences a mono session outright.
+        for (int dead : { 0, 1 })
+        {
+            auto oneDead = clean.audioData;
+            oneDead.clear(dead, 0, oneDead.getNumSamples());
+            auto f = writeFloatWav("sr_user_ir_dead_channel.wav", oneDead, 44100.0);
             UserIREntry e;
             REQUIRE_FALSE(readUserIRFromFile(f, e));
             f.deleteFile();

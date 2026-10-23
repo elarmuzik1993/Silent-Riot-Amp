@@ -129,3 +129,88 @@ plan's Tasks 3–4 (and much of the "power-tube feel") live. Today that is preve
 is to re-balance headroom against the grid clamp first, and Tasks 3–4 become meaningful after
 that. If no, Tasks 3–4 can be descoped to a cleanup (delete `softConductionCurve`, skip the
 load line) and Task 2 reduces to the B2 fix.
+
+## Grid conduction corners (2026-10-23, `fix/ir-restore-and-samples` at `d3417b1`)
+
+Where the coupling-cap charge sits today, for the `GRID_CHARGE_RATE` / GRID I notes in CLAUDE.md.
+Re-run: build the probe as in its header, then `/tmp/sr_power_probe grid` (~30 s). 44.1 kHz / 4×,
+IIR cab. Not a task of the plan; no source changed.
+
+**Method.** Each corner starts on the seeded idle point (as `resetDSPState()` leaves it), runs
+0.5 s of silence, then 2 s of signal with a 5 ms linear fade-in; statistics cover the 2 s. The
+input passes the plugin's base-rate front end (INPUT trim, then the real `Boost` at 44.1 kHz) and a
+4× linear-phase windowed-sinc upsampler standing in for JUCE's oversampler.
+
+- **EL84 grid peak**: the larger of the two PI outputs after the master volume — the voltage
+  `applyGridConduction()` compares with `GRID_CONDUCT_THRESH_EL84_N` (8.6 V). Margin is
+  20·log10(8.6 V / peak).
+- **Railed**: % of signal samples whose coupling-cap charge is ≥ 99 % of `MAX_BIAS_SHIFT_N`
+  (≥ 1.485 V).
+- **Nominal DI**: a sine at −18 dBFS RMS (0.178 peak, the gates' `sine:220:0.18`).
+- **HOT**: gain 10, volume 10, INPUT +12 dB, BOOST on with LEVEL (+18 dB) and BRIGHT (+9 dB
+  shelf) at max, TIGHT 0. With a 0.5-peak signal that is +21 dBFS RMS into the amp for a sine.
+- **Square**: band-limited (odd harmonics below 19.8 kHz), plateau 0.5. **Chord**: open-string
+  E chord (E2 A2 D3 G3 B3 E4), equal amplitudes, scaled to 0.5 peak.
+
+Cross-check: 10 of these corners were also run through the real `processBlock` with temporary
+instrumentation of the same quantities (reverted, not committed); every one agreed within
+0.02 V on the grid peak and 0.7 points on the railed %.
+
+**EL84 conduction: none.** No sample of any corner below crossed 8.6 V (`conducting` 0.00 % on
+every row of the probe output). Hottest: a 1.6 kHz square at the HOT corner with SHAPE 10, 15W,
+5.91 V, 3.3 dB under the threshold. That is the margin at the corners tried, not a proof for
+every possible input.
+
+### Nominal DI (SHAPE 5, 15W, no trim, no boost)
+
+| Knobs (gain / volume) | Signal | EL84 grid peak | Margin | PI charge avg | PI railed | V1b railed |
+|---|---|---|---|---|---|---|
+| 6 / 5 (default) | sine 110 | 0.26 V | 30.2 dB | 0.21 V | 0.0 % | 0.0 % |
+| 6 / 5 (default) | sine 220 | 0.27 V | 30.0 dB | 0.36 V | 0.0 % | 0.0 % |
+| 8 / 5 | sine 110 | 0.37 V | 27.3 dB | 1.44 V | 39.9 % | 0.0 % |
+| 8 / 5 | sine 220 | 0.35 V | 27.8 dB | 1.47 V | 47.1 % | 0.0 % |
+| 10 / 5 | sine 110 | 0.61 V | 23.0 dB | 1.46 V | 53.4 % | 0.0 % |
+| 10 / 5 | sine 220 | 0.58 V | 23.5 dB | 1.48 V | 59.4 % | 0.0 % |
+| 10 / 10 | sine 110 | 2.46 V | 10.9 dB | 1.46 V | 53.4 % | 0.0 % |
+| 10 / 10 | sine 220 | 2.31 V | 11.4 dB | 1.48 V | 59.4 % | 0.0 % |
+
+### HOT corners — EL84 grid peak (margin to 8.6 V)
+
+| Signal | 15W, SHAPE 0 | 15W, SHAPE 10 | 7W, SHAPE 0 | 7W, SHAPE 10 |
+|---|---|---|---|---|
+| sine 110 @0.5 | 5.01 V (4.7 dB) | 4.46 V (5.7 dB) | 4.89 V (4.9 dB) | 4.35 V (5.9 dB) |
+| sine 800 @0.5 | 4.97 V (4.8 dB) | 5.08 V (4.6 dB) | 4.82 V (5.0 dB) | 4.91 V (4.9 dB) |
+| sine 1600 @0.5 | 3.74 V (7.2 dB) | 5.73 V (3.5 dB) | 3.62 V (7.5 dB) | 5.57 V (3.8 dB) |
+| sine 800 @1.0 | 5.20 V (4.4 dB) | 5.25 V (4.3 dB) | 5.06 V (4.6 dB) | 5.10 V (4.5 dB) |
+| square 110 @0.5 | 4.87 V (4.9 dB) | 4.55 V (5.5 dB) | 4.74 V (5.2 dB) | 4.44 V (5.7 dB) |
+| square 1600 @0.5 | 4.01 V (6.6 dB) | **5.91 V (3.3 dB)** | 3.90 V (6.9 dB) | 5.75 V (3.5 dB) |
+| chord @0.5 | 4.81 V (5.0 dB) | 4.65 V (5.3 dB) | 4.69 V (5.3 dB) | 4.46 V (5.7 dB) |
+
+### HOT corners — PI and V1b charge railed
+
+Both sit upstream of SHAPE and the master volume, so SHAPE does not change them (identical to
+the 0.1 % in every pair); 15W and 7W differ only through the shared supply.
+
+| Signal | PI railed 15W / 7W | V1b railed 15W / 7W | PI charge avg |
+|---|---|---|---|
+| sine 110 @0.5 | 55.3 / 56.0 % | 61.6 / 61.7 % | 1.47 V |
+| sine 800 @0.5 | 79.8 / 79.4 % | 75.9 / 76.1 % | 1.49 V |
+| sine 1600 @0.5 | 100.0 / 100.0 % | 91.8 / 91.9 % | 1.50 V |
+| sine 800 @1.0 | 82.5 / 82.4 % | 72.1 / 72.1 % | 1.49 V |
+| square 110 @0.5 | 56.7–56.8 / 57.3 % | 52.8 / 52.8 % | 1.47 V |
+| square 1600 @0.5 | 100.0 / 100.0 % | 84.3 / 84.3 % | 1.50 V |
+| chord @0.5 | 61.4 / 62.2 % | 63.3 / 63.2 % | 1.48 V |
+
+**What it says.** The EL84 grids never conduct at any corner tried, so GRID I reads 0 and the
+EL84 charge stays 0. The rail that does engage is the PI's: from about gain 8 at a nominal DI,
+and 55–100 % of samples under the HOT corners, where V1b's rails too (53–92 %; 0 at a nominal DI).
+At default knobs with a nominal DI the PI charge stays off its rail (0.21–0.36 V average).
+Whether the PI rail is load-bearing (the way the EL84 rail was before `VOLUME_KNOB_HEADROOM`)
+is not measured here.
+
+These replace figures quoted earlier from instrumentation that was not kept (hottest 5.55 V at
+the 1.6 kHz sine corner; PI railed 40 % at gain 8 and 57 % at gain 10 at −18 dBFS; 60–100 % hot;
+0.02 V at default knobs). Gain 8 agrees (39.9 % at 110 Hz). The rest differ, and the numbers
+above are the ones to use: that sine corner measures 5.73 V (5.57 V in 7W) and the hottest
+corner found is the square, 5.91 V; gain 10 is 53–59 % (110 / 220 Hz); hot is 55–100 %; the
+default-knob PI charge is 0.21–0.36 V.

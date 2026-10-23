@@ -20,10 +20,19 @@
 //       src/dsp/tubes/GridConduction.cpp src/dsp/filters/FilterBank.cpp
 //       src/dsp/power/PowerSupplyModel.cpp src/dsp/power/LTPSolver.cpp
 //       src/dsp/cabinet/SpeakerCoupling.cpp -o /tmp/sr_power_probe
-//   /tmp/sr_power_probe
+//   /tmp/sr_power_probe          Task 0 power-stage telemetry (table "Power-stage telemetry")
+//   /tmp/sr_power_probe grid     grid-conduction corners (section "Grid conduction corners")
 //
-// Each run: 1 s of silence to get past the start-up transient (review B1), then
-// the signal; statistics cover the signal only. 44.1 kHz, 4x, IIR cab.
+// Task 0 runs: 1 s of silence to get past the start-up transient (review B1),
+// then the signal; statistics cover the signal only. 44.1 kHz, 4x, IIR cab.
+//
+// `grid` runs (added 2026-10-23, after B1/B7): the amp starts on its seeded idle
+// point exactly as resetDSPState() leaves it, and the input goes through the
+// plugin's base-rate front end — INPUT trim, then BOOST (the real Boost class
+// at 44.1 kHz) — and a 4x linear-phase windowed-sinc upsampler standing in for
+// JUCE's oversampler (its phase differs near 20 kHz; everything that reaches
+// the PI has been through the 5 kHz gain-loading LP first). Shape is the
+// knob's value, applied the way processBlock applies it on its first sample.
 
 #include "dsp/tubes/TriodeWaveshaper.h"
 #include "dsp/tubes/PentodeWaveshaper.h"
@@ -35,9 +44,14 @@
 #include "dsp/power/LTPSolver.h"
 #include "dsp/cabinet/SpeakerCoupling.h"
 #include "dsp/cabinet/OTSaturation.h"
+#include "dsp/effects/Boost.h"
+#include "dsp/IdleOperatingPoint.h"
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <cstring>
+#include <functional>
+#include <vector>
 
 using namespace sr;
 
@@ -61,6 +75,9 @@ struct Amp {
     // Probes
     float lastFc1 = 0, lastFc2 = 0, lastGain2 = 0, lastPlate = 0;
     float lastIpA = 0, lastIpB = 0, lastCondA = 1, lastCondB = 1, lastBPlus = 0, lastScreen = 0;
+    // EL84 grid drive: the larger of the two PI outputs after the master volume,
+    // i.e. what applyGridConduction() compares with GRID_CONDUCT_THRESH_EL84_N.
+    float lastEl84Grid = 0;
 
     Amp(float baseSR, int os, bool is7W) {
         esr = baseSR * os;
@@ -81,6 +98,16 @@ struct Amp {
         bias = is7W ? PENTODE_BIAS_7W_N : PENTODE_BIAS_15W_N;
         // First processBlock: sag reference at NOMINAL voltages (PluginProcessor.cpp:406).
         sag.setQuiescent(pentodeQuiescentTotal(bias, V_POWER_NOMINAL_N, V_SCREEN_NOMINAL_N));
+    }
+
+    // What resetDSPState() does since review B1: start on the solved idle point
+    // instead of zeroed filters and a nominal supply. Then the Shape knob, which
+    // processBlock applies on its first sample. Used by the `grid` runs only, so
+    // the Task 0 table above keeps describing the build it was measured on.
+    void seedIdleAndShape(float shapeKnob) {
+        settlePowerStageAtIdle(bias, psu, sag);
+        seedPreampAtIdle(fb, t1, t2, ltp, psu);
+        fb.updateShape(shapeKnob);
     }
 
     // One oversampled sample of PluginProcessor.cpp:518-646 (IIR cab on, no IR).
@@ -134,6 +161,7 @@ struct Amp {
         piA *= vol; piB *= vol;
 
         const float effBias = bias + (noSag ? 0.0f : sag.biasOffset());
+        lastEl84Grid = std::max(piA, piB);
         piA = applyGridConduction(piA, ga);
         piB = applyGridConduction(piB, gb);
         const float condA = softConductionCurve(piA, effBias), condB = softConductionCurve(piB, effBias);
@@ -189,7 +217,156 @@ static void run(const Point& p, const Signal& s) {
                 VS::toVolts(sagMin), VS::toVolts(sagMax), VS::toVolts(bMin), VS::toVolts(scMin));
 }
 
-int main() {
+// ── Grid conduction corners (`grid`) ──────────────────────────────────────
+
+struct Knobs {
+    const char* name;
+    float gain, vol, shape;
+    float inTrim;                 // INPUT knob 0..1 (0.5 = unity, 1.0 = +12 dB)
+    bool boost;                   // BOOST on: LEVEL, BRIGHT at max, TIGHT 0 (full range)
+    bool is7W;
+};
+
+// Base-rate input at sample n (44.1 kHz), before the INPUT trim.
+using Source = std::function<float(int)>;
+
+static Source sineAt(float f, float a) {
+    return [=](int n) { return a * std::sin(2.0f * PI_F * f * n / 44100.0f); };
+}
+
+// Band-limited square: odd harmonics below 19.8 kHz, plateau ~a (Gibbs ~9 % over).
+static Source squareAt(float f, float a) {
+    return [=](int n) {
+        float y = 0.0f;
+        for (int k = 1; k * f < 19800.0f; k += 2)
+            y += std::sin(2.0f * PI_F * k * f * n / 44100.0f) / k;
+        return a * 4.0f / PI_F * y;
+    };
+}
+
+// Open-string E chord (E2 A2 D3 G3 B3 E4), equal amplitudes, scaled so the
+// first 2 s peak at `a`.
+static Source chordAt(float a) {
+    static const float f[] = { 82.41f, 110.0f, 146.83f, 196.0f, 246.94f, 329.63f };
+    auto raw = [](int n) {
+        float y = 0.0f;
+        for (float fk : f) y += std::sin(2.0f * PI_F * fk * n / 44100.0f);
+        return y;
+    };
+    float pk = 0.0f;
+    for (int n = 0; n < 2 * 44100; ++n) pk = std::max(pk, std::abs(raw(n)));
+    const float g = a / pk;
+    return [=](int n) { return g * raw(n); };
+}
+
+// 4x windowed-sinc interpolation (Blackman, 64 base-rate taps per phase,
+// cutoff 0.45 fs), DC gain 1 per phase.
+static std::vector<float> upsample4(const std::vector<float>& x) {
+    constexpr int L = 4, half = 32 * L;
+    std::vector<float> h(2 * half + 1);
+    for (int j = -half; j <= half; ++j) {
+        const double t = j / static_cast<double>(L), fc = 0.9;   // fc relative to base Nyquist
+        const double sinc = j == 0 ? fc : std::sin(M_PI * fc * t) / (M_PI * t);
+        const double w = 0.42 + 0.5 * std::cos(M_PI * j / half) + 0.08 * std::cos(2.0 * M_PI * j / half);
+        h[j + half] = static_cast<float>(sinc * w);
+    }
+    for (int ph = 0; ph < L; ++ph) {                // normalise each phase to unity DC
+        double sum = 0.0;
+        for (int j = ph; j < static_cast<int>(h.size()); j += L) sum += h[j];
+        for (int j = ph; j < static_cast<int>(h.size()); j += L) h[j] = static_cast<float>(h[j] / sum);
+    }
+    std::vector<float> y(x.size() * L, 0.0f);
+    for (size_t m = 0; m < y.size(); ++m) {
+        // y[m] = sum_k x[k] h[m - L k + half] over taps in range (centred, non-causal)
+        float acc = 0.0f;
+        const long kLo = (static_cast<long>(m) - half + L - 1) / L, kHi = (static_cast<long>(m) + half) / L;
+        for (long k = std::max(0L, kLo); k <= kHi && k < static_cast<long>(x.size()); ++k)
+            acc += x[static_cast<size_t>(k)] * h[static_cast<size_t>(static_cast<long>(m) - L * k + half)];
+        y[m] = acc;
+    }
+    return y;
+}
+
+// One corner: seeded idle point, 0.5 s of silence, then 2 s of `src` with a 5 ms
+// linear fade-in; statistics cover the 2 s. Reports the EL84 grid drive peak
+// against GRID_CONDUCT_THRESH_EL84_N and how often the PI (and V1b) coupling-cap
+// charge sits on its MAX_BIAS_SHIFT_N rail (>= 99 % of 1.5 V).
+static void runGrid(const Knobs& k, const char* sigName, const Source& src) {
+    const int baseN = static_cast<int>(44100 * 2.5), sigStart = 44100 / 2, fade = 44100 * 5 / 1000;
+    std::vector<float> in(static_cast<size_t>(baseN), 0.0f);
+    Boost boost;
+    boost.prepare(44100.0f);
+    const float trim = inputTrimGain(k.inTrim);
+    for (int n = sigStart; n < baseN; ++n) {
+        const int i = n - sigStart;
+        const float env = i < fade ? static_cast<float>(i) / fade : 1.0f;
+        float x = env * src(i) * trim;
+        if (k.boost) x = boost.process(x, 1.0f, 0.0f, 1.0f);
+        in[static_cast<size_t>(n)] = x;
+    }
+    const std::vector<float> os = upsample4(in);
+
+    Amp amp(44100.0f, 4, k.is7W);
+    amp.seedIdleAndShape(k.shape);
+    const float rail = 0.99f * std::abs(MAX_BIAS_SHIFT_N);
+    float gridPk = -1e9f, piMax = 0.0f;
+    double piSum = 0.0;
+    long piRailed = 0, v1bRailed = 0, conducts = 0, count = 0;
+    const size_t osStart = static_cast<size_t>(sigStart) * 4;
+    for (size_t m = 0; m < os.size(); ++m) {
+        amp.tick(os[m], k.gain, k.vol);
+        if (m < osStart) continue;
+        ++count;
+        gridPk = std::max(gridPk, amp.lastEl84Grid);
+        if (amp.ga.lastGridDrop > 0.0f || amp.gb.lastGridDrop > 0.0f) ++conducts;
+        const float qpi = amp.gpi.couplingCapCharge;
+        piMax = std::max(piMax, qpi);
+        piSum += qpi;
+        if (qpi >= rail) ++piRailed;
+        if (amp.g2.couplingCapCharge >= rail) ++v1bRailed;
+    }
+    const float gridV = VS::toVolts(gridPk), threshV = VS::toVolts(GRID_CONDUCT_THRESH_EL84_N);
+    std::printf("%-30s %-18s | EL84 grid pk %6.2f V  margin %+5.1f dB  conducting %5.2f%%"
+                " | PI charge avg %.2f max %.2f V  railed %5.1f%% | V1b railed %5.1f%%\n",
+                k.name, sigName, gridV, 20.0f * std::log10(threshV / std::max(gridV, 1e-6f)),
+                100.0 * conducts / count, VS::toVolts(static_cast<float>(piSum / count)),
+                VS::toVolts(piMax), 100.0 * piRailed / count, 100.0 * v1bRailed / count);
+}
+
+static void gridCorners() {
+    constexpr float nominalDI = 0.178f;   // sine peak at -18 dBFS RMS
+    const Knobs defaults { "default (6 / 5 / 5)", 0.6f, 0.5f, 0.5f, 0.5f, false, false };
+    const Knobs gain8    { "gain 8", 0.8f, 0.5f, 0.5f, 0.5f, false, false };
+    const Knobs gain10   { "gain 10", 1.0f, 0.5f, 0.5f, 0.5f, false, false };
+    const Knobs maxed    { "gain 10, vol 10", 1.0f, 1.0f, 0.5f, 0.5f, false, false };
+    for (const Knobs* k : { &defaults, &gain8, &gain10, &maxed })
+        for (float f : { 110.0f, 220.0f }) {
+            char name[32];
+            std::snprintf(name, sizeof name, "sine %.0f @0.178", f);
+            runGrid(*k, name, sineAt(f, nominalDI));
+        }
+
+    // Hot corners: gain 10, volume 10, INPUT +12 dB, BOOST LEVEL + BRIGHT max.
+    for (bool is7W : { false, true })
+        for (float shape : { 0.0f, 1.0f }) {
+            char kname[40];
+            std::snprintf(kname, sizeof kname, "HOT shape %.0f %s", shape * 10.0f, is7W ? "7W" : "15W");
+            const Knobs hot { kname, 1.0f, 1.0f, shape, 1.0f, true, is7W };
+            runGrid(hot, "sine 110 @0.5", sineAt(110.0f, 0.5f));
+            runGrid(hot, "sine 800 @0.5", sineAt(800.0f, 0.5f));
+            runGrid(hot, "sine 1600 @0.5", sineAt(1600.0f, 0.5f));
+            runGrid(hot, "sine 800 @1.0", sineAt(800.0f, 1.0f));
+            runGrid(hot, "square 110 @0.5", squareAt(110.0f, 0.5f));
+            runGrid(hot, "square 1600 @0.5", squareAt(1600.0f, 0.5f));
+            runGrid(hot, "E chord pk 0.5", chordAt(0.5f));
+        }
+}
+
+int main(int argc, char** argv) {
+    if (argc > 1 && std::strcmp(argv[1], "grid") == 0) {
+        gridCorners();
+        return 0;
+    }
     // Operating points from tools/signoff_gates.json; P-CLEAN/EDGE/CRANK also in 7W.
     const Point points[] = {
         { "P-CLEAN", 0.375f, 0.5f, false }, { "P-EDGE", 0.625f, 0.5f, false }, { "P-CRANK", 1.0f, 0.7f, false },

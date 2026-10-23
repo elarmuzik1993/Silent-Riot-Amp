@@ -8,11 +8,13 @@
 //   - host bypass passes the dry input through, and the meters show it
 //
 // GRID I's current = drop / R relation is unit-tested in
-// grid_conduction_tests.cpp. It can't be driven non-zero here: with
-// VOLUME_KNOB_HEADROOM the EL84 grids never reach their 8.6 V conduction
-// threshold — 5.55 V at the hottest corner measured (gain 10, volume 10,
-// +12 dB INPUT, BOOST and BRIGHT max, SHAPE 10, 1.6 kHz at 0.5 peak). So the
-// gridCurrentMA == 0 checks below are smoke checks: GRID I reads 0 anyway.
+// grid_conduction_tests.cpp. No setting is known that drives it non-zero
+// here: with VOLUME_KNOB_HEADROOM the EL84 grids stayed under their 8.6 V
+// conduction threshold at every corner measured (sines, a band-limited square,
+// a six-note chord) — hottest 5.91 V, a 3.3 dB margin (gain 10, volume 10,
+// +12 dB INPUT, BOOST LEVEL and BRIGHT max, SHAPE 10, 1.6 kHz square at 0.5
+// peak; docs/handoff-power-section-fixes.md, "Grid conduction corners"). So
+// the gridCurrentMA == 0 checks below are smoke checks: GRID I reads 0 anyway.
 // ═══════════════════════════════════════════════════════════════
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/catch_approx.hpp>

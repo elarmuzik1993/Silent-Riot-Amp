@@ -101,11 +101,15 @@ void CabinetSim::loadIRFromFile(const juce::File& file)
     auto numSamples = static_cast<int>(
         std::min(reader->lengthInSamples, static_cast<juce::int64>(MAX_USER_IR_SAMPLES)));
 
-    juce::AudioBuffer<float> irBuffer(static_cast<int>(reader->numChannels), numSamples);
+    // Stereo::yes convolves with at most the first two channels, so only those
+    // are read — and only those are checked, or a dead third channel of a
+    // multichannel file would get it refused.
+    const int numChannels = std::min(static_cast<int>(reader->numChannels), 2);
+    juce::AudioBuffer<float> irBuffer(numChannels, numSamples);
     reader->read(&irBuffer, 0, numSamples, 0, true, true);
 
-    if (!isNormalisableIR(irBuffer))
-        return; // silent, NaN/Inf or overflowing samples would silence IR mode (review S4)
+    if (!isLoadableIR(irBuffer))
+        return; // NaN/Inf, overflowing or dead-channel IRs would silence IR mode (review S4)
 
     currentIRLengthSamples = numSamples;
     irNativeSampleRate = reader->sampleRate;
