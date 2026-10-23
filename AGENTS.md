@@ -78,5 +78,7 @@ Tests use Catch2 v3:
 
 - `SilentRiotTests` for pure C++ DSP tests.
 - `SilentRiotJuceTests` for JUCE-dependent cabinet, convolution, and IR-loading tests.
+- `SilentRiotProcessorTests` for anything in `processBlock`'s wiring, on the real processor via
+  `tests/processor_harness.h` (links the plugin's SharedCode target; no source list to maintain).
 
 Verify DSP, parameter, and GUI behavior with focused tests whenever changing behavior.
