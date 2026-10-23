@@ -157,3 +157,124 @@ TEST_CASE("isValidUserIRFormat rejects out-of-range formats", "[cabinet][ir][sta
     REQUIRE_FALSE(isValidUserIRFormat(1, 512, std::numeric_limits<double>::infinity()));
     REQUIRE_FALSE(isValidUserIRFormat(1, 512, std::numeric_limits<double>::quiet_NaN()));
 }
+
+// ═══════════════════════════════════════════════════════════════
+// Non-finite samples (review S4) — rejected on both paths
+// ═══════════════════════════════════════════════════════════════
+
+TEST_CASE("Restored entry with a NaN/Inf sample is rejected and stops parsing",
+          "[cabinet][ir][state]")
+{
+    for (float bad : { std::numeric_limits<float>::quiet_NaN(),
+                       std::numeric_limits<float>::infinity(),
+                       -std::numeric_limits<float>::infinity() })
+    {
+        std::vector<UserIREntry> in;
+        in.push_back(makeEntry("ok", 1, 256));
+        in.push_back(makeEntry("poisoned", 2, 512));
+        in.push_back(makeEntry("after_poisoned", 1, 256));
+        in[1].audioData.setSample(1, 300, bad);  // inside the body, channel 2
+
+        auto out = userIRsFromValueTree(userIRsToValueTree(in));
+
+        // Stops at the bad entry, like any other invalid one, so later
+        // entries keep their 1-based IR_INDEX mapping.
+        REQUIRE(out.size() == 1);
+        REQUIRE(out[0].name == "ok");
+    }
+}
+
+namespace {
+
+juce::File writeFloatWav(const juce::String& fileName, const juce::AudioBuffer<float>& audio,
+                         double sampleRate)
+{
+    auto f = juce::File::getSpecialLocation(juce::File::tempDirectory).getChildFile(fileName);
+    f.deleteFile();
+    juce::WavAudioFormat wav;
+    std::unique_ptr<juce::AudioFormatWriter> writer(
+        wav.createWriterFor(new juce::FileOutputStream(f), sampleRate,
+                            static_cast<unsigned int>(audio.getNumChannels()), 32, {}, 0));
+    REQUIRE(writer != nullptr);
+    writer->writeFromAudioSampleBuffer(audio, 0, audio.getNumSamples());
+    return f;
+}
+
+} // namespace
+
+TEST_CASE("readUserIRFromFile loads a clean float WAV and rejects NaN/Inf",
+          "[cabinet][ir][state]")
+{
+    auto clean = makeEntry("src", 2, 300, 44100.0);
+
+    SECTION("clean IR loads with its format")
+    {
+        auto f = writeFloatWav("sr_user_ir_clean.wav", clean.audioData, 44100.0);
+        UserIREntry e;
+        REQUIRE(readUserIRFromFile(f, e));
+        REQUIRE(e.name == "sr_user_ir_clean");
+        REQUIRE(e.numChannels == 2);
+        REQUIRE(e.numSamples == 300);
+        REQUIRE(e.sampleRate == 44100.0);
+        REQUIRE(e.audioData.getSample(1, 299) == clean.audioData.getSample(1, 299));
+        f.deleteFile();
+    }
+
+    SECTION("NaN or Inf inside the body is rejected")
+    {
+        for (float bad : { std::numeric_limits<float>::quiet_NaN(),
+                           std::numeric_limits<float>::infinity() })
+        {
+            auto poisoned = clean.audioData;
+            poisoned.setSample(0, 150, bad);
+            auto f = writeFloatWav("sr_user_ir_bad.wav", poisoned, 44100.0);
+            UserIREntry e;
+            REQUIRE_FALSE(readUserIRFromFile(f, e));
+            f.deleteFile();
+        }
+    }
+
+    SECTION("unreadable file is rejected")
+    {
+        UserIREntry e;
+        REQUIRE_FALSE(readUserIRFromFile(juce::File("/tmp/sr_no_such_ir_98765.wav"), e));
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// IR_INDEX → convolution (review S2)
+// ═══════════════════════════════════════════════════════════════
+
+TEST_CASE("applyUserIRIndex disables the convolution for an index past the list",
+          "[cabinet][ir][state]")
+{
+    CabinetSim cab;
+    cab.prepare(48000.0, 512, 2);
+
+    std::vector<UserIREntry> five;
+    for (int i = 0; i < 5; ++i)
+        five.push_back(makeEntry("ir_" + juce::String(i), 1, 256));
+
+    REQUIRE(applyUserIRIndex(cab, five, 5));
+    REQUIRE(cab.useIR.load());
+    REQUIRE(cab.getIRTailSeconds() > 0.0);
+
+    // The review's repro: IR 5 live, then a state with only three IRs but the
+    // same IR_INDEX = 5 is restored. The old IR 5 must not keep playing.
+    std::vector<UserIREntry> three(five.begin(), five.begin() + 3);
+    REQUIRE_FALSE(applyUserIRIndex(cab, three, 5));
+    REQUIRE_FALSE(cab.useIR.load());
+    REQUIRE(cab.getIRTailSeconds() == 0.0);
+
+    // In range again → loads; 0 (IIR mode) and garbage → disabled
+    REQUIRE(applyUserIRIndex(cab, three, 2));
+    REQUIRE(cab.useIR.load());
+    REQUIRE_FALSE(applyUserIRIndex(cab, three, 0));
+    REQUIRE_FALSE(cab.useIR.load());
+    REQUIRE(applyUserIRIndex(cab, three, 3));
+    REQUIRE_FALSE(applyUserIRIndex(cab, three, -1));
+    REQUIRE_FALSE(cab.useIR.load());
+    REQUIRE(applyUserIRIndex(cab, three, 1));
+    REQUIRE_FALSE(applyUserIRIndex(cab, {}, 1));  // empty list
+    REQUIRE_FALSE(cab.useIR.load());
+}

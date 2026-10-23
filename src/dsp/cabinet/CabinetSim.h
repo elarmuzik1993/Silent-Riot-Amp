@@ -12,6 +12,7 @@
 #include <juce_dsp/juce_dsp.h>
 #include <juce_audio_formats/juce_audio_formats.h>
 #include <atomic>
+#include <cmath>
 
 namespace sr {
 
@@ -59,6 +60,22 @@ private:
 // ── Cabinet Simulation Engine ──
 
 inline constexpr int MAX_USER_IR_SAMPLES = 8192;
+
+// True when every sample is finite. A NaN/Inf inside an IR's body survives
+// Convolution's normalisation and silences IR mode (review S4), so each
+// user-IR entry point (file load, state restore) rejects such an IR outright
+// rather than altering it.
+inline bool hasOnlyFiniteSamples(const juce::AudioBuffer<float>& buffer)
+{
+    for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
+    {
+        const float* data = buffer.getReadPointer(ch);
+        for (int i = 0; i < buffer.getNumSamples(); ++i)
+            if (!std::isfinite(data[i]))
+                return false;
+    }
+    return true;
+}
 
 struct CabinetSim
 {

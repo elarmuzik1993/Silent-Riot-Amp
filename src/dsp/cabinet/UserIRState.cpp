@@ -1,6 +1,8 @@
 #include "UserIRState.h"
 
+#include <algorithm>
 #include <cmath>
+#include <memory>
 
 namespace sr {
 
@@ -81,10 +83,67 @@ std::vector<UserIREntry> userIRsFromValueTree(const juce::ValueTree& irsNode)
             entry.audioData.copyFrom(ch, 0, rawData + ch * entry.numSamples,
                                      entry.numSamples);
 
+        // A NaN/Inf inside the body would silence IR mode and be re-saved with
+        // the project (review S4). Same stop-at-first-invalid rule as above.
+        if (!hasOnlyFiniteSamples(entry.audioData))
+            break;
+
         result.push_back(std::move(entry));
     }
 
     return result;
+}
+
+bool readUserIRFromFile(const juce::File& file, UserIREntry& out)
+{
+    juce::AudioFormatManager mgr;
+    mgr.registerBasicFormats();
+    std::unique_ptr<juce::AudioFormatReader> reader(mgr.createReaderFor(file));
+    if (!reader) return false;
+
+    const int numSamples = static_cast<int>(
+        std::min(reader->lengthInSamples, static_cast<juce::int64>(MAX_USER_IR_SAMPLES)));
+
+    // Convolution uses at most 2 channels (Stereo::yes); reading more would
+    // only bloat the saved state — and the restore path rejects >2 channels.
+    const int numChannels = std::min(static_cast<int>(reader->numChannels), 2);
+
+    // Reject formats the restore path can't accept (e.g. an out-of-band sample
+    // rate) up front — otherwise the IR would load now but be silently dropped
+    // on the next project reload, taking every user IR after it with it.
+    if (!isValidUserIRFormat(numChannels, numSamples, reader->sampleRate))
+        return false;
+
+    out.name = file.getFileNameWithoutExtension();
+    out.sampleRate = reader->sampleRate;
+    out.numChannels = numChannels;
+    out.numSamples = numSamples;
+    out.audioData.setSize(numChannels, numSamples);
+    if (!reader->read(&out.audioData, 0, numSamples, 0, true, true))
+        return false;
+
+    // Float WAVs can carry NaN/Inf; the restore path would drop such an entry
+    // anyway, so reject it here instead of loading a silent IR (review S4).
+    return hasOnlyFiniteSamples(out.audioData);
+}
+
+bool applyUserIRIndex(CabinetSim& cab, const std::vector<UserIREntry>& irs, int irIndex)
+{
+    // IR_INDEX maps directly onto user IR slots. The stock-IR table in
+    // CabinetSim is intentionally NOT reachable from this parameter today —
+    // the loader UI only populates user IRs, and the stock entries are
+    // synthetic placeholders (see ROADMAP.md "Ship real cabinet IRs").
+    const int userIdx = irIndex - 1;
+    if (userIdx < 0 || userIdx >= static_cast<int>(irs.size()))
+    {
+        cab.setIRIndex(0);
+        return false;
+    }
+
+    const auto& ir = irs[static_cast<size_t>(userIdx)];
+    juce::AudioBuffer<float> bufCopy(ir.audioData);
+    cab.loadIRFromBuffer(std::move(bufCopy), ir.sampleRate);
+    return true;
 }
 
 } // namespace sr

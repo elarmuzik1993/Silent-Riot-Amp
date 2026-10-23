@@ -97,7 +97,7 @@ cmake -B build -DSR_BUILD_TESTS=ON # Build with tests
 - CMake target is `SilentRiot`; product name is `Silent Riot`
 - Tests use Catch2 v3 — one test file per DSP module, two test targets:
   - `SilentRiotTests` — 284 pure C++ test cases (no JUCE dependency)
-  - `SilentRiotJuceTests` — 51 JUCE-dependent test cases (cabinet IR, convolution, user IR loading, oversample switcher + latency, delay/reverb)
+  - `SilentRiotJuceTests` — 56 JUCE-dependent test cases (cabinet IR, convolution, user IR loading, oversample switcher + latency, delay/reverb)
 
 ## Cabinet IR Loader Architecture
 
@@ -105,7 +105,8 @@ cmake -B build -DSR_BUILD_TESTS=ON # Build with tests
 - **IRLibrary.h** — stock IR metadata registry (8 IRs) + synthetic IR generator (placeholders until real WAVs arrive)
 - **Thread safety**: IR loading is deferred to the message thread via `juce::AsyncUpdater`. Audio thread only reads `useIR` (atomic) and calls `bufferTransfer.get()` (try-lock, never blocks). Zero allocation on audio thread.
 - **IR_INDEX param**: 0=IIR mode, 1–8=stock IRs, 9+=user slots (require `loadIRFromFile()`)
-- **User IR loading**: `SilentRiotProcessor::loadUserIR(file)` delegates to `CabinetSim::loadIRFromFile()`. Wired from `IRLoaderPanel::onUserIRLoaded` (drag-and-drop + file browser)
+- **User IR loading**: `SilentRiotProcessor::loadUserIR(file)` reads through `readUserIRFromFile()` (`UserIRState.h`), which applies the same accept criteria as state restore — format via `isValidUserIRFormat()`, and no NaN/Inf samples (`hasOnlyFiniteSamples()`; one inside the IR body silences IR mode). Wired from `IRLoaderPanel::onUserIRLoaded` (drag-and-drop + file browser)
+- **IR_INDEX → convolution**: always through `applyUserIRIndex()`. An index past the IR list (automation, or a restored state with fewer IRs than its saved index) must *disable* the convolution, not leave the previous IR playing; restore and `prepareToPlay` apply it directly via `applyIRIndexParam()`, because `processBlock` only reacts when the index changes
 - `useIR` is only set to `true` AFTER the IR buffer is pushed to `bufferTransfer`
 - Convolution runs at base SR (after downsample), not at oversampled rate
 - `getTailLengthSeconds()` reports IR tail using the IR's native sample rate

@@ -45,23 +45,24 @@ void SilentRiotProcessor::handleAsyncUpdate()
     int idx = pendingIRIndex.exchange(-1);
     if (idx < 0) return;
 
-    // IR_INDEX maps directly onto user IR slots: 0 = IIR mode, 1..N = userIRs[idx-1].
-    // The stock-IR table in CabinetSim is intentionally NOT reachable from this
-    // parameter today — the loader UI only populates user IRs, and the stock
-    // entries are synthetic placeholders. Wiring stock IRs is deferred until real
-    // cabinet IRs ship (see ROADMAP.md "Ship real cabinet IRs").
-    int userIdx = idx - 1;
-    if (userIdx < 0 || userIdx >= static_cast<int>(userIRs.size()))
-    {
-        // IIR mode, or an out-of-range index from restored state / host automation:
-        // disable convolution so we never leave a stale IR active.
-        cabSim.setIRIndex(0);
-        return;
-    }
+    // An out-of-range index (host automation past the list) disables the
+    // convolution so a stale IR never stays active — see applyUserIRIndex().
+    sr::applyUserIRIndex(cabSim, userIRs, idx);
+}
 
-    auto& ir = userIRs[static_cast<size_t>(userIdx)];
-    juce::AudioBuffer<float> bufCopy(ir.audioData);
-    cabSim.loadIRFromBuffer(std::move(bufCopy), ir.sampleRate);
+void SilentRiotProcessor::applyIRIndexParam()
+{
+    // Message thread (state restore) or prepareToPlay. Syncs the convolution to
+    // IR_INDEX now — including disabling it when the index is past the IR list,
+    // which processBlock can't catch when the index equals cachedIRIndex
+    // (review S2) — then marks the index seen so processBlock doesn't queue it
+    // again. Drops any async load still pending: it would select from the old
+    // list by an old index.
+    pendingIRIndex.store(-1);
+    const int irIdx = static_cast<int>(
+        apvts.getRawParameterValue(sr::Params::IDs::IR_INDEX)->load());
+    sr::applyUserIRIndex(cabSim, userIRs, irIdx);
+    cachedIRIndex = irIdx;
 }
 
 juce::AudioProcessorValueTreeState::ParameterLayout SilentRiotProcessor::createParameterLayout()
@@ -358,15 +359,9 @@ void SilentRiotProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
     outputTrimSm.setCurrentAndTargetValue(sanitizeUnitParamOr(
         apvts.getRawParameterValue(Params::IDs::OUTPUT_LEVEL)->load(), 0.5f));
 
-    // Reload active user IR after prepare (convolution state was reset)
-    int irIdx = static_cast<int>(apvts.getRawParameterValue(sr::Params::IDs::IR_INDEX)->load());
-    if (irIdx > 0 && irIdx <= static_cast<int>(userIRs.size()))
-    {
-        auto& ir = userIRs[static_cast<size_t>(irIdx - 1)];
-        juce::AudioBuffer<float> bufCopy(ir.audioData);
-        cabSim.loadIRFromBuffer(std::move(bufCopy), ir.sampleRate);
-        cachedIRIndex = irIdx;
-    }
+    // Reload active user IR after prepare (convolution state was reset), or
+    // disable it if IR_INDEX no longer names one (review S2)
+    applyIRIndexParam();
 
     // Clear any state carried over from a previous configuration
     resetDSPState();
@@ -1005,33 +1000,11 @@ bool SilentRiotProcessor::loadUserIR(const juce::File& file)
     if (static_cast<int>(userIRs.size()) >= sr::MAX_USER_IRS)
         return false;
 
-    juce::AudioFormatManager mgr;
-    mgr.registerBasicFormats();
-    std::unique_ptr<juce::AudioFormatReader> reader(mgr.createReaderFor(file));
-    if (!reader) return false;
-
-    int numSamples = static_cast<int>(
-        std::min(reader->lengthInSamples, static_cast<juce::int64>(sr::MAX_USER_IR_SAMPLES)));
-    if (numSamples <= 0) return false;
-
-    // Convolution uses at most 2 channels (Stereo::yes); reading more would
-    // only bloat the saved state — and the restore path rejects >2 channels.
-    int numChannels = std::min(static_cast<int>(reader->numChannels), 2);
-    if (numChannels <= 0) return false;
-
-    // Reject formats the restore path can't accept (e.g. an out-of-band sample
-    // rate) up front — otherwise the IR would load now but be silently dropped
-    // on the next project reload, taking every user IR after it with it.
-    if (!sr::isValidUserIRFormat(numChannels, numSamples, reader->sampleRate))
-        return false;
-
+    // Reads, format-checks and rejects NaN/Inf samples (review S4) — the same
+    // criteria the restore path applies, see UserIRState.h.
     UserIREntry entry;
-    entry.name = file.getFileNameWithoutExtension();
-    entry.sampleRate = reader->sampleRate;
-    entry.numChannels = numChannels;
-    entry.numSamples = numSamples;
-    entry.audioData.setSize(numChannels, numSamples);
-    reader->read(&entry.audioData, 0, numSamples, 0, true, true);
+    if (!sr::readUserIRFromFile(file, entry))
+        return false;
 
     // Load into convolution immediately
     juce::AudioBuffer<float> bufCopy(entry.audioData);
@@ -1081,15 +1054,9 @@ void SilentRiotProcessor::loadUserIRsFromState()
     // project files and must not be trusted (see UserIRState.h).
     userIRs = sr::userIRsFromValueTree(apvts.state.getChildWithName("UserIRs"));
 
-    // Reload active IR if saved
-    int irIndex = static_cast<int>(apvts.getRawParameterValue(sr::Params::IDs::IR_INDEX)->load());
-    if (irIndex > 0 && irIndex <= static_cast<int>(userIRs.size()))
-    {
-        auto& ir = userIRs[static_cast<size_t>(irIndex - 1)];
-        juce::AudioBuffer<float> bufCopy(ir.audioData);
-        cabSim.loadIRFromBuffer(std::move(bufCopy), ir.sampleRate);
-        cachedIRIndex = irIndex;
-    }
+    // Reload the saved active IR — or disable the live one when the saved
+    // index is past the restored list (review S2)
+    applyIRIndexParam();
 }
 
 // ── State Persistence ──

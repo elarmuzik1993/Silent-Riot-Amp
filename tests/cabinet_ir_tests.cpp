@@ -3,6 +3,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
+#include <limits>
 #include <vector>
 
 #include "dsp/cabinet/IRLibrary.h"
@@ -255,6 +256,55 @@ TEST_CASE("loadIRFromFile with nonexistent file keeps IR disabled", "[cabinet][i
     juce::File bogus("/tmp/nonexistent_ir_file_12345.wav");
     cab.loadIRFromFile(bogus);
     REQUIRE(cab.useIR.load() == false);
+}
+
+TEST_CASE("loadIRFromFile rejects a float WAV with a NaN/Inf sample", "[cabinet][ir]")
+{
+    // Review S4: a non-finite sample inside the IR body survives Convolution's
+    // normalisation and silences IR mode, so the load must be refused.
+    for (float bad : { std::numeric_limits<float>::quiet_NaN(),
+                       std::numeric_limits<float>::infinity() })
+    {
+        auto tempFile = juce::File::getSpecialLocation(
+            juce::File::tempDirectory).getChildFile("test_ir_nonfinite.wav");
+        tempFile.deleteFile();
+        {
+            juce::WavAudioFormat wav;
+            std::unique_ptr<juce::AudioFormatWriter> writer(
+                wav.createWriterFor(new juce::FileOutputStream(tempFile),
+                                    48000.0, 1, 32, {}, 0));  // 32-bit float
+            REQUIRE(writer != nullptr);
+
+            juce::AudioBuffer<float> ir(1, 256);
+            ir.clear();
+            ir.setSample(0, 0, 1.0f);
+            ir.setSample(0, 100, bad);  // inside the body, not trimmed away
+            writer->writeFromAudioSampleBuffer(ir, 0, 256);
+        }
+
+        CabinetSim cab;
+        cab.prepare(48000.0, 512, 1);
+        cab.loadIRFromFile(tempFile);
+        REQUIRE(cab.useIR.load() == false);
+        REQUIRE(cab.getIRTailSeconds() == 0.0);
+
+        tempFile.deleteFile();
+    }
+}
+
+TEST_CASE("hasOnlyFiniteSamples flags NaN and Inf in any channel", "[cabinet][ir]")
+{
+    juce::AudioBuffer<float> b(2, 64);
+    b.clear();
+    b.setSample(0, 0, 1.0f);
+    REQUIRE(hasOnlyFiniteSamples(b));
+
+    b.setSample(1, 63, std::numeric_limits<float>::quiet_NaN());
+    REQUIRE_FALSE(hasOnlyFiniteSamples(b));
+
+    b.setSample(1, 63, 0.0f);
+    b.setSample(0, 10, -std::numeric_limits<float>::infinity());
+    REQUIRE_FALSE(hasOnlyFiniteSamples(b));
 }
 
 TEST_CASE("User IR -> stock IR transition", "[cabinet][ir]")

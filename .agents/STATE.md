@@ -4,7 +4,7 @@ _Updated 2026-10-23_
 
 ## Now
 - Silent Riot v0.3.4 (JUCE 7 VST3/Standalone). `bash scripts/verify.sh` passes: static checks +
-  Release build + 335/335 ctest. Cloud sessions provision via `.agents/bootstrap.sh`.
+  Release build + 340/340 ctest. Cloud sessions provision via `.agents/bootstrap.sh`.
 - Two work lists, **one combined order below**:
   - DSP review `docs/review-dsp-2026-10-15.md`: B1–B8 blocking, S1–S8 suggestions, measured and
     re-checked. Line refs against `b8e20a9`. **B5 + B4 fixed**: saved OVERSAMPLE mode applied at
@@ -14,8 +14,9 @@ _Updated 2026-10-23_
     **B7 fixed**: grid-charge increment × `GRID_CHARGE_REF_SR`/effectiveSR (176.4k bit-exact).
     **B6 + B8 fixed**: effects restart clean on off→on, unmute and host `reset()`; delay loop gain =
     FEEDBACK, never self-oscillates (owner); at 0.35 each repeat is −9.0 dB on the last (was −3.4).
-  - Power-section plan `docs/superpowers/plans/2026-10-23-power-section-fixes.md`, Tasks 0–5 (its
-    *Coordination…* section maps the overlap). Tasks 0–1 done: `docs/handoff-power-section-fixes.md`.
+    **S2 + S4 fixed**: restore/prepare disable the IR when `IR_INDEX` is past the IR list
+    (`applyUserIRIndex`); IRs with NaN/Inf samples are rejected on file load and state restore.
+  - Power plan `docs/superpowers/plans/2026-10-23-power-section-fixes.md`, Tasks 0–5; 0–1 done.
 
 ## Next (combined order; one PR per step, each with a test)
 1. Owner: GitHub Actions is down (every run since 2026-10-09 fails in ~3–5 s, no logs). Check
@@ -32,7 +33,7 @@ _Updated 2026-10-23_
    (`tools/signoff_gates.json`) a real bright IR (today a skipped placeholder, so E3 runs the IIR
    path). Step 2 alongside S8: harmonic fall-off per nonlinearity (`TriodeWaveshaper.cpp:28`,
    `GridConduction.cpp:39`, `OTSaturation.h:43`; Task 4 adds a plate knee).
-5. Phase 3, batched: S2 + S4, S3 + S6, S5 + S7 (owner: raise S7's 1000 ms limit or show clamp?).
+5. Phase 3, batched: S3 + S6, S5 + S7 (owner: raise S7's 1000 ms limit or show clamp?).
 6. Owner: delete stale remote branches (keep `main`, `claude/neural-learning-path-slider-kt8dy7`,
    check `fix/effects-toggle-rendering-use-60`); adopt the kit's *Rules* in AGENTS.md?
 
@@ -42,8 +43,7 @@ _Updated 2026-10-23_
   once. B1 seeds the solved idle point, not hard-coded values, so B2/Task 2 can't break it
   (B2 must update the pinned idle numbers in `idle_operating_point_tests.cpp`).
 - PSU's one-sample current lag is intended (spec §3.11); not a power-section defect.
-- Latency: exact integer report (Thiran-rounded, not the old truncated 7/8/8), constant across cab
-  modes; the IIR path is padded, not the report split.
+- Latency: exact integer report (Thiran-rounded), constant across cab modes; IIR path padded to match.
 - `verify.sh` builds into `build-verify/`; `bootstrap.sh` omits webkit; sr_render not in CI/verify.
 
 ## Known issues

@@ -1,7 +1,7 @@
 # DSP code review — 2026-10-15
 
 **Status:** open; it is the work list for the fixes. Fixed so far: **B5, B4**
-(branch `fix/oversample-prepare-latency`), **B1, S1** (branch `fix/startup-burst`), **B7** (branch `fix/grid-charge-rate`), **B6, B8** (branch `fix/effects-stale-tails`). Line references are against `main` at
+(branch `fix/oversample-prepare-latency`), **B1, S1** (branch `fix/startup-burst`), **B7** (branch `fix/grid-charge-rate`), **B6, B8** (branch `fix/effects-stale-tails`), **S2, S4** (branch `fix/ir-restore-and-samples`). Line references are against `main` at
 `b8e20a9`.
 
 **Scope:** `src/dsp/**`, `src/utils/**`, and the signal chain in
@@ -436,7 +436,7 @@ Fix: read the three through `sanitizeUnitParamOr(...)`, and seed the smoothers
 with `setImmediate` in `prepareToPlay` (which also settles B1's fresh-instance
 ramp question).
 
-### S2 — State restore can leave the previous session's IR playing
+### S2 — State restore can leave the previous session's IR playing — *fixed*
 
 **Where:** `src/PluginProcessor.cpp:989-1004`.
 
@@ -469,7 +469,7 @@ path, whose `GRID_CHARGE_RATE` / `MAX_BIAS_SHIFT_N` are calibrated on the voltag
 Also, the value published at `:797-800` is each stage's *last* sample of the
 block, not a peak as its comment says.
 
-### S4 — User IR samples are never checked for NaN/Inf
+### S4 — User IR samples are never checked for NaN/Inf — *fixed*
 
 **Where:** `src/dsp/cabinet/UserIRState.cpp:78-82`; `src/PluginProcessor.cpp:945`.
 
