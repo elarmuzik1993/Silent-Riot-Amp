@@ -7,7 +7,8 @@
 //   - Delay loop gain is FEEDBACK: repeats decay even at DELAY_MAX_FEEDBACK (B8)
 //   - Delay/Reverb restart() drop the tail frozen while off, ramp mix in (B6)
 //   - Delay holds a tempo-synced 2000 ms, past the knob's 1000 ms (S7)
-//   - Reverb SIZE glides when turned, no block-rate zipper; restart lands it (S5)
+//   - Reverb SIZE ramps + glides when turned: no zipper or pitch warble at any
+//     host block size (512 vs 2048 follow one path); restart lands it (S5)
 //   - Reverb mix=0 is bit-exact dry
 //   - Reverb mix>0 adds energy / a decaying tail
 // ═══════════════════════════════════════════════════════════════
@@ -564,6 +565,11 @@ TEST_CASE("Delay plays a synced 2000 ms repeat at 192 kHz (review S7)", "[delay]
 // and, on a fast turn, clicks. Measured as in the review: 44.1 kHz, 512-sample
 // blocks, a 220 Hz tone into a fully wet reverb. The loop's damping caps the
 // wet at a few kHz, so energy above 8 kHz is the zipper.
+//
+// Host block size must not matter. Gliding a per-block step alone held only
+// while the 20 ms glide outlasted a block: at 2048 samples (46 ms) each step
+// settled inside its own block, so the read speed jumped at every boundary — a
+// ~21 Hz pitch warble on a fast turn. SIZE is now ramped across the block.
 
 namespace {
 struct SweepStats { double hfEnergy; float maxStep; };
@@ -571,10 +577,9 @@ struct SweepStats { double hfEnergy; float maxStep; };
 // sweepSec > 0 turns SIZE 0 → 1 over sweepSec (one setParameters per block, as
 // the processor does) after 1 s at SIZE 0; sweepSec == 0 holds `staticSize`.
 // Measures from the start of the sweep to 0.1 s after it ends.
-SweepStats reverbSizeSweep(double sweepSec, float staticSize, double windowSec)
+SweepStats reverbSizeSweep(double sweepSec, float staticSize, double windowSec, int block = 512)
 {
     constexpr double fs = 44100.0;
-    constexpr int    block = 512;
     const bool sweep = sweepSec > 0.0;
     Reverb r;
     r.prepare(fs, block, 2);
@@ -621,25 +626,103 @@ SweepStats reverbSizeSweep(double sweepSec, float staticSize, double windowSec)
 
 TEST_CASE("Reverb SIZE turned fast or slow adds no block-rate zipper (review S5)", "[reverb]")
 {
-    for (const double sweepSec : { 0.25, 2.5 })   // 0 → 1 in 0.25 s; 0.4 of the range per second
+    struct Case { double sweepSec; int block; };
+    // 0 → 1 in 0.25 s and 0.4 of the range per second at 512-sample blocks; the
+    // fast turn again at 2048-sample blocks, longer than the glide.
+    for (const Case c : { Case { 0.25, 512 }, Case { 2.5, 512 }, Case { 0.25, 2048 } })
     {
-        CAPTURE(sweepSec);
-        const double window = sweepSec + 0.1;
-        const auto swept = reverbSizeSweep(sweepSec, 0.0f, window);
-        const auto lo    = reverbSizeSweep(0.0, 0.0f, window);
-        const auto hi    = reverbSizeSweep(0.0, 1.0f, window);
+        CAPTURE(c.sweepSec, c.block);
+        const double window = c.sweepSec + 0.1;
+        const auto swept = reverbSizeSweep(c.sweepSec, 0.0f, window, c.block);
+        const auto lo    = reverbSizeSweep(0.0, 0.0f, window, c.block);
+        const auto hi    = reverbSizeSweep(0.0, 1.0f, window, c.block);
         const double refHf  = std::max(lo.hfEnergy, hi.hfEnergy);
         const float refStep = std::max(lo.maxStep, hi.maxStep);
 
         // Snapping the loop: +56.7 dB (fast) / +34.7 dB (slow) above 8 kHz over
-        // a static SIZE. Gliding it: +1.5 / -0.4 dB.
+        // a static SIZE. Gliding a per-block step: +1.5 / -0.4 dB, and +3.2 dB
+        // fast at 2048. Ramped across the block: 0.0 / -0.5, and -0.1 at 2048.
+        // (The 2048-block warble is too low to show here; see the next tests.)
         const double hfDb = 10.0 * std::log10(swept.hfEnergy / refHf);
         CAPTURE(hfDb);
         REQUIRE(hfDb < 6.0);
         // The fast turn's clicks: steps 10.6x a static SIZE's largest; gliding, 1.5x.
-        if (sweepSec < 1.0)
+        if (c.sweepSec < 1.0)
             REQUIRE(swept.maxStep < 2.5f * refStep);
     }
+}
+
+TEST_CASE("Reverb SIZE turned fast sounds the same at 512- and 2048-sample blocks (review S5)", "[reverb]")
+{
+    const auto small = reverbSizeSweep(0.25, 0.0f, 0.35, 512);
+    const auto large = reverbSizeSweep(0.25, 0.0f, 0.35, 2048);
+    const double dDb = 10.0 * std::log10(large.hfEnergy / small.hfEnergy);
+    CAPTURE(small.hfEnergy, large.hfEnergy, dDb, small.maxStep, large.maxStep);
+    // Gliding a per-block step: +1.7 dB. Ramped across the block: -0.1 dB.
+    REQUIRE(std::abs(dDb) < 3.0);
+    REQUIRE(large.maxStep < 1.5f * small.maxStep);
+}
+
+namespace {
+// Channel 0 of a fully wet reverb fed a 220 Hz tone while SIZE turns 0 → 1 over
+// `sweepLen` samples starting at `sweepStart`, one setParameters per block.
+std::vector<float> reverbSweepOutput(int block, int sweepStart, int sweepLen, int total)
+{
+    constexpr double fs = 44100.0;
+    Reverb r;
+    r.prepare(fs, block, 2);
+    r.setParameters(1.0f, 0.0f, 0.5f);
+    r.restart();
+    std::vector<float> out(static_cast<size_t>(total));
+    auto buf = makeBuffer(2, block);
+    for (int start = 0; start < total; start += block)
+    {
+        const double knob = std::clamp(static_cast<double>(start - sweepStart) / sweepLen, 0.0, 1.0);
+        r.setParameters(1.0f, static_cast<float>(knob), 0.5f);
+        const int n = std::min(block, total - start);
+        buf.setSize(2, n, false, false, true);
+        for (int i = 0; i < n; ++i)
+        {
+            const float x = 0.25f * std::sin(2.0f * PI_F * 220.0f * static_cast<float>(start + i) / static_cast<float>(fs));
+            buf.setSample(0, i, x);
+            buf.setSample(1, i, x);
+        }
+        r.process(buf);
+        for (int i = 0; i < n; ++i)
+            out[static_cast<size_t>(start + i)] = buf.getSample(0, i);
+    }
+    return out;
+}
+} // namespace
+
+TEST_CASE("Reverb SIZE turned fast follows the same path at 512- and 2048-sample blocks (review S5)", "[reverb]")
+{
+    // SIZE is ramped across each block, so a turn reaches the tank one block
+    // late and otherwise exactly as the knob moved: delay the 512-block run's
+    // turn by the 1536-sample latency difference and both runs read the same
+    // loop length at every sample, so they give the same output. Gliding a
+    // per-block step instead made each block size its own staircase — at 2048
+    // samples a read-speed kick at every boundary, a ~21 Hz pitch warble.
+    // Block boundaries sit on the sweep's corners (all multiples of 2048).
+    constexpr int big = 2048, small = 512;
+    const int sweepStart = 11 * big;   // ~0.5 s at SIZE 0
+    const int sweepLen   = 6 * big;    // 0 → 1 in 0.28 s
+    const int total      = sweepStart + sweepLen + 4 * big;
+    const auto a = reverbSweepOutput(big,   sweepStart,               sweepLen, total);
+    const auto b = reverbSweepOutput(small, sweepStart + big - small, sweepLen, total);
+
+    double sig = 0.0, diff = 0.0;
+    for (int i = sweepStart; i < total; ++i)
+    {
+        const double d = static_cast<double>(a[static_cast<size_t>(i)]) - b[static_cast<size_t>(i)];
+        sig  += static_cast<double>(a[static_cast<size_t>(i)]) * a[static_cast<size_t>(i)];
+        diff += d * d;
+    }
+    const double residualDb = 10.0 * std::log10(diff / sig);
+    CAPTURE(residualDb);
+    // Gliding a per-block step: +2.3 dB (unrelated outputs). Ramped across the
+    // block: -128 dB.
+    REQUIRE(residualDb < -40.0);
 }
 
 TEST_CASE("Reverb restart() lands a SIZE glide on its target (review S5)", "[reverb]")

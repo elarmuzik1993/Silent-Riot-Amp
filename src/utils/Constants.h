@@ -386,10 +386,12 @@ constexpr float SPRING_MAX_LOOP_MS   = 60.0f;   // ring-buffer sizing headroom (
 constexpr float SPRING_MOD_DEPTH_SAMP = 2.0f;   // ± samples of loop-length sway
 constexpr float SPRING_MOD_RATE1_HZ   = 0.7f;   // spring 1 LFO rate
 constexpr float SPRING_MOD_RATE2_HZ   = 1.1f;   // spring 2 LFO rate (decorrelated)
-// SIZE glide (review S5): SIZE arrives once per host block, so the loop length
-// and feedback one-pole toward it per sample. The time constant must outlast a
-// block (11.6 ms at 44.1 kHz / 512) or the steps still come through as a
-// block-rate zipper; 20 ms lands a turn in ~60 ms, like the 50 ms mix ramps.
+// SIZE glide (review S5): SIZE arrives once per host block and is ramped
+// linearly across the block (SpringReverbCore::rampSize), so the loop target
+// moves a whole sample at a time; the loop length and feedback one-pole toward
+// it per sample, smoothing those steps and the ramp's corners. The glide no
+// longer has to outlast a block — alone it did, and failed at 2048-sample
+// blocks (46 ms) — and 20 ms lands a turn in ~60 ms, like the 50 ms mix ramps.
 constexpr float SPRING_SIZE_GLIDE_MS   = 20.0f;
 constexpr float SPRING_GLIDE_SNAP_SAMP = 1e-4f; // land the length glide (samples)
 constexpr float SPRING_GLIDE_SNAP_FB   = 1e-6f; // land the feedback glide

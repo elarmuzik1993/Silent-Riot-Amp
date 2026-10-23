@@ -17,12 +17,19 @@ void Reverb::prepare(double sampleRate, int /*samplesPerBlock*/, int numChannels
 
     lastSize = -1.0f;
     lastTone = -1.0f;
+    sizePending = false;
     tailEstimate = 0.0f;
 }
 
 void Reverb::reset()
 {
-    coreL.reset();
+    if (sizePending)   // never ramped: land it, there is nothing to sweep
+    {
+        coreL.setSize(lastSize);
+        coreR.setSize(lastSize);
+        sizePending = false;
+    }
+    coreL.reset();   // also lands a ramp or glide in progress
     coreR.reset();
 }
 
@@ -43,14 +50,12 @@ void Reverb::setParameters(float mix, float size, float tone)
     mixSm.setTargetValue(mix);
 
     // SIZE/TONE change loop length & filter cutoffs — recompute only when they
-    // actually move. A new SIZE sets each spring's target; the loop length and
-    // feedback glide to it per sample (SpringReverb.h, review S5), and
-    // restart() lands the glide.
+    // actually move. A new SIZE is ramped across the next process() block and
+    // glided per sample (SpringReverb.h, review S5); restart() lands both.
     if (std::abs(size - lastSize) > 1e-4f)
     {
-        coreL.setSize(size);
-        coreR.setSize(size);
         lastSize = size;
+        sizePending = true;
     }
     if (std::abs(tone - lastTone) > 1e-4f)
     {
@@ -60,9 +65,10 @@ void Reverb::setParameters(float mix, float size, float tone)
     }
 
     // RT60 estimate for getTailLengthSeconds(): loopLen · ln(0.001)/ln(feedback).
-    const float fb = juce::jlimit(1e-4f, 0.999f, coreL.feedbackGain());
+    // From the SIZE asked for, not the one the ramp has reached.
+    const float fb = juce::jlimit(1e-4f, 0.999f, SpringReverbCore::feedbackFor(lastSize));
     tailEstimate = (mix > 0.0f)
-        ? coreL.loopSeconds() * (std::log(0.001f) / std::log(fb))
+        ? coreL.loopSecondsFor(lastSize) * (std::log(0.001f) / std::log(fb))
         : 0.0f;
 }
 
@@ -74,6 +80,13 @@ void Reverb::process(juce::AudioBuffer<float>& buffer)
     // Equal-power wet/dry blend: constant perceived loudness across the sweep,
     // and still bit-exact dry at mix=0 (cos(0)=1, sin(0)=0).
     constexpr float kHalfPi = 1.57079632679f;
+
+    if (sizePending && numSamples > 0)
+    {
+        coreL.rampSize(lastSize, numSamples);
+        coreR.rampSize(lastSize, numSamples);
+        sizePending = false;
+    }
 
     if (numCh <= 1)
     {

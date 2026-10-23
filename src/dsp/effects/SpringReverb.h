@@ -51,9 +51,11 @@ struct Spring {
     float sampleRate = 44100.0f;
 
     // Loop length (samples) and feedback glide per sample toward what SIZE
-    // asks for (review S5). SIZE arrives once per block, and snapping the loop
-    // to each new length jumped the read tap several samples per block — a
-    // block-rate zipper, and clicks on a fast turn. Each glide is a one-pole
+    // asks for (review S5). Snapping the loop to each new length jumped the
+    // read tap — per block, a block-rate zipper and clicks on a fast turn. The
+    // core ramps SIZE across the block (rampSize), so the target moves a whole
+    // sample at a time; the glide smooths those steps and the ramp's corners
+    // where the knob changes speed. Each glide is a one-pole
     // (the ParamSmoother law), held as an offset from its target that decays
     // to 0: a one-pole run on the length itself stalls in float a fraction of
     // a sample short (~2 samples at 192 kHz), the offset form does not. The
@@ -103,11 +105,16 @@ struct Spring {
         fbOffset  = 0.0f;
     }
 
+    // Whole-sample loop length for a SIZE length scale.
+    float lengthFor(float sr, float lenScale) const {
+        int len = static_cast<int>(std::lround(baseMs * 0.001f * sr * lenScale));
+        return static_cast<float>(std::clamp(len, 1, bufSize - 1));
+    }
+
     // A new target carries the current read length over into the offset, so
     // the read glides from where it is rather than jumping.
     void setLength(float sr, float lenScale) {
-        int len = static_cast<int>(std::lround(baseMs * 0.001f * sr * lenScale));
-        const float newTarget = static_cast<float>(std::clamp(len, 1, bufSize - 1));
+        const float newTarget = lengthFor(sr, lenScale);
         lenOffset += lenTarget - newTarget;
         lenTarget  = newTarget;
     }
@@ -172,6 +179,13 @@ struct SpringReverbCore {
     float sr = 44100.0f;
     float curFeedback = 0.7f;
 
+    // SIZE ramp (rampSize): the value applied to the springs moves linearly
+    // from sizeNow to sizeTarget over the next rampLeft process() calls.
+    float sizeNow    = 0.5f;
+    float sizeTarget = 0.5f;
+    float sizeStep   = 0.0f;
+    int   rampLeft   = 0;
+
     // detune decorrelates left vs right cores for genuine stereo width.
     void prepare(float sampleRate, float detune = 1.0f) {
         sr = sampleRate;
@@ -184,19 +198,40 @@ struct SpringReverbCore {
         reset();   // start on the default SIZE, not gliding to it
     }
 
+    // Clears the tanks and lands a pending SIZE ramp and glide on the target.
     void reset() {
+        if (rampLeft > 0) setSize(sizeTarget);
         for (auto& s : springs) s.reset();
     }
 
+    static float lenScaleFor(float size01) {
+        return SPRING_LEN_SCALE_MIN + size01 * (SPRING_LEN_SCALE_MAX - SPRING_LEN_SCALE_MIN);
+    }
+    static float feedbackFor(float size01) {
+        return SPRING_FB_MIN + size01 * (SPRING_FB_MAX - SPRING_FB_MIN);
+    }
+
+    // Sets SIZE now: the springs glide to it (SPRING_SIZE_GLIDE_MS).
     void setSize(float size01) {
         size01 = std::clamp(size01, 0.0f, 1.0f);
-        const float lenScale = SPRING_LEN_SCALE_MIN
-            + size01 * (SPRING_LEN_SCALE_MAX - SPRING_LEN_SCALE_MIN);
-        curFeedback = SPRING_FB_MIN + size01 * (SPRING_FB_MAX - SPRING_FB_MIN);
-        for (auto& s : springs) {
-            s.setLength(sr, lenScale);
-            s.setFeedback(curFeedback);
-        }
+        sizeNow = sizeTarget = size01;
+        rampLeft = 0;
+        applySize(size01);
+    }
+
+    // SIZE as the host hands it over, once per block: ramps linearly to size01
+    // across the next numSamples process() calls (review S5). Stepping it once
+    // per block left the glide alone to hide the step, which only works while
+    // the glide outlasts the block — at 2048 samples a step settled inside its
+    // own block, so the read speed kicked at every boundary (a pitch warble).
+    // Ramped, a turn reaches the tank one block late and otherwise follows the
+    // knob at any block size.
+    void rampSize(float size01, int numSamples) {
+        size01 = std::clamp(size01, 0.0f, 1.0f);
+        if (numSamples <= 1) { setSize(size01); return; }
+        sizeTarget = size01;
+        sizeStep   = (sizeTarget - sizeNow) / static_cast<float>(numSamples);
+        rampLeft   = numSamples;
     }
 
     void setTone(float tone01) {
@@ -208,6 +243,12 @@ struct SpringReverbCore {
 
     // One mono sample in → wet sample out.
     float process(float x) {
+        if (rampLeft > 0) {
+            --rampLeft;   // the last step lands exactly on the target
+            sizeNow = (rampLeft == 0) ? sizeTarget
+                                      : sizeTarget - static_cast<float>(rampLeft) * sizeStep;
+            applySize(sizeNow);
+        }
         float wet = 0.0f;
         for (auto& s : springs) wet += s.process(x);
         return wet * (1.0f / static_cast<float>(SPRING_NUM));
@@ -220,6 +261,24 @@ struct SpringReverbCore {
         float longest = 1.0f;
         for (const auto& s : springs) longest = std::max(longest, s.lenTarget);
         return longest / sr;
+    }
+
+    // Settled loop length a SIZE will give, before a ramp reaches it.
+    float loopSecondsFor(float size01) const {
+        const float lenScale = lenScaleFor(std::clamp(size01, 0.0f, 1.0f));
+        float longest = 1.0f;
+        for (const auto& s : springs) longest = std::max(longest, s.lengthFor(sr, lenScale));
+        return longest / sr;
+    }
+
+private:
+    void applySize(float size01) {
+        const float lenScale = lenScaleFor(size01);
+        curFeedback = feedbackFor(size01);
+        for (auto& s : springs) {
+            s.setLength(sr, lenScale);
+            s.setFeedback(curFeedback);
+        }
     }
 };
 

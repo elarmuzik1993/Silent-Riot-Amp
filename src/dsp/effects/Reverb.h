@@ -41,6 +41,7 @@ private:
     juce::SmoothedValue<float> mixSm;
     float lastSize = -1.0f;
     float lastTone = -1.0f;
+    bool  sizePending = false;   // lastSize not yet handed to the cores' ramp
 };
 
 } // namespace sr
