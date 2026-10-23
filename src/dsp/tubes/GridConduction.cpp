@@ -9,7 +9,7 @@ float applyGridConduction(float vGrid, GridConductionModel& model) {
         model.couplingCapCharge *= model.chargeDecay;
         if (std::abs(model.couplingCapCharge) < 1e-10f)
             model.couplingCapCharge = 0.0f;
-        model.lastGridCurrent = 0.0f;
+        model.lastGridDrop = 0.0f;
         return vGrid - model.couplingCapCharge;
     }
 
@@ -42,10 +42,11 @@ float applyGridConduction(float vGrid, GridConductionModel& model) {
     // to absorb — the same quantity the divider fed it, so GRID_CHARGE_RATE and
     // MAX_BIAS_SHIFT_N keep their calibrated meaning. chargeRate is
     // GRID_CHARGE_RATE scaled to the running sample rate, so the charge per
-    // second — not per sample — is fixed.
-    float gridCurrent = vGrid - vLoaded;
-    model.lastGridCurrent = gridCurrent;
-    model.couplingCapCharge += gridCurrent * model.chargeRate;
+    // second — not per sample — is fixed. The drop is a voltage, not a current
+    // (that is drop / sourceResistance; see gridCurrentN()).
+    float vDrop = vGrid - vLoaded;
+    model.lastGridDrop = vDrop;
+    model.couplingCapCharge += vDrop * model.chargeRate;
     float maxCharge = std::abs(MAX_BIAS_SHIFT_N);
     if (model.couplingCapCharge > maxCharge)
         model.couplingCapCharge = maxCharge;

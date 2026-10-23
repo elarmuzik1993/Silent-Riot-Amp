@@ -8,6 +8,7 @@
 //   - Coupling cap decays toward zero in absence of drive
 //   - Per-stage factories produce correct impedances
 //   - Bias shift is negative (shifts operating point colder)
+//   - GRID I readout: current = voltage drop / source resistance (review S3)
 // ═══════════════════════════════════════════════════════════════
 
 #include <catch2/catch_test_macros.hpp>
@@ -270,4 +271,32 @@ TEST_CASE("Grid charge: settled bias shift is independent of the sample rate", "
                 REQUIRE(shift == Approx(reference).epsilon(0.01)); // within 1 %
         }
     }
+}
+
+// ── GRID I readout (review S3) ───────────────────────────────
+
+TEST_CASE("Grid readout: lastGridDrop is a voltage, the current is drop / source R", "[grid][readout]") {
+    auto model = makeEL84Grid();
+    recalcGridChargeDecay(model, GRID_TAU_EL84_S, TEST_SR);
+
+    // 20 V above threshold: knee = 6 V · 19.2k/(19.2k+38.5k) ≈ 2.0 V, so the
+    // grid is clamped to ≈ threshold + 4.8 V and the source drops ≈ 15.2 V.
+    applyGridConduction(GRID_CONDUCT_THRESH_EL84_N + VS::v(20.0f), model);
+    REQUIRE(VS::toVolts(model.lastGridDrop) == Approx(15.2f).margin(0.05f));
+
+    // I = V / R: 15.2 V across the PI's 38.5 kΩ output impedance ≈ 0.395 mA.
+    // Read as a current, the drop showed 0.051 mA — 7.8× low.
+    const float mA = VS::toAmps(gridCurrentN(model.lastGridDrop, model)) * 1000.0f;
+    REQUIRE(mA == Approx(VS::toVolts(model.lastGridDrop) / VS::toOhms(model.sourceResistance) * 1000.0f)
+                      .epsilon(1e-4));
+    REQUIRE(mA == Approx(0.395f).margin(0.002f));
+}
+
+TEST_CASE("Grid readout: no conduction reads zero drop and zero current", "[grid][readout]") {
+    auto model = makeEL84Grid();
+    applyGridConduction(GRID_CONDUCT_THRESH_EL84_N + VS::v(20.0f), model);
+    REQUIRE(model.lastGridDrop > 0.0f);
+    applyGridConduction(GRID_CONDUCT_THRESH_EL84_N * 0.5f, model);
+    REQUIRE(model.lastGridDrop == 0.0f);
+    REQUIRE(gridCurrentN(model.lastGridDrop, model) == 0.0f);
 }

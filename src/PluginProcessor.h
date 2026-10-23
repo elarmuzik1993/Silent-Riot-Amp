@@ -214,7 +214,7 @@ public:
     // GUI level metering (atomic, updated per block from audio thread)
     std::atomic<float> inputLevelForGUI  { 0.0f };
     std::atomic<float> outputLevelForGUI { 0.0f };
-    std::atomic<float> gridCurrentForGUI { 0.0f };
+    std::atomic<float> gridCurrentForGUI { 0.0f };   // normalized current, block peak of the EL84 grids
 
     // GUI DSP-state telemetry — published once per block by the audio thread,
     // read by the editor timer. Atomic snapshots avoid torn reads of the

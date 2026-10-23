@@ -7,6 +7,20 @@
 
 using namespace sr;
 
+namespace {
+
+// RMS of one channel, for the GUI meters. 0 for an empty block.
+float channelRms(const float* x, int n)
+{
+    if (n <= 0) return 0.0f;
+    float sumSq = 0.0f;
+    for (int i = 0; i < n; ++i)
+        sumSq += x[i] * x[i];
+    return std::sqrt(sumSq / static_cast<float>(n));
+}
+
+} // namespace
+
 SilentRiotProcessor::SilentRiotProcessor()
     : AudioProcessor(BusesProperties()
           .withInput("Input",  juce::AudioChannelSet::stereo(), true)
@@ -407,14 +421,25 @@ void SilentRiotProcessor::processBlockBypassed(juce::AudioBuffer<float>& buffer,
     // and tuner mute — tuning with the plugin bypassed is a normal workflow.
     tailsStale = true;
     const int n = buffer.getNumSamples();
-    if (buffer.getNumChannels() > 0)
+    const bool hasCh0 = buffer.getNumChannels() > 0;
+    if (hasCh0)
         pushTunerSamples(buffer.getReadPointer(0), n);
+
+    // Meters show what the plugin passes: the raw DI in (no INPUT trim runs
+    // here) and, below, that DI out. processBlock's metering doesn't run, so
+    // without this both meters froze at their last level (review S6). No amp
+    // is running, so no grid current either.
+    inputLevelForGUI.store(hasCh0 ? channelRms(buffer.getReadPointer(0), n) : 0.0f,
+                           std::memory_order_relaxed);
+    gridCurrentForGUI.store(0.0f, std::memory_order_relaxed);
 
     // Dry input, delayed by the latency the host is compensating for (JUCE's
     // default passes it through undelayed and asserts the latency is 0).
     // processBlock primes the line, so entering bypass is seamless.
     syncBypassDelay();
     bypassDelay.process(buffer.getArrayOfWritePointers(), buffer.getNumChannels(), n);
+    outputLevelForGUI.store(hasCh0 ? channelRms(buffer.getReadPointer(0), n) : 0.0f,
+                            std::memory_order_relaxed);
 }
 
 bool SilentRiotProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const {
@@ -489,7 +514,25 @@ void SilentRiotProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     // still ran, so the tuner keeps tracking pitch while the amp is silent.
     // The effects below stop running here and freeze holding their tails, so
     // flag them to start clean when the amp comes back (review B6).
-    if (!powerOn || tunerMute) { buffer.clear(); tailsStale = true; return; }
+    //
+    // The metering at the end of the block is skipped too, so publish the
+    // silence here, or both meters hold their last level and VUMeter's jitter
+    // makes them look live (review S6). Under tuner mute the input meter stays
+    // live (post-trim, as when playing): the tuner is listening to that signal.
+    // Power off reads all zero, matching the editor's dark meters.
+    if (!powerOn || tunerMute)
+    {
+        const bool meterInput = powerOn && buffer.getNumChannels() > 0;
+        inputLevelForGUI.store(meterInput ? channelRms(buffer.getReadPointer(0), buffer.getNumSamples())
+                                                * inputTrimGain(inTrimParam)
+                                          : 0.0f,
+                               std::memory_order_relaxed);
+        outputLevelForGUI.store(0.0f, std::memory_order_relaxed);
+        gridCurrentForGUI.store(0.0f, std::memory_order_relaxed);
+        buffer.clear();
+        tailsStale = true;
+        return;
+    }
 
     // Leaving power-off / tuner mute, or after a host reset(): drop every frozen
     // effect tail. Clearing the was-on flags sends delay, reverb and widener
@@ -549,17 +592,9 @@ void SilentRiotProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     // ── Input level metering (RMS, post-trim) ──
     // Post-trim on purpose: the meter has to show what the amp sees, or the
     // INPUT knob can't be set by eye.
-    {
-        const int n = buffer.getNumSamples();
-        if (n > 0)
-        {
-            const float* ch0 = buffer.getReadPointer(0);
-            float sumSq = 0.0f;
-            for (int i = 0; i < n; ++i)
-                sumSq += ch0[i] * ch0[i];
-            inputLevelForGUI.store(std::sqrt(sumSq / static_cast<float>(n)), std::memory_order_relaxed);
-        }
-    }
+    if (buffer.getNumSamples() > 0)
+        inputLevelForGUI.store(channelRms(buffer.getReadPointer(0), buffer.getNumSamples()),
+                               std::memory_order_relaxed);
 
     // ── Pre-amp effects (gate → boost) at base SR, BEFORE upsampling ──
     // The amp reads mono from channel 0, so we process channel 0 only; the
@@ -617,6 +652,7 @@ void SilentRiotProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     // Oversampled processing (Spec §2.5 processBlock)
     auto* oversampler = oversampleSwitcher.active();
     auto osBlock = oversampler->processSamplesUp(juce::dsp::AudioBlock<float>(buffer));
+    float peakEl84GridDrop = 0.0f;   // GRID I readout: the block's peak, not its last sample
 
     for (size_t i = 0; i < osBlock.getNumSamples(); ++i)
     {
@@ -704,6 +740,7 @@ void SilentRiotProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
         float effectiveBias = el84BaseBias + sag.biasOffset();
         piA = applyGridConduction(piA, el84GridA);
         piB = applyGridConduction(piB, el84GridB);
+        peakEl84GridDrop = std::max({ peakEl84GridDrop, el84GridA.lastGridDrop, el84GridB.lastGridDrop });
         float condA = softConductionCurve(piA, effectiveBias);
         float condB = softConductionCurve(piB, effectiveBias);
         PentodeOutput ppA = pentodeWaveshaper(piA, effectiveBias, vPlate, vScreen);
@@ -932,24 +969,14 @@ void SilentRiotProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     }
 
     // ── GUI level metering (RMS of channel 0, post-trim) ──
-    {
-        const int n = buffer.getNumSamples();
-        if (n > 0)
-        {
-            const float* ch0 = buffer.getReadPointer(0);
-            float sumSq = 0.0f;
-            for (int i = 0; i < n; ++i)
-                sumSq += ch0[i] * ch0[i];
-            float rms = std::sqrt(sumSq / static_cast<float>(n));
-            outputLevelForGUI.store(rms, std::memory_order_relaxed);
-        }
-    }
+    if (buffer.getNumSamples() > 0)
+        outputLevelForGUI.store(channelRms(buffer.getReadPointer(0), buffer.getNumSamples()),
+                                std::memory_order_relaxed);
 
-    // ── Grid current readout (peak across EL84 stages) ──
-    {
-        float peakGridI = std::max(el84GridA.lastGridCurrent, el84GridB.lastGridCurrent);
-        gridCurrentForGUI.store(peakGridI, std::memory_order_relaxed);
-    }
+    // ── Grid current readout (block peak across both EL84 grids) ──
+    // The tracked drop is a voltage; the current is drop / source resistance
+    // (review S3). Both grids share GRID_SOURCE_R_EL84_N, so one division.
+    gridCurrentForGUI.store(gridCurrentN(peakEl84GridDrop, el84GridA), std::memory_order_relaxed);
 
     // ── DSP-state telemetry for the editor readout (publish atomic snapshot) ──
     {
