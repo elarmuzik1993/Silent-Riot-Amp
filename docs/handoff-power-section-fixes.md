@@ -152,9 +152,25 @@ input passes the plugin's base-rate front end (INPUT trim, then the real `Boost`
 - **Square**: band-limited (odd harmonics below 19.8 kHz), plateau 0.5. **Chord**: open-string
   E chord (E2 A2 D3 G3 B3 E4), equal amplitudes, scaled to 0.5 peak.
 
-Cross-check: 10 of these corners were also run through the real `processBlock` with temporary
-instrumentation of the same quantities (reverted, not committed); every one agreed within
-0.02 V on the grid peak and 0.7 points on the railed %.
+Cross-check: 10 corners were also run through the real `processBlock` (`ProcessorHarness`, JUCE's
+4× oversampler, 512-sample blocks) with temporary instrumentation of the same quantities
+(reverted, not committed; re-checking means adding it back). EL84 conduction was counted by the
+probe only.
+
+| # | Corner | Grid peak probe / real | PI railed probe / real | V1b railed probe / real |
+|---|---|---|---|---|
+| 1–2 | default knobs, sine 110 / 220 @0.178 | 0.26 / 0.26, 0.27 / 0.27 V | 0.0 / 0.0 % | 0.0 / 0.0 % |
+| 3 | gain 8 / vol 5, sine 110 @0.178 | 0.37 / 0.37 V | 39.9 / 39.9 % | 0.0 / 0.0 % |
+| 4–5 | gain 10 / vol 5, sine 110 / 220 @0.178 | 0.61 / 0.61, 0.58 / 0.58 V | 53.4 / 53.4, 59.4 / 59.4 % | 0.0 / 0.0 % |
+| 6 | gain 10 / vol 10, sine 110 @0.178 | 2.46 / 2.46 V | 53.4 / 53.4 % | 0.0 / 0.0 % |
+| 7 | HOT, SHAPE 10, 15W, sine 1600 @0.5 | 5.73 / 5.74 V | 100.0 / 100.0 % | 91.8 / 91.7 % |
+| 8 | HOT, SHAPE 0, 15W, sine 800 @1.0 | 5.20 / 5.19 V | 82.5 / 82.5 % | 72.1 / 72.0 % |
+| 9 | HOT, SHAPE 10, 15W, **square 1600 @0.5** | **5.91 / 5.89 V** | 100.0 / 100.0 % | 84.3 / 85.0 % |
+| 10 | HOT, SHAPE 10, 7W, sine 1600 @0.5 | 5.57 / 5.57 V | 100.0 / 100.0 % | 91.9 / 91.9 % |
+
+The largest gaps are 0.02 V on the grid peak and 0.7 points on V1b's railed % (the PI's matched
+exactly), both at the headline corner, row 9. The other HOT corners below (the chord, 110 Hz,
+800 Hz @0.5, the other squares, the other 7W and SHAPE 0 cells) are from the probe alone.
 
 **EL84 conduction: none.** No sample of any corner below crossed 8.6 V (`conducting` 0.00 % on
 every row of the probe output). Hottest: a 1.6 kHz square at the HOT corner with SHAPE 10, 15W,

@@ -9,7 +9,7 @@
 // range and the minimum B+ / screen. Tasks 2-4 are each checked against these numbers.
 //
 // The amp loop is copied from docs/review-dsp-2026-10-15-probe.cpp (main at
-// b8e20a9; src/ unchanged through 9970ddd): processBlock's per-sample loop
+// b8e20a9; re-checked against processBlock at c6e276d): processBlock's per-sample loop
 // minus the oversampling filters, input fed at the oversampled rate. When a
 // task changes the power stage, mirror it in Amp::tick here before re-running,
 // or the numbers stop describing the plugin.
@@ -30,8 +30,11 @@
 // point exactly as resetDSPState() leaves it, and the input goes through the
 // plugin's base-rate front end — INPUT trim, then BOOST (the real Boost class
 // at 44.1 kHz) — and a 4x linear-phase windowed-sinc upsampler standing in for
-// JUCE's oversampler (its phase differs near 20 kHz; everything that reaches
-// the PI has been through the 5 kHz gain-loading LP first). Shape is the
+// JUCE's oversampler. JUCE's polyphase-IIR half-band filters are not linear
+// phase anywhere in the band, so harmonics reaching V1a's grid clamp and
+// triode (before the 5 kHz gain-loading LP) are shaped slightly differently;
+// docs/handoff-power-section-fixes.md lists the corners checked against the
+// real processBlock (grid peak within 0.02 V). Shape is the
 // knob's value, applied the way processBlock applies it on its first sample.
 
 #include "dsp/tubes/TriodeWaveshaper.h"
@@ -110,9 +113,9 @@ struct Amp {
         fb.updateShape(shapeKnob);
     }
 
-    // One oversampled sample of PluginProcessor.cpp:518-646 (IIR cab on, no IR).
-    // Copied from docs/review-dsp-2026-10-15-probe.cpp; Shape stays at the filter
-    // bank's default (noon), which every preset below uses.
+    // One oversampled sample of processBlock's oversampled loop (IIR cab on, no IR).
+    // Copied from docs/review-dsp-2026-10-15-probe.cpp. Shape is noon for the Task 0
+    // presets; `grid` mode sets the knob in seedIdleAndShape().
     float tick(float in, float gainKnob, float volKnob) {
         const float gainDrive = gainDriveTaper(gainKnob);
         if (!freezePSU) psu.update();
