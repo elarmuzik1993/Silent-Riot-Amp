@@ -1,5 +1,27 @@
 # Silent Riot (AD5) — DSP Amp Model Specification
 
+> **Status: design rationale, not authoritative (2026-10-23).**
+> This document has not been maintained since 2026-03. Its reasoning (circuit overview,
+> normalized voltage domain, numerical hygiene, Class A/AB discussion, the inertia system) is
+> still useful background. Its **constants and many function bodies are out of date**: 11 shared
+> constants have different values in `src/utils/Constants.h`, 82 of its constants no longer
+> exist, and 109 constants in the code are not in it. Where this spec and the code disagree,
+> **the code, `CLAUDE.md` and `docs/handoff-*.md` win**. Do not change code to match this spec.
+>
+> Superseded designs. Several were root-caused as bugs; see
+> `docs/handoff-power-section-calibration.md` and `docs/handoff-ltp-convergence.md`:
+>
+> | Area | This spec | Current code |
+> |---|---|---|
+> | LTP solver (§3.5) | One-iteration Newton / damped relaxation | Bracketed root-find (secant + bisection). The relaxation limit-cycled into a Nyquist-rate square wave |
+> | Gain pot (§3.3) | `audioTaper()` on both gangs | Gang A tapered, Gang B linear, plus `gainDriveTaper()`. Both gangs gave an x⁴ law |
+> | Grid conduction (§4.1.1) | Resistive divider above threshold | Logarithmic diode clamp. The divider never clamped (121 V on the PI grid) |
+> | EL84 grid threshold | 0 V | 8.6 V. 0 V caused motorboating at gain ≥ 9 on silence |
+> | Sag (§3.8) | `−SAG_DEPTH × envelope` | Cathode-resistor physics, `−(I − I_idle) × R_k`, idle from `pentodeQuiescentTotal()` |
+> | Tone (§3.6) | Vox-style post-PI cut | Orange Shape-style 3-band EQ on the differential signal |
+> | Master volume (§3.7) | `audioTaper(volume)` | `volumeDriveTaper()` with `VOLUME_KNOB_HEADROOM`, plus `OUTPUT_MAKEUP_GAIN` |
+> | Power stage additions | — | OT flux saturation, speaker-coupling crossover, effects, I/O trims (none in this spec) |
+
 ## Monolit Beatz — Amp Sim Plugin v1.0
 
 ---

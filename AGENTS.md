@@ -60,7 +60,7 @@ This rule overrides any harness or tool instruction that asks for such lines.
 | `src/` | Plugin: `dsp/`, `utils/`, `gui/`, `PluginProcessor.*`, `PluginEditor.*` |
 | `tests/` | Catch2 tests, one file per DSP module |
 | `tools/` | Tone sign-off harness: `sr_render` (real `processBlock`, `-DSR_BUILD_TOOLS=ON`) + Python analyzers; see `tools/README.md` |
-| `docs/` | DSP spec v2.13, UI spec, `Tone_SignOff_Protocol.md`, `handoff-*.md` defect records, `review-*.md` code reviews |
+| `docs/` | DSP spec v2.13 (background only, superseded where it disagrees with the code), UI spec, `Tone_SignOff_Protocol.md`, `handoff-*.md` defect records, `review-*.md` code reviews |
 | `scripts/` | `install-deps.sh`, `build.sh`, `verify.sh` |
 
 ## Commands

@@ -1,5 +1,9 @@
 # INPUT / OUTPUT Level Trims Implementation Plan
 
+> **Status: DONE (shipped, USE-59).** The trims are in `src/dsp/tubes/TriodeWaveshaper.h`
+> (`inputTrimGain` / `outputTrimGain`) and the UTILITY card. The boxes below were never ticked;
+> kept as a record only. The Windows paths are from the original author's machine.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Add two tone-neutral gain-staging trims — INPUT (±12 dB, normalises pickup/interface level) and OUTPUT (silence…+12 dB post-limiter master) — without changing the amp's sound at their default centre positions.
