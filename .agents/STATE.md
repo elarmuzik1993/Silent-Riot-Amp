@@ -1,6 +1,3 @@
-<!-- Hand-off between sessions on any machine, local or cloud. AGENTS.md imports it, so every
-     session starts with it. The hand-off rewrites it; it is not a log, and history belongs in git.
-     Keep it under ~40 lines; the SessionStart hook warns past 60. -->
 # State
 
 _Updated 2026-10-23_
@@ -13,31 +10,34 @@ _Updated 2026-10-23_
     re-checked. Line refs against `b8e20a9`; still valid (no src/tests change since).
   - Power-section plan `docs/superpowers/plans/2026-10-23-power-section-fixes.md`, Tasks 0–5.
     Written without the review; its *Coordination with the DSP review* section maps the overlap.
-- Docs: DSP spec v2.13 is background only; `COMPETITIVE_ROADMAP.md` is the live plan.
+    Tasks 0–1 done: baseline in `docs/handoff-power-section-fixes.md` (+ `-probe.cpp`).
 
 ## Next (combined order; one PR per step, each with a test)
 1. Owner: GitHub Actions is down (every run since 2026-10-09 fails in ~3–5 s, no logs). Check
    Actions billing / spending limit. Until fixed, verify locally.
-2. Phase 1, settled tone unchanged at 44.1k/4×:
-   a. Plan Task 0 (baseline: `signoff.py`, thump, idle, bloom) + Task 1 (stale comment).
-   b. Review B5 + B4: apply the saved OVERSAMPLE mode at prepare; latency report per active path.
-   c. B1 + S1: seed filters/PSU/sag from a solved idle point (clears E1); sanitize + seed smoothers.
-   d. B7 (grid-charge rate × 176400/effectiveSR), then B6 + B8 (owner: delay self-oscillation?).
-3. Phase 2, changes the tone, then ONE re-calibration and an owner listening check:
-   Plan Task 2 **together with** B2 (one idle fixed-point solve, shared with B1's seeding; the
-   existing idle test is tautological, replace it with one that runs the real PSU loop), B3,
-   Task 3, Task 4 with S8 (bracketed solves, not the 0.5-damped plate loop), Task 5 (owner picks
-   the 7W option). Then re-tune D1/A1/B1 and the P-* positions once.
-4. E3 last (owner: confirm "repoint the gate, then fix the engine"). Step 1: give `alias_crank`
+2. Owner: should the EL84s ever leave class A? The baseline shows they never do (no cut-off,
+   plate knee never approached, B+ moves 0.1 V, even with every knob on 10) because
+   `VOLUME_KNOB_HEADROOM` = 0.21 keeps their grids small. Yes → re-balance headroom vs. grid clamp
+   before plan Tasks 3–4; no → descope Tasks 3–4 to cleanup, Task 2 reduces to B2.
+3. Phase 1, settled tone unchanged at 44.1k/4×:
+   a. Review B5 + B4: apply the saved OVERSAMPLE mode at prepare; latency report per active path.
+   b. B1 + S1: seed filters/PSU/sag from a solved idle point (clears E1); sanitize + seed smoothers.
+   c. B7 (grid-charge rate × 176400/effectiveSR), then B6 + B8 (owner: delay self-oscillation?).
+4. Phase 2, changes the tone, then ONE re-calibration and an owner listening check:
+   Plan Task 2 **with** B2 (one idle fixed-point solve, shared with B1; replace the tautological
+   idle test with one running the real PSU loop), B3, Tasks 3–4 per item 2 (Task 4 with S8:
+   bracketed solves), Task 5 (owner: 7W option). Then re-tune D1/A1/B1 and P-* once.
+5. E3 last (owner: confirm "repoint the gate, then fix the engine"). Step 1: give `alias_crank`
    (`tools/signoff_gates.json`) a real bright IR (today a skipped placeholder, so E3 runs the IIR
    path). Step 2 alongside S8: harmonic fall-off per nonlinearity (`TriodeWaveshaper.cpp:28`,
    `GridConduction.cpp:39`, `OTSaturation.h:43`; Task 4 adds a plate knee).
-5. Phase 3, batched: S2 + S4, S3 + S6, S5 + S7 (owner: raise S7's 1000 ms limit or show clamp?).
-6. Owner: delete stale remote branches (keep `main`, `claude/neural-learning-path-slider-kt8dy7`;
+6. Phase 3, batched: S2 + S4, S3 + S6, S5 + S7 (owner: raise S7's 1000 ms limit or show clamp?).
+7. Owner: delete stale remote branches (keep `main`, `claude/neural-learning-path-slider-kt8dy7`;
    check `fix/effects-toggle-rendering-use-60` first); adopt the kit's *Rules* in AGENTS.md?
 
 ## Decisions
 - DSP spec v2.13 is background, not authoritative; code, CLAUDE.md and handoff docs win.
+  `COMPETITIVE_ROADMAP.md` is the live plan.
 - Fix order: tone-neutral fixes first, tone-changing ones together, so the amp is re-calibrated
   once. B1 seeds the solved idle point, not hard-coded values, so B2/Task 2 can't break it.
 - PSU's one-sample current lag is intended (spec §3.11); not a power-section defect.
@@ -51,6 +51,9 @@ _Updated 2026-10-23_
 - E1 is the startup burst (B1: preamp filter reset + PSU reset), not a noise floor; settled, the
   amp idles at −269 dBFS. `CLAUDE.md`'s *Next* line still blames the PSU alone; fix with B1.
 - E3 is engine aliasing (16th harmonic of 11 kHz folding at 176.4k); 8× OS only reaches −43.5.
-- Sag idles warm: +0.77 V (15W) / +1.03 V (7W), reference taken at nominal rails (B2).
-- EL84s have no plate load line (Vp = PSU B+), so the plate knee never engages (Task 4).
+- Sag idles warm: +0.77 V (15W) / +1.03 V (7W), reference taken at nominal rails (B2), and never
+  reaches the cold side: average plate current *falls* slightly under drive.
+- `sr_bloom.py` at gain 0.625 rebounds 3.8 dB (15W) / 4.1 dB (7W) at 25 ms; at gain 1.0 louder input
+  (0.2 → 0.4) gives quieter output in `sr_thump.py`. Both point at upstream blocking; not root-caused.
+- EL84s have no plate load line (Vp = PSU B+); inaudible today, as they never leave class A.
 - Settings → About paints a hard-coded "Licensed — Full Version" (`SettingsPanel.cpp:162`).

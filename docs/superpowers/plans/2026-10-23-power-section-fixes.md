@@ -61,14 +61,21 @@ combined order lives in `.agents/STATE.md`. Where they meet:
 
 Every later task is judged against these numbers, so record them before touching code.
 
-- [ ] `bash scripts/verify.sh` passes (308/308).
-- [ ] Build `sr_render` (`-DSR_BUILD_TOOLS=ON`, Release) and run
+> **Done 2026-10-23.** Results in `docs/handoff-power-section-fixes.md`; the diagnostic is
+> `docs/handoff-power-section-fixes-probe.cpp`. **Read its last section before Tasks 2–4:** the
+> EL84s run class A at every sign-off point and at every knob on 10 (no cut-off, plate knee
+> never approached, B+ moves 0.1 V), so Tasks 3–4 are inaudible at today's
+> `VOLUME_KNOB_HEADROOM`, and idle `cond` is 0.975 (15W) / 0.923 (7W), not ≈ 0.98. Whether the
+> power stage should ever leave class A is an owner decision that now gates Tasks 3–4.
+
+- [x] `bash scripts/verify.sh` passes (308/308).
+- [x] Build `sr_render` (`-DSR_BUILD_TOOLS=ON`, Release) and run
       `python3 tools/signoff.py --render-bin …/sr_render`. Save the full gate table to
       `docs/handoff-power-section-fixes.md` (new). Expect the 2026-10-14 figures in
       `.agents/STATE.md`: A1 −31.6 LUFS, B1 0.99 %, E1 −70.4 dBFS, E3 −37.9 dBc, other 8 pass.
-- [ ] Also record `tools/sr_thump.py`, `tools/sr_idle.py`, `tools/sr_bloom.py` at P-CLEAN,
+- [x] Also record `tools/sr_thump.py`, `tools/sr_idle.py`, `tools/sr_bloom.py` at P-CLEAN,
       P-EDGE and P-CRANK, in 15W and 7W.
-- [ ] Add a temporary diagnostic test (or `sr_render` debug output) that logs, per preset:
+- [x] Add a temporary diagnostic test (or `sr_render` debug output) that logs, per preset:
       peak and average `ipA`/`ipB`, `condA`/`condB` minimum, `sag.biasOffset()` range, and
       B+ minimum. Tasks 2–4 are each checked against these.
 
@@ -76,9 +83,9 @@ Every later task is judged against these numbers, so record them before touching
 
 **Files:** `src/dsp/tubes/PentodeWaveshaper.cpp` (`softConductionCurve`)
 
-- [ ] Replace the −0.9 / −0.96 / 1.067 example with the real values: bias −0.032 (15W) /
+- [x] Replace the −0.9 / −0.96 / 1.067 example with the real values: bias −0.032 (15W) /
       −0.023 (7W), `biasFactor` = −9.6/−7.0 ≈ 1.37, `overlapWidth` = 5 V × `biasFactor`.
-- [ ] Verify: build passes and output is bit-identical (comments only).
+- [x] Verify: build passes and output is bit-identical (comments only).
 
 ## Task 2: Feed the PSU and sag the current that actually flows
 
