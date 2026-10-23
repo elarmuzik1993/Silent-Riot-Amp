@@ -20,7 +20,10 @@ _Updated 2026-10-23_
 3. Phase 2 (changes the tone; owner listening check, then ONE re-calibration of D1/A1/B1/P-*):
    plan Task 2 with B2 (replace the tautological idle test; update the pinned numbers in
    `idle_operating_point_tests.cpp`), then B3. Measure whether the PI rail is load-bearing first.
-4. Owner, after B2/B3: should the EL84s leave class A? Gates plan Tasks 3–4 (Task 4 with S8) and 5.
+4. EL84s leaving class A (owner leans yes: cranked volume should break up the power tubes;
+   not yet confirmed). After B2/B3: raise `VOLUME_KNOB_HEADROOM` so knob 10 reaches the EL84
+   grids and check pick dynamics survive (D1 at knob 10), then plan Tasks 3–4 (Task 4 with S8)
+   and 5, then the one re-calibration. Each step ends in an owner listening check.
 5. E3 last (owner: confirm "repoint the gate, then fix the engine"); its bright IR is a placeholder.
 6. Owner: GitHub Actions fails every run since 2026-10-09 (check billing); delete stale branches.
 
