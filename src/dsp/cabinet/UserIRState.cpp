@@ -88,8 +88,8 @@ std::vector<UserIREntry> userIRsFromValueTree(const juce::ValueTree& irsNode)
             entry.audioData.copyFrom(ch, 0, rawData + ch * entry.numSamples,
                                      entry.numSamples);
 
-        // A NaN/Inf, or samples whose energy overflows JUCE's normalisation,
-        // would silence IR mode and be re-saved with the project (review S4).
+        // A NaN/Inf, samples whose energy overflows JUCE's normalisation, or
+        // an IR JUCE's -80 dBFS trim cuts to nothing would silence IR mode and be re-saved with the project (review S4).
         // Same stop-at-first-invalid rule as above.
         if (!isNormalisableIR(entry.audioData))
             break;
@@ -128,7 +128,8 @@ bool readUserIRFromFile(const juce::File& file, UserIREntry& out)
     if (!reader->read(&out.audioData, 0, numSamples, 0, true, true))
         return false;
 
-    // Float WAVs can carry NaN/Inf or absurdly large samples; the restore path
+    // Float WAVs can carry NaN/Inf or absurdly large samples, and any file can
+    // be silent (all below JUCE's -80 dBFS trim); the restore path
     // would drop such an entry anyway, so reject it here instead of loading a
     // silent IR (review S4).
     return isNormalisableIR(out.audioData);

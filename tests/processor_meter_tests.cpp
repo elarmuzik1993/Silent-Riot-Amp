@@ -9,8 +9,10 @@
 //
 // GRID I's current = drop / R relation is unit-tested in
 // grid_conduction_tests.cpp. It can't be driven non-zero here: with
-// VOLUME_KNOB_HEADROOM the EL84 grids peak at ~3.6 V even at gain 10 /
-// volume 10 / +12 dB INPUT, under their 8.6 V conduction threshold.
+// VOLUME_KNOB_HEADROOM the EL84 grids never reach their 8.6 V conduction
+// threshold — 5.55 V at the hottest corner measured (gain 10, volume 10,
+// +12 dB INPUT, BOOST and BRIGHT max, SHAPE 10, 1.6 kHz at 0.5 peak). So the
+// gridCurrentMA == 0 checks below are smoke checks: GRID I reads 0 anyway.
 // ═══════════════════════════════════════════════════════════════
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/catch_approx.hpp>
@@ -45,7 +47,7 @@ TEST_CASE("Processor: tuner mute zeroes the output meter, the input meter stays 
     CHECK(outputMeter(h) == 0.0f);             // silent output reads silent
     // The tuner is listening to the input, so it is real signal (unity trim).
     CHECK(inputMeter(h) == Catch::Approx(rmsOf(0.25f)).epsilon(0.01));
-    CHECK(h.proc.getDSPReadout().gridCurrentMA == 0.0f);
+    CHECK(h.proc.getDSPReadout().gridCurrentMA == 0.0f);   // smoke check (see header)
 
     h.set(IDs::TUNER_MUTE, 0.0f);
     h.run(0.5, blockSine(0.25f));
@@ -83,5 +85,5 @@ TEST_CASE("Processor: host bypass meters the dry passthrough (review S6)", "[pro
     const float rms = rmsOf(0.25f);
     CHECK(inputMeter(h)  == Catch::Approx(rms).epsilon(0.01));
     CHECK(outputMeter(h) == Catch::Approx(rms).epsilon(0.01));
-    CHECK(h.proc.getDSPReadout().gridCurrentMA == 0.0f);
+    CHECK(h.proc.getDSPReadout().gridCurrentMA == 0.0f);   // smoke check (see header)
 }

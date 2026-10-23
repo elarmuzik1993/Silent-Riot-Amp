@@ -181,8 +181,9 @@ TEST_CASE("isValidUserIRFormat rejects out-of-range formats", "[cabinet][ir][sta
 }
 
 // ═══════════════════════════════════════════════════════════════
-// Samples JUCE can't normalise (review S4) — NaN/Inf, or energy that
-// overflows its float sum of squares — rejected on both paths
+// Samples JUCE can't trim or normalise (review S4) — NaN/Inf, energy that
+// overflows its float sum of squares, or nothing at or above its -80 dBFS
+// trim — rejected on both paths
 // ═══════════════════════════════════════════════════════════════
 
 TEST_CASE("Restored entry with a NaN/Inf or overflowing sample is rejected and stops parsing",
@@ -201,8 +202,8 @@ TEST_CASE("Restored entry with a NaN/Inf or overflowing sample is rejected and s
 
         auto out = userIRsFromValueTree(userIRsToValueTree(in));
 
-        // Stops at the bad entry, like any other invalid one, so later
-        // entries keep their 1-based IR_INDEX mapping.
+        // Stops at the bad entry, like any other invalid one, so no later
+        // entry shifts onto its 1-based IR_INDEX.
         REQUIRE(out.size() == 1);
         REQUIRE(out[0].name == "ok");
     }
@@ -224,6 +225,36 @@ TEST_CASE("Restored entry whose channel energy overflows is rejected and stops p
     auto out = userIRsFromValueTree(userIRsToValueTree(in));
     REQUIRE(out.size() == 1);
     REQUIRE(out[0].name == "ok");
+}
+
+TEST_CASE("Restored entry JUCE's -80 dBFS trim would cut to nothing is rejected and stops parsing",
+          "[cabinet][ir][state]")
+{
+    // JUCE's Convolution trims every sample below an absolute -80 dBFS before
+    // normalising; an IR with nothing at or above it plays silence.
+    for (float level : { 0.0f, 0.5f * IR_TRIM_THRESHOLD })
+    {
+        std::vector<UserIREntry> in;
+        in.push_back(makeEntry("ok", 1, 256));
+        in.push_back(makeEntry("silent", 2, 512));
+        in.push_back(makeEntry("after_silent", 1, 256));
+        for (int ch = 0; ch < 2; ++ch)
+            for (int s = 0; s < 512; ++s)
+                in[1].audioData.setSample(ch, s, (s % 2) ? level : -level);
+
+        auto out = userIRsFromValueTree(userIRsToValueTree(in));
+        REQUIRE(out.size() == 1);
+        REQUIRE(out[0].name == "ok");
+    }
+
+    // Quiet but above the threshold in one channel only: kept, like JUCE keeps it.
+    std::vector<UserIREntry> in;
+    in.push_back(makeEntry("quiet", 2, 512));
+    in[0].audioData.clear();
+    in[0].audioData.setSample(1, 100, 2.0f * IR_TRIM_THRESHOLD);
+    auto out = userIRsFromValueTree(userIRsToValueTree(in));
+    REQUIRE(out.size() == 1);
+    REQUIRE(out[0].name == "quiet");
 }
 
 namespace {
@@ -286,6 +317,21 @@ TEST_CASE("readUserIRFromFile loads a clean float WAV and rejects ones JUCE can'
         UserIREntry e;
         REQUIRE_FALSE(readUserIRFromFile(f, e));
         f.deleteFile();
+    }
+
+    SECTION("a silent file (nothing at or above JUCE's -80 dBFS trim) is rejected")
+    {
+        for (float level : { 0.0f, 0.5f * IR_TRIM_THRESHOLD })
+        {
+            juce::AudioBuffer<float> silent(2, 300);
+            for (int ch = 0; ch < 2; ++ch)
+                for (int s = 0; s < 300; ++s)
+                    silent.setSample(ch, s, (s % 2) ? level : -level);
+            auto f = writeFloatWav("sr_user_ir_silent.wav", silent, 44100.0);
+            UserIREntry e;
+            REQUIRE_FALSE(readUserIRFromFile(f, e));
+            f.deleteFile();
+        }
     }
 
     SECTION("unreadable file is rejected")

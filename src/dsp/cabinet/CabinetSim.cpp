@@ -105,7 +105,7 @@ void CabinetSim::loadIRFromFile(const juce::File& file)
     reader->read(&irBuffer, 0, numSamples, 0, true, true);
 
     if (!isNormalisableIR(irBuffer))
-        return; // NaN/Inf or overflowing samples would silence IR mode (review S4)
+        return; // silent, NaN/Inf or overflowing samples would silence IR mode (review S4)
 
     currentIRLengthSamples = numSamples;
     irNativeSampleRate = reader->sampleRate;

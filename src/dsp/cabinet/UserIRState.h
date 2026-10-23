@@ -50,6 +50,8 @@ juce::ValueTree userIRsToValueTree(const std::vector<UserIREntry>& userIRs);
 // normalise — see isNormalisableIR() in CabinetSim.h); parsing STOPS at
 // the first invalid entry rather than skipping it — dropping an entry from
 // the middle would shift the 1-based IR_INDEX mapping of everything after it.
+// Entries after the stop are dropped too; their saved IR_INDEX then falls
+// past the list, which disables the convolution (applyUserIRIndex).
 // A child that isn't an "IR" node counts as invalid too: the writer emits
 // nothing else, so any future child type must go after the IRs or elsewhere.
 // At most MAX_USER_IRS entries are returned.
@@ -58,9 +60,9 @@ std::vector<UserIREntry> userIRsFromValueTree(const juce::ValueTree& irsNode);
 // Read an audio file into `out` for the user-IR list. At most 2 channels and
 // MAX_USER_IR_SAMPLES samples are kept. Returns false — leaving `out` unusable —
 // when the file can't be read, fails isValidUserIRFormat(), or fails
-// isNormalisableIR() (a NaN/Inf sample, or samples whose energy overflows
-// JUCE's normalisation), so the load path accepts exactly what the restore
-// path does.
+// isNormalisableIR() (a NaN/Inf sample, samples whose energy overflows
+// JUCE's normalisation, or nothing at or above its -80 dBFS trim), so the
+// load path accepts exactly what the restore path does.
 bool readUserIRFromFile(const juce::File& file, UserIREntry& out);
 
 // Make the convolution match IR_INDEX: 0 = IIR mode, 1..N = irs[irIndex-1].

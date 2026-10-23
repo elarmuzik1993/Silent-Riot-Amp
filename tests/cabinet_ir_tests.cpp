@@ -3,6 +3,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
+#include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <limits>
@@ -297,6 +298,40 @@ TEST_CASE("loadIRFromFile rejects a float WAV JUCE can't normalise", "[cabinet][
     }
 }
 
+TEST_CASE("loadIRFromFile rejects a WAV JUCE's -80 dBFS trim cuts to nothing", "[cabinet][ir]")
+{
+    // JUCE's trim threshold is absolute, so a quiet-but-real IR (peak just
+    // above -80 dBFS) still loads; all-zero, or wholly below it, does not.
+    struct Case { float peak; bool loads; };
+    for (const auto c : { Case { 0.0f, false },
+                          Case { 0.5f * IR_TRIM_THRESHOLD, false },
+                          Case { 2.0f * IR_TRIM_THRESHOLD, true } })
+    {
+        auto tempFile = juce::File::getSpecialLocation(
+            juce::File::tempDirectory).getChildFile("test_ir_silent.wav");
+        tempFile.deleteFile();
+        {
+            juce::WavAudioFormat wav;
+            std::unique_ptr<juce::AudioFormatWriter> writer(
+                wav.createWriterFor(new juce::FileOutputStream(tempFile),
+                                    48000.0, 1, 32, {}, 0));  // 32-bit float: exact
+            REQUIRE(writer != nullptr);
+
+            juce::AudioBuffer<float> ir(1, 256);
+            for (int i = 0; i < 256; ++i)
+                ir.setSample(0, i, c.peak * std::exp(-0.02f * static_cast<float>(i)));
+            writer->writeFromAudioSampleBuffer(ir, 0, 256);
+        }
+
+        CabinetSim cab;
+        cab.prepare(48000.0, 512, 1);
+        cab.loadIRFromFile(tempFile);
+        REQUIRE(cab.useIR.load() == c.loads);
+
+        tempFile.deleteFile();
+    }
+}
+
 TEST_CASE("isNormalisableIR flags NaN, Inf and overflowing energy in any channel", "[cabinet][ir]")
 {
     juce::AudioBuffer<float> b(2, 64);
@@ -328,17 +363,45 @@ TEST_CASE("isNormalisableIR flags NaN, Inf and overflowing energy in any channel
     REQUIRE(isNormalisableIR(b));
 }
 
+TEST_CASE("isNormalisableIR rejects an IR JUCE's -80 dBFS trim cuts to nothing", "[cabinet][ir]")
+{
+    // juce::dsp::Convolution (Trim::yes) keeps only the span between the first
+    // and last sample with |x| >= -80 dBFS over all channels — an ABSOLUTE
+    // threshold — and an IR with none plays silence.
+    REQUIRE(IR_TRIM_THRESHOLD == juce::Decibels::decibelsToGain(-80.0f));
+    REQUIRE_THAT(IR_TRIM_THRESHOLD, Catch::Matchers::WithinRel(1.0e-4f, 1.0e-5f));
+
+    juce::AudioBuffer<float> b(2, 64);
+    b.clear();
+    REQUIRE_FALSE(isNormalisableIR(b));          // all zero
+
+    // Every sample just below the threshold, both channels: trimmed to nothing.
+    const float below = std::nextafter(IR_TRIM_THRESHOLD, 0.0f);
+    for (int ch = 0; ch < 2; ++ch)
+        for (int i = 0; i < 64; ++i)
+            b.setSample(ch, i, (i % 2) ? below : -below);
+    REQUIRE_FALSE(isNormalisableIR(b));
+
+    // One sample AT the threshold (JUCE's test is >=), in either channel, keeps it.
+    b.setSample(1, 40, -IR_TRIM_THRESHOLD);
+    REQUIRE(isNormalisableIR(b));
+
+    // An empty buffer has nothing to survive the trim either.
+    juce::AudioBuffer<float> empty(1, 0);
+    REQUIRE_FALSE(isNormalisableIR(empty));
+}
+
 namespace {
 
-// Feeds a 1 kHz sine through `cab` until its convolution has swapped in the
-// pending IR (juce::dsp::Convolution builds the engine on a background thread,
-// then crossfades to it), and reports whether the settled output is audible.
-// A NaN output counts as not audible — IR mode is just as dead.
-bool settledOutputIsAudible(CabinetSim& cab)
+// Feeds a 1 kHz sine (amplitude 0.5) through `cab` until its convolution has
+// swapped in the pending IR (juce::dsp::Convolution builds the engine on a
+// background thread, then crossfades to it over 50 ms), and returns the
+// settled output peak. A NaN anywhere in the settled output returns NaN.
+float settledPeak(CabinetSim& cab)
 {
     juce::AudioBuffer<float> buf(1, 512);
     int n = 0;
-    bool audible = false;
+    float peak = 0.0f;
     for (int block = 0; block < 100; ++block)
     {
         for (int i = 0; i < 512; ++i, ++n)
@@ -349,48 +412,91 @@ bool settledOutputIsAudible(CabinetSim& cab)
 
         if (block < 60)
             std::this_thread::sleep_for(std::chrono::milliseconds(5));
-        else  // past the engine swap and its crossfade
+        else if (block >= 80)  // well past the engine swap and its crossfade
             for (int i = 0; i < 512; ++i)
-                audible = audible || std::abs(buf.getSample(0, i)) > 1.0e-3f;
+            {
+                const float y = buf.getSample(0, i);
+                if (std::isnan(y))
+                    return y;
+                peak = std::max(peak, std::abs(y));
+            }
     }
-    return audible;
+    return peak;
+}
+
+// Only NaN-free output above -60 dBFS counts — a NaN output is just as dead.
+bool settledOutputIsAudible(CabinetSim& cab)
+{
+    const float peak = settledPeak(cab);
+    return std::isfinite(peak) && peak > 1.0e-3f;
 }
 
 } // namespace
 
-TEST_CASE("An IR whose energy overflows a float silences IR mode (why it is rejected)",
+TEST_CASE("IRs JUCE can't trim or normalise silence IR mode (why they are rejected)",
           "[cabinet][ir]")
 {
     // loadIRFromBuffer() does not validate (callers pass entries that already
     // passed isNormalisableIR()), so it shows what JUCE does without the check.
-    auto makeIR = [](float bodyLevel) {
+    auto makeIR = [](float headLevel, float bodyLevel) {
         juce::AudioBuffer<float> ir(1, 2048);
         ir.clear();
-        ir.setSample(0, 0, 1.0f);
+        ir.setSample(0, 0, headLevel);
         for (int i = 1; i < 1000; ++i)
             ir.setSample(0, i, bodyLevel * ((i % 2) ? 1.0f : -1.0f));
         return ir;
     };
 
-    SECTION("a sane IR plays")
+    SECTION("a sane IR plays — through the IR, not JUCE's pass-through default")
     {
+        // A fresh Convolution passes audio through at about unity (a 0.5 sine
+        // comes out near 0.5), so "audible" alone would pass with no IR at all.
+        // Normalisation is what gives this IR away: JUCE scales it to
+        // 0.125/sqrt(energy), so the sine must come out at that gain times the
+        // IR's response at 1 kHz — about 0.06, an eighth of pass-through.
+        auto ir = makeIR(1.0f, 0.01f);
+        REQUIRE(isNormalisableIR(ir));
+
+        double energy = 0.0, re = 0.0, im = 0.0;
+        const double w = 2.0 * juce::MathConstants<double>::pi * 1000.0 / 48000.0;
+        for (int i = 0; i < ir.getNumSamples(); ++i)
+        {
+            const double h = ir.getSample(0, i);
+            energy += h * h;
+            re += h * std::cos(w * i);
+            im -= h * std::sin(w * i);
+        }
+        const float expected = static_cast<float>(
+            0.5 * (0.125 / std::sqrt(energy)) * std::sqrt(re * re + im * im));
+        REQUIRE(expected < 0.1f);   // far from pass-through's ~0.5
+
         CabinetSim cab;
         cab.prepare(48000.0, 512, 1);
-        auto ir = makeIR(0.01f);
-        REQUIRE(isNormalisableIR(ir));
         cab.loadIRFromBuffer(std::move(ir), 48000.0);
-        REQUIRE(settledOutputIsAudible(cab));
+        REQUIRE_THAT(settledPeak(cab), Catch::Matchers::WithinRel(expected, 0.05f));
     }
 
     SECTION("finite samples whose float sum of squares overflows play silence")
     {
         CabinetSim cab;
         cab.prepare(48000.0, 512, 1);
-        auto ir = makeIR(1.0e18f);   // each square 1e36 is finite; the sum is not
+        auto ir = makeIR(1.0f, 1.0e18f);   // each square 1e36 is finite; the sum is not
         REQUIRE_FALSE(isNormalisableIR(ir));
         cab.loadIRFromBuffer(std::move(ir), 48000.0);
         REQUIRE(cab.useIR.load());   // IR mode is on...
         REQUIRE_FALSE(settledOutputIsAudible(cab));   // ...and dead
+    }
+
+    SECTION("an IR wholly below the -80 dBFS trim threshold plays silence")
+    {
+        CabinetSim cab;
+        cab.prepare(48000.0, 512, 1);
+        const float below = 0.5f * IR_TRIM_THRESHOLD;
+        auto ir = makeIR(below, below);   // normalisation alone would have raised it
+        REQUIRE_FALSE(isNormalisableIR(ir));
+        cab.loadIRFromBuffer(std::move(ir), 48000.0);
+        REQUIRE(cab.useIR.load());
+        REQUIRE_FALSE(settledOutputIsAudible(cab));
     }
 }
 

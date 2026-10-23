@@ -71,27 +71,45 @@ inline constexpr int MAX_USER_IR_SAMPLES = 8192;
 inline constexpr float MAX_IR_CHANNEL_ENERGY =
     std::numeric_limits<float>::max() / 1048576.0f;
 
-// True when juce::dsp::Convolution can normalise this IR (Normalise::yes).
-// Its normaliseImpulseResponse() (juce_Convolution.cpp) takes the largest
-// per-channel FLOAT sum of squares and scales by 0.125/sqrt(sum). A NaN/Inf
-// sample (review S4), or finite samples large enough that the sum overflows
-// to Inf, turn that gain into 0 or NaN and silence IR mode. So the energy is
-// accumulated here exactly as JUCE does it — in float, sample by sample — and
-// a NaN/Inf sample needs no separate test: it carries the sum to NaN/Inf,
-// which fails the comparison. Each user-IR entry point (file load, state
-// restore) rejects a failing IR outright rather than altering it.
+// JUCE's Convolution (Trim::yes) cuts an IR down to the span between its
+// first and last sample with |x| >= this, taken over every channel, BEFORE it
+// normalises. The threshold is ABSOLUTE (-80 dBFS, not relative to the IR's
+// peak): trimImpulseResponse() in juce_Convolution.cpp compares against
+// Decibels::decibelsToGain(-80.0f), and an IR with no such sample in any
+// channel comes out as one zero sample — IR mode plays silence. Computed the
+// same way here so the two thresholds are the same float.
+inline const float IR_TRIM_THRESHOLD = juce::Decibels::decibelsToGain(-80.0f);
+
+// True when juce::dsp::Convolution can trim and normalise this IR into
+// something audible (Trim::yes, Normalise::yes). Two ways it can't:
+//  - Trimmed to nothing: no sample in any channel reaches IR_TRIM_THRESHOLD
+//    (an all-zero IR, or one wholly below -80 dBFS).
+//  - Normalised into garbage: normaliseImpulseResponse() takes the largest
+//    per-channel FLOAT sum of squares and scales by 0.125/sqrt(sum). Finite
+//    samples whose sum overflows to Inf turn that gain into 0 — silence. A
+//    NaN/Inf sample (review S4) poisons the output itself: JUCE's jmax drops
+//    a NaN channel sum, so the gain stays finite, but NaN × gain is NaN (and
+//    an Inf sample's channel sum drives the gain to 0, and Inf × 0 is NaN).
+// The energy is accumulated here exactly as JUCE does it — in float, sample by
+// sample — and a NaN/Inf sample needs no separate test: it carries the sum to
+// NaN/Inf, which fails the comparison. Each user-IR entry point (file load,
+// state restore) rejects a failing IR outright rather than altering it.
 inline bool isNormalisableIR(const juce::AudioBuffer<float>& buffer)
 {
+    bool survivesTrim = false;
     for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
     {
         const float* data = buffer.getReadPointer(ch);
         float energy = 0.0f;
         for (int i = 0; i < buffer.getNumSamples(); ++i)
+        {
             energy += data[i] * data[i];
+            survivesTrim = survivesTrim || std::abs(data[i]) >= IR_TRIM_THRESHOLD;
+        }
         if (!(energy <= MAX_IR_CHANNEL_ENERGY))  // also false for NaN
             return false;
     }
-    return true;
+    return survivesTrim;
 }
 
 struct CabinetSim
