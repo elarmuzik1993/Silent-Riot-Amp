@@ -37,8 +37,7 @@ _Updated 2026-10-23_
    check `fix/effects-toggle-rendering-use-60`); adopt the kit's *Rules* in AGENTS.md?
 
 ## Decisions
-- DSP spec v2.13 is background, not authoritative; code, CLAUDE.md and handoff docs win.
-  `COMPETITIVE_ROADMAP.md` is the live plan.
+- DSP spec v2.13 is background only; code, CLAUDE.md, handoffs win. `COMPETITIVE_ROADMAP.md` is live.
 - Fix order: tone-neutral fixes first, tone-changing ones together, so the amp is re-calibrated
   once. B1 seeds the solved idle point, not hard-coded values, so B2/Task 2 can't break it
   (B2 must update the pinned idle numbers in `idle_operating_point_tests.cpp`).
