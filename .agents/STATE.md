@@ -35,6 +35,8 @@ _Updated 2026-10-14_
 - `bootstrap.sh` omits `libwebkit2gtk-4.1-dev` (in CI's list): `JUCE_WEB_BROWSER=0`, and the full
   verify builds and passes without it.
 - sr_render is not built by CI or verify (`-DSR_BUILD_TOOLS=ON`); build it when touching tools/.
+- DSP spec v2.13 is background only, not authoritative (2026-10-23): code, CLAUDE.md and handoff
+  docs win. It carries a status banner listing the superseded designs; it is not kept in sync.
 
 ## Known issues
 - E3 = −37.9 dBc (gate ≤ −85, MUST-PASS), reproduced with `sr_render` at P-CRANK, 44.1k, 4× OS.

@@ -7,7 +7,8 @@
 volume → EL84 pair → PSU and sag → OT) without breaking the USE-59 calibration more than the
 fixes themselves require.
 
-**Review findings, after checking each one against spec v2.13:**
+**Review findings.** Each one was checked against spec v2.13 for *intent*. The spec is background
+only (see its status banner), so it explains why a behaviour exists, never what the code must do:
 
 | # | Finding | Verdict | Task |
 |---|---|---|---|
@@ -56,8 +57,6 @@ Every later task is judged against these numbers, so record them before touching
 
 - [ ] Replace the −0.9 / −0.96 / 1.067 example with the real values: bias −0.032 (15W) /
       −0.023 (7W), `biasFactor` = −9.6/−7.0 ≈ 1.37, `overlapWidth` = 5 V × `biasFactor`.
-- [ ] The spec has the same stale numbers in §3.8 and "MISTAKE 7" (line ~3484). Fix them there
-      too, or add a note that the code values win.
 - [ ] Verify: build passes and output is bit-identical (comments only).
 
 ## Task 2: Feed the PSU and sag the current that actually flows
@@ -190,4 +189,5 @@ checklist. **Owner chooses one:**
       handoff doc.
 - [ ] Task 5 decided and, if (b) or (c), built and calibrated.
 - [ ] No gate that passed at Task 0 fails at the end, unless the owner signs off on the change.
-- [ ] CLAUDE.md, the spec and `.agents/STATE.md` match the code.
+- [ ] CLAUDE.md and `.agents/STATE.md` match the code. The spec is not updated (it is background
+      only), unless a superseded design is added to its status banner.
