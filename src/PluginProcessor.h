@@ -46,6 +46,7 @@ public:
 
     void prepareToPlay(double sampleRate, int samplesPerBlock) override;
     void releaseResources() override;
+    void reset() override;   // host stop / reset: clear the effect tails (review B6)
     bool isBusesLayoutSupported(const BusesLayout& layouts) const override;
     using juce::AudioProcessor::processBlock;
     void processBlock(juce::AudioBuffer<float>&, juce::MidiBuffer&) override;
@@ -177,6 +178,11 @@ private:
     float outputGainCompensation = sr::OUTPUT_MAKEUP_GAIN;  // scales cab output into tanh soft-clip range
     bool  psuFrozen    = false;
     bool  widenerWasActive = false;   // edge-detect widener on/off for tail clear
+    bool  delayWasOn  = false;        // edge-detect delay/reverb off→on for restart() (review B6)
+    bool  reverbWasOn = false;
+    // Set by reset() and by the power-off / tuner-mute return; the next audible
+    // block clears every effect tail on the audio thread (review B6).
+    std::atomic<bool> tailsStale { false };
     double baseSampleRate = 44100.0;
     std::atomic<int> cachedIRIndex { 0 };   // last IR index seen by audio thread (written msg+audio)
     std::atomic<int> pendingIRIndex { -1 }; // deferred IR load (message thread)

@@ -26,6 +26,14 @@ void Reverb::reset()
     coreR.reset();
 }
 
+void Reverb::restart()
+{
+    reset();
+    const float mixTarget = mixSm.getTargetValue();
+    mixSm.setCurrentAndTargetValue(0.0f);
+    mixSm.setTargetValue(mixTarget);
+}
+
 void Reverb::setParameters(float mix, float size, float tone)
 {
     mix  = juce::jlimit(0.0f, 1.0f, mix);

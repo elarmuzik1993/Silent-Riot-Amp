@@ -4,6 +4,8 @@
 //   - Delay mix=0 is bit-exact dry (incl. with tone + feedback engaged)
 //   - Delay produces a delayed tap; feedback decays
 //   - Delay TONE darkens the repeats; modulation stays finite at max feedback
+//   - Delay loop gain is FEEDBACK: repeats decay even at DELAY_MAX_FEEDBACK (B8)
+//   - Delay/Reverb restart() drop the tail frozen while off, ramp mix in (B6)
 //   - Reverb mix=0 is bit-exact dry
 //   - Reverb mix>0 adds energy / a decaying tail
 // ═══════════════════════════════════════════════════════════════
@@ -290,4 +292,192 @@ TEST_CASE("Reverb mix>0 adds a decaying tail", "[reverb]")
     float tail = buf.getMagnitude(0, static_cast<int>(0.05 * kSR), static_cast<int>(0.3 * kSR));
     REQUIRE(tail > 1e-4f);
     REQUIRE(r.tailSeconds() > 0.0f);
+}
+
+// ── Review B8: the feedback loop's small-signal gain is the FEEDBACK value ──
+// The saturator used to be tanh(k·x)/tanh(k), whose slope at low level is
+// k/tanh(k) ≈ 1.9, so the loop ran at feedback × 1.9 and self-oscillated above
+// feedback ≈ 0.53 — the top ~45 % of the knob.
+
+namespace {
+// Runs `seconds` of audio through `d` in host-sized blocks, input from `fill`
+// (sample index → value, channel 0 and 1 alike), and returns the peak of
+// channel `ch` over [fromSec, toSec).
+template <typename Fill>
+float runAndPeak(Delay& d, int channels, double seconds, double fromSec, double toSec,
+                 Fill&& fill, int ch = 0)
+{
+    const int total = static_cast<int>(seconds * kSR);
+    const int from  = static_cast<int>(fromSec * kSR);
+    const int to    = static_cast<int>(toSec * kSR);
+    float peak = 0.0f;
+    auto buf = makeBuffer(channels, kBlock);
+    for (int start = 0; start < total; start += kBlock)
+    {
+        const int n = std::min(kBlock, total - start);
+        buf.setSize(channels, n, false, false, true);
+        for (int c = 0; c < channels; ++c)
+            for (int i = 0; i < n; ++i)
+                buf.setSample(c, i, fill(start + i));
+        d.process(buf);
+        for (int i = 0; i < n; ++i)
+            if (start + i >= from && start + i < to)
+                peak = std::max(peak, std::abs(buf.getSample(ch, i)));
+    }
+    return peak;
+}
+
+// 10 ms burst of a 0.1-amplitude 1 kHz sine, then silence.
+float burst(int i)
+{
+    return i < static_cast<int>(0.01 * kSR)
+        ? 0.1f * std::sin(2.0f * PI_F * 1000.0f * static_cast<float>(i) / static_cast<float>(kSR))
+        : 0.0f;
+}
+} // namespace
+
+TEST_CASE("Delay repeats decay to silence at DELAY_MAX_FEEDBACK (review B8)", "[delay]")
+{
+    Delay d;
+    d.prepare(kSR, kBlock, 1);
+    d.setParameters(100.0f, DELAY_MAX_FEEDBACK, 1.0f, 1.0f);   // bright: least loop loss
+
+    // Old code: the repeats grew to and held at ~1.0 full scale.
+    const float late = runAndPeak(d, 1, 30.0, 29.0, 30.0, burst);
+    REQUIRE(std::isfinite(late));
+    REQUIRE(late < 1e-4f);   // the burst was 0.1: at least -60 dB below it
+}
+
+TEST_CASE("Delay ping-pong repeats decay to silence at DELAY_MAX_FEEDBACK (review B8)", "[delay]")
+{
+    Delay d;
+    d.prepare(kSR, kBlock, 2);
+    d.setParameters(100.0f, DELAY_MAX_FEEDBACK, 1.0f, 1.0f, true);
+
+    const float lateL = runAndPeak(d, 2, 30.0, 29.0, 30.0, burst, 0);
+    d.prepare(kSR, kBlock, 2);
+    d.setParameters(100.0f, DELAY_MAX_FEEDBACK, 1.0f, 1.0f, true);
+    const float lateR = runAndPeak(d, 2, 30.0, 29.0, 30.0, burst, 1);
+    REQUIRE(lateL < 1e-4f);
+    REQUIRE(lateR < 1e-4f);
+}
+
+TEST_CASE("A freshly reset delay at DELAY_MAX_FEEDBACK stays silent on silence (review B8)", "[delay]")
+{
+    // The loop filters inject ANTI_DENORMAL; with loop gain > 1 that floor grew
+    // into a full-scale self-oscillation with nothing played.
+    Delay d;
+    d.prepare(kSR, kBlock, 1);
+    d.setParameters(100.0f, DELAY_MAX_FEEDBACK, 1.0f, 1.0f);
+    const float peak = runAndPeak(d, 1, 30.0, 0.0, 30.0, [](int) { return 0.0f; });
+    REQUIRE(peak < 1e-9f);
+}
+
+TEST_CASE("Delay repeat-to-repeat level is the FEEDBACK value at low level (review B8)", "[delay]")
+{
+    // Default FEEDBACK (0.35): each repeat sits at ~0.35 of the one before
+    // (-9.1 dB), not 0.35 × 1.9 = 0.67 (-3.5 dB) as before the fix.
+    Delay d;
+    d.prepare(kSR, kBlock, 1);
+    const float timeMs = 200.0f;
+    d.setParameters(timeMs, 0.35f, 1.0f, 1.0f);
+    runAndPeak(d, 1, 0.2, 0.0, 0.2, [](int) { return 0.0f; });   // settle the smoothers
+
+    const double t = timeMs * 0.001;
+    // Repeats k = 1, 2, 3 land at k·T after the burst; read each in a window.
+    const int total = static_cast<int>(4.0 * t * kSR);
+    auto buf = makeBuffer(1, total);
+    for (int i = 0; i < total; ++i) buf.setSample(0, i, burst(i));
+    d.process(buf);
+    auto repeatPeak = [&](int k)
+    {
+        const int lo = static_cast<int>((k * t - 0.02) * kSR);
+        return buf.getMagnitude(0, lo, static_cast<int>(0.05 * kSR));
+    };
+    const float r1 = repeatPeak(1), r2 = repeatPeak(2), r3 = repeatPeak(3);
+    REQUIRE(r1 > 0.05f);   // first repeat unchanged by the fix (still ~0.19 for a 0.1 burst)
+    REQUIRE(r2 / r1 == Catch::Approx(0.35f).margin(0.03f));
+    REQUIRE(r3 / r2 == Catch::Approx(0.35f).margin(0.03f));
+}
+
+// ── Review B6: re-enabling an effect must not replay the tail it froze with ──
+// While an effect is off the processor stops calling process(), so its state
+// is whatever it held when it stopped. The processor calls restart() on the
+// off→on edge (and after power-off, tuner mute or a host reset).
+
+TEST_CASE("Delay restart() drops the frozen tail and ramps the wet in (review B6)", "[delay]")
+{
+    Delay d;
+    d.prepare(kSR, kBlock, 2);
+    d.setParameters(1000.0f, 0.35f, 0.5f, 0.5f);
+    // Fill the line, then "switch off" (stop calling process) right after.
+    runAndPeak(d, 2, 1.5, 0.0, 1.5, [](int i) {
+        return 0.5f * std::sin(2.0f * PI_F * 220.0f * static_cast<float>(i) / static_cast<float>(kSR));
+    });
+
+    d.setParameters(1000.0f, 0.35f, 0.5f, 0.5f);
+    d.restart();
+
+    // Re-enabled on silence: without restart() this replays the old repeats
+    // at ~-20 dBFS for seconds.
+    const float replay = runAndPeak(d, 2, 3.0, 0.0, 3.0, [](int) { return 0.0f; });
+    REQUIRE(replay < 1e-9f);
+}
+
+TEST_CASE("Delay restart() starts fully dry and snaps TIME (review B6)", "[delay]")
+{
+    Delay d;
+    d.prepare(kSR, kBlock, 1);
+    d.setParameters(50.0f, 0.0f, 1.0f, 1.0f);
+    runAndPeak(d, 1, 0.2, 0.0, 0.2, [](int) { return 0.0f; });
+
+    // TIME moved while off: 50 → 400 ms.
+    const float timeMs = 400.0f;
+    d.setParameters(timeMs, 0.0f, 1.0f, 1.0f);
+    d.restart();
+
+    const int n = static_cast<int>(0.6 * kSR);
+    auto buf = makeBuffer(1, n);
+    buf.setSample(0, 0, 1.0f);
+    d.process(buf);
+
+    // MIX ramps in from 0, so the first sample is (almost exactly) the dry input,
+    // not the fully-wet mix's silence.
+    REQUIRE(buf.getSample(0, 0) == Catch::Approx(1.0f).margin(1e-3f));
+    // The tap is at 400 ms from the first sample — no 50 ms glide from 50 ms
+    // that would smear the impulse across the early part of the buffer.
+    const int expected = static_cast<int>(timeMs * 0.001 * kSR);
+    const float atTap = buf.getMagnitude(0, expected - 200, 400);
+    const float early = buf.getMagnitude(0, 1, expected - 200 - 1);
+    REQUIRE(atTap > 0.2f);
+    REQUIRE(early < 1e-6f);
+}
+
+TEST_CASE("Reverb restart() drops the frozen tail and ramps the wet in (review B6)", "[reverb]")
+{
+    Reverb r;
+    r.prepare(kSR, kBlock, 2);
+    r.setParameters(0.5f, 1.0f, 0.5f);
+    auto buf = makeBuffer(2, static_cast<int>(0.5 * kSR));
+    for (int i = 0; i < buf.getNumSamples(); ++i)
+    {
+        const float v = 0.5f * std::sin(2.0f * PI_F * 220.0f * static_cast<float>(i) / static_cast<float>(kSR));
+        buf.setSample(0, i, v);
+        buf.setSample(1, i, v);
+    }
+    r.process(buf);
+
+    r.setParameters(0.5f, 1.0f, 0.5f);
+    r.restart();
+
+    auto quiet = makeBuffer(2, static_cast<int>(1.0 * kSR));
+    r.process(quiet);
+    REQUIRE(maxAbs(quiet, 0) < 1e-9f);
+    REQUIRE(maxAbs(quiet, 1) < 1e-9f);
+
+    // And the first sample after restart is the dry signal, not a -3 dB step.
+    r.restart();
+    auto step = makeBuffer(2, 1, 1.0f);
+    r.process(step);
+    REQUIRE(step.getSample(0, 0) == Catch::Approx(1.0f).margin(1e-3f));
 }

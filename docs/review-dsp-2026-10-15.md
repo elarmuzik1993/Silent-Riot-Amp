@@ -1,7 +1,7 @@
 # DSP code review — 2026-10-15
 
 **Status:** open; it is the work list for the fixes. Fixed so far: **B5, B4**
-(branch `fix/oversample-prepare-latency`), **B1, S1** (branch `fix/startup-burst`), **B7** (branch `fix/grid-charge-rate`). Line references are against `main` at
+(branch `fix/oversample-prepare-latency`), **B1, S1** (branch `fix/startup-burst`), **B7** (branch `fix/grid-charge-rate`), **B6, B8** (branch `fix/effects-stale-tails`). Line references are against `main` at
 `b8e20a9`.
 
 **Scope:** `src/dsp/**`, `src/utils/**`, and the signal chain in
@@ -302,7 +302,7 @@ host).
 (clamped to 0..2) and reset the transition state before
 `recalcRateDependentCoeffs()`.
 
-### B6 — Delay, reverb and IR freeze while off and replay stale audio when re-enabled
+### B6 — Delay, reverb and IR freeze while off and replay stale audio when re-enabled — *fixed*
 
 **Where:** `src/PluginProcessor.cpp:687-713` (delay/reverb), `:655-657` (IR
 convolution, skipped whenever `irMode` is false), `:397` (power-off / tuner-mute
@@ -381,7 +381,7 @@ to the decay in `recalcGridChargeDecay` — `GRID_CHARGE_RATE · 176400 /
 effectiveSR` keeps the current calibration. Add a test that the settled bias
 shift is the same at 2×/4×/8× and 44.1/96 kHz.
 
-### B8 — The delay self-oscillates above feedback ≈ 0.53
+### B8 — The delay self-oscillates above feedback ≈ 0.53 — *fixed*
 
 **Where:** `src/dsp/effects/Delay.cpp:81-82`, `:141`; the comments at
 `src/utils/Constants.h:335` and `:347-349`.

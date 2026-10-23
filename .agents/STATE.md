@@ -4,7 +4,7 @@ _Updated 2026-10-23_
 
 ## Now
 - Silent Riot v0.3.4 (JUCE 7 VST3/Standalone). `bash scripts/verify.sh` passes: static checks +
-  Release build + 328/328 ctest. Cloud sessions provision via `.agents/bootstrap.sh`.
+  Release build + 335/335 ctest. Cloud sessions provision via `.agents/bootstrap.sh`.
 - Two work lists, **one combined order below**:
   - DSP review `docs/review-dsp-2026-10-15.md`: B1–B8 blocking, S1–S8 suggestions, measured and
     re-checked. Line refs against `b8e20a9`. **B5 + B4 fixed**: saved OVERSAMPLE mode applied at
@@ -12,9 +12,10 @@ _Updated 2026-10-23_
     **B1 + S1 fixed**: prepare seeds the solved idle point (`dsp/IdleOperatingPoint.h`), silence
     is silent from sample 1 (was up to −5 dBFS); amp knobs sanitized, smoothers seeded.
     **B7 fixed**: grid-charge increment × `GRID_CHARGE_REF_SR`/effectiveSR (176.4k bit-exact).
-  - Power-section plan `docs/superpowers/plans/2026-10-23-power-section-fixes.md`, Tasks 0–5.
-    Written without the review; its *Coordination with the DSP review* section maps the overlap.
-    Tasks 0–1 done: baseline in `docs/handoff-power-section-fixes.md` (+ `-probe.cpp`).
+    **B6 + B8 fixed**: effects restart clean on off→on, unmute and host `reset()`; delay loop gain =
+    FEEDBACK, never self-oscillates (owner); at 0.35 each repeat is −9.0 dB on the last (was −3.4).
+  - Power-section plan `docs/superpowers/plans/2026-10-23-power-section-fixes.md`, Tasks 0–5 (its
+    *Coordination…* section maps the overlap). Tasks 0–1 done: `docs/handoff-power-section-fixes.md`.
 
 ## Next (combined order; one PR per step, each with a test)
 1. Owner: GitHub Actions is down (every run since 2026-10-09 fails in ~3–5 s, no logs). Check
@@ -23,17 +24,16 @@ _Updated 2026-10-23_
    plate knee never approached, B+ moves 0.1 V, even with every knob on 10) because
    `VOLUME_KNOB_HEADROOM` = 0.21 keeps their grids small. Yes → re-balance headroom vs. grid clamp
    before plan Tasks 3–4; no → descope Tasks 3–4 to cleanup, Task 2 reduces to B2.
-3. Phase 1, settled tone unchanged at 44.1k/4×: B6 + B8 (owner: delay self-oscillation?).
-4. Phase 2, changes the tone, then ONE re-calibration and an owner listening check:
+3. Phase 2, changes the tone, then ONE re-calibration and an owner listening check:
    Plan Task 2 **with** B2 (one idle fixed-point solve, shared with B1; replace the tautological
    idle test with one running the real PSU loop), B3, Tasks 3–4 per item 2 (Task 4 with S8:
    bracketed solves), Task 5 (owner: 7W option). Then re-tune D1/A1/B1 and P-* once.
-5. E3 last (owner: confirm "repoint the gate, then fix the engine"). Step 1: give `alias_crank`
+4. E3 last (owner: confirm "repoint the gate, then fix the engine"). Step 1: give `alias_crank`
    (`tools/signoff_gates.json`) a real bright IR (today a skipped placeholder, so E3 runs the IIR
    path). Step 2 alongside S8: harmonic fall-off per nonlinearity (`TriodeWaveshaper.cpp:28`,
    `GridConduction.cpp:39`, `OTSaturation.h:43`; Task 4 adds a plate knee).
-6. Phase 3, batched: S2 + S4, S3 + S6, S5 + S7 (owner: raise S7's 1000 ms limit or show clamp?).
-7. Owner: delete stale remote branches (keep `main`, `claude/neural-learning-path-slider-kt8dy7`,
+5. Phase 3, batched: S2 + S4, S3 + S6, S5 + S7 (owner: raise S7's 1000 ms limit or show clamp?).
+6. Owner: delete stale remote branches (keep `main`, `claude/neural-learning-path-slider-kt8dy7`,
    check `fix/effects-toggle-rendering-use-60`); adopt the kit's *Rules* in AGENTS.md?
 
 ## Decisions

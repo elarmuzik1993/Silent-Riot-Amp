@@ -24,6 +24,12 @@ public:
     void prepare(double sampleRate, int samplesPerBlock, int numChannels);
     void reset();
 
+    // Off→on edge (call after setParameters): reset(), snap TIME and FEEDBACK to
+    // their targets so a change made while off doesn't glide, and ramp MIX in
+    // from 0. While off, process() isn't called, so the line still holds the
+    // audio it had when it stopped and would replay it (review B6).
+    void restart();
+
     // Per-block parameter update (called before processBlock).
     // timeMs / feedback / mix / tone are the raw parameter values.
     // tone is 0..1 (0 = dark/tape, 1 = bright/digital) → feedback high-cut.

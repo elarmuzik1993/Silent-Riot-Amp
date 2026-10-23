@@ -51,6 +51,16 @@ void Delay::reset()
     flutterPhase = 0.0f;
 }
 
+void Delay::restart()
+{
+    reset();
+    delaySamples.setCurrentAndTargetValue(delaySamples.getTargetValue());
+    feedbackSm.setCurrentAndTargetValue(feedbackSm.getTargetValue());
+    const float mixTarget = mixSm.getTargetValue();
+    mixSm.setCurrentAndTargetValue(0.0f);
+    mixSm.setTargetValue(mixTarget);
+}
+
 void Delay::setParameters(float timeMs, float feedback, float mix, float tone, bool pingPong)
 {
     currentTimeMs   = juce::jlimit(DELAY_TIME_MIN_MS, DELAY_TIME_MAX_MS, timeMs);
@@ -77,16 +87,23 @@ void Delay::process(juce::AudioBuffer<float>& buffer)
     // and still bit-exact dry at mix=0 (cos(0)=1, sin(0)=0). Matches Reverb.cpp.
     constexpr float kHalfPi = 1.57079632679f;
 
-    // Feedback-loop saturation — unity gain at low level, soft-knee above.
-    const float satK    = DELAY_FB_SAT_DRIVE;
-    const float satNorm = 1.0f / std::tanh(satK);
+    // Feedback-loop saturation. satNorm makes the curve unity at full scale, so
+    // at low level a repeat plays back at k/tanh(k) ≈ 1.9× (+5.6 dB); that is the
+    // heard wet level and stays. What recirculates is scaled back by loopNorm =
+    // tanh(k)/k, so the loop's small-signal gain is exactly the FEEDBACK value and
+    // only falls as the tanh compresses: repeats always decay, even at
+    // DELAY_MAX_FEEDBACK. Without it the loop ran at feedback × 1.9 and
+    // self-oscillated above feedback ≈ 0.53 (review B8).
+    const float satK     = DELAY_FB_SAT_DRIVE;
+    const float satNorm  = 1.0f / std::tanh(satK);
+    const float loopNorm = std::tanh(satK) / satK;
 
     const bool doPingPong = pingPongOn && numCh >= 2;
 
     for (int n = 0; n < numSamples; ++n)
     {
         const float base = delaySamples.getNextValue();
-        const float fb   = feedbackSm.getNextValue();
+        const float fb   = feedbackSm.getNextValue() * loopNorm;
         const float mx   = mixSm.getNextValue();
         const float dryG = std::cos(mx * kHalfPi);
         const float wetG = std::sin(mx * kHalfPi);

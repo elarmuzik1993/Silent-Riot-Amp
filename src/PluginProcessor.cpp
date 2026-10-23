@@ -219,6 +219,10 @@ void SilentRiotProcessor::resetDSPState()
     reverb.reset();
     stereoWidth.reset();
     widenerWasActive = false;
+    delayWasOn  = false;
+    reverbWasOn = false;
+    tailsStale  = false;
+    lastIrMode  = false;
 
     lastShapeCoeffVal = -1.0f;   // force shape coeff recompute on first sample
     psuFrozen = false;
@@ -370,6 +374,16 @@ void SilentRiotProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 
 void SilentRiotProcessor::releaseResources() {}
 
+void SilentRiotProcessor::reset()
+{
+    // Host stop / transport reset (VST3 setProcessing(false)): the delay, reverb,
+    // IR convolution and widener tails would otherwise play on into the next
+    // start. Only flags it — the next processBlock clears them on the audio
+    // thread, so this is safe from any thread. The amp stays on its operating
+    // point: zeroing its filters here would replay the startup burst (B1).
+    tailsStale = true;
+}
+
 bool SilentRiotProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const {
     auto mainIn  = layouts.getMainInputChannelSet();
     auto mainOut = layouts.getMainOutputChannelSet();
@@ -434,7 +448,19 @@ void SilentRiotProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
 
     // Master power off, or tuner mute engaged — silence output. Capture above
     // still ran, so the tuner keeps tracking pitch while the amp is silent.
-    if (!powerOn || tunerMute) { buffer.clear(); return; }
+    // The effects below stop running here and freeze holding their tails, so
+    // flag them to start clean when the amp comes back (review B6).
+    if (!powerOn || tunerMute) { buffer.clear(); tailsStale = true; return; }
+
+    // Leaving power-off / tuner mute, or after a host reset(): drop every frozen
+    // effect tail. Clearing the was-on flags sends delay, reverb and widener
+    // through their off→on restart below; lastIrMode = false does the same for
+    // the IR convolution; the IIR path's alignment delay is cleared here.
+    if (tailsStale.exchange(false))
+    {
+        delayWasOn = reverbWasOn = widenerWasActive = lastIrMode = false;
+        iirPathAlign.reset();
+    }
 
     // Keep the sag reference locked to what the tube model actually idles at for
     // this bias. 7W runs a hotter bias → higher idle current → different
@@ -691,6 +717,17 @@ void SilentRiotProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     // ── IR Convolution path (runs at base SR, after downsample) ──
     if (irMode)
     {
+        // IR path (re)activated — cab switched back on, an IR selected after
+        // IIR, or leaving mute/reset. The convolution and its limiter
+        // oversampler were skipped meanwhile and still hold the old tail, so
+        // clear them rather than replay it (review B6). Both resets are
+        // allocation-free; the IR engine itself is still only changed on the
+        // message thread.
+        if (!lastIrMode)
+        {
+            cabSim.reset();
+            limiterOversampler->reset();
+        }
         cabSim.processBlock(outputBlock);
 
         // Apply output scaling + tanh limiter oversampled (4x) so the
@@ -729,7 +766,9 @@ void SilentRiotProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
 
     // ── Post-cab effects (delay → reverb) at base SR, after the amp/cab ──
     // Operate per channel: a stereo bus picks up reverb/delay width; mono
-    // stays mono. Skipped entirely (bit-exact dry) when toggled off.
+    // stays mono. Skipped entirely (bit-exact dry) when toggled off. On each
+    // off→on edge restart() clears the tail the effect froze with while skipped,
+    // snaps its smoothers and ramps its mix in from 0 (review B6).
     if (delayOn)
     {
         float delayMs;
@@ -750,13 +789,17 @@ void SilentRiotProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
             delayMs = computeSyncMs(delaySync, bpm);
         }
         delay.setParameters(delayMs, delayFb, delayMix, delayTone, delayPP);
+        if (!delayWasOn) delay.restart();
         delay.process(buffer);
     }
+    delayWasOn = delayOn;
     if (reverbOn)
     {
         reverb.setParameters(reverbMix, reverbSz, reverbTn);
+        if (!reverbWasOn) reverb.restart();
         reverb.process(buffer);
     }
+    reverbWasOn = reverbOn;
 
     // ── MONO/STEREO widener (stereo bus only) ──
     // Skipped entirely (bit-exact dry) while the knob sits parked at 0 and the

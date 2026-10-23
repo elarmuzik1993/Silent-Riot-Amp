@@ -338,7 +338,7 @@ constexpr float SAFETY_LIMIT_THRESH = 0.9f;
 // Delay (post-cab)
 constexpr float DELAY_TIME_MIN_MS   = 20.0f;
 constexpr float DELAY_TIME_MAX_MS   = 1000.0f;
-constexpr float DELAY_MAX_FEEDBACK  = 0.95f;    // clamp to keep it from self-oscillating
+constexpr float DELAY_MAX_FEEDBACK  = 0.95f;    // longest repeats; the loop's small-signal gain (see below)
 // Analog/tape voicing — feedback-path tone shaping + wow/flutter modulation.
 // The high-cut sits IN the feedback loop, so each repeat is darkened again →
 // echoes fade toward the dark, like a tape/analog echo. TONE convention
@@ -352,7 +352,10 @@ constexpr float DELAY_FLUTTER_RATE_HZ  = 6.5f;  // faster, subtler flutter LFO r
 constexpr float DELAY_FLUTTER_DEPTH_MS = 0.06f; // ± tap sway (adds high-frequency "buzz" wobble)
 // Feedback-loop saturation — soft-clips the tone-shaped repeat before it's
 // heard and fed back (models what a tape head/BBD chip actually plays back).
-// Unity gain at low level; tanh(x*k)/tanh(k) keeps it transparent until hot.
+// tanh(x*k)/tanh(k) is unity at full scale, so at low level it has a gain of
+// k/tanh(k) ≈ 1.9: the heard repeat keeps that, the recirculated copy is
+// scaled by tanh(k)/k so the loop gain is FEEDBACK itself, never above
+// DELAY_MAX_FEEDBACK — the delay cannot self-oscillate (review B8).
 constexpr float DELAY_FB_SAT_DRIVE  = 1.8f;
 
 // Reverb (post-cab) — spring tank: dispersive all-pass chain in a damped

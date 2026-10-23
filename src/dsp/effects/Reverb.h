@@ -16,6 +16,10 @@ public:
     void prepare(double sampleRate, int samplesPerBlock, int numChannels);
     void reset();
 
+    // Off→on edge (call after setParameters): reset() the tanks and ramp MIX in
+    // from 0, so re-enabling doesn't replay the tail they froze with (review B6).
+    void restart();
+
     // mix / size / tone are the raw 0..1 parameter values.
     void setParameters(float mix, float size, float tone);
 
