@@ -45,13 +45,14 @@ _Updated 2026-10-23_
 - PSU's one-sample current lag is intended (spec §3.11); not a power-section defect.
 - Latency: exact integer report (Thiran-rounded, +2–4 samples vs. the old truncated 7/8/8) over a
   smaller but wrong one. Constant across cab modes; the IIR path is padded, not the report split.
-- `verify.sh` builds into `build-verify/` so it never clobbers `build/` from `scripts/build.sh`.
-- `bootstrap.sh` omits `libwebkit2gtk-4.1-dev` (`JUCE_WEB_BROWSER=0`; verify passes without it).
-- sr_render is not built by CI or verify (`-DSR_BUILD_TOOLS=ON`); build it when touching tools/.
+- `verify.sh` builds into `build-verify/` (never clobbers `build/`). `bootstrap.sh` omits
+  `libwebkit2gtk-4.1-dev` (`JUCE_WEB_BROWSER=0`). sr_render is not built by CI or verify.
 
 ## Known issues
-- `signoff.py` on `d2315b4`: A1 −31.6 LUFS (band −17.5…−14.5), B1 0.99% (floor 1.0%), E1
-  −70.4 dBFS (≤ −90), E3 −37.9 dBc (≤ −85, MUST-PASS); the other 8 pass. Valid only at 44.1k/4× (B7).
+- `signoff.py` after B1: A1 −31.6 LUFS (band −17.5…−14.5), B1 0.99% (floor 1.0%), E3 −37.9 dBc
+  (≤ −85, MUST-PASS) fail; the other 9 pass, E1 now −200 dBFS (was −70.4). Valid only at 44.1k/4× (B7).
+- Switching 15W ↔ 7W live still settles audibly (−44 dBFS at gain 10 in `sr_idle.py` via the 7W
+  wrapper, which flips the mode after prepare): the idle point moves. A prepare in 7W is silent.
 - E3 is engine aliasing (16th harmonic of 11 kHz folding at 176.4k); 8× OS only reaches −43.5.
 - Sag idles warm: +0.77 V (15W) / +1.03 V (7W), reference taken at nominal rails (B2), and never
   reaches the cold side: average plate current *falls* slightly under drive.
