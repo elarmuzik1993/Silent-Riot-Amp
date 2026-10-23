@@ -40,10 +40,12 @@ float applyGridConduction(float vGrid, GridConductionModel& model) {
 
     // Coupling cap charge (bias shift). Driven by what the source impedance has
     // to absorb — the same quantity the divider fed it, so GRID_CHARGE_RATE and
-    // MAX_BIAS_SHIFT_N keep their calibrated meaning.
+    // MAX_BIAS_SHIFT_N keep their calibrated meaning. chargeRate is
+    // GRID_CHARGE_RATE scaled to the running sample rate, so the charge per
+    // second — not per sample — is fixed.
     float gridCurrent = vGrid - vLoaded;
     model.lastGridCurrent = gridCurrent;
-    model.couplingCapCharge += gridCurrent * GRID_CHARGE_RATE;
+    model.couplingCapCharge += gridCurrent * model.chargeRate;
     float maxCharge = std::abs(MAX_BIAS_SHIFT_N);
     if (model.couplingCapCharge > maxCharge)
         model.couplingCapCharge = maxCharge;
@@ -61,6 +63,9 @@ GridConductionModel makeEL84Grid() { return { GRID_CONDUCT_THRESH_EL84_N, GRID_R
 
 void recalcGridChargeDecay(GridConductionModel& m, float tauSec, float effectiveSR) {
     m.chargeDecay = std::exp(-1.0f / (tauSec * effectiveSR));
+    // Ratio first: at the reference rate it is exactly 1.0f, so 44.1 kHz / 4×
+    // keeps GRID_CHARGE_RATE bit for bit.
+    m.chargeRate  = GRID_CHARGE_RATE * (GRID_CHARGE_REF_SR / effectiveSR);
 }
 
 } // namespace sr

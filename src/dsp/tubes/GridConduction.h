@@ -15,8 +15,11 @@ struct GridConductionModel {
     float couplingCapCharge = 0.0f;
     float chargeDecay       = 0.999f;
     float lastGridCurrent   = 0.0f;  // for GUI readout
+    // Per-sample charge increment; rate-scaled with the decay by
+    // recalcGridChargeDecay. The default is the GRID_CHARGE_REF_SR calibration.
+    float chargeRate        = GRID_CHARGE_RATE;
 
-    // Clear dynamic state (keeps configured resistances + charge decay)
+    // Clear dynamic state (keeps configured resistances + charge decay/rate)
     void reset() { couplingCapCharge = 0.0f; lastGridCurrent = 0.0f; }
 };
 
@@ -28,6 +31,8 @@ GridConductionModel makeV1bGrid();
 GridConductionModel makePIGrid();
 GridConductionModel makeEL84Grid();
 
+// Sets both rate-dependent terms: the charge decay (time constant tauSec) and
+// the charge increment (GRID_CHARGE_RATE scaled to effectiveSR).
 void recalcGridChargeDecay(GridConductionModel& m, float tauSec, float effectiveSR);
 
 } // namespace sr

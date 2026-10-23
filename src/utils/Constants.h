@@ -138,6 +138,12 @@ constexpr float GRID_R_EL84_N              = VS::r(19231.0f);        // ~19.2KΩ
 // reaching for the gain taper.
 constexpr float GRID_CLAMP_KNEE_N           = VS::v(6.0f);
 constexpr float GRID_CHARGE_RATE            = 0.003f;   // was 0.01 → caused PI grid charge saturation at gain≥5 (pumping)
+// GRID_CHARGE_RATE is a per-sample increment calibrated at this effective rate
+// (44.1 kHz × 4×, sr_render's and the sign-off's default). recalcGridChargeDecay
+// scales it by GRID_CHARGE_REF_SR / effectiveSR so the settled bias shift — and
+// with it the amp's level and blocking — is the same at every host rate and
+// oversampling factor (review B7). Without it 96 kHz / 8× was ~5.7 dB quieter.
+constexpr float GRID_CHARGE_REF_SR          = 176400.0f;
 constexpr float MAX_BIAS_SHIFT_N            = VS::v(-1.5f); // was -5V → excessive for 12AX7 (clips at ~-1.5V grid)
 // Coupling-cap charge-decay time constants (seconds) per stage
 constexpr float GRID_TAU_PREAMP_S           = 0.022f;  // V1a / V1b

@@ -1,7 +1,7 @@
 # DSP code review — 2026-10-15
 
 **Status:** open; it is the work list for the fixes. Fixed so far: **B5, B4**
-(branch `fix/oversample-prepare-latency`), **B1, S1** (branch `fix/startup-burst`). Line references are against `main` at
+(branch `fix/oversample-prepare-latency`), **B1, S1** (branch `fix/startup-burst`), **B7** (branch `fix/grid-charge-rate`). Line references are against `main` at
 `b8e20a9`.
 
 **Scope:** `src/dsp/**`, `src/utils/**`, and the signal chain in
@@ -342,7 +342,7 @@ tuner-mute), `reset()` it and ramp its mix from 0 — the `widenerWasActive`
 pattern — or keep processing it with the wet level ramped to 0 if tails should
 ring out. Override `AudioProcessor::reset()` to clear the tails.
 
-### B7 — Grid-conduction charge rate is per sample, so tone and level depend on the sample rate
+### B7 — Grid-conduction charge rate is per sample, so tone and level depend on the sample rate — *fixed*
 
 **Where:** `src/dsp/tubes/GridConduction.cpp:46`; the rate-aware decay at
 `:62-64`, called from `src/PluginProcessor.cpp:244-248`.
