@@ -28,15 +28,15 @@ way back to the built-in cab, panel doesn't refresh), the built-in cab's 400 Hz 
 decision on the IIR path, not the IR loader), positional `IR_INDEX` and the state-copy issue.
 They don't change what an IR sounds like. They need their own plan.
 
-## Owner decisions
+## Owner decisions (decided 2026-10-26)
 
-- **D1, level target (Task 2).** Recommended: match the built-in cab's level over 100 Hz–5 kHz,
-  so `OUTPUT_MAKEUP_GAIN`, the headroom calibration and A1/D1 mean the same thing in both modes.
-  The alternative is to play each IR at its recorded level plus a user IR-level trim. That needs
-  a new parameter and UI, and file levels are arbitrary (some are peak-normalised, some aren't),
-  so it isn't recommended.
-- **D2, IR length cap (Task 4).** Recommended: keep 8192 samples and only add a fade. A time-based
-  cap (e.g. 250 ms, so up to 48000 samples at 192 kHz) makes saved projects up to ~6× larger,
+- **D1, level target (Task 2): match the built-in cab's level over 100 Hz–5 kHz**, so
+  `OUTPUT_MAKEUP_GAIN`, the headroom calibration and A1/D1 mean the same thing in both modes.
+  Accepted consequence: existing projects that use an IR play ~10 dB louder after the update.
+  Rejected: playing each IR at its recorded level plus a user IR-level trim. That needs a new
+  parameter and UI, and file levels are arbitrary (some are peak-normalised, some aren't).
+- **D2, IR length cap (Task 4): keep 8192 samples and only add a fade.** Rejected: a time-based
+  cap (e.g. 250 ms, so up to 48000 samples at 192 kHz). It makes saved projects up to ~6× larger,
   because every user IR is stored inside the project. Older builds would also reject the longer
   IRs, and the loader stops at the first IR it rejects, so every IR after it is dropped too.
   Revisit with real IRs in roadmap Phase B.
@@ -125,7 +125,7 @@ it predicts the neutral fixture at −11.4 dB under JUCE's normalisation, a −1
 `src/dsp/cabinet/CabinetSim.cpp`, new `tests/ir_level_tests.cpp` (`SilentRiotTests`),
 `tests/cabinet_ir_tests.cpp`, `tests/CMakeLists.txt`
 
-- [ ] Confirm decision D1 with the owner (recommended default above).
+- [x] Decision D1 confirmed by the owner (2026-10-26): match the built-in cab.
 - [ ] Write pure tests first (`ir_level_tests.cpp`):
   - [ ] A unit impulse reads 0 dB ± 0.01, and impulse × 2 reads +6.02 dB.
   - [ ] The same analog band-pass, designed and sampled at 48 kHz and at 96 kHz, reads within
@@ -220,7 +220,7 @@ ripple. Low impact at ≤ 96 kHz, but it costs a few lines.
 **Files:** `src/dsp/cabinet/UserIRState.{h,cpp}` (pure helper `fadeTruncatedTail(buffer, rate)`),
 `src/PluginProcessor.cpp` (`loadUserIR`), `tests/user_ir_state_tests.cpp`
 
-- [ ] Confirm decision D2 (recommended: keep 8192 samples).
+- [x] Decision D2 confirmed by the owner (2026-10-26): keep 8192 samples.
 - [ ] Write the test first: `fadeTruncatedTail` ends the buffer in a monotonic raised-cosine fade
       over its last 5 ms, finishing at ~0, and leaves every earlier sample untouched.
 - [ ] Call it in `loadUserIR` only when the file was longer than the cap. This is the one
