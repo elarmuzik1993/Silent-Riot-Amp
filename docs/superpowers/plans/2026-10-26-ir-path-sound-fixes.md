@@ -28,6 +28,23 @@ way back to the built-in cab, panel doesn't refresh), the built-in cab's 400 Hz 
 decision on the IIR path, not the IR loader), positional `IR_INDEX` and the state-copy issue.
 They don't change what an IR sounds like. They need their own plan.
 
+## If PR #33 merges first
+
+This plan was written against `main` at `377925e`. Open PR #33 (`fix/ir-restore-and-samples`)
+rewrites the IR load and restore paths. If it lands first, re-point the tasks like this:
+
+- **Loading moves.** `loadUserIR` reads files through `readUserIRFromFile`, and the
+  `prepareToPlay` reload goes through `applyIRIndexParam` → `applyUserIRIndex`. That path is
+  **also** used by state restore, which can run while `processBlock` does. So Task 1 must use
+  `installIRNow` on the `prepareToPlay` call only, and keep the restore call asynchronous.
+- **Task 2 keeps the guard.** `isSafeToNormaliseIR` rejects NaN and huge samples because they
+  poison JUCE's normalisation. With `Normalise::no` that reason goes away, but our band-level
+  metric needs the same guard, so keep the check and update its comment.
+- **Task 3 tests get easier.** #33 adds `tests/processor_harness.h`, which runs the real
+  processor. Use it for the click and switch measurements; the `sr_render` switch flags become
+  optional.
+- **Task 4 moves.** The fade goes in `readUserIRFromFile`, where truncation happens.
+
 ## Owner decisions (decided 2026-10-26)
 
 - **D1, level target (Task 2): match the built-in cab's level over 100 Hz–5 kHz**, so
