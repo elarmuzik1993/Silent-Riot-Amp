@@ -3,58 +3,44 @@
 _Updated 2026-10-26_
 
 ## Now
-- Silent Riot v0.3.4 (JUCE 7 VST3/Standalone). `bash scripts/verify.sh` passes on `main`: static
-  checks + Release build + 308/308 ctest (2026-10-23). Cloud sessions provision via `.agents/bootstrap.sh`.
-- Docs: the DSP spec v2.13 is background only (status banner lists superseded designs);
-  `ROADMAP.md` is archived; `COMPETITIVE_ROADMAP.md` is the live plan, ticked against the code
-  2026-10-23. The JSX prototype is marked out of date.
-- Power section reviewed 2026-10-23; fixes planned in
-  `docs/superpowers/plans/2026-10-23-power-section-fixes.md`, none built yet.
-- Going open source (2026-10-26): GPLv3 + optional donations, no paid tier. History rewritten
-  and force-pushed: every commit is `Boris Miscenco <219343213+elarmuzik1993@users.noreply.github.com>`,
-  AI trailers stripped. Kept branches: `main`, `docs/dsp-review` (#31),
-  `fix/ir-restore-and-samples` (#33), `feat/neural-hybrid-blend-sketch` (ex `claude/neural-learning-path-slider-kt8dy7`).
-  Roadmap Phase C is now release readiness (installers, support link), not licensing.
-- Tone sign-off still open: E3 (MUST-PASS) diagnosed but not fixed; A1/B1 need re-ratifying.
+- Silent Riot v0.3.4 (JUCE 7 VST3/Standalone), GPLv3, going open source with optional donations
+  (no paid tier). `bash scripts/verify.sh` passes: static + Release build + 308/308 ctest (2026-10-26).
+- `COMPETITIVE_ROADMAP.md` is the live plan (open-source 1.0; Phase C = installers + support link);
+  `ROADMAP.md` archived; DSP spec v2.13 background only; JSX prototype out of date.
+- History rewritten 2026-10-26: every commit authored `Boris Miscenco <219343213+elarmuzik1993@users.noreply.github.com>`,
+  AI trailers stripped. Commit with that identity (the cloud env sets `aidevblock@gmail.com`; override it).
+- Power-section fixes planned in `docs/superpowers/plans/2026-10-23-power-section-fixes.md`, none built.
+- Tone sign-off open: E3 (MUST-PASS) diagnosed not fixed; A1/B1 need re-ratifying.
 
 ## Next
-1. Owner: delete the 20 stale remote branches. They still hold the pre-rewrite history (old
-   emails, AI trailers); the cloud session's proxy refused branch deletion. Anything that is not
-   one of the four kept branches above goes.
-2. Owner: make the repo public (Settings → General → Danger Zone). Old commits stay reachable
-   through closed PRs' `refs/pull/*` (GitHub-owned, read-only); only GitHub Support or a fresh
-   repo removes those. Then pick a donation platform (Sponsors / Ko-fi) for roadmap Phase C.
-3. Owner: GitHub Actions is down: every run since 2026-10-09 fails in ~3–5 s with no logs (seen
-   again 2026-10-23). Likely billing; a public repo gets free standard-runner minutes. Until
-   fixed, verify locally.
-4. Owner: pick the 7W option in the power-section plan (Task 5: leave / lower B+ / match a
-   reference schematic). Not blocking Tasks 0–2.
-5. Power-section plan Task 0 (baseline: verify + build `sr_render` + record `signoff.py`, thump,
-   idle, bloom), then Task 1 (stale comment) and Task 2 (conduction-scaled PSU/sag currents).
-6. Owner: confirm the E3 plan, "repoint the gate, then fix the engine" (proposed, not agreed).
-7. E3, step 1: give `alias_crank` in `tools/signoff_gates.json` a real bright IR (today the
-   `OPTIONAL_BRIGHT_IR` placeholder, which `signoff.py` skips, so E3 runs the IIR path). Owner
-   supplies one, or commit a synthetic bright IR fixture. Move whole-engine aliasing to its own
-   report-only gate with a ratified target.
-8. E3, step 2: measure harmonic fall-off per nonlinearity; smooth the sharpest corner. Suspects:
-   hard plate `std::clamp` (`TriodeWaveshaper.cpp:28`), C1-only grid clamp (`GridConduction.cpp:39`),
-   OT flux clamp (`OTSaturation.h:43`). Coordinate with power-plan Task 4 (adds a plate knee).
-9. Owner: adopt the kit template's *Rules* section (git, branch naming, secrets) in AGENTS.md?
+1. Owner: delete every remote branch except `main`, `docs/dsp-review`, `fix/ir-restore-and-samples`,
+   `feat/neural-hybrid-blend-sketch`. The others hold pre-rewrite history (old emails, AI trailers);
+   the cloud proxy refuses branch deletion. Re-clone any local copy (hashes changed).
+2. Owner: make the repo public (Settings → General → Danger Zone).
+3. Owner: pick a donation platform (GitHub Sponsors / Ko-fi); then add `.github/FUNDING.yml`, a
+   README "Support" section and an About-panel link (roadmap Phase C).
+4. Owner: GitHub Actions fails every run since 2026-10-09 (~3–5 s, no logs); likely billing.
+   Recheck once public (free standard runners). Until then verify locally.
+5. Owner: pick the 7W option (power plan Task 5). Not blocking Tasks 0–2.
+6. Power plan Task 0 (baseline: verify, build `sr_render`, record `signoff.py`/thump/idle/bloom),
+   then Task 1 (stale comment), Task 2 (conduction-scaled PSU/sag currents).
+7. Owner: confirm the E3 plan, "repoint the gate, then fix the engine" (proposed, not agreed).
+8. E3 step 1: give `alias_crank` (`tools/signoff_gates.json`) a real bright IR (today a skipped
+   placeholder, so E3 runs the IIR path); move whole-engine aliasing to a report-only gate.
+9. E3 step 2: measure harmonic fall-off per nonlinearity; smooth the sharpest corner
+   (`TriodeWaveshaper.cpp:28`, `GridConduction.cpp:39`, `OTSaturation.h:43`); coordinate with power Task 4.
 
 ## Decisions
-- Open source (GPLv3) with optional donations, not a paid plugin (2026-10-26): no leverage to
-  sell yet, and GPL source makes a license gate moot. Never gate features or add a trial.
-- DSP spec v2.13 is background, not authoritative: unmaintained since 2026-03 and several of its
-  designs were root-caused as bugs in USE-59. Code, CLAUDE.md and handoff docs win; not kept in sync.
-- PSU's one-sample current lag is intended (spec §3.11); not a power-section defect.
-- `verify.sh` builds into `build-verify/` so it never clobbers `build/` from `scripts/build.sh`.
-- `bootstrap.sh` omits `libwebkit2gtk-4.1-dev`: `JUCE_WEB_BROWSER=0`; verify passes without it.
+- Open source + optional donations (2026-10-26): no audience to sell to yet, and GPL source makes a
+  license gate moot. Never gate features, nag, or add a trial.
+- DSP spec v2.13 is background: several designs were root-caused as bugs in USE-59. Code wins.
+- PSU's one-sample current lag is intended (spec §3.11).
+- `verify.sh` builds into `build-verify/`; `bootstrap.sh` omits webkit (`JUCE_WEB_BROWSER=0`).
 - sr_render is not built by CI or verify (`-DSR_BUILD_TOOLS=ON`); build it when touching tools/.
 
 ## Known issues
-- E3 = −37.9 dBc (gate ≤ −85), P-CRANK, 44.1k, 4× OS: engine aliasing (16th harmonic of 11 kHz
-  folding at 176.4k), not the IR limiter. 8× OS only reaches −43.5; oversampling alone can't fix it.
-- `signoff.py` on `d2315b4`: A1 −31.6 LUFS (band −17.5…−14.5), B1 0.99% (floor 1.0%), E1 −70.4
-  dBFS (≤ −90), E3 −37.9; other 8 pass. A1 and the P-* volume positions need re-ratification.
-- EL84s have no plate load line (Vp = PSU B+), so the plate knee never engages (power plan Task 4).
-- ~0.5 s startup thump while the PSU settles; it pollutes E1's idle noise floor (unverified).
+- Old commits stay reachable via closed PRs' `refs/pull/*` (GitHub-owned); only GitHub Support or a fresh repo removes them.
+- E3 = −37.9 dBc (≤ −85): engine aliasing, not the IR limiter; 8× OS only reaches −43.5.
+- `signoff.py` on `d2315b4`: A1 −31.6 LUFS, B1 0.99%, E1 −70.4 dBFS, E3 −37.9 fail; other 8 pass.
+- EL84s have no plate load line (Vp = PSU B+), so the plate knee never engages (power Task 4).
+- ~0.5 s startup thump while the PSU settles; pollutes E1's idle floor (unverified).
