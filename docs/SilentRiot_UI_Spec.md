@@ -477,7 +477,7 @@ In JUCE, implement with `juce::ComponentAnimator` or manually interpolate bounds
 
 **About section**:
 - Product info grid: PRODUCT, VERSION, FORMAT, DEVELOPER
-- License status card: green dot with glow + "LICENSED" + registration email
+- License status card: green dot with glow + "Free & open source — GPLv3" (the project is GPLv3 with no activation; there is no registration email)
 - Action buttons: MANUAL, SUPPORT, CHANGELOG — same style as IR action buttons
 
 ### 5.7 IR Loader Panel

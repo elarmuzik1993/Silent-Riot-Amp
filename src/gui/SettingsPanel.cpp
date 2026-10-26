@@ -147,7 +147,7 @@ void SettingsPanel::paint(juce::Graphics& g)
         y += 20.0f;
     }
 
-    // License status
+    // License: free and open source (GPLv3) — there is no activation
     y += 8.0f;
     g.setColour(Colours::surface);
     g.fillRoundedRectangle(px, y, w, 28.0f, 4.0f);
@@ -159,7 +159,7 @@ void SettingsPanel::paint(juce::Graphics& g)
     g.fillEllipse(px + 10.0f, y + 10.0f, 8.0f, 8.0f);
     g.setFont(Fonts::spaceMono(Fonts::Sizes::small));
     g.setColour(Colours::text);
-    g.drawText("Licensed — Full Version", juce::Rectangle<float>(px + 24.0f, y, w - 24.0f, 28.0f),
+    g.drawText("Free & open source — GPLv3", juce::Rectangle<float>(px + 24.0f, y, w - 24.0f, 28.0f),
                juce::Justification::centredLeft, false);
 }
 
