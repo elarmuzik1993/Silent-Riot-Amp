@@ -17,6 +17,7 @@
 
 #include "dsp/filters/FilterBank.h"
 #include "dsp/filters/DynamicMillerLP.h"
+#include "dsp/filters/IntegerDelay.h"
 #include "dsp/tubes/TriodeWaveshaper.h"
 #include "dsp/tubes/PentodeWaveshaper.h"
 #include "dsp/tubes/GridConduction.h"
@@ -45,9 +46,14 @@ public:
 
     void prepareToPlay(double sampleRate, int samplesPerBlock) override;
     void releaseResources() override;
+    void reset() override;   // host stop / reset: clear the effect tails (review B6)
     bool isBusesLayoutSupported(const BusesLayout& layouts) const override;
     using juce::AudioProcessor::processBlock;
     void processBlock(juce::AudioBuffer<float>&, juce::MidiBuffer&) override;
+    // Host bypass: dry input delayed by the reported latency; flags the effect
+    // tails stale, since processBlock (and so every effect) stops running.
+    using juce::AudioProcessor::processBlockBypassed;
+    void processBlockBypassed(juce::AudioBuffer<float>&, juce::MidiBuffer&) override;
 
     juce::AudioProcessorEditor* createEditor() override;
     bool hasEditor() const override;
@@ -105,6 +111,7 @@ public:
 private:
     juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
     void handleAsyncUpdate() override;  // deferred IR loading on message thread
+    void applyIRIndexParam();           // sync cabSim to IR_INDEX now (restore/prepare)
     void resetDSPState();               // clear all filter/integrator/cached state
     // Recompute every sample-rate-dependent coefficient for the current base
     // rate + oversample factor (filters, Millers, PSU/sag/OT, grid-charge decay,
@@ -149,6 +156,18 @@ private:
     // main engine's switchable oversample factor.
     std::unique_ptr<juce::dsp::Oversampling<float>> limiterOversampler;
 
+    // Delays the IIR cab path by limiterOversampler's latency, so the latency
+    // reported to the host (main + limiter) is true in both cab modes (review
+    // B4). Mono/stereo bus only, hence 2 channels.
+    sr::IntegerDelay<2, 16> iirPathAlign;
+    bool lastIrMode = false;          // clear iirPathAlign on IR -> IIR switches
+
+    // Host-bypass passthrough: the dry input delayed by the reported latency, so
+    // a bypassed plugin stays time-aligned. processBlock write()s every input
+    // block into it, so the first bypassed block continues without a gap.
+    sr::IntegerDelay<2, 32> bypassDelay;
+    void syncBypassDelay();           // follow latency changes (oversample switch)
+
     // Triode plate voltage cache (inter-sample)
     sr::TriodeState v1aTriode, v1bTriode;
 
@@ -158,6 +177,11 @@ private:
     // Parameter smoothers
     sr::ParamSmoother gainSmoother, toneSmoother, volumeSmoother;
 
+    // Amp knob read, NaN → fallback, clamped to 0..1 (review S1).
+    float readAmpKnob(const juce::String& id, float fallback) const;
+    // Sets the EL84 base bias and re-derives the sag reference from it.
+    void setEl84Bias(float bias);
+
     // State
     float el84BaseBias = sr::PENTODE_BIAS_15W_N;
     float lastSagQuiescentBias = 0.0f;          // forces a sag-reference recompute on first block
@@ -165,6 +189,13 @@ private:
     float outputGainCompensation = sr::OUTPUT_MAKEUP_GAIN;  // scales cab output into tanh soft-clip range
     bool  psuFrozen    = false;
     bool  widenerWasActive = false;   // edge-detect widener on/off for tail clear
+    bool  delayWasOn  = false;        // edge-detect delay/reverb off→on for restart() (review B6)
+    bool  reverbWasOn = false;
+    bool  delayFading  = false;       // switched off, wet still ramping to 0 (review B6)
+    bool  reverbFading = false;
+    // Set by reset(), the power-off / tuner-mute return and host bypass; the next
+    // audible block clears every effect tail on the audio thread (review B6).
+    std::atomic<bool> tailsStale { false };
     double baseSampleRate = 44100.0;
     std::atomic<int> cachedIRIndex { 0 };   // last IR index seen by audio thread (written msg+audio)
     std::atomic<int> pendingIRIndex { -1 }; // deferred IR load (message thread)
@@ -183,7 +214,7 @@ public:
     // GUI level metering (atomic, updated per block from audio thread)
     std::atomic<float> inputLevelForGUI  { 0.0f };
     std::atomic<float> outputLevelForGUI { 0.0f };
-    std::atomic<float> gridCurrentForGUI { 0.0f };
+    std::atomic<float> gridCurrentForGUI { 0.0f };   // normalized current, block peak of the EL84 grids
 
     // GUI DSP-state telemetry — published once per block by the audio thread,
     // read by the editor timer. Atomic snapshots avoid torn reads of the

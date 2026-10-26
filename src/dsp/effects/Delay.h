@@ -24,8 +24,23 @@ public:
     void prepare(double sampleRate, int samplesPerBlock, int numChannels);
     void reset();
 
+    // Off→on edge (call after setParameters): reset(), snap TIME and FEEDBACK to
+    // their targets so a change made while off doesn't glide, and ramp MIX in
+    // from 0. While off, process() isn't called, so the line still holds the
+    // audio it had when it stopped and would replay it (review B6).
+    void restart();
+
+    // On→off edge: ramp MIX down to 0 over its usual 50 ms instead of cutting
+    // the wet (and stepping the dry +3 dB at mix 0.5). Keep calling process()
+    // until fadedOut(); from then on the processor skips it, bit-exact dry
+    // (review B6).
+    void fadeOut() { mixSm.setTargetValue(0.0f); }
+    bool fadedOut() const { return !mixSm.isSmoothing(); }
+
     // Per-block parameter update (called before processBlock).
-    // timeMs / feedback / mix / tone are the raw parameter values.
+    // timeMs is in ms, clamped to DELAY_TIME_MIN_MS..DELAY_LINE_MAX_MS (the
+    // knob's 1000 ms or a tempo-synced time up to 2000 ms).
+    // feedback / mix / tone are the raw parameter values.
     // tone is 0..1 (0 = dark/tape, 1 = bright/digital) → feedback high-cut.
     // pingPong cross-feeds the two channels (bouncing L/R repeats) instead of
     // independent dual-mono; no-op on mono buffers.

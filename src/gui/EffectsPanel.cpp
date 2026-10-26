@@ -37,7 +37,7 @@ EffectsPanel::EffectsPanel()
     // Note: with DELAY SYNC set to anything but MANUAL the host tempo drives
     // delay time and this knob is inactive — the readout still shows its own value.
     delayTime.setValueFormatter([](float v) {
-        float ms = DELAY_TIME_MIN_MS + v * (DELAY_TIME_MAX_MS - DELAY_TIME_MIN_MS);
+        float ms = DELAY_TIME_MIN_MS + v * (DELAY_TIME_KNOB_MAX_MS - DELAY_TIME_MIN_MS);
         return juce::String(juce::roundToInt(ms)) + "ms";
     });
 

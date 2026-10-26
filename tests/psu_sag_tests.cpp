@@ -563,3 +563,26 @@ TEST_CASE("PSU droop: zero current produces no droop", "[psu][droop]") {
     REQUIRE(psu.vPi()     == Approx(V_PI_NOMINAL_N).margin(1e-6f));
     REQUIRE(psu.vPreamp() == Approx(V_PREAMP_NOMINAL_N).margin(1e-6f));
 }
+
+// ── settle (review B1): start the supply on its loaded steady state ──
+
+TEST_CASE("PSU settle: the settled voltages are update()'s fixed point", "[psu][seed]") {
+    PowerSupplyModel psu;
+    psu.init();
+    psu.recalcDecayCoeffs(TEST_SR_4X);
+    const float plate = VS::i(0.080f), screen = VS::i(0.009f);
+    psu.settle(plate, screen);
+    REQUIRE(psu.vPower() < V_POWER_NOMINAL_N);     // loaded supply sits below nominal
+    REQUIRE(psu.vPreamp() < V_PREAMP_NOMINAL_N);   // and the droop reaches the preamp
+
+    const float p = psu.vPower(), s = psu.vScreen(), pi = psu.vPi(), pre = psu.vPreamp();
+    for (int i = 0; i < 10000; ++i) {
+        psu.update();
+        psu.resetCurrentDraw();
+        psu.reportPowerDirect(plate, screen);
+    }
+    REQUIRE(psu.vPower()  == Approx(p).epsilon(1e-6));
+    REQUIRE(psu.vScreen() == Approx(s).epsilon(1e-6));
+    REQUIRE(psu.vPi()     == Approx(pi).epsilon(1e-6));
+    REQUIRE(psu.vPreamp() == Approx(pre).epsilon(1e-6));
+}

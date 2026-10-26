@@ -46,17 +46,20 @@ float pentodeQuiescentTotal(float vBias_n, float vPlate_n, float vScreen_n) {
 float softConductionCurve(float vGrid_n, float vBias_n) {
     // Spec §3.8: smooth Class A/AB crossover per EL84
     //
-    // cutoffMargin = how far above cutoff the grid sits
+    // cutoffMargin = how far above cutoff the grid sits. vGrid_n is the grid
+    // SIGNAL, before bias, so the gate sits at signal -10 V (real grid ≈ -19.6 V
+    // at 15W, -17 V at 7W), not at the Koren cutoff.
     //   At idle (vGrid=0): margin = 0 - (-0.033) = +0.033 (conducting)
     //   At deep negative swing: margin goes negative (approaching cutoff)
     //
     // overlapWidth controls the transition steepness:
-    //   15W (bias=-0.9): narrower overlap → more AB (some crossover)
-    //   7W  (bias=-0.96): wider overlap → more Class A (no crossover)
+    //   15W (bias=-0.032, -9.6 V): narrower overlap → more AB (some crossover)
+    //   7W  (bias=-0.023, -7.0 V): wider overlap → more Class A (no crossover)
     //
-    // The width is scaled by |EL84_CUTOFF_N| (the cutoff distance)
-    // and modulated by the bias ratio so 7W is wider than 15W.
-    // bias_factor: -0.9/(-0.9) = 1.0 for 15W, -0.96/(-0.9) = 1.067 for 7W
+    // The width is |EL84_CUTOFF_N| × 0.5 (5 V), scaled by the bias ratio so
+    // 7W is wider than 15W: biasFactor = -9.6/-7.0 ≈ 1.37 for 7W, 1.0 for 15W,
+    // giving 5 V (15W) / 6.9 V (7W). Idle value: ≈ 0.98 (15W) / 0.95 (7W).
+    // vBias_n is the effective bias, so sag shifts biasFactor slightly.
     float cutoffMargin = vGrid_n - EL84_CUTOFF_N;
     float biasFactor = PENTODE_BIAS_15W_N / vBias_n;  // >1.0 for 7W (hotter)
     float overlapWidth = std::abs(EL84_CUTOFF_N) * 0.5f * biasFactor;

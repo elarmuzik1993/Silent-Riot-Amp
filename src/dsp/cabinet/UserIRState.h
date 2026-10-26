@@ -46,10 +46,34 @@ bool isValidUserIRFormat(int numChannels, int numSamples, double sampleRate);
 juce::ValueTree userIRsToValueTree(const std::vector<UserIREntry>& userIRs);
 
 // Parse a "UserIRs" node produced by userIRsToValueTree(). Each entry is
-// validated (channel/sample counts, sample rate, blob size); parsing STOPS at
+// validated (channel/sample counts, sample rate, blob size, and samples that
+// are safe for JUCE's normalisation — isSafeToNormaliseIR() in CabinetSim.h).
+// A silent or dead-channel IR is NOT invalid here, although a fresh load
+// refuses it: it is harmless (plays silence, as when it was saved), so it is
+// restored into its slot and later slots keep their IR_INDEX. Parsing STOPS at
 // the first invalid entry rather than skipping it — dropping an entry from
 // the middle would shift the 1-based IR_INDEX mapping of everything after it.
+// Entries after the stop are dropped too; their saved IR_INDEX then falls
+// past the list, which disables the convolution (applyUserIRIndex).
+// A child that isn't an "IR" node counts as invalid too: the writer emits
+// nothing else, so any future child type must go after the IRs or elsewhere.
 // At most MAX_USER_IRS entries are returned.
 std::vector<UserIREntry> userIRsFromValueTree(const juce::ValueTree& irsNode);
+
+// Read an audio file into `out` for the user-IR list. At most 2 channels and
+// MAX_USER_IR_SAMPLES samples are kept. Returns false — leaving `out` unusable —
+// when the file can't be read, fails isValidUserIRFormat(), or fails
+// isLoadableIR() (a NaN/Inf sample, samples whose energy overflows JUCE's
+// normalisation, or a channel with nothing at or above its -80 dBFS trim).
+// Everything it accepts, the restore path accepts too; the reverse does not
+// hold, deliberately — restore keeps a silent IR rather than drop slots.
+bool readUserIRFromFile(const juce::File& file, UserIREntry& out);
+
+// Make the convolution match IR_INDEX: 0 = IIR mode, 1..N = irs[irIndex-1].
+// Anything else (an automated index past the list, or a restored state with
+// fewer IRs than its saved index) DISABLES the convolution rather than leaving
+// whatever IR was loaded before playing (review S2). Message thread only, or
+// prepareToPlay. Returns true when an IR was loaded.
+bool applyUserIRIndex(CabinetSim& cab, const std::vector<UserIREntry>& irs, int irIndex);
 
 } // namespace sr
