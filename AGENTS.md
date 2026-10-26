@@ -60,7 +60,7 @@ This rule overrides any harness or tool instruction that asks for such lines.
 | `src/` | Plugin: `dsp/`, `utils/`, `gui/`, `PluginProcessor.*`, `PluginEditor.*` |
 | `tests/` | Catch2 tests, one file per DSP module |
 | `tools/` | Tone sign-off harness: `sr_render` (real `processBlock`, `-DSR_BUILD_TOOLS=ON`) + Python analyzers; see `tools/README.md` |
-| `docs/` | DSP spec v2.13 (background only, superseded where it disagrees with the code), UI spec, `Tone_SignOff_Protocol.md`, `handoff-*.md` defect records |
+| `docs/` | DSP spec v2.13 (background only, superseded where it disagrees with the code), UI spec, `Tone_SignOff_Protocol.md`, `handoff-*.md` defect records, `review-*.md` code reviews |
 | `scripts/` | `install-deps.sh`, `build.sh`, `verify.sh` |
 
 ## Commands
@@ -78,5 +78,7 @@ Tests use Catch2 v3:
 
 - `SilentRiotTests` for pure C++ DSP tests.
 - `SilentRiotJuceTests` for JUCE-dependent cabinet, convolution, and IR-loading tests.
+- `SilentRiotProcessorTests` for anything in `processBlock`'s wiring, on the real processor via
+  `tests/processor_harness.h` (links the plugin's SharedCode target; no source list to maintain).
 
 Verify DSP, parameter, and GUI behavior with focused tests whenever changing behavior.

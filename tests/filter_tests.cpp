@@ -331,3 +331,47 @@ TEST_CASE("FilterBank: recalcAll resets shape EQ to noon", "[filter][regression]
     // recalcAll clobbered the shape back to noon — the caller must re-apply it.
     REQUIRE(fb.shapeMidBell.gainDb == Approx(midGainAtNoon));
 }
+
+// ── seedDC (review B1): start a filter on its DC operating point ──
+
+TEST_CASE("OnePoleLP seedDC: starts on its own steady state", "[filter][seed]") {
+    OnePoleLP lp;
+    lp.setFreq(4.2f, TEST_SR_4X);   // the cathode bypass: 1+a1 ~ 1.5e-4, the hard case
+    lp.seedDC(0.65f);
+    const float first = lp.process(0.65f);
+    REQUIRE(first == Approx(0.65f).epsilon(1e-3));   // unity DC gain, up to float coefficients
+    float drift = 0.0f;
+    for (int i = 0; i < 200000; ++i)                 // > 1 s at 4x: many time constants
+        drift = std::max(drift, std::abs(lp.process(0.65f) - first));
+    // seedDC lets the float recurrence come to rest, so it does not creep.
+    // (From the exact steady state alone it crept 1.3e-4 at some inputs.)
+    REQUIRE(drift < 1e-7f);
+}
+
+TEST_CASE("OnePole seedDC: a seeded LP -> HP chain rests at 0 at awkward inputs", "[filter][seed]") {
+    // 0.63387871 is the 7W idle plate, where rounding parked the LP furthest
+    // from its exact steady state and the HP behind it passed a 4.4 mV step.
+    for (float x : { 0.63387871f, 0.64771283f, 0.1f, 0.9f }) {
+        OnePoleLP lp;
+        OnePoleHP hp;
+        lp.setFreq(4.2f, TEST_SR_4X);
+        hp.setFreq(72.0f, TEST_SR_4X);
+        hp.seedDC(x - lp.seedDC(x) * 0.5f);
+        float peak = 0.0f;
+        for (int i = 0; i < 20000; ++i)
+            peak = std::max(peak, std::abs(hp.process(x - lp.process(x) * 0.5f)));
+        REQUIRE(peak < 1e-9f);
+    }
+}
+
+TEST_CASE("OnePoleHP seedDC: a charged coupling cap passes no step", "[filter][seed]") {
+    OnePoleHP hp;
+    hp.setFreq(7.0f, TEST_SR_4X);
+    hp.seedDC(0.65f);
+    for (int i = 0; i < 1000; ++i)
+        REQUIRE(std::abs(hp.process(0.65f)) < 1e-6f);
+
+    OnePoleHP cold;                       // unseeded: the whole DC comes through as a step
+    cold.setFreq(7.0f, TEST_SR_4X);
+    REQUIRE(cold.process(0.65f) == Approx(0.65f).epsilon(1e-3));
+}

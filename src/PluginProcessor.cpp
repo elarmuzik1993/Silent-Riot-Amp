@@ -1,10 +1,25 @@
 #include "PluginProcessor.h"
+#include "dsp/IdleOperatingPoint.h"
 #include "PluginEditor.h"
 
 #include <cmath>
 #include <algorithm>
 
 using namespace sr;
+
+namespace {
+
+// RMS of one channel, for the GUI meters. 0 for an empty block.
+float channelRms(const float* x, int n)
+{
+    if (n <= 0) return 0.0f;
+    float sumSq = 0.0f;
+    for (int i = 0; i < n; ++i)
+        sumSq += x[i] * x[i];
+    return std::sqrt(sumSq / static_cast<float>(n));
+}
+
+} // namespace
 
 SilentRiotProcessor::SilentRiotProcessor()
     : AudioProcessor(BusesProperties()
@@ -44,23 +59,32 @@ void SilentRiotProcessor::handleAsyncUpdate()
     int idx = pendingIRIndex.exchange(-1);
     if (idx < 0) return;
 
-    // IR_INDEX maps directly onto user IR slots: 0 = IIR mode, 1..N = userIRs[idx-1].
-    // The stock-IR table in CabinetSim is intentionally NOT reachable from this
-    // parameter today — the loader UI only populates user IRs, and the stock
-    // entries are synthetic placeholders. Wiring stock IRs is deferred until real
-    // cabinet IRs ship (see ROADMAP.md "Ship real cabinet IRs").
-    int userIdx = idx - 1;
-    if (userIdx < 0 || userIdx >= static_cast<int>(userIRs.size()))
-    {
-        // IIR mode, or an out-of-range index from restored state / host automation:
-        // disable convolution so we never leave a stale IR active.
-        cabSim.setIRIndex(0);
-        return;
-    }
+    // An out-of-range index (host automation past the list) disables the
+    // convolution so a stale IR never stays active — see applyUserIRIndex().
+    sr::applyUserIRIndex(cabSim, userIRs, idx);
+}
 
-    auto& ir = userIRs[static_cast<size_t>(userIdx)];
-    juce::AudioBuffer<float> bufCopy(ir.audioData);
-    cabSim.loadIRFromBuffer(std::move(bufCopy), ir.sampleRate);
+void SilentRiotProcessor::applyIRIndexParam()
+{
+    // Message thread (state restore) or prepareToPlay. Syncs the convolution to
+    // IR_INDEX now — including disabling it when the index is past the IR list,
+    // which processBlock can't catch when the index equals cachedIRIndex
+    // (review S2). Drops any async load still pending: it would select from
+    // the old list by an old index.
+    //
+    // The index is marked seen BEFORE the pending slot is cleared (both are
+    // seq_cst atomics, so the audio thread observes the writes in this order):
+    // once the slot is empty, processBlock already compares against the new
+    // index and won't queue a redundant reload of it. A block that compared
+    // just before the cache write can still queue an index; handleAsyncUpdate()
+    // applies that against the current list on this thread, and the next block
+    // re-queues the parameter's value if it differs — so a stale index never
+    // sticks.
+    const int irIdx = static_cast<int>(
+        apvts.getRawParameterValue(sr::Params::IDs::IR_INDEX)->load());
+    cachedIRIndex = irIdx;
+    pendingIRIndex.store(-1);
+    sr::applyUserIRIndex(cabSim, userIRs, irIdx);
 }
 
 juce::AudioProcessorValueTreeState::ParameterLayout SilentRiotProcessor::createParameterLayout()
@@ -70,15 +94,15 @@ juce::AudioProcessorValueTreeState::ParameterLayout SilentRiotProcessor::createP
     // Knobs: internal 0–1, UI displays 0–10 (see UI spec §7.1)
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         juce::ParameterID{ Params::IDs::GAIN, 1 }, "Gain",
-        juce::NormalisableRange<float>(0.0f, 1.0f, 0.001f), 0.6f));
+        juce::NormalisableRange<float>(0.0f, 1.0f, 0.001f), Params::Defaults::GAIN));
 
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         juce::ParameterID{ Params::IDs::TONE, 1 }, "Shape",
-        juce::NormalisableRange<float>(0.0f, 1.0f, 0.001f), 0.5f));
+        juce::NormalisableRange<float>(0.0f, 1.0f, 0.001f), Params::Defaults::TONE));
 
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         juce::ParameterID{ Params::IDs::VOLUME, 1 }, "Volume",
-        juce::NormalisableRange<float>(0.0f, 1.0f, 0.001f), 0.5f));
+        juce::NormalisableRange<float>(0.0f, 1.0f, 0.001f), Params::Defaults::VOLUME));
 
     params.push_back(std::make_unique<juce::AudioParameterBool>(
         juce::ParameterID{ Params::IDs::HALF_POWER, 1 }, "7W Mode", false));
@@ -125,7 +149,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout SilentRiotProcessor::createP
 
     params.push_back(std::make_unique<juce::AudioParameterBool>(
         juce::ParameterID{ Params::IDs::DELAY_ON, 1 }, "Delay", false));
-    // Time is a 0–1 knob (maps 0..1 → DELAY_TIME_MIN..MAX ms in processBlock).
+    // Time is a 0–1 knob (maps 0..1 → DELAY_TIME_MIN..KNOB_MAX ms in processBlock).
     // Default ~0.34 ≈ 350 ms.
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         juce::ParameterID{ Params::IDs::DELAY_TIME, 1 }, "Delay Time",
@@ -209,6 +233,7 @@ void SilentRiotProcessor::resetDSPState()
 
     if (limiterOversampler != nullptr)
         limiterOversampler->reset();
+    iirPathAlign.reset();
 
     // Effects module
     noiseGate.reset();
@@ -217,14 +242,41 @@ void SilentRiotProcessor::resetDSPState()
     reverb.reset();
     stereoWidth.reset();
     widenerWasActive = false;
+    delayWasOn  = false;
+    reverbWasOn = false;
+    delayFading = reverbFading = false;
+    tailsStale  = false;
+    bypassDelay.reset();
+    lastIrMode  = false;
 
     lastShapeCoeffVal = -1.0f;   // force shape coeff recompute on first sample
     psuFrozen = false;
+
+    // Start on the idle operating point, not on zeroed filters and a nominal
+    // supply: those replayed ~0.5 s of settling as a burst on silence after
+    // every prepare (review B1; see dsp/IdleOperatingPoint.h). Needs the rate-
+    // dependent coefficients, which prepareToPlay sets before calling this.
+    setEl84Bias(apvts.getRawParameterValue(Params::IDs::HALF_POWER)->load() > 0.5f
+                    ? PENTODE_BIAS_7W_N : PENTODE_BIAS_15W_N);
+    sr::settlePowerStageAtIdle(el84BaseBias, psu, sag);
+    sr::seedPreampAtIdle(filterBank, v1aTriode, v1bTriode, ltpModel, psu);
 
     // Snap the gain-staging trims to their current targets so a re-prepare or
     // sample-rate change doesn't audibly ramp from a stale value.
     inputTrimSm.setCurrentAndTargetValue(inputTrimSm.getTargetValue());
     outputTrimSm.setCurrentAndTargetValue(outputTrimSm.getTargetValue());
+}
+
+float SilentRiotProcessor::readAmpKnob(const juce::String& id, float fallback) const
+{
+    return sanitizeUnitParamOr(apvts.getRawParameterValue(id)->load(), fallback);
+}
+
+void SilentRiotProcessor::setEl84Bias(float bias)
+{
+    el84BaseBias = bias;
+    lastSagQuiescentBias = bias;
+    sag.setQuiescent(pentodeQuiescentTotal(bias, V_POWER_NOMINAL_N, V_SCREEN_NOMINAL_N));
 }
 
 void SilentRiotProcessor::recalcRateDependentCoeffs()
@@ -255,10 +307,12 @@ void SilentRiotProcessor::recalcRateDependentCoeffs()
     // Report oversampler latency to DAW. The limiter oversampler's latency is
     // included unconditionally (not just when IR mode is active) so total
     // latency stays constant across cab/IR mode switches instead of requiring
-    // a host renegotiation every time irMode flips.
-    int totalLatency = static_cast<int>(oversampleSwitcher.active()->getLatencyInSamples());
+    // a host renegotiation every time irMode flips; iirPathAlign delays the
+    // IIR path by the same amount so the report holds there too (review B4).
+    // Both oversamplers use integer latency, so these are exact, not truncated.
+    int totalLatency = static_cast<int>(std::lround(oversampleSwitcher.active()->getLatencyInSamples()));
     if (limiterOversampler != nullptr)
-        totalLatency += static_cast<int>(limiterOversampler->getLatencyInSamples());
+        totalLatency += static_cast<int>(std::lround(limiterOversampler->getLatencyInSamples()));
     setLatencySamples(totalLatency);
 }
 
@@ -266,17 +320,31 @@ void SilentRiotProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 {
     baseSampleRate = sampleRate;
 
-    oversampleSwitcher.init(getTotalNumOutputChannels(), samplesPerBlock);
+    // Start in the saved oversample mode — otherwise every prepare starts at 4x
+    // and a 2x/8x session fades out, goes silent and fades back in on its first
+    // blocks (review B5). A choice parameter's raw value is its index.
+    const float osRaw = apvts.getRawParameterValue(Params::IDs::OVERSAMPLE)->load();
+    const int osMode = std::isfinite(osRaw) ? static_cast<int>(std::lround(osRaw)) : 1;
+    oversampleSwitcher.init(getTotalNumOutputChannels(), samplesPerBlock, osMode);
 
     // 4x polyphase-IIR oversampler dedicated to the IR-path output limiter
     // (see docs/handoff-IR-limiter-aliasing.md). Runs at base SR -> 4x base SR,
     // independent of the main engine's oversample factor.
-    limiterOversampler = std::make_unique<juce::dsp::Oversampling<float>>(
-        getTotalNumOutputChannels(), 2,
-        juce::dsp::Oversampling<float>::filterHalfBandPolyphaseIIR);
-    limiterOversampler->initProcessing(static_cast<size_t>(samplesPerBlock));
+    limiterOversampler = sr::makeIntegerLatencyOversampler(getTotalNumOutputChannels(), 2,
+                                                           samplesPerBlock);
+    const int limiterLatency = static_cast<int>(std::lround(limiterOversampler->getLatencyInSamples()));
+    jassert(limiterLatency <= 16);   // iirPathAlign's capacity
+    iirPathAlign.setDelay(limiterLatency);
 
     recalcRateDependentCoeffs();
+    syncBypassDelay();
+
+    // Seed the amp-knob smoothers at the knobs' values. They were never seeded,
+    // so a fresh instance ramped GAIN/VOLUME in from 0 and a smoother that once
+    // held NaN stayed NaN through every later prepare (review S1).
+    gainSmoother.setImmediate(readAmpKnob(Params::IDs::GAIN, Params::Defaults::GAIN));
+    toneSmoother.setImmediate(readAmpKnob(Params::IDs::TONE, Params::Defaults::TONE));
+    volumeSmoother.setImmediate(readAmpKnob(Params::IDs::VOLUME, Params::Defaults::VOLUME));
 
     // Cabinet IR convolution engine (runs at base SR, after downsample)
     cabSim.prepare(sampleRate, samplesPerBlock, getTotalNumOutputChannels());
@@ -316,21 +384,63 @@ void SilentRiotProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
     outputTrimSm.setCurrentAndTargetValue(sanitizeUnitParamOr(
         apvts.getRawParameterValue(Params::IDs::OUTPUT_LEVEL)->load(), 0.5f));
 
-    // Reload active user IR after prepare (convolution state was reset)
-    int irIdx = static_cast<int>(apvts.getRawParameterValue(sr::Params::IDs::IR_INDEX)->load());
-    if (irIdx > 0 && irIdx <= static_cast<int>(userIRs.size()))
-    {
-        auto& ir = userIRs[static_cast<size_t>(irIdx - 1)];
-        juce::AudioBuffer<float> bufCopy(ir.audioData);
-        cabSim.loadIRFromBuffer(std::move(bufCopy), ir.sampleRate);
-        cachedIRIndex = irIdx;
-    }
+    // Reload active user IR after prepare (convolution state was reset), or
+    // disable it if IR_INDEX no longer names one (review S2)
+    applyIRIndexParam();
 
     // Clear any state carried over from a previous configuration
     resetDSPState();
 }
 
 void SilentRiotProcessor::releaseResources() {}
+
+void SilentRiotProcessor::reset()
+{
+    // Host stop / transport reset (VST3 setProcessing(false)): the delay, reverb,
+    // IR convolution and widener tails would otherwise play on into the next
+    // start. Only flags it — the next processBlock clears them on the audio
+    // thread, so this is safe from any thread. The amp stays on its operating
+    // point: zeroing its filters here would replay the startup burst (B1).
+    tailsStale = true;
+}
+
+void SilentRiotProcessor::syncBypassDelay()
+{
+    // setDelay clears the line, so only on a change. Allocation-free.
+    const int latency = getLatencySamples();
+    jassert(latency <= 32);   // bypassDelay's capacity
+    if (latency != bypassDelay.getDelay()) bypassDelay.setDelay(latency);
+}
+
+void SilentRiotProcessor::processBlockBypassed(juce::AudioBuffer<float>& buffer, juce::MidiBuffer&)
+{
+    // Host bypass. processBlock doesn't run, so delay, reverb, IR convolution
+    // and widener freeze holding their tails, exactly as under power-off: flag
+    // them so the first processed block after un-bypass starts them clean
+    // (review B6). The tuner keeps getting the DI, as it does under power-off
+    // and tuner mute — tuning with the plugin bypassed is a normal workflow.
+    tailsStale = true;
+    const int n = buffer.getNumSamples();
+    const bool hasCh0 = buffer.getNumChannels() > 0;
+    if (hasCh0)
+        pushTunerSamples(buffer.getReadPointer(0), n);
+
+    // Meters show what the plugin passes: the raw DI in (no INPUT trim runs
+    // here) and, below, that DI out. processBlock's metering doesn't run, so
+    // without this both meters froze at their last level (review S6). No amp
+    // is running, so no grid current either.
+    inputLevelForGUI.store(hasCh0 ? channelRms(buffer.getReadPointer(0), n) : 0.0f,
+                           std::memory_order_relaxed);
+    gridCurrentForGUI.store(0.0f, std::memory_order_relaxed);
+
+    // Dry input, delayed by the latency the host is compensating for (JUCE's
+    // default passes it through undelayed and asserts the latency is 0).
+    // processBlock primes the line, so entering bypass is seamless.
+    syncBypassDelay();
+    bypassDelay.process(buffer.getArrayOfWritePointers(), buffer.getNumChannels(), n);
+    outputLevelForGUI.store(hasCh0 ? channelRms(buffer.getReadPointer(0), n) : 0.0f,
+                            std::memory_order_relaxed);
+}
 
 bool SilentRiotProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const {
     auto mainIn  = layouts.getMainInputChannelSet();
@@ -344,10 +454,12 @@ void SilentRiotProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
 {
     juce::ScopedNoDenormals noDenormals;
 
-    // Read parameters
-    float gainParam = apvts.getRawParameterValue(Params::IDs::GAIN)->load();
-    float toneParam = apvts.getRawParameterValue(Params::IDs::TONE)->load();
-    float volParam  = apvts.getRawParameterValue(Params::IDs::VOLUME)->load();
+    // Read parameters. The amp knobs are sanitized like the effects below: a
+    // single host NaN on GAIN or VOLUME used to lock its ParamSmoother at NaN
+    // and silence the plugin for the life of the instance (review S1).
+    float gainParam = readAmpKnob(Params::IDs::GAIN,   Params::Defaults::GAIN);
+    float toneParam = readAmpKnob(Params::IDs::TONE,   Params::Defaults::TONE);
+    float volParam  = readAmpKnob(Params::IDs::VOLUME, Params::Defaults::VOLUME);
     bool  is7W      = apvts.getRawParameterValue(Params::IDs::HALF_POWER)->load() > 0.5f;
     bool  cabOn     = apvts.getRawParameterValue(Params::IDs::CAB_SIM)->load() > 0.5f;
     bool  powerOn   = apvts.getRawParameterValue(Params::IDs::POWER)->load() > 0.5f;
@@ -392,19 +504,53 @@ void SilentRiotProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     if (buffer.getNumChannels() > 0)
         pushTunerSamples(buffer.getReadPointer(0), buffer.getNumSamples());
 
+    // Keep the host-bypass passthrough primed with the raw input, so a bypass
+    // engaged after this block continues from it without a gap.
+    syncBypassDelay();
+    bypassDelay.write(buffer.getArrayOfReadPointers(), buffer.getNumChannels(),
+                      buffer.getNumSamples());
+
     // Master power off, or tuner mute engaged — silence output. Capture above
     // still ran, so the tuner keeps tracking pitch while the amp is silent.
-    if (!powerOn || tunerMute) { buffer.clear(); return; }
+    // The effects below stop running here and freeze holding their tails, so
+    // flag them to start clean when the amp comes back (review B6).
+    //
+    // The metering at the end of the block is skipped too, so publish the
+    // silence here, or both meters hold their last level and VUMeter's jitter
+    // makes them look live (review S6). Under tuner mute the input meter stays
+    // live (post-trim, as when playing): the tuner is listening to that signal.
+    // Power off reads all zero, matching the editor's dark meters.
+    if (!powerOn || tunerMute)
+    {
+        const bool meterInput = powerOn && buffer.getNumChannels() > 0;
+        inputLevelForGUI.store(meterInput ? channelRms(buffer.getReadPointer(0), buffer.getNumSamples())
+                                                * inputTrimGain(inTrimParam)
+                                          : 0.0f,
+                               std::memory_order_relaxed);
+        outputLevelForGUI.store(0.0f, std::memory_order_relaxed);
+        gridCurrentForGUI.store(0.0f, std::memory_order_relaxed);
+        buffer.clear();
+        tailsStale = true;
+        return;
+    }
 
-    el84BaseBias = is7W ? PENTODE_BIAS_7W_N : PENTODE_BIAS_15W_N;
+    // Leaving power-off / tuner mute, or after a host reset(): drop every frozen
+    // effect tail. Clearing the was-on flags sends delay, reverb and widener
+    // through their off→on restart below; lastIrMode = false does the same for
+    // the IR convolution; the IIR path's alignment delay is cleared here.
+    if (tailsStale.exchange(false))
+    {
+        delayWasOn = reverbWasOn = widenerWasActive = lastIrMode = false;
+        delayFading = reverbFading = false;
+        iirPathAlign.reset();
+    }
 
     // Keep the sag reference locked to what the tube model actually idles at for
     // this bias. 7W runs a hotter bias → higher idle current → different
     // reference, so this has to follow the power-mode switch, not be a constant.
-    if (el84BaseBias != lastSagQuiescentBias) {
-        lastSagQuiescentBias = el84BaseBias;
-        sag.setQuiescent(pentodeQuiescentTotal(el84BaseBias,
-                                               V_POWER_NOMINAL_N, V_SCREEN_NOMINAL_N));
+    {
+        const float bias = is7W ? PENTODE_BIAS_7W_N : PENTODE_BIAS_15W_N;
+        if (bias != lastSagQuiescentBias) setEl84Bias(bias);
     }
 
     cabSim.setEnabled(cabOn);
@@ -414,7 +560,7 @@ void SilentRiotProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     {
         cachedIRIndex = irIndex;
         pendingIRIndex.store(irIndex);
-        triggerAsyncUpdate();  // handleAsyncUpdate() calls cabSim.setIRIndex() on message thread
+        triggerAsyncUpdate();  // handleAsyncUpdate() applies it via applyUserIRIndex() on message thread
     }
 
     // IR mode: cab on AND convolution has an active IR.
@@ -446,17 +592,9 @@ void SilentRiotProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     // ── Input level metering (RMS, post-trim) ──
     // Post-trim on purpose: the meter has to show what the amp sees, or the
     // INPUT knob can't be set by eye.
-    {
-        const int n = buffer.getNumSamples();
-        if (n > 0)
-        {
-            const float* ch0 = buffer.getReadPointer(0);
-            float sumSq = 0.0f;
-            for (int i = 0; i < n; ++i)
-                sumSq += ch0[i] * ch0[i];
-            inputLevelForGUI.store(std::sqrt(sumSq / static_cast<float>(n)), std::memory_order_relaxed);
-        }
-    }
+    if (buffer.getNumSamples() > 0)
+        inputLevelForGUI.store(channelRms(buffer.getReadPointer(0), buffer.getNumSamples()),
+                               std::memory_order_relaxed);
 
     // ── Pre-amp effects (gate → boost) at base SR, BEFORE upsampling ──
     // The amp reads mono from channel 0, so we process channel 0 only; the
@@ -514,6 +652,7 @@ void SilentRiotProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     // Oversampled processing (Spec §2.5 processBlock)
     auto* oversampler = oversampleSwitcher.active();
     auto osBlock = oversampler->processSamplesUp(juce::dsp::AudioBlock<float>(buffer));
+    float peakEl84GridDrop = 0.0f;   // GRID I readout: the block's peak, not its last sample
 
     for (size_t i = 0; i < osBlock.getNumSamples(); ++i)
     {
@@ -601,6 +740,7 @@ void SilentRiotProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
         float effectiveBias = el84BaseBias + sag.biasOffset();
         piA = applyGridConduction(piA, el84GridA);
         piB = applyGridConduction(piB, el84GridB);
+        peakEl84GridDrop = std::max({ peakEl84GridDrop, el84GridA.lastGridDrop, el84GridB.lastGridDrop });
         float condA = softConductionCurve(piA, effectiveBias);
         float condB = softConductionCurve(piB, effectiveBias);
         PentodeOutput ppA = pentodeWaveshaper(piA, effectiveBias, vPlate, vScreen);
@@ -654,6 +794,17 @@ void SilentRiotProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     // ── IR Convolution path (runs at base SR, after downsample) ──
     if (irMode)
     {
+        // IR path (re)activated — cab switched back on, an IR selected after
+        // IIR, or leaving mute/reset. The convolution and its limiter
+        // oversampler were skipped meanwhile and still hold the old tail, so
+        // clear them rather than replay it (review B6). Both resets are
+        // allocation-free; the IR engine itself is still only changed on the
+        // message thread.
+        if (!lastIrMode)
+        {
+            cabSim.reset();
+            limiterOversampler->reset();
+        }
         cabSim.processBlock(outputBlock);
 
         // Apply output scaling + tanh limiter oversampled (4x) so the
@@ -680,10 +831,25 @@ void SilentRiotProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
                 if (!std::isfinite(samples[i])) samples[i] = 0.0f;
         }
     }
+    else
+    {
+        // Match the IR path's limiter-oversampler latency (review B4). Cleared
+        // on an IR -> IIR switch so it never replays a stale few samples.
+        if (lastIrMode) iirPathAlign.reset();
+        iirPathAlign.process(buffer.getArrayOfWritePointers(), buffer.getNumChannels(),
+                             buffer.getNumSamples());
+    }
+    lastIrMode = irMode;
 
     // ── Post-cab effects (delay → reverb) at base SR, after the amp/cab ──
     // Operate per channel: a stereo bus picks up reverb/delay width; mono
-    // stays mono. Skipped entirely (bit-exact dry) when toggled off.
+    // stays mono. Skipped entirely (bit-exact dry) when toggled off. On each
+    // off→on edge restart() clears the tail the effect froze with while skipped,
+    // snaps its smoothers and ramps its mix in from 0; on each on→off edge the
+    // effect keeps running for one mix ramp down to 0 before it is skipped, so
+    // switching it off doesn't cut the wet and step the dry (review B6).
+    // Switched back on mid-fade, it never stopped running, so its tail is live
+    // and the mix ramp simply reverses — no restart.
     if (delayOn)
     {
         float delayMs;
@@ -691,7 +857,7 @@ void SilentRiotProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
         {
             // MANUAL — map time knob 0..1 → ms
             delayMs = DELAY_TIME_MIN_MS
-                + delayTime * (DELAY_TIME_MAX_MS - DELAY_TIME_MIN_MS);
+                + delayTime * (DELAY_TIME_KNOB_MAX_MS - DELAY_TIME_MIN_MS);
         }
         else
         {
@@ -704,13 +870,34 @@ void SilentRiotProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
             delayMs = computeSyncMs(delaySync, bpm);
         }
         delay.setParameters(delayMs, delayFb, delayMix, delayTone, delayPP);
-        delay.process(buffer);
+        if (!delayWasOn && !delayFading) delay.restart();
+        delayFading = false;
     }
+    else if (delayWasOn)
+    {
+        delay.fadeOut();
+        delayFading = !delay.fadedOut();   // mix already at 0: nothing to fade
+    }
+    const bool delayRan = delayOn || delayFading;
+    if (delayRan) delay.process(buffer);
+    if (delayFading && delay.fadedOut()) delayFading = false;
+    delayWasOn = delayOn;
+
     if (reverbOn)
     {
         reverb.setParameters(reverbMix, reverbSz, reverbTn);
-        reverb.process(buffer);
+        if (!reverbWasOn && !reverbFading) reverb.restart();
+        reverbFading = false;
     }
+    else if (reverbWasOn)
+    {
+        reverb.fadeOut();
+        reverbFading = !reverb.fadedOut();   // mix already at 0: nothing to fade
+    }
+    const bool reverbRan = reverbOn || reverbFading;
+    if (reverbRan) reverb.process(buffer);
+    if (reverbFading && reverb.fadedOut()) reverbFading = false;
+    reverbWasOn = reverbOn;
 
     // ── MONO/STEREO widener (stereo bus only) ──
     // Skipped entirely (bit-exact dry) while the knob sits parked at 0 and the
@@ -763,11 +950,12 @@ void SilentRiotProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     // input (it can exceed ±1 even when the mono sum is in range). Both land
     // after the amp's own limiter, so soft-clip the finished bus back into ±1
     // (and scrub any non-finite sample) as a last line of defence. Runs ONLY
-    // when an effect is active, so the dry amp path stays bit-identical when the
-    // whole module is off. NOTE: this per-channel clip is nonlinear, so on peaks
-    // that actually hit the knee it marginally perturbs the widener's exact
-    // mono-sum invariance — an accepted trade against hard DAC clipping.
-    if (delayOn || reverbOn || widenerActive || outputBoosting)
+    // while an effect runs (fading out included), so the dry amp path stays
+    // bit-identical when the whole module is off. NOTE: this per-channel clip
+    // is nonlinear, so on peaks that actually hit the knee it marginally
+    // perturbs the widener's exact mono-sum invariance — an accepted trade
+    // against hard DAC clipping.
+    if (delayRan || reverbRan || widenerActive || outputBoosting)
     {
         for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
         {
@@ -781,24 +969,14 @@ void SilentRiotProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     }
 
     // ── GUI level metering (RMS of channel 0, post-trim) ──
-    {
-        const int n = buffer.getNumSamples();
-        if (n > 0)
-        {
-            const float* ch0 = buffer.getReadPointer(0);
-            float sumSq = 0.0f;
-            for (int i = 0; i < n; ++i)
-                sumSq += ch0[i] * ch0[i];
-            float rms = std::sqrt(sumSq / static_cast<float>(n));
-            outputLevelForGUI.store(rms, std::memory_order_relaxed);
-        }
-    }
+    if (buffer.getNumSamples() > 0)
+        outputLevelForGUI.store(channelRms(buffer.getReadPointer(0), buffer.getNumSamples()),
+                                std::memory_order_relaxed);
 
-    // ── Grid current readout (peak across EL84 stages) ──
-    {
-        float peakGridI = std::max(el84GridA.lastGridCurrent, el84GridB.lastGridCurrent);
-        gridCurrentForGUI.store(peakGridI, std::memory_order_relaxed);
-    }
+    // ── Grid current readout (block peak across both EL84 grids) ──
+    // The tracked drop is a voltage; the current is drop / source resistance
+    // (review S3). Both grids share GRID_SOURCE_R_EL84_N, so one division.
+    gridCurrentForGUI.store(gridCurrentN(peakEl84GridDrop, el84GridA), std::memory_order_relaxed);
 
     // ── DSP-state telemetry for the editor readout (publish atomic snapshot) ──
     {
@@ -916,33 +1094,11 @@ bool SilentRiotProcessor::loadUserIR(const juce::File& file)
     if (static_cast<int>(userIRs.size()) >= sr::MAX_USER_IRS)
         return false;
 
-    juce::AudioFormatManager mgr;
-    mgr.registerBasicFormats();
-    std::unique_ptr<juce::AudioFormatReader> reader(mgr.createReaderFor(file));
-    if (!reader) return false;
-
-    int numSamples = static_cast<int>(
-        std::min(reader->lengthInSamples, static_cast<juce::int64>(sr::MAX_USER_IR_SAMPLES)));
-    if (numSamples <= 0) return false;
-
-    // Convolution uses at most 2 channels (Stereo::yes); reading more would
-    // only bloat the saved state — and the restore path rejects >2 channels.
-    int numChannels = std::min(static_cast<int>(reader->numChannels), 2);
-    if (numChannels <= 0) return false;
-
-    // Reject formats the restore path can't accept (e.g. an out-of-band sample
-    // rate) up front — otherwise the IR would load now but be silently dropped
-    // on the next project reload, taking every user IR after it with it.
-    if (!sr::isValidUserIRFormat(numChannels, numSamples, reader->sampleRate))
-        return false;
-
+    // Reads, format-checks and rejects NaN/Inf samples (review S4) — the same
+    // criteria the restore path applies, see UserIRState.h.
     UserIREntry entry;
-    entry.name = file.getFileNameWithoutExtension();
-    entry.sampleRate = reader->sampleRate;
-    entry.numChannels = numChannels;
-    entry.numSamples = numSamples;
-    entry.audioData.setSize(numChannels, numSamples);
-    reader->read(&entry.audioData, 0, numSamples, 0, true, true);
+    if (!sr::readUserIRFromFile(file, entry))
+        return false;
 
     // Load into convolution immediately
     juce::AudioBuffer<float> bufCopy(entry.audioData);
@@ -992,15 +1148,9 @@ void SilentRiotProcessor::loadUserIRsFromState()
     // project files and must not be trusted (see UserIRState.h).
     userIRs = sr::userIRsFromValueTree(apvts.state.getChildWithName("UserIRs"));
 
-    // Reload active IR if saved
-    int irIndex = static_cast<int>(apvts.getRawParameterValue(sr::Params::IDs::IR_INDEX)->load());
-    if (irIndex > 0 && irIndex <= static_cast<int>(userIRs.size()))
-    {
-        auto& ir = userIRs[static_cast<size_t>(irIndex - 1)];
-        juce::AudioBuffer<float> bufCopy(ir.audioData);
-        cabSim.loadIRFromBuffer(std::move(bufCopy), ir.sampleRate);
-        cachedIRIndex = irIndex;
-    }
+    // Reload the saved active IR — or disable the live one when the saved
+    // index is past the restored list (review S2)
+    applyIRIndexParam();
 }
 
 // ── State Persistence ──

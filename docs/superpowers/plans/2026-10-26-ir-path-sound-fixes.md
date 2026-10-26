@@ -7,43 +7,30 @@
 about 11 dB quieter than the built-in cab, its level moves with the host sample rate, and
 switching into it can briefly play the amp with no cab at all.
 
-**Review findings (2026-10-26 cabinet/IR review).** Each was measured with `sr_render`, a
-throwaway `CabinetSim` probe or JUCE 7.0.12's source, not estimated:
+**Baseline:** `main` at `495c256` (after #33). The numbers below were re-measured there with
+`sr_render`, a throwaway `CabinetSim` probe and JUCE 7.0.12's source, not estimated.
+
+**Review findings (2026-10-26 cabinet/IR review):**
 
 | # | Finding | Evidence | Task |
 |---|---|---|---|
 | 1 | IR mode is ~11 dB quieter than the built-in cab | `Normalise::yes` scales to `0.125/√energy`, 18 dB below unit energy. Neutral fixture IR: −53.5 vs −42.6 dBFS at gain 0.3, −14.8 vs −4.9 at full crank | 2 |
 | 2 | IR loudness depends on the host rate | JUCE normalises *after* resampling to the session rate. +3.1 dB at 96 kHz vs 48 kHz; the built-in cab moves 0.01 dB | 2 |
-| 3 | The first IR after a `prepare` plays un-cabbed | JUCE's convolution starts as a pass-through and builds the engine on a thread that polls every 10 ms. Probe: first block passed a 10 kHz tone unchanged (should be −41.5 dB), then a ~58 ms crossfade | 1, 3 |
-| 4 | Mode switches are hard cuts, and IR mode resumes with a stale tail | Built-in cab ↔ IR and CAB on/off swap at a block edge. First block of silence after re-entering IR mode was −47.7 dBFS, not 0 | 3 |
-| 5 | Offline IR renders aren't repeatable | `sr_render.cpp:428` calls the load "synchronous". With `--warmup-ms 0` under CPU load, 6 renders differed from the unloaded one between 11.7 and 74 ms | 1 |
+| 3 | The first IR after a `prepare` plays un-cabbed | JUCE's convolution starts as a pass-through and builds the engine on a thread that polls every 10 ms. Probe: the first block passed a 10 kHz tone unchanged (should be −41.5 dB). Real processor: the first ~20 ms of IR mode carry as much >7 kHz energy as CAB off, 27 dB above where they settle by ~80 ms | 1, 3 |
+| 4 | Mode switches are hard cuts | Built-in cab ↔ IR and CAB on/off swap at a block edge. (#33 already clears the stale convolution and limiter tail on entering IR mode, review B6) | 3 |
+| 5 | When the real IR takes over depends on wall-clock time | JUCE's background thread does the swap. Before #33, 6 renders under CPU load with `--warmup-ms 0` differed from an unloaded one between 11.7 and 74 ms. On `495c256` the same test matched, but the swap point still moves with block size, so repeatability isn't guaranteed. `sr_render.cpp:428` calls the load "synchronous" | 1 |
 | 6 | Long IRs are cut off with no fade | Hard cut at 8192 samples (170 ms at 48 kHz, 43 ms at 192 kHz) | 4 |
 
 **Order:** Task 1 first. It makes every later IR measurement repeatable. Task 2 is the big sound
 change. Task 3 needs Task 1's install path. Task 4 is small and independent. **One task per
-commit**, sign-off after each.
+commit**, sign-off after each. None of it depends on the power-section Phase 2 (B2/B3):
+Task 2 matches IR mode to the built-in cab's filters, not to the make-up gain, so a later
+re-calibration carries over to IR mode by itself.
 
 **Not in this plan:** the IR loader UI bugs (list won't scroll, wrong file types, no remove, no
 way back to the built-in cab, panel doesn't refresh), the built-in cab's 400 Hz notch (a tone
 decision on the IIR path, not the IR loader), positional `IR_INDEX` and the state-copy issue.
 They don't change what an IR sounds like. They need their own plan.
-
-## If PR #33 merges first
-
-This plan was written against `main` at `377925e`. Open PR #33 (`fix/ir-restore-and-samples`)
-rewrites the IR load and restore paths. If it lands first, re-point the tasks like this:
-
-- **Loading moves.** `loadUserIR` reads files through `readUserIRFromFile`, and the
-  `prepareToPlay` reload goes through `applyIRIndexParam` → `applyUserIRIndex`. That path is
-  **also** used by state restore, which can run while `processBlock` does. So Task 1 must use
-  `installIRNow` on the `prepareToPlay` call only, and keep the restore call asynchronous.
-- **Task 2 keeps the guard.** `isSafeToNormaliseIR` rejects NaN and huge samples because they
-  poison JUCE's normalisation. With `Normalise::no` that reason goes away, but our band-level
-  metric needs the same guard, so keep the check and update its comment.
-- **Task 3 tests get easier.** #33 adds `tests/processor_harness.h`, which runs the real
-  processor. Use it for the click and switch measurements; the `sr_render` switch flags become
-  optional.
-- **Task 4 moves.** The fade goes in `readUserIRFromFile`, where truncation happens.
 
 ## Owner decisions (decided 2026-10-26)
 
@@ -69,6 +56,10 @@ rewrites the IR load and restore paths. If it lands first, re-point the tasks li
 - Saved state is unchanged: `userIRs` and the project keep the **raw** IR audio. Normalisation
   is applied when an IR is handed to the convolution, so it can be retuned later without
   touching saved projects. (Task 4's fade is the one stated exception.)
+- Keep #33's IR rules: load requires `isLoadableIR()` plus `isValidUserIRFormat()`; restore
+  requires only the safety predicate and stops at the first invalid entry.
+- Processor wiring is tested through `tests/processor_harness.h` (`SilentRiotProcessorTests`),
+  not only with `sr_render`.
 - No new APVTS parameters.
 - A new `.cpp` must be listed in `CMakeLists.txt` **and** `tools/CMakeLists.txt` (`verify.sh`
   checks both), plus `tests/CMakeLists.txt` if a test needs it.
@@ -78,26 +69,28 @@ rewrites the IR load and restore paths. If it lands first, re-point the tasks li
 
 ## Task 0: Baseline and fixtures
 
-- [ ] `bash scripts/verify.sh` passes (308/308).
+- [ ] `bash scripts/verify.sh` passes (372/372).
 - [ ] Add `tools/make_ir_fixtures.py`, which writes three deterministic 48 kHz, 8192-sample mono
       IRs with numpy/scipy. Commit the WAVs under `tests/fixtures/ir/` (~32 KB each):
   - `neutral.wav`: 4th-order Butterworth band-pass, 80 Hz–5 kHz, peak-normalised. This is the
     IR all the numbers above came from.
   - `dark.wav`: 80 Hz–3 kHz.
   - `bright.wav`: 80 Hz–8 kHz plus a +4 dB peak at 3 kHz. This is also the synthetic bright IR
-    that E3 step 1 in `.agents/STATE.md` asks for. Repointing the E3 gate stays with the E3 plan.
+    the E3 step in `.agents/STATE.md` needs. Repointing the E3 gate stays with E3.
 - [ ] Add `tools/sr_irpath.py`, in the style of `sr_thump.py`. It renders `note:220:0.1:2.0` with
       the built-in cab and with each fixture, at P-CLEAN/P-EDGE/P-CRANK and at 44.1/48/96 kHz,
-      then prints RMS from 0.5 s on. Add a `--repeat N` mode that renders IR mode with
-      `--warmup-ms 0` N times under a CPU load and reports the first and last differing sample.
-- [ ] Build `sr_render`. Record `signoff.py`, `sr_irpath.py` and the CPU-load repeat test in
+      then prints RMS from 0.5 s on. Add a `--startup` mode that renders IR mode with
+      `--warmup-ms 0` and prints >7 kHz energy per 10 ms window next to a CAB-off render, and a
+      `--repeat N` mode that renders N times under CPU load and reports where they differ.
+- [ ] Build `sr_render`. Record `signoff.py` and every `sr_irpath.py` mode in
       `docs/handoff-ir-path-sound.md` (new). Expect the numbers in the findings table.
 - [ ] Save built-in-cab renders of every sign-off point (`.f32`). Later tasks diff against them.
 
 ## Task 1: Install the active IR synchronously in `prepareToPlay`
 
-**Problem:** `prepareToPlay` hands the IR to `bufferTransfer`, so the first block after
-`prepare` runs JUCE's pass-through engine. The real engine then arrives at a wall-clock time
+**Problem:** `prepareToPlay` → `applyIRIndexParam()` → `applyUserIRIndex()` →
+`CabinetSim::loadIRFromBuffer`, which hands the IR to `bufferTransfer`. So the first blocks
+after `prepare` run JUCE's pass-through engine, and the real one arrives at a wall-clock time
 (finding 3 at session load, and finding 5).
 
 **Mechanism:** JUCE's `Convolution::prepare()` first runs any queued loads on the calling thread
@@ -105,23 +98,33 @@ rewrites the IR load and restore paths. If it lands first, re-point the tasks li
 "load, then `prepare()`" installs an IR immediately, and that's safe whenever `processBlock`
 isn't running.
 
-**Files:** `src/dsp/cabinet/CabinetSim.{h,cpp}`, `src/PluginProcessor.cpp`, `tools/sr_render.cpp`,
-`tests/cabinet_ir_tests.cpp`
+**Files:** `src/dsp/cabinet/CabinetSim.{h,cpp}`, `src/dsp/cabinet/UserIRState.{h,cpp}`
+(`applyUserIRIndex`), `src/PluginProcessor.{h,cpp}` (`applyIRIndexParam`), `tools/sr_render.cpp`,
+`tests/cabinet_ir_tests.cpp`, `tests/processor_ir_tests.cpp`
 
-- [ ] Write a failing test: `prepare(44100, 512, 2)`, install a 64-tap moving-average IR, then
-      process one block of a 10 kHz tone with no sleeps. Assert the output is ≥ 30 dB below the
-      input. Today it is 0 dB.
+- [ ] Write failing tests first:
+  - [ ] `CabinetSim`: `prepare(44100, 512, 2)`, install a 64-tap moving-average IR, then process
+        one block of a 10 kHz tone with no sleeps. The output must be ≥ 30 dB below the input.
+        Today it is 0 dB.
+  - [ ] Processor (harness): with an IR selected, prepare and run one block of the amp. Its
+        >7 kHz energy must match settled IR mode, not CAB off. Today it matches CAB off.
 - [ ] Add `BufferTransfer::clear()` and `CabinetSim::installIRNow(AudioBuffer&&, double rate)`.
-      Document that it must not run concurrently with `processBlock`, so `prepareToPlay` is the
-      only plugin caller. Steps: clear any pending transfer (otherwise the audio thread reloads
-      the same IR and starts a second, timing-dependent crossfade), call
-      `convolution.loadImpulseResponse(...)`, then `convolution.prepare(spec)` with the spec
-      stored by `prepare()`, then set `useIR` and the length fields.
-- [ ] `prepareToPlay`: call `installIRNow` instead of `loadIRFromBuffer`.
+      Document that it must not run concurrently with `processBlock`. Steps:
+  1. clear any pending transfer (otherwise the audio thread reloads the same IR and starts a
+     second, timing-dependent crossfade);
+  2. call `convolution.loadImpulseResponse(...)`;
+  3. call `convolution.prepare(spec)` with the spec stored by `prepare()`;
+  4. set `useIR` and the length fields.
+- [ ] Give `applyUserIRIndex()` and `applyIRIndexParam()` a load-mode argument (`now` / `async`).
+      **Only the `prepareToPlay` call passes `now`.** The other caller, `setStateInformation`,
+      can run while `processBlock` does, so it stays `async`.
 - [ ] `sr_render`: load `--ir` **before** `prepareToPlay`, so `prepareToPlay` installs it
       synchronously. Fix the "synchronous" comment.
-- [ ] Verify: the test passes. `sr_irpath.py --repeat 6` under load gives bit-identical renders.
-      Built-in-cab renders are bit-identical. The only IR-mode change is the first ~70 ms.
+- [ ] Verify:
+  - Both tests pass, and `sr_irpath.py --startup` shows no CAB-off-level burst.
+  - `--repeat 6` under load gives bit-identical renders at block sizes 64, 512 and 2048.
+  - Built-in-cab renders are bit-identical.
+  - The only IR-mode change is the first ~80 ms.
 
 ## Task 2: Level-match the IR path (do our own normalisation)
 
@@ -137,10 +140,15 @@ built-in cab's three biquads (`cab_presence × cab_rolloff × cab_notch`), which
 it predicts the neutral fixture at −11.4 dB under JUCE's normalisation, a −10.5 dB gap, and
 `sr_render` measured −10.9 dB.
 
+**Keep #33's safety guard.** `isSafeToNormaliseIR()` and `MAX_IR_CHANNEL_ENERGY` exist because
+NaN or huge samples poison JUCE's normalisation. JUCE no longer normalises after this task, but
+our band metric needs exactly the same guard. Keep the check and rewrite its comment.
+`Trim::yes` and `isAudibleOnEveryChannel()` are unchanged.
+
 **Files:** new `src/dsp/cabinet/IRLevel.h` (pure C++, header-only), `src/utils/Constants.h`
 (`IR_LEVEL_BAND_LO_HZ`, `IR_LEVEL_BAND_HI_HZ`, `IR_LEVEL_POINTS_PER_OCT`),
-`src/dsp/cabinet/CabinetSim.cpp`, new `tests/ir_level_tests.cpp` (`SilentRiotTests`),
-`tests/cabinet_ir_tests.cpp`, `tests/CMakeLists.txt`
+`src/dsp/cabinet/CabinetSim.{h,cpp}`, new `tests/ir_level_tests.cpp` (`SilentRiotTests`),
+`tests/cabinet_ir_tests.cpp`, `tests/processor_ir_tests.cpp`, `tests/CMakeLists.txt`
 
 - [x] Decision D1 confirmed by the owner (2026-10-26): match the built-in cab.
 - [ ] Write pure tests first (`ir_level_tests.cpp`):
@@ -155,14 +163,20 @@ it predicts the neutral fixture at −11.4 dB under JUCE's normalisation, a −1
       push the neutral fixture through a real `juce::dsp::Convolution` prepared at 44.1 kHz and
       at 96 kHz. Feed it an impulse and measure the resulting IR with the same metric. It must
       be within 0.3 dB of the reference at both rates. Today it is −10.5 dB, and 3 dB apart.
+- [ ] Write a processor test (harness): with the neutral fixture loaded, IR mode's output level
+      on a 220 Hz note is within ±1.5 dB of the built-in cab's. Today it is −10.9 dB.
 - [ ] Implement: one private `CabinetSim` helper that every load path calls (`loadIRFromBuffer`,
-      `installIRNow`, and the dead `loadStockIR`/`loadIRFromFile` for consistency). It measures
-      the channel-averaged band power at the IR's native rate, scales **all channels by one
-      factor** (keeps the stereo balance), then passes `Normalise::no`. Runs on the message
-      thread: about 1M multiply-adds per IR at 8192 samples, a few ms.
-- [ ] Measure with `sr_irpath.py`. Target: IR vs built-in cab within ±1.5 dB at all three points
-      for all three fixtures, and IR mode within ±0.3 dB across 44.1/48/96 kHz. Record the before
-      and after table in the handoff doc.
+      `installIRNow`, and the test-only `loadStockIR`/`loadIRFromFile` for consistency). It:
+  - measures the channel-averaged band power at the IR's native rate;
+  - scales **all channels by one factor**, which keeps the stereo balance;
+  - passes `Normalise::no`.
+
+  It runs on the message thread: about 1M multiply-adds per IR at 8192 samples, a few ms.
+- [ ] Measure with `sr_irpath.py`. Targets:
+  - IR vs built-in cab within ±1.5 dB at all three points, for all three fixtures;
+  - IR mode within ±0.3 dB across 44.1/48/96 kHz.
+
+  Record the before and after table in the handoff doc.
 - [ ] Re-check the IR-path limiter. The output tanh now sees ~11 dB more drive in IR mode, and
       the 4× limiter oversampler (`docs/handoff-IR-limiter-aliasing.md`) was only validated at the
       old, too-quiet level. Add report-only IR variants of A2 (peak ceiling), B3, D1 and D5 to
@@ -175,11 +189,16 @@ it predicts the neutral fixture at −11.4 dB under JUCE's normalisation, a −1
 ## Task 3: Fade every cab-mode switch and never play un-cabbed
 
 **Problem:** finding 4, plus finding 3 at runtime. The first time you pick an IR in a session,
-the convolution is still a pass-through, and today `useIR` flips IR mode on immediately.
+the convolution is still a pass-through, and `useIR` flips IR mode on immediately.
+
+**What #33 already does:** `processBlock` keeps `lastIrMode`. On entering IR mode it calls
+`cabSim.reset()` and `limiterOversampler->reset()`, and on leaving it calls
+`iirPathAlign.reset()`. So neither path replays a stale tail. Those resets stay. They move to
+the switcher's commit point, so they still run exactly once per switch, with the output at zero.
 
 **Design:** the three effective modes are Off, built-in, and IR. The requested mode is
 `!cabOn ? Off : (useIR ? IR : built-in)`. A small state machine, modelled on
-`OversampleSwitcher`, owns the **active** mode:
+`OversampleSwitcher`, owns the **active** mode and replaces the `lastIrMode` edge check:
 
 - `Idle`: active == requested, gain 1.
 - `WaitingForIR` (only when entering IR mode): keep playing the active mode. Each block, call
@@ -189,27 +208,29 @@ the convolution is still a pass-through, and today `useIR` flips IR mode on imme
   to stay on the built-in cab a few ms longer than ever play un-cabbed. Log in debug builds if
   waiting exceeds 1 s.
 - `FadingOut`: gain 1 → 0 over 128 base-rate samples, in the old mode.
-- Commit at gain 0: switch the active mode and reset the state of the path being entered. For
-  IR mode that's `convolution.reset()` (zeroes the stale tail and drops any half-finished JUCE
-  crossfade) and `limiterOversampler->reset()`. For the built-in cab it's the three cab biquads.
+- Commit at gain 0: switch the active mode and run #33's resets for the path being entered. The
+  convolution reset also drops any half-finished JUCE crossfade from the pass-through. For the
+  built-in cab, reset the three cab biquads too.
 - `FadingIn`: gain 0 → 1 over 128 samples. A new request during the fade-in fades out from the
   current gain, so the ramp has no step.
 
 IR → IR changes are not mode changes. JUCE's own 50 ms crossfade keeps handling them.
 
 `Convolution::reset()` is safe on the audio thread: it zeroes buffers, resets the crossfade
-smoother, and passes the previous engine to JUCE's background queue for deletion. That's the same
-call JUCE makes inside its own `process()`.
+smoother, and passes the previous engine to JUCE's background queue for deletion. #33 already
+calls it from `processBlock`.
 
 A true crossfade between the two paths would need the oversampled loop to output both streams,
 plus a second downsampler. A short dip is click-free, matches oversample switching, and only
-happens on a user action.
+happens on a user action. `iirPathAlign` keeps both paths at the same latency, so the dip doesn't
+shift the audio in time.
 
 **Files:** new `src/dsp/cabinet/CabModeSwitcher.h` (pure C++), `src/dsp/cabinet/CabinetSim.{h,cpp}`
-(`prime()`, scratch buffer, `hasRealIR()`), `src/PluginProcessor.{h,cpp}` (use the active mode
-everywhere `irMode`/`cabOn` gate processing today: the cab biquads, the in-loop tanh, the IR
-block, `cabSim.setEnabled`), new `tests/cab_mode_switcher_tests.cpp`, `tests/cabinet_ir_tests.cpp`,
-`tools/sr_render.cpp`
+(`prime()`, scratch buffer, `hasRealIR()`), `src/PluginProcessor.{h,cpp}`, new
+`tests/cab_mode_switcher_tests.cpp`, `tests/cabinet_ir_tests.cpp`, `tests/processor_ir_tests.cpp`
+
+In `PluginProcessor`, use the active mode everywhere `irMode`/`cabOn` gate processing today: the
+cab biquads, the in-loop tanh, the IR block, `iirPathAlign` and `cabSim.setEnabled`.
 
 - [ ] Write the state-machine tests first (`SilentRiotTests`):
   - [ ] An unchanged mode gives gain exactly 1 and no commit over 10k samples.
@@ -218,32 +239,37 @@ block, `cabSim.setEnabled`), new `tests/cab_mode_switcher_tests.cpp`, `tests/cab
   - [ ] → IR with the IR not ready: gain stays 1 and no commit. Commit happens only once ready.
   - [ ] A request reversed mid-fade-out never commits the abandoned mode.
   - [ ] A request during fade-in continues from the current gain.
-- [ ] Write JUCE tests: after the entry reset, the first block of silence is exactly 0 (today
-      −47.7 dBFS). An IR pushed while not in IR mode reaches `hasRealIR()` through `prime()`
-      within 1 s (bounded poll loop).
-- [ ] Add `--ir-at-ms T` and `--cab-at-ms T` to `sr_render` (load an IR, or toggle CAB, between
-      blocks at time T), so the click can be measured in the real `processBlock`.
-- [ ] Measure before and after: for built-in → IR, IR → built-in, CAB off → on and CAB on → off
-      at P-EDGE, record the largest sample-to-sample step and the energy above 7 kHz in the
-      20 ms after T. Target: no step above the steady-state maximum, and no >7 kHz burst on the
-      first IR load.
+- [ ] Write a JUCE test: an IR pushed while not in IR mode reaches `hasRealIR()` through
+      `prime()` within 1 s (bounded poll loop).
+- [ ] Write processor tests (harness), at P-EDGE on a sustained note, for built-in → IR,
+      IR → built-in, CAB off → on and CAB on → off. In the 20 ms after the switch:
+  - no sample-to-sample step larger than the steady-state maximum;
+  - and, on the first IR load of a session, no >7 kHz energy above settled IR mode.
+
+  Record the before and after numbers in the handoff doc.
 - [ ] Verify. Built-in-cab renders with no switch must be bit-identical.
+- [ ] #33's B6 tests in `processor_effects_tests.cpp` must still pass. The first four already run
+      the IR path (`Fx::IR`, switched by CAB). The two fade tests cover only delay and reverb,
+      whose wet signal fades into dry. A cab switch dips to zero instead, so Task 3's own
+      processor tests are the cab's equivalent.
 
 ## Task 4: Fade truncated IRs
 
 **Problem:** finding 6. An IR longer than the cap is cut mid-ring, which adds a small spectral
 ripple. Low impact at ≤ 96 kHz, but it costs a few lines.
 
-**Files:** `src/dsp/cabinet/UserIRState.{h,cpp}` (pure helper `fadeTruncatedTail(buffer, rate)`),
-`src/PluginProcessor.cpp` (`loadUserIR`), `tests/user_ir_state_tests.cpp`
+**Files:** `src/dsp/cabinet/UserIRState.{h,cpp}` (pure helper `fadeTruncatedTail(buffer, rate)`,
+called from `readUserIRFromFile`, which truncates), `tests/user_ir_state_tests.cpp`
 
 - [x] Decision D2 confirmed by the owner (2026-10-26): keep 8192 samples.
 - [ ] Write the test first: `fadeTruncatedTail` ends the buffer in a monotonic raised-cosine fade
       over its last 5 ms, finishing at ~0, and leaves every earlier sample untouched.
-- [ ] Call it in `loadUserIR` only when the file was longer than the cap. This is the one
-      exception to "store the raw audio": what gets stored is already the truncated copy, not
-      the file, so storing it faded needs no flag on restore. IRs at or under the cap stay bit
-      for bit. Projects saved before this change keep their unfaded truncation.
+- [ ] Call it in `readUserIRFromFile` only when the file was longer than the cap, before the
+      `isLoadableIR()` check.
+  - This is the one exception to "store the raw audio". What gets stored is already the
+    truncated copy, not the file, so storing it faded needs no flag on restore.
+  - IRs at or under the cap stay bit for bit.
+  - Projects saved before this change keep their unfaded truncation.
 - [ ] Verify.
 
 ## Done when
@@ -255,10 +281,9 @@ ripple. Low impact at ≤ 96 kHz, but it costs a few lines.
 - [ ] Every built-in-cab sign-off gate is bit-identical to Task 0. The new IR-variant gates are
       recorded.
 - [ ] `CLAUDE.md` updated:
-  - Cabinet IR Loader Architecture: fix the stale `IR_INDEX` lines (1–32 are user slots;
-    `loadUserIR` doesn't go through `loadIRFromFile`). Add the normalisation, `installIRNow` and
-    the mode switcher.
-  - Important Pitfalls: never pass `Normalise::yes` (−18 dB and rate-dependent);
-    `installIRNow` only when `processBlock` can't run.
+  - Cabinet IR Loader Architecture: add the normalisation, `installIRNow` and the mode switcher.
+    Reword the user-IR-loading paragraph, which says JUCE normalises the IR.
+  - Important Pitfalls: never pass `Normalise::yes` (−18 dB and rate-dependent); `installIRNow`
+    only from `prepareToPlay`.
   - Signal-chain diagram: add the mode fade to the IR path.
 - [ ] `.agents/STATE.md` updated, including the ~10 dB louder IR mode in existing projects.
