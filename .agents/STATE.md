@@ -1,15 +1,18 @@
 # State
 
-_Updated 2026-10-23_
+_Updated 2026-10-26_
 
 ## Now
 - Silent Riot v0.3.4 (JUCE 7 VST3/Standalone). `bash scripts/verify.sh` passes on `main`: static
-  checks + Release build + 308/308 ctest (2026-10-23). Cloud sessions provision via `.agents/bootstrap.sh`.
+  checks + Release build + 308/308 ctest (2026-10-26). Cloud sessions provision via `.agents/bootstrap.sh`.
 - Docs: the DSP spec v2.13 is background only (status banner lists superseded designs);
   `ROADMAP.md` is archived; `COMPETITIVE_ROADMAP.md` is the live plan, ticked against the code
   2026-10-23. The JSX prototype is marked out of date.
 - Power section reviewed 2026-10-23; fixes planned in
   `docs/superpowers/plans/2026-10-23-power-section-fixes.md`, none built yet.
+- Cabinet/IR reviewed 2026-10-26; IR sound fixes planned in
+  `docs/superpowers/plans/2026-10-26-ir-path-sound-fixes.md`, none built yet. The loader-panel
+  bugs found in the same review are not planned (see Known issues).
 - Tone sign-off still open: E3 (MUST-PASS) diagnosed but not fixed; A1/B1 need re-ratifying.
 
 ## Next
@@ -31,6 +34,11 @@ _Updated 2026-10-23_
    (unique hybrid-blend sketch). Check `fix/effects-toggle-rendering-use-60` first (unverified
    whether the LED-toggle work superseded it).
 8. Owner: adopt the kit template's *Rules* section (git, branch naming, secrets) in AGENTS.md?
+9. Owner: IR plan decisions D1 (level target; recommended: match the built-in cab) and D2 (IR
+   length cap; recommended: keep 8192 samples, add a fade). D1 blocks IR plan Task 2 only.
+10. IR plan Task 0 (fixtures `tests/fixtures/ir/`, `tools/sr_irpath.py`, baseline), then Task 1
+   (install the active IR synchronously in `prepareToPlay`). Its `bright.wav` fixture is the
+   synthetic bright IR item 5 needs.
 
 ## Decisions
 - DSP spec v2.13 is background, not authoritative: unmaintained since 2026-03 and several of its
@@ -48,3 +56,12 @@ _Updated 2026-10-23_
 - EL84s have no plate load line (Vp = PSU B+), so the plate knee never engages (power plan Task 4).
 - Settings → About paints a hard-coded "Licensed — Full Version" (`SettingsPanel.cpp:162`); no licensing exists.
 - ~0.5 s startup thump while the PSU settles; it pollutes E1's idle noise floor (unverified).
+- IR mode is ~11 dB quieter than the built-in cab (JUCE `Normalise::yes` = 0.125/√energy) and
+  ~3 dB louder per doubling of host rate. The first IR after `prepare` plays un-cabbed for ~70 ms;
+  mode switches are hard cuts. Measured 2026-10-26; IR plan Tasks 1–3.
+- IR loader panel: the list can't scroll (wheel delta truncates to 0, `IRLoaderPanel.cpp:116`),
+  so IRs 9–32 are unreachable; `.ir` is accepted but unreadable while AIFF/FLAC are refused; no
+  remove and no way back to the built-in cab; the panel never refreshes after automation or a
+  state load. Not planned yet.
+- CLAUDE.md's `IR_INDEX` lines are stale: 1–32 are user slots (no stock IRs reachable), and
+  `loadUserIR` doesn't go through `CabinetSim::loadIRFromFile`.
