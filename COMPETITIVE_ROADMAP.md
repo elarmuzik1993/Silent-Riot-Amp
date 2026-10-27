@@ -1,4 +1,4 @@
-# Silent Riot — Competitive Roadmap (to a paid 1.0)
+# Silent Riot — Competitive Roadmap (to an open-source 1.0)
 
 _Created: 2026-06-24 · Version at planning: v0.3.4 · Branch: `claude/plugin-audit-rating-ngbq53`_
 
@@ -6,10 +6,13 @@ _Checkboxes last checked against the code: 2026-10-23. `[~]` = partial. This is 
 plan; `ROADMAP.md` is archived._
 
 This roadmap takes the project from "excellent engine, unfinished product" (audit
-rating **7.5/10**) into **competitive, paid territory**. It is scoped to three
-deliberate decisions:
+rating **7.5/10**) to a **competitive 1.0**. It is scoped to three deliberate decisions:
 
-- **Business model:** Commercial / paid.
+- **Business model:** Free and open source (GPLv3), funded by optional support
+  (pay-what-you-want / sponsorship). _Changed 2026-10-26 from "Commercial / paid": there
+  is no audience to sell to yet, and GPLv3 (the project's license, and JUCE's free
+  license) lets anyone rebuild and redistribute the source, so a license gate could not
+  hold anyway. Phase C was rewritten accordingly._
 - **Differentiation bet:** _Perfect one amp + real cabs_ — depth over breadth, the
   boutique route. The product is the **feel and tone of a single EL84 voicing**, not a
   feature checklist.
@@ -18,22 +21,23 @@ deliberate decisions:
 
 > Companion to `ROADMAP.md` (the engineering-to-1.0 audit). That doc closed the
 > correctness/CI/release-eng gaps (P0–P4, all merged). This doc is about turning the
-> finished engine into a **product people pay for**.
+> finished engine into a **product people want to use — and choose to support**.
 
 ---
 
 ## Positioning — what "competitive" means here
 
-The boutique paid niche (think STL, Mercuriall, ML Sound Lab single amps; the tier
-_below_ Neural DSP's price) is won on three things, in order:
+The bar is the boutique single-amp tier (think STL, Mercuriall, ML Sound Lab single amps;
+the tier _below_ Neural DSP) — being free does not lower it. It is won on three things,
+in order:
 
 1. **Feel under the fingers** — dynamics, sag, pick response. This engine already models
    the physics (PSU droop, cathode sag, grid conduction, LTP). The job is to _finalize
    and prove_ it, not build it.
 2. **Cabs that sound like real speakers** — currently the single biggest gap (all stock
    IRs are synthetic placeholders).
-3. **Trust to charge money** — signed installers, a license gate, a trial, presets that
-   sell the sound in 10 seconds.
+3. **Trust to install it** — easy installers, clear releases, presets that sell the sound
+   in 10 seconds, and an obvious way to support the project.
 
 Everything below serves those three. Anything that doesn't is deferred.
 
@@ -86,8 +90,9 @@ All 8 stock IRs are synthetic placeholders (`IRLibrary.h::generateSyntheticIR`).
 boutique amp sim the cab is half the sound — this is the highest-impact _product_ gap.
 
 - [ ] **[H] Source real cabinet IRs.** Two paths — pick one:
-  - **License** a commercial IR pack with redistribution rights (fastest; verify the
-    license explicitly permits bundling inside a paid plugin).
+  - **License** an IR pack with redistribution rights (fastest; verify the license
+    explicitly permits bundling in a GPLv3 project's public repo and releases —
+    CC0 / CC-BY packs are the safe fit).
   - **Capture your own** (real cab + mics) — slower, but becomes a genuine
     differentiator and avoids licensing ambiguity. On-brand for the boutique bet.
   - Curate **quality over quantity** — ~6–10 great cab/mic/position combos beats 100
@@ -101,34 +106,32 @@ boutique amp sim the cab is half the sound — this is the highest-impact _produ
 - [ ] **[M] Re-validate the IR path** under the Phase-A aliasing fix with the real IRs
   (bright real cabs are exactly what exposed the aliasing).
 
-**Exit criteria:** N real, licensed/owned cabs ship and are browsable; factory default
+**Exit criteria:** N real, redistributable/owned cabs ship and are browsable; factory default
 uses one; no level jumps; IR path is clean under drive.
 
 ---
 
-## Phase C — Commercial readiness _(you're charging money)_
+## Phase C — Release readiness _(people can install it and support it)_
 
-None of this exists yet, and all of it is required to sell. Keep it lean — indie-grade,
-not enterprise.
+Free does not mean "devs only" — players expect an installer. Keep it lean.
 
-- [ ] **[H] Code signing.** Windows **Authenticode** cert (acquire from a CA;
-  placeholder slots already exist in `release.yml`). Unsigned plugins trip SmartScreen
-  and many hosts' security prompts — a conversion killer. Linux: ship SHA256 sums (done)
-  + clear install instructions.
 - [ ] **[H] Installers.** Windows: NSIS or Inno Setup placing the VST3 in the standard
   dir + Standalone. Linux: `.deb` + the existing tarball. Currently the release pipeline
-  ships raw archives only — fine for devs, not for paying customers.
-- [ ] **[H] Licensing / activation.** _(Note: Settings → About currently paints a hard-coded
-  "Licensed — Full Version" label, `SettingsPanel.cpp:162`, with no licensing behind it.)_ Decide the model (offline license file/serial is
-  the indie-friendly default; avoid heavy DRM that hurts UX). Implement a gate +
-  **time-limited or noise-burst trial** — non-negotiable for a paid plugin; most sales
-  come after a trial.
-- [ ] **[M] Legal/store basics.** EULA, version/changelog discipline, an update channel,
-  a refund policy. Pick a storefront with VAT handling (Gumroad/Paddle) and/or a
-  distributor (Plugin Boutique).
+  ships raw archives only — fine for devs, not for players.
+- [ ] **[M] Code signing.** Windows **Authenticode** cert (placeholder slots already exist
+  in `release.yml`). Unsigned plugins trip SmartScreen and some hosts' security prompts.
+  Optional for a free release — weigh the cert's cost against support donations. Linux:
+  ship SHA256 sums (done) + clear install instructions.
+- [ ] **[H] Support channel.** `.github/FUNDING.yml` (GitHub Sponsors and/or Ko-fi), a
+  "Support the project" section in the README, and a support link in Settings → About
+  (which now reads "Free & open source — GPLv3"). Donations are optional: never gate
+  features, nag, or add a trial.
+- [ ] **[M] Open-source basics.** `CONTRIBUTING.md`, issue templates, version/changelog
+  discipline, and GitHub Releases as the update channel. Keep the GPLv3 obligations
+  straight: every binary release links its exact source tag.
 
-**Exit criteria:** signed installers for Win/Linux; a working trial→license flow; a place
-to buy it.
+**Exit criteria:** installers for Win/Linux on GitHub Releases; a working support link in
+the README, repo and About panel; a contributor can build from the README alone.
 
 ---
 
@@ -137,8 +140,8 @@ to buy it.
 The finishing layer that separates "works" from "feels premium."
 
 - [ ] **[H] Curated factory presets** built on the _frozen_ tone + real cabs. Today's 5
-  presets are "starter values" (ROADMAP P2). For a boutique amp, presets are a primary
-  sales tool — they demo the sound instantly. Name them by use-case/feel.
+  presets are "starter values" (ROADMAP P2). For a boutique amp, presets are the
+  first impression — they demo the sound instantly. Name them by use-case/feel.
 - [x] **[M] Front-of-amp essentials** (kept minimal, per depth-over-breadth):
   - [x] **Noise gate** _(done: `NoiseGate.h`, UTILITY card)_ — near-essential for high-gain guitar; its absence is conspicuous.
   - [x] **Boost / tight EQ** _(done: `Boost.h`, level/tight/bright)_ in front — very on-brand for an EL84 amp (everyone runs a
@@ -160,19 +163,19 @@ no rough edges; level-matchable output.
 
 - [ ] **[H] Demo assets.** Audio demos (raw DI + processed, multiple genres), a short
   video walkthrough, clean screenshots, a product page. For an amp sim, _the audio demo
-  is the sales pitch_.
+  is the pitch_.
 - [ ] **[M] Closed beta.** Get it into the hands of a handful of guitarists for real
-  tone/feel feedback before charging — the cheapest insurance against shipping a voicing
+  tone/feel feedback before a public 1.0 — the cheapest insurance against shipping a voicing
   only you like.
 - [ ] **[M] Manual + support.** A short user manual, a changelog, and an update
   mechanism. Boutique buyers expect responsiveness.
-- [ ] **[L] Post-launch backlog** (only after 1.0 sells): revisit the parked **neural
+- [ ] **[L] Post-launch backlog** (only after 1.0 finds players): revisit the parked **neural
   capture** (now trainable against the frozen DSP), then **AU/macOS** if Mac demand
   shows up. These are growth bets, not launch blockers.
 
 ---
 
-## Explicitly out of scope for paid 1.0
+## Explicitly out of scope for 1.0
 
 Deferred by the chosen strategy — tracked so they don't creep into the launch:
 
@@ -190,7 +193,7 @@ Deferred by the chosen strategy — tracked so they don't creep into the launch:
 A (freeze tone + fix DSP defects + golden test)   ← unblocks everything
         │
         ▼
-B (real cabs + browser)        C (signing/installer/license/trial)   ← can run in parallel
+B (real cabs + browser)        C (installers/signing/support link)   ← can run in parallel
         │                                   │
         └───────────────┬───────────────────┘
                         ▼
@@ -200,14 +203,14 @@ B (real cabs + browser)        C (signing/installer/license/trial)   ← can run
               E (demos, beta, launch)
 ```
 
-**Critical path is A → B → D → E.** Phase C (commercial plumbing) has no dependency on
+**Critical path is A → B → D → E.** Phase C (release plumbing) has no dependency on
 the audio work and should run in parallel to avoid being a last-minute scramble.
 
 ## Why this gets to competitive territory
 
 The engine already out-classes most indie amp sims on DSP and engineering hygiene (the
 audit's strong scores). The 7.5 ceiling came entirely from _product_ gaps: synthetic
-cabs, an unfrozen tone, two known defects, and zero commercial plumbing. This roadmap
+cabs, an unfrozen tone, two known defects, and no release plumbing. This roadmap
 closes exactly those, in dependency order, without diluting the boutique bet — turning a
-strong engine into a paid product that can stand next to the established single-amp
-boutique releases on Windows and Linux.
+strong engine into a free, open-source amp that can stand next to the established
+single-amp boutique releases on Windows and Linux.
