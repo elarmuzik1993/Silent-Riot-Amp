@@ -626,3 +626,90 @@ TEST_CASE("IR tail length is positive when IR active", "[cabinet][ir]")
     cab.setIRIndex(0);
     REQUIRE(cab.getIRTailSeconds() == 0.0);
 }
+
+// ═══════════════════════════════════════════════════════════════
+// Synchronous install (installIRNow) — IR-path plan Task 1
+// ═══════════════════════════════════════════════════════════════
+
+namespace {
+
+// 64-tap moving average: a low-pass whose 10 kHz response at 44.1 kHz is
+// -32.4 dB (|sin(pi f N/fs) / (N sin(pi f/fs))|). Its energy is 1/64, so
+// JUCE's normalisation (0.125/sqrt(energy)) leaves it at unity gain.
+juce::AudioBuffer<float> movingAverageIR()
+{
+    juce::AudioBuffer<float> ir(1, 64);
+    for (int i = 0; i < 64; ++i)
+        ir.setSample(0, i, 1.0f / 64.0f);
+    return ir;
+}
+
+juce::AudioBuffer<float> unitImpulseIR()
+{
+    juce::AudioBuffer<float> ir(1, 64);
+    ir.clear();
+    ir.setSample(0, 0, 1.0f);
+    return ir;
+}
+
+// Processes one block of a 10 kHz tone (amplitude 0.5, phase continuous from
+// `startSample`) and returns output RMS / input RMS in dB, skipping the
+// filter's first 64 samples on the first block.
+double tenKHzGainDb(CabinetSim& cab, int startSample)
+{
+    constexpr int n = 512;
+    juce::AudioBuffer<float> buffer(2, n);
+    for (int ch = 0; ch < 2; ++ch)
+        for (int i = 0; i < n; ++i)
+            buffer.setSample(ch, i, 0.5f * std::sin(2.0f * juce::MathConstants<float>::pi
+                                                    * 10000.0f * static_cast<float>(startSample + i)
+                                                    / 44100.0f));
+    juce::dsp::AudioBlock<float> block(buffer);
+    cab.processBlock(block);
+
+    const int skip = startSample == 0 ? 64 : 0;
+    double sumOut = 0.0;
+    for (int i = skip; i < n; ++i)
+        sumOut += static_cast<double>(buffer.getSample(0, i)) * buffer.getSample(0, i);
+    const double rmsOut = std::sqrt(sumOut / (n - skip));
+    return 20.0 * std::log10(std::max(rmsOut, 1e-12) / (0.5 / std::sqrt(2.0)));
+}
+
+} // namespace
+
+TEST_CASE("installIRNow plays the IR on the very first block", "[cabinet][ir]")
+{
+    // Before Task 1 every load went through bufferTransfer: the first block
+    // ran JUCE's pass-through engine (0 dB at 10 kHz) while the real one was
+    // built on JUCE's background thread. installIRNow builds it on this
+    // thread, so no sleep or polling is needed.
+    CabinetSim cab;
+    cab.prepare(44100.0, 512, 2);
+    cab.installIRNow(movingAverageIR(), 44100.0);
+    REQUIRE(cab.useIR.load());
+    REQUIRE(cab.getIRTailSeconds() > 0.0);
+
+    const double gainDb = tenKHzGainDb(cab, 0);
+    INFO("10 kHz through the first block: " << gainDb << " dB");
+    REQUIRE(gainDb <= -30.0);
+}
+
+TEST_CASE("installIRNow drops a pending async load instead of replaying it", "[cabinet][ir]")
+{
+    // An async load still waiting in bufferTransfer would otherwise be picked
+    // up by the next processBlock and crossfade, at a wall-clock time, back to
+    // the older IR — here a unit impulse, which passes 10 kHz at 0 dB.
+    CabinetSim cab;
+    cab.prepare(44100.0, 512, 2);
+    cab.loadIRFromBuffer(unitImpulseIR(), 44100.0);   // queued, not yet picked up
+    cab.installIRNow(movingAverageIR(), 44100.0);
+
+    double worstDb = -200.0;
+    for (int b = 0; b < 40; ++b)   // 0.46 s: past JUCE's 10 ms poll and 50 ms crossfade
+    {
+        worstDb = std::max(worstDb, tenKHzGainDb(cab, b * 512));
+        std::this_thread::sleep_for(std::chrono::milliseconds(5));
+    }
+    INFO("loudest 10 kHz block: " << worstDb << " dB");
+    REQUIRE(worstDb <= -30.0);
+}

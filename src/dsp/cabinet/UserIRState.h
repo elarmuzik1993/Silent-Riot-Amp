@@ -69,11 +69,19 @@ std::vector<UserIREntry> userIRsFromValueTree(const juce::ValueTree& irsNode);
 // hold, deliberately — restore keeps a silent IR rather than drop slots.
 bool readUserIRFromFile(const juce::File& file, UserIREntry& out);
 
+// How applyUserIRIndex() hands an IR to the convolution.
+//   Async: CabinetSim::loadIRFromBuffer() — safe while processBlock runs; the
+//          IR takes over a few blocks later, after JUCE's background build.
+//   Now:   CabinetSim::installIRNow() — playing from the next block, but must
+//          NOT run concurrently with processBlock. prepareToPlay only.
+enum class IRLoad { Async, Now };
+
 // Make the convolution match IR_INDEX: 0 = IIR mode, 1..N = irs[irIndex-1].
 // Anything else (an automated index past the list, or a restored state with
 // fewer IRs than its saved index) DISABLES the convolution rather than leaving
 // whatever IR was loaded before playing (review S2). Message thread only, or
 // prepareToPlay. Returns true when an IR was loaded.
-bool applyUserIRIndex(CabinetSim& cab, const std::vector<UserIREntry>& irs, int irIndex);
+bool applyUserIRIndex(CabinetSim& cab, const std::vector<UserIREntry>& irs, int irIndex,
+                      IRLoad load);
 
 } // namespace sr

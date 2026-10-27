@@ -111,7 +111,9 @@ public:
 private:
     juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
     void handleAsyncUpdate() override;  // deferred IR loading on message thread
-    void applyIRIndexParam();           // sync cabSim to IR_INDEX now (restore/prepare)
+    // Sync cabSim to IR_INDEX now (restore: Async; prepareToPlay: Now — the
+    // only caller that may, since processBlock can't be running there).
+    void applyIRIndexParam(sr::IRLoad load);
     void resetDSPState();               // clear all filter/integrator/cached state
     // Recompute every sample-rate-dependent coefficient for the current base
     // rate + oversample factor (filters, Millers, PSU/sag/OT, grid-charge decay,

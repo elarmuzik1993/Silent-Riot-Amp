@@ -7,12 +7,12 @@ void CabinetSim::prepare(double sampleRate, int maxBlockSize, int numChannels)
 {
     currentSampleRate = sampleRate;
 
-    juce::dsp::ProcessSpec spec;
     spec.sampleRate       = sampleRate;
     spec.maximumBlockSize = static_cast<juce::uint32>(maxBlockSize);
     spec.numChannels      = static_cast<juce::uint32>(numChannels);
 
     convolution.prepare(spec);
+    prepared = true;
 
     // IR reload after prepare is handled by the processor (it holds user IR data).
 }
@@ -31,11 +31,7 @@ void CabinetSim::processBlock(juce::dsp::AudioBlock<float>& block)
     // Pick up any pending IR from the message thread (never blocks)
     bufferTransfer.get([this](BufferWithSampleRate& buf)
     {
-        convolution.loadImpulseResponse(std::move(buf.buffer),
-                                        buf.sampleRate,
-                                        juce::dsp::Convolution::Stereo::yes,
-                                        juce::dsp::Convolution::Trim::yes,
-                                        juce::dsp::Convolution::Normalise::yes);
+        queueConvolutionLoad(std::move(buf.buffer), buf.sampleRate);
     });
 
     juce::dsp::ProcessContextReplacing<float> context(block);
@@ -125,6 +121,35 @@ void CabinetSim::loadIRFromBuffer(juce::AudioBuffer<float>&& buffer, double samp
     irNativeSampleRate = sampleRate;
     bufferTransfer.set(BufferWithSampleRate(std::move(buffer), sampleRate));
     useIR.store(true);
+}
+
+void CabinetSim::installIRNow(juce::AudioBuffer<float>&& buffer, double sampleRate)
+{
+    // prepareToPlay only — see the header. A transfer still pending would be
+    // picked up by the next processBlock and start a second, timing-dependent
+    // load and crossfade back to the older IR, so it goes first.
+    jassert(prepared);   // the convolution is prepared with the spec prepare() stored
+    bufferTransfer.clear();
+
+    currentIRLengthSamples = buffer.getNumSamples();
+    irNativeSampleRate = sampleRate;
+    queueConvolutionLoad(std::move(buffer), sampleRate);
+
+    // Convolution::prepare() first runs every queued load on this thread
+    // (waiting out one the background loader may be running), then builds the
+    // engine for the spec and installs it directly — no pass-through, and no
+    // crossfade from the previous engine.
+    convolution.prepare(spec);
+    useIR.store(true);
+}
+
+void CabinetSim::queueConvolutionLoad(juce::AudioBuffer<float>&& buffer, double sampleRate)
+{
+    convolution.loadImpulseResponse(std::move(buffer),
+                                    sampleRate,
+                                    juce::dsp::Convolution::Stereo::yes,
+                                    juce::dsp::Convolution::Trim::yes,
+                                    juce::dsp::Convolution::Normalise::yes);
 }
 
 double CabinetSim::getIRTailSeconds() const

@@ -1,10 +1,10 @@
 # State
 
-_Updated 2026-10-26_
+_Updated 2026-10-27_
 
 ## Now
 - Silent Riot v0.3.4 (JUCE 7 VST3/Standalone). `bash scripts/verify.sh` passes: static checks +
-  Release build + 372/372 ctest (290 pure C++ / 70 JUCE / 12 `SilentRiotProcessorTests`, which
+  Release build + 375/375 ctest (290 pure C++ / 72 JUCE / 13 `SilentRiotProcessorTests`, which
   drives the real processor via `tests/processor_harness.h`).
 - Work list: DSP review `docs/review-dsp-2026-10-15.md` (line refs against `b8e20a9`). Fixed: B1, B4–B8,
   S1–S7. Open: B2, B3 (tone-changing), S8. IRs: load rejects unsafe (NaN/Inf/energy overflow) and

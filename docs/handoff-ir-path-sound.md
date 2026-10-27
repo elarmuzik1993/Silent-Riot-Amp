@@ -134,3 +134,75 @@ python3 tools/sr_irpath.py --render-bin $SR --diff-baseline <dir>   # after; exi
 
 At Task 0, `--diff-baseline` against a fresh save: 19/19 bit-identical, and the saved signoff
 renders are byte-identical to `signoff.py`'s own.
+
+## Task 1 — install the active IR synchronously in `prepareToPlay` (2026-10-27)
+
+`CabinetSim::installIRNow()` hands the IR to JUCE and then calls `Convolution::prepare()` on the
+same thread. JUCE 7.0.12 (`juce_Convolution.cpp`, `Convolution::Impl::prepare`) does exactly what
+the plan says: `messageQueue->pimpl->popAll()` runs every queued load on the calling thread
+(under `popMutex`, so it waits out a load the background thread is in the middle of), then
+`engineQueue->prepare(spec)` rebuilds the engine from that IR and the new spec, and the engine is
+moved straight into `currentEngine` with `previousEngine = nullptr` and the crossfade mixer reset:
+no pass-through and no crossfade. A pending `BufferTransfer` is cleared first
+(`BufferTransfer::clear()`); otherwise the next `processBlock` would queue the same IR again and
+crossfade to it at a wall-clock time. `applyUserIRIndex()` / `applyIRIndexParam()` take
+`IRLoad::Now` / `IRLoad::Async`; only `prepareToPlay` passes `Now` (state restore can run beside
+`processBlock`, so it stays `Async`). `sr_render` now runs one startup order for both cab modes:
+`--ir` is loaded (`loadUserIR()` needs nothing prepared), then `prepareToPlay`, then the knobs.
+It exits with an error when the IR does not load (it used to render the built-in cab silently).
+
+No mechanism differed from the plan. One JUCE detail matters for anyone writing the next test:
+`ConvolutionEngineFactory` keeps the last IR it built, so a *re*-prepare of a convolution that
+has already installed an IR rebuilds that IR, not a pass-through. Finding 3 only shows on the
+first IR a convolution sees, e.g. a project restored into a fresh instance.
+
+Tests (written first, failing before the change): `installIRNow plays the IR on the very first
+block` (10 kHz through a 64-tap moving average, one block, no sleeps: −0.004 dB before,
+≤ −30 dB required and met), `installIRNow drops a pending async load instead of replaying it`
+(0.46 s of blocks with sleeps after a queued unit impulse: −0.004 dB before; with the
+`clear()` call removed it reads −18.1 dB and fails, so it pins the clear), and
+`Processor: a session restored before prepare plays its IR from the first block` (>7 kHz energy,
+IR minus CAB off: first block 0.0 dB before, −57.8 dB after, settled −53.1 dB).
+`user_ir_state_tests.cpp` also runs the past-the-list and index-0 cases through `IRLoad::Now`.
+`bash scripts/verify.sh`: pass, 375/375 (290 / 72 / 13).
+
+### Startup (`--startup`, same settings as Task 0)
+
+| t (ms) | IR before | IR after | CAB off | IR − CAB off before | after |
+|---|---|---|---|---|---|
+| 0 | −115.3 | −141.6 | −115.3 | −0.0 | −26.3 |
+| 10 | −113.6 | −141.9 | −113.5 | −0.0 | −28.3 |
+| 20 | −114.4 | −141.2 | −114.1 | −0.3 | −27.1 |
+| 30 | −116.3 | −142.0 | −114.0 | −2.3 | −28.0 |
+| 40 | −118.2 | −141.9 | −113.1 | −5.0 | −28.8 |
+| 50 | −121.6 | −140.9 | −112.9 | −8.7 | −28.0 |
+| 60 | −127.3 | −140.2 | −112.3 | −15.1 | −27.9 |
+| 70 | −132.1 | −141.0 | −113.4 | −18.6 | −27.6 |
+| 80–140 | −139.9…−141.1 | −139.9…−141.1 | −112.0…−113.1 | −27.8…−28.6 | −27.8…−28.6 |
+| settled 0.5–1.5 s | −140.7 | −140.7 | −112.6 | −28.1 | −28.1 |
+
+No CAB-off burst: IR mode sits at its settled level from the first window. (The first window
+reads 2 dB above the rest because the analysis high-pass starts on the note's onset.)
+
+### Repeatability (`--repeat 6 --block 64 512 2048`, 4 busy loops on 4 cores)
+
+| Block | Before: bit-identical | After: bit-identical |
+|---|---|---|
+| 64 | 0/6 | 6/6 |
+| 512 | 1/6 (0/6 on a second run; unloaded runs differed too) | 6/6 |
+| 2048 | 6/6 | 6/6 |
+
+No second cause turned up: with the IR installed before the first block, nothing in the render
+depends on JUCE's background thread any more.
+
+### Built-in cab and level table
+
+`--diff-baseline` against Task 0's saved renders: **19/19 bit-identical** (every sign-off render
+plus the nine built-in level renders), so the sign-off gates are unchanged.
+
+The default level table (RMS from 0.5 s, `--warmup-ms 250`) is identical to Task 0's, and so are
+the renders behind it: all 27 IR renders are bit-identical to Task 0's from the first sample of
+the measured region (JUCE's swap finished inside the 250 ms warm-up then). With `--warmup-ms 0`
+(the `--repeat` renders, P-EDGE, neutral), the new renders differ from Task 0's reference only in
+the first 64–100 ms (64 ms at block 512, 68 ms at 64, 100 ms at 2048), the old pass-through and
+crossfade, and are bit-identical after it.

@@ -142,7 +142,8 @@ bool readUserIRFromFile(const juce::File& file, UserIREntry& out)
     return isLoadableIR(out.audioData);
 }
 
-bool applyUserIRIndex(CabinetSim& cab, const std::vector<UserIREntry>& irs, int irIndex)
+bool applyUserIRIndex(CabinetSim& cab, const std::vector<UserIREntry>& irs, int irIndex,
+                      IRLoad load)
 {
     // IR_INDEX maps directly onto user IR slots. The stock-IR table in
     // CabinetSim is intentionally NOT reachable from this parameter today —
@@ -157,7 +158,10 @@ bool applyUserIRIndex(CabinetSim& cab, const std::vector<UserIREntry>& irs, int 
 
     const auto& ir = irs[static_cast<size_t>(userIdx)];
     juce::AudioBuffer<float> bufCopy(ir.audioData);
-    cab.loadIRFromBuffer(std::move(bufCopy), ir.sampleRate);
+    if (load == IRLoad::Now)
+        cab.installIRNow(std::move(bufCopy), ir.sampleRate);
+    else
+        cab.loadIRFromBuffer(std::move(bufCopy), ir.sampleRate);
     return true;
 }
 

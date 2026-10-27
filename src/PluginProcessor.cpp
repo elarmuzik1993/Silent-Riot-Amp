@@ -61,10 +61,10 @@ void SilentRiotProcessor::handleAsyncUpdate()
 
     // An out-of-range index (host automation past the list) disables the
     // convolution so a stale IR never stays active — see applyUserIRIndex().
-    sr::applyUserIRIndex(cabSim, userIRs, idx);
+    sr::applyUserIRIndex(cabSim, userIRs, idx, sr::IRLoad::Async);
 }
 
-void SilentRiotProcessor::applyIRIndexParam()
+void SilentRiotProcessor::applyIRIndexParam(sr::IRLoad load)
 {
     // Message thread (state restore) or prepareToPlay. Syncs the convolution to
     // IR_INDEX now — including disabling it when the index is past the IR list,
@@ -80,11 +80,16 @@ void SilentRiotProcessor::applyIRIndexParam()
     // applies that against the current list on this thread, and the next block
     // re-queues the parameter's value if it differs — so a stale index never
     // sticks.
+    //
+    // `load` is IRLoad::Now only from prepareToPlay, where processBlock can't
+    // run: the IR then plays from the first block instead of JUCE's
+    // pass-through. State restore can run alongside processBlock, so it stays
+    // Async (CabinetSim::installIRNow must not race the audio thread).
     const int irIdx = static_cast<int>(
         apvts.getRawParameterValue(sr::Params::IDs::IR_INDEX)->load());
     cachedIRIndex = irIdx;
     pendingIRIndex.store(-1);
-    sr::applyUserIRIndex(cabSim, userIRs, irIdx);
+    sr::applyUserIRIndex(cabSim, userIRs, irIdx, load);
 }
 
 juce::AudioProcessorValueTreeState::ParameterLayout SilentRiotProcessor::createParameterLayout()
@@ -384,9 +389,11 @@ void SilentRiotProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
     outputTrimSm.setCurrentAndTargetValue(sanitizeUnitParamOr(
         apvts.getRawParameterValue(Params::IDs::OUTPUT_LEVEL)->load(), 0.5f));
 
-    // Reload active user IR after prepare (convolution state was reset), or
-    // disable it if IR_INDEX no longer names one (review S2)
-    applyIRIndexParam();
+    // Install the active user IR synchronously, so the first block already
+    // plays it — a session restored before prepare would otherwise start on
+    // JUCE's pass-through engine (no cab) and hand over at a wall-clock time.
+    // Or disable it if IR_INDEX no longer names one (review S2).
+    applyIRIndexParam(sr::IRLoad::Now);
 
     // Clear any state carried over from a previous configuration
     resetDSPState();
@@ -1149,8 +1156,9 @@ void SilentRiotProcessor::loadUserIRsFromState()
     userIRs = sr::userIRsFromValueTree(apvts.state.getChildWithName("UserIRs"));
 
     // Reload the saved active IR — or disable the live one when the saved
-    // index is past the restored list (review S2)
-    applyIRIndexParam();
+    // index is past the restored list (review S2). Async: a restore can run
+    // while processBlock does; the next prepareToPlay installs it at once.
+    applyIRIndexParam(sr::IRLoad::Async);
 }
 
 // ── State Persistence ──

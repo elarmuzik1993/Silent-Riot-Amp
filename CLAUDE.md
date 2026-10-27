@@ -97,8 +97,8 @@ cmake -B build -DSR_BUILD_TESTS=ON # Build with tests
 - CMake target is `SilentRiot`; product name is `Silent Riot`
 - Tests use Catch2 v3 — one test file per DSP module, three test targets:
   - `SilentRiotTests` — 290 pure C++ test cases (no JUCE dependency)
-  - `SilentRiotJuceTests` — 70 JUCE-dependent test cases (cabinet IR, convolution, user IR loading, oversample switcher + latency, delay/reverb)
-  - `SilentRiotProcessorTests` — 12 test cases on the real `SilentRiotProcessor` (effect-tail wiring, host bypass, IR restore, GUI meters). Links the plugin's SharedCode target `SilentRiot`, so there is no source list to keep in step; drive it through `tests/processor_harness.h` (`ProcessorHarness`: prepared processor, `set()` params in natural units, `run()` / `silence()` in host blocks, `Mode::Bypassed`, `loadIR()`). Use it for anything that lives in `processBlock`'s wiring — a unit test of the DSP class it calls cannot see that. Each case takes seconds (4× oversampled amp), so keep runs short
+  - `SilentRiotJuceTests` — 72 JUCE-dependent test cases (cabinet IR, convolution, user IR loading, oversample switcher + latency, delay/reverb)
+  - `SilentRiotProcessorTests` — 13 test cases on the real `SilentRiotProcessor` (effect-tail wiring, host bypass, IR restore and first-block install, GUI meters). Links the plugin's SharedCode target `SilentRiot`, so there is no source list to keep in step; drive it through `tests/processor_harness.h` (`ProcessorHarness`: prepared processor, `set()` params in natural units, `run()` / `silence()` in host blocks, `Mode::Bypassed`, `loadIR()`). Use it for anything that lives in `processBlock`'s wiring — a unit test of the DSP class it calls cannot see that. Each case takes seconds (4× oversampled amp), so keep runs short
 
 ## Cabinet IR Loader Architecture
 

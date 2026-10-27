@@ -398,26 +398,38 @@ TEST_CASE("applyUserIRIndex disables the convolution for an index past the list"
     for (int i = 0; i < 5; ++i)
         five.push_back(makeEntry("ir_" + juce::String(i), 1, 256));
 
-    REQUIRE(applyUserIRIndex(cab, five, 5));
+    REQUIRE(applyUserIRIndex(cab, five, 5, IRLoad::Async));
     REQUIRE(cab.useIR.load());
     REQUIRE(cab.getIRTailSeconds() > 0.0);
 
     // The review's repro: IR 5 live, then a state with only three IRs but the
     // same IR_INDEX = 5 is restored. The old IR 5 must not keep playing.
     std::vector<UserIREntry> three(five.begin(), five.begin() + 3);
-    REQUIRE_FALSE(applyUserIRIndex(cab, three, 5));
+    REQUIRE_FALSE(applyUserIRIndex(cab, three, 5, IRLoad::Async));
     REQUIRE_FALSE(cab.useIR.load());
     REQUIRE(cab.getIRTailSeconds() == 0.0);
 
     // In range again → loads; 0 (IIR mode) and garbage → disabled
-    REQUIRE(applyUserIRIndex(cab, three, 2));
+    REQUIRE(applyUserIRIndex(cab, three, 2, IRLoad::Async));
     REQUIRE(cab.useIR.load());
-    REQUIRE_FALSE(applyUserIRIndex(cab, three, 0));
+    REQUIRE_FALSE(applyUserIRIndex(cab, three, 0, IRLoad::Async));
     REQUIRE_FALSE(cab.useIR.load());
-    REQUIRE(applyUserIRIndex(cab, three, 3));
-    REQUIRE_FALSE(applyUserIRIndex(cab, three, -1));
+    REQUIRE(applyUserIRIndex(cab, three, 3, IRLoad::Async));
+    REQUIRE_FALSE(applyUserIRIndex(cab, three, -1, IRLoad::Async));
     REQUIRE_FALSE(cab.useIR.load());
-    REQUIRE(applyUserIRIndex(cab, three, 1));
-    REQUIRE_FALSE(applyUserIRIndex(cab, {}, 1));  // empty list
+    REQUIRE(applyUserIRIndex(cab, three, 1, IRLoad::Async));
+    REQUIRE_FALSE(applyUserIRIndex(cab, {}, 1, IRLoad::Async));  // empty list
+    REQUIRE_FALSE(cab.useIR.load());
+
+    // The same through IRLoad::Now, the branch prepareToPlay takes
+    REQUIRE(applyUserIRIndex(cab, five, 5, IRLoad::Now));
+    REQUIRE(cab.useIR.load());
+    REQUIRE(cab.getIRTailSeconds() > 0.0);
+    REQUIRE_FALSE(applyUserIRIndex(cab, three, 5, IRLoad::Now));
+    REQUIRE_FALSE(cab.useIR.load());
+    REQUIRE(cab.getIRTailSeconds() == 0.0);
+    REQUIRE(applyUserIRIndex(cab, three, 2, IRLoad::Now));
+    REQUIRE(cab.useIR.load());
+    REQUIRE_FALSE(applyUserIRIndex(cab, three, 0, IRLoad::Now));
     REQUIRE_FALSE(cab.useIR.load());
 }

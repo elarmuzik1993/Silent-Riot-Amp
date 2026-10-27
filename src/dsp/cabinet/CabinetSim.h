@@ -53,6 +53,15 @@ public:
         }
     }
 
+    // Drops a buffer set() but not yet picked up by get(). Blocking, like
+    // set(): never from the audio thread.
+    void clear()
+    {
+        const juce::SpinLock::ScopedLockType lock(mutex);
+        buffer = {};
+        newBuffer = false;
+    }
+
 private:
     BufferWithSampleRate buffer;
     bool newBuffer = false;
@@ -175,12 +184,26 @@ struct CabinetSim
     void loadIRFromFile(const juce::File& file);
     void loadIRFromBuffer(juce::AudioBuffer<float>&& buffer, double sampleRate);
 
+    // Installs an IR into the convolution on the CALLING thread, so the very
+    // next processBlock already convolves with it — loadIRFromBuffer() leaves
+    // that to the audio thread and JUCE's background loader, which runs the
+    // pass-through engine until the real one is built, then crossfades at a
+    // wall-clock time. Any load still waiting in bufferTransfer is dropped.
+    // Allocates and builds the FFT engine: must NOT run concurrently with
+    // processBlock (prepareToPlay only), and needs a prior prepare().
+    void installIRNow(juce::AudioBuffer<float>&& buffer, double sampleRate);
+
     // IR tail length in seconds (for getTailLengthSeconds)
     double getIRTailSeconds() const;
 
 private:
+    // Queues an IR on JUCE's loader with this class's fixed load options.
+    void queueConvolutionLoad(juce::AudioBuffer<float>&& buffer, double sampleRate);
+
     juce::dsp::Convolution convolution;
     BufferTransfer bufferTransfer;
+    juce::dsp::ProcessSpec spec { 44100.0, 512, 2 };   // as last passed to prepare()
+    bool prepared = false;                              // prepare() has run (installIRNow needs it)
 
     double currentSampleRate = 44100.0;
     double irNativeSampleRate = 48000.0;  // sample rate of the loaded IR

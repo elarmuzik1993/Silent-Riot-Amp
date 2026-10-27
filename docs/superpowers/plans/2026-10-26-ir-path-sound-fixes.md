@@ -102,25 +102,25 @@ isn't running.
 (`applyUserIRIndex`), `src/PluginProcessor.{h,cpp}` (`applyIRIndexParam`), `tools/sr_render.cpp`,
 `tests/cabinet_ir_tests.cpp`, `tests/processor_ir_tests.cpp`
 
-- [ ] Write failing tests first:
-  - [ ] `CabinetSim`: `prepare(44100, 512, 2)`, install a 64-tap moving-average IR, then process
+- [x] Write failing tests first:
+  - [x] `CabinetSim`: `prepare(44100, 512, 2)`, install a 64-tap moving-average IR, then process
         one block of a 10 kHz tone with no sleeps. The output must be ≥ 30 dB below the input.
         Today it is 0 dB.
-  - [ ] Processor (harness): with an IR selected, prepare and run one block of the amp. Its
+  - [x] Processor (harness): with an IR selected, prepare and run one block of the amp. Its
         >7 kHz energy must match settled IR mode, not CAB off. Today it matches CAB off.
-- [ ] Add `BufferTransfer::clear()` and `CabinetSim::installIRNow(AudioBuffer&&, double rate)`.
+- [x] Add `BufferTransfer::clear()` and `CabinetSim::installIRNow(AudioBuffer&&, double rate)`.
       Document that it must not run concurrently with `processBlock`. Steps:
   1. clear any pending transfer (otherwise the audio thread reloads the same IR and starts a
      second, timing-dependent crossfade);
   2. call `convolution.loadImpulseResponse(...)`;
   3. call `convolution.prepare(spec)` with the spec stored by `prepare()`;
   4. set `useIR` and the length fields.
-- [ ] Give `applyUserIRIndex()` and `applyIRIndexParam()` a load-mode argument (`now` / `async`).
+- [x] Give `applyUserIRIndex()` and `applyIRIndexParam()` a load-mode argument (`now` / `async`).
       **Only the `prepareToPlay` call passes `now`.** The other caller, `setStateInformation`,
       can run while `processBlock` does, so it stays `async`.
-- [ ] `sr_render`: load `--ir` **before** `prepareToPlay`, so `prepareToPlay` installs it
+- [x] `sr_render`: load `--ir` **before** `prepareToPlay`, so `prepareToPlay` installs it
       synchronously. Fix the "synchronous" comment.
-- [ ] Verify:
+- [x] Verify:
   - Both tests pass, and `sr_irpath.py --startup` shows no CAB-off-level burst.
   - `--repeat 6` under load gives bit-identical renders at block sizes 64, 512 and 2048.
   - Built-in-cab renders are bit-identical.

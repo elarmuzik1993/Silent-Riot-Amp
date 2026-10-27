@@ -8,6 +8,10 @@
 // reacts to IR_INDEX only when it differs from the last index it saw, so a
 // restore that leaves the index unchanged but shrinks the IR list is caught
 // by nothing else — the previous IR would keep playing in IIR mode's place.
+//
+// Also: the active IR is installed synchronously by prepareToPlay (IR-path
+// plan Task 1), so a session restored before prepare plays its cab from the
+// first block instead of JUCE's pass-through.
 // ═══════════════════════════════════════════════════════════════
 #include <catch2/catch_test_macros.hpp>
 #include "processor_harness.h"
@@ -52,6 +56,48 @@ float tailAfterNote(ProcessorHarness& h)
     return h.silence(0.1);
 }
 
+// Mean-square energy above 7 kHz (8th-order Butterworth high-pass at 44.1 kHz)
+// of x[from, from + n), in dB. The high-pass runs over all of x from its
+// start, so a window boundary adds no step of its own.
+double energyAbove7kDb(const std::vector<float>& x, size_t from, size_t n)
+{
+    auto sections = juce::dsp::FilterDesign<float>::designIIRHighpassHighOrderButterworthMethod(
+        7000.0f, 44100.0, 8);
+    std::vector<juce::dsp::IIR::Filter<float>> hp;
+    for (auto& c : sections) hp.emplace_back(c);
+    double sum = 0.0;
+    for (size_t i = 0; i < from + n; ++i)
+    {
+        float v = x[i];
+        for (auto& f : hp) v = f.processSample(v);
+        if (i >= from) sum += static_cast<double>(v) * v;
+    }
+    return 10.0 * std::log10(std::max(sum / static_cast<double>(n), 1e-30));
+}
+
+// A cab-like IR for the >7 kHz check: Hann-windowed sinc low-pass at 3 kHz,
+// 127 taps at 44.1 kHz — at least ~40 dB down everywhere above 5 kHz.
+std::vector<float> lowPassIR()
+{
+    constexpr int taps = 127;
+    constexpr double fc = 3000.0 / 44100.0;
+    std::vector<float> ir(static_cast<size_t>(taps));
+    for (int i = 0; i < taps; ++i)
+    {
+        const double m = i - (taps - 1) / 2.0;
+        const double sinc = m == 0.0 ? 2.0 * fc
+                                     : std::sin(2.0 * juce::MathConstants<double>::pi * fc * m)
+                                           / (juce::MathConstants<double>::pi * m);
+        const double hann = 0.5 - 0.5 * std::cos(2.0 * juce::MathConstants<double>::pi * i / (taps - 1));
+        ir[static_cast<size_t>(i)] = static_cast<float>(sinc * hann);
+    }
+    return ir;
+}
+
+// 3 cycles per 512-sample block: the first and the last block of a render see
+// the note at the same phase.
+Fill blockPeriodicNote() { return sine(3.0f * 44100.0f / 512.0f, 0.25f); }
+
 } // namespace
 
 TEST_CASE("Processor: restoring a state whose IR_INDEX is past its IR list disables the IR (review S2)",
@@ -88,4 +134,53 @@ TEST_CASE("Processor: restoring a state whose IR_INDEX is past its IR list disab
     INFO("IR 2 kept playing after a restore that no longer holds it");
     REQUIRE(h.proc.getTailLengthSeconds() <= 0.0);   // no IR tail reported
     REQUIRE(tailAfterNote(h) < dB(-120.0));          // and none heard: IIR path
+}
+
+TEST_CASE("Processor: a session restored before prepare plays its IR from the first block",
+          "[processor][ir][state]")
+{
+    // A host loads a project, then prepares. Before Task 1 the restore queued
+    // the IR for JUCE's background thread and prepareToPlay did the same, so
+    // the first blocks ran JUCE's pass-through engine: IR mode with no cab,
+    // its >7 kHz energy level with CAB off.
+    juce::TemporaryFile irFile(".wav");
+    const juce::File wav = writeWav(irFile, lowPassIR(), 44100.0);
+
+    juce::MemoryBlock saved;
+    {
+        ProcessorHarness src;
+        REQUIRE(src.proc.loadUserIR(wav));
+        src.proc.getStateInformation(saved);
+    }
+
+    // The amp's own >7 kHz content changes over the note's onset, so a first
+    // block is compared through the IR-to-CAB-off ratio: in the first block it
+    // must be no worse than once both have settled (the last of 44 blocks,
+    // 0.5 s on), i.e. the cab is the IR from the start, not a pass-through
+    // that hands over later. (Measured: first -57.8 dB, settled -53.1 dB;
+    // before Task 1 the first block read 0.0 dB.) One-sided, because the
+    // onset's spectrum differs enough to move the ratio a few dB either way.
+    struct Hf { double first, settled; };
+    const double blockSec = 512.0 / 44100.0;
+    auto render = [&](bool cabOn) {
+        ProcessorHarness h;
+        h.proc.setStateInformation(saved.getData(), static_cast<int>(saved.getSize()));
+        h.set(IDs::GAIN, 0.8f);
+        h.set(IDs::CAB_SIM, cabOn ? 1.0f : 0.0f);
+        h.proc.prepareToPlay(h.sampleRate, h.blockSize);
+        std::vector<float> out;
+        h.run(44.0 * blockSec, blockPeriodicNote(), ProcessorHarness::Mode::Process, &out);
+        const size_t block = static_cast<size_t>(h.blockSize);
+        return Hf { energyAbove7kDb(out, 0, block), energyAbove7kDb(out, out.size() - block, block) };
+    };
+
+    const Hf ir  = render(true);
+    const Hf off = render(false);
+    const double firstRatio   = ir.first - off.first;
+    const double settledRatio = ir.settled - off.settled;
+
+    INFO("IR minus CAB off, >7 kHz: first block " << firstRatio << " dB, settled "
+         << settledRatio << " dB");
+    REQUIRE(settledRatio < -20.0);   // the IR does cut >7 kHz once it plays
+    REQUIRE(firstRatio < settledRatio + 3.0);
 }
