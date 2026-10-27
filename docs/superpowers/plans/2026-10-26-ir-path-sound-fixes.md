@@ -69,22 +69,22 @@ They don't change what an IR sounds like. They need their own plan.
 
 ## Task 0: Baseline and fixtures
 
-- [ ] `bash scripts/verify.sh` passes (372/372).
-- [ ] Add `tools/make_ir_fixtures.py`, which writes three deterministic 48 kHz, 8192-sample mono
+- [x] `bash scripts/verify.sh` passes (372/372).
+- [x] Add `tools/make_ir_fixtures.py`, which writes three deterministic 48 kHz, 8192-sample mono
       IRs with numpy/scipy. Commit the WAVs under `tests/fixtures/ir/` (~32 KB each):
   - `neutral.wav`: 4th-order Butterworth band-pass, 80 Hz–5 kHz, peak-normalised. This is the
     IR all the numbers above came from.
   - `dark.wav`: 80 Hz–3 kHz.
   - `bright.wav`: 80 Hz–8 kHz plus a +4 dB peak at 3 kHz. This is also the synthetic bright IR
     the E3 step in `.agents/STATE.md` needs. Repointing the E3 gate stays with E3.
-- [ ] Add `tools/sr_irpath.py`, in the style of `sr_thump.py`. It renders `note:220:0.1:2.0` with
+- [x] Add `tools/sr_irpath.py`, in the style of `sr_thump.py`. It renders `note:220:0.1:2.0` with
       the built-in cab and with each fixture, at P-CLEAN/P-EDGE/P-CRANK and at 44.1/48/96 kHz,
       then prints RMS from 0.5 s on. Add a `--startup` mode that renders IR mode with
       `--warmup-ms 0` and prints >7 kHz energy per 10 ms window next to a CAB-off render, and a
       `--repeat N` mode that renders N times under CPU load and reports where they differ.
-- [ ] Build `sr_render`. Record `signoff.py` and every `sr_irpath.py` mode in
+- [x] Build `sr_render`. Record `signoff.py` and every `sr_irpath.py` mode in
       `docs/handoff-ir-path-sound.md` (new). Expect the numbers in the findings table.
-- [ ] Save built-in-cab renders of every sign-off point (`.f32`). Later tasks diff against them.
+- [x] Save built-in-cab renders of every sign-off point (`.f32`). Later tasks diff against them.
 
 ## Task 1: Install the active IR synchronously in `prepareToPlay`
 
