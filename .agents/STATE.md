@@ -4,7 +4,7 @@ _Updated 2026-10-27_
 
 ## Now
 - Silent Riot v0.3.4 (JUCE 7 VST3/Standalone). `bash scripts/verify.sh` passes: static checks +
-  Release build + 388/388 ctest (299 pure C++ / 74 JUCE / 15 `SilentRiotProcessorTests`, which
+  Release build + 405/405 ctest (308 pure C++ / 78 JUCE / 19 `SilentRiotProcessorTests`, which
   drives the real processor via `tests/processor_harness.h`).
 - Work list: DSP review `docs/review-dsp-2026-10-15.md` (line refs against `b8e20a9`). Fixed: B1, B4–B8,
   S1–S7. Open: B2, B3 (tone-changing), S8. IRs: load rejects unsafe (NaN/Inf/energy overflow) and
@@ -13,10 +13,12 @@ _Updated 2026-10-27_
   grid-conduction corners in `docs/handoff-power-section-fixes.md` (probe `… -probe.cpp`, `grid` mode).
   EL84s stay class A and their grids never conduct at any corner tried (hottest 5.91 V vs 8.6 V);
   the PI charge rails from ~gain 8.
-- IR plan `docs/superpowers/plans/2026-10-26-ir-path-sound-fixes.md` (against `495c256`): Tasks 0–2
+- IR plan `docs/superpowers/plans/2026-10-26-ir-path-sound-fixes.md` (against `495c256`): Tasks 0–3
   done (record: `docs/handoff-ir-path-sound.md`). The active IR installs synchronously in
   `prepareToPlay`; every IR is level-matched to the built-in cab (`IRLevel.h`, `Normalise::no`):
-  all three fixtures within 1.5 dB of it, rate dependence ≤ 0.05 dB.
+  all three fixtures within 1.5 dB of it, rate dependence ≤ 0.05 dB. Every cab-mode switch
+  (built-in ↔ IR, CAB on/off) fades through a short dip (`CabModeSwitcher.h`), and IR mode waits
+  for the real IR instead of playing JUCE's pass-through.
 - **Behaviour change (Task 2): projects that use an IR play louder**, now matching the built-in
   cab: neutral fixture +10.3…+10.7 dB at 44.1/48 kHz, +7.0…+7.4 dB at 96 kHz; across fixtures
   +5.4 dB (dark, 96 kHz) to +13.1 dB (bright, 44.1 kHz). Release-note it.
@@ -24,7 +26,7 @@ _Updated 2026-10-27_
 ## Next (one PR per step, each with a test)
 1. Owner: delay FEEDBACK default now decays 9 dB/repeat (was 3.4); keep, or remap the knob?
 2. Owner: GRID I reads 0 in normal play (EL84 grids never conduct). Keep, or read the PI grid?
-3. IR plan Tasks 3–4 (mode-switch fade, truncated-tail fade). Independent of Phase 2: Task 2
+3. IR plan Task 4 (truncated-tail fade). Independent of Phase 2: Task 2
    matched IR mode to the built-in cab's filters, so a later re-calibration carries over.
    Task 0's `bright.wav` can replace E3's placeholder IR (`spur_crank_ir` already renders it:
    −23.1 dBc, unchanged by the level match).
@@ -60,9 +62,15 @@ _Updated 2026-10-27_
 - A stereo IR with a dead channel 1 is refused on load even for mono-bus users (owner may prefer
   keeping channel 0). `readUserIRFromFile` has no 3-channel-file test (only `CabinetSim`'s path).
 - Settings → About paints a hard-coded "Licensed — Full Version" (`SettingsPanel.cpp:162`).
-- IR mode: hard mode switches, and the first IR picked in a session plays un-cabbed until
-  JUCE's engine is built (IR plan Task 3). The level match is band power, so a bright IR's 220 Hz
-  note plays 1.2–1.5 dB under the built-in cab (dark +0.4, neutral −0.2).
+- IR mode: a cab-mode switch is a dip, not a crossfade: 128 samples down, silence to the end of
+  that host block plus a hold (IR entry: the IR's peak + 32 + the limiter's 12, capped), 128 up —
+  at 44.1 kHz ~6 ms at block 64, 14.5–17 ms at 512, ~95 ms at 4096. The linear fade's corners carry broadband
+  energy (>7 kHz ~−99 dB on a P-EDGE note) where the IR would have none. An IR of a few taps (or a
+  silent one) is "ready" at once and hands over through JUCE's 50 ms pass-through crossfade.
+  Readiness fails open (any non-pass-through engine counts), so an IR picked while an older one
+  is still installed enters IR mode on the older IR, then JUCE crossfades — cabbed throughout.
+  The level match is band power, so a bright IR's 220 Hz note plays 1.2–1.5 dB under the
+  built-in cab (dark +0.4, neutral −0.2).
 - IR loader panel, not planned: the list can't scroll past 8 (`IRLoaderPanel.cpp:116`), `.ir` is
   accepted but unreadable while AIFF/FLAC are refused, no remove or way back to the built-in cab,
   and it never refreshes after automation or a state load.

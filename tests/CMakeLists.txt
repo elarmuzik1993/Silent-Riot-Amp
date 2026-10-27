@@ -36,6 +36,7 @@ add_executable(SilentRiotTests
     integer_delay_tests.cpp
     idle_operating_point_tests.cpp
     ir_level_tests.cpp
+    cab_mode_switcher_tests.cpp
 
     # DSP source files (tests call functions defined in these)
     ${CMAKE_SOURCE_DIR}/src/dsp/tubes/TriodeWaveshaper.cpp

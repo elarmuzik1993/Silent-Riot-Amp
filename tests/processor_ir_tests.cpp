@@ -14,7 +14,9 @@
 // first block instead of JUCE's pass-through.
 // ═══════════════════════════════════════════════════════════════
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/generators/catch_generators.hpp>
 #include "processor_harness.h"
+#include "dsp/cabinet/CabModeSwitcher.h"
 
 #include <algorithm>
 #include <cstdint>
@@ -251,4 +253,213 @@ TEST_CASE("Processor: saved state keeps the raw IR, not the level-matched copy",
     for (int ch = 0; ch < file.getNumChannels(); ++ch)
         REQUIRE(std::equal(file.getReadPointer(ch), file.getReadPointer(ch) + file.getNumSamples(),
                            stored.getReadPointer(ch)));
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Cab-mode switches fade, and IR mode never plays un-cabbed (IR-path plan
+// Task 3). P-EDGE, a sustained 220 Hz note; every switch is made mid-note.
+// ═══════════════════════════════════════════════════════════════
+
+namespace {
+
+const juce::File& neutralFixture()
+{
+    static const juce::File f = juce::File(SOURCE_DIR).getChildFile("tests/fixtures/ir/neutral.wav");
+    return f;
+}
+
+// A host restoring this session with IR_INDEX changed — the one host path,
+// besides automation (which needs the message loop), that moves IR_INDEX.
+void restoreWithIRIndex(ProcessorHarness& h, int index)
+{
+    juce::MemoryBlock saved;
+    h.proc.getStateInformation(saved);
+    auto xml = juce::AudioProcessor::getXmlFromBinary(saved.getData(), static_cast<int>(saved.getSize()));
+    REQUIRE(xml != nullptr);
+    auto state = juce::ValueTree::fromXml(*xml);
+    bool found = false;
+    for (auto child : state)
+        if (child.hasType("PARAM") && child.getProperty("id").toString() == IDs::IR_INDEX)
+        {
+            child.setProperty("value", index, nullptr);
+            found = true;
+        }
+    REQUIRE(found);
+    juce::MemoryBlock edited;
+    juce::AudioProcessor::copyXmlToBinary(*state.createXml(), edited);
+    h.proc.setStateInformation(edited.getData(), static_cast<int>(edited.getSize()));
+    REQUIRE(irIndex(h) == index);
+}
+
+float maxStep(const std::vector<float>& x, size_t from, size_t to)
+{
+    float m = 0.0f;
+    for (size_t i = std::max<size_t>(from, 1); i < to; ++i)
+        m = std::max(m, std::abs(x[i] - x[i - 1]));
+    return m;
+}
+
+// Plays the P-EDGE note through a mode switch. `out` holds 0.21 s before the
+// switch, then 0.41 s after it (whole 512-sample blocks, phase continuous).
+struct SwitchRender
+{
+    std::vector<float> out;
+    size_t switchAt = 0;   // first sample rendered after doSwitch()
+};
+
+constexpr int kBlocksBefore = 18, kBlocksAfter = 35;
+
+// The steady state's own largest step drifts by ~1e-4 relative between the
+// 0.2 s before a switch and the last 0.15 s (sag is still settling); a hard
+// cut steps 2–30x past it.
+constexpr float kSteadyTolerance = 1.01f;
+
+SwitchRender renderSwitch(ProcessorHarness& h, const std::function<void()>& doSwitch)
+{
+    h.set(IDs::GAIN, 0.625f);   // P-EDGE
+    h.set(IDs::VOLUME, 0.5f);
+    h.set(IDs::TONE, 0.5f);
+    const auto note = sine(220.0f, 0.1f);
+    int t = 0;
+    auto from = [&](int offset) { return [=](int i, int ch) { return note(i + offset, ch); }; };
+    const double block = 512.0 / 44100.0;
+
+    h.run(52 * block, from(t));   // settle on the note (0.6 s)
+    t += 52 * 512;
+    SwitchRender r;
+    h.run(kBlocksBefore * block, from(t), ProcessorHarness::Mode::Process, &r.out);
+    t += kBlocksBefore * 512;
+    r.switchAt = r.out.size();
+    doSwitch();
+    h.run(kBlocksAfter * block, from(t), ProcessorHarness::Mode::Process, &r.out);
+    return r;
+}
+
+// Largest sample-to-sample step after the switch, against the steady state
+// on either side of it (before the switch, and the last 0.15 s).
+struct Steps { float before, after, post; long where; };
+
+// End of the first run of >= 64 exact zeros at or after `from` (the dip's
+// silent stretch), or `from` when there is none.
+size_t dipEnd(const std::vector<float>& x, size_t from)
+{
+    for (size_t i = from, run = 0; i < x.size(); ++i)
+    {
+        run = x[i] == 0.0f ? run + 1 : 0;
+        if (run >= 64)
+        {
+            while (i < x.size() && x[i] == 0.0f) ++i;
+            return i;
+        }
+    }
+    return from;
+}
+
+// Steps are checked from the switch to 20 ms past the dip's end (past the
+// switch itself, when there is no dip); the steady state is the 0.2 s before
+// the switch and the last 0.15 s.
+Steps stepsOf(const SwitchRender& r)
+{
+    const size_t tail = r.out.size() - static_cast<size_t>(0.15 * 44100.0);
+    const size_t end = std::min(tail, dipEnd(r.out, r.switchAt) + static_cast<size_t>(0.02 * 44100.0));
+    size_t at = r.switchAt;
+    float post = 0.0f;
+    for (size_t i = r.switchAt; i < end; ++i)
+        if (std::abs(r.out[i] - r.out[i - 1]) > post) { post = std::abs(r.out[i] - r.out[i - 1]); at = i; }
+    return { maxStep(r.out, 0, r.switchAt), maxStep(r.out, tail, r.out.size()), post,
+             static_cast<long>(at) - static_cast<long>(dipEnd(r.out, r.switchAt)) };
+}
+
+} // namespace
+
+TEST_CASE("Processor: the first IR of a session fades in and never plays un-cabbed",
+          "[processor][ir][switch]")
+{
+    // built-in -> IR, async: the convolution has only ever held JUCE's
+    // pass-through, which plays the amp with no cab until the real engine is
+    // built. Before Task 3 IR mode took over at once, on the pass-through.
+    // The 3 kHz low-pass IR: >7 kHz cut far below the built-in cab's, so a
+    // pass-through stretch stands out by tens of dB.
+    juce::TemporaryFile irFile(".wav");
+    const juce::File wav = writeWav(irFile, lowPassIR(), 44100.0);
+    ProcessorHarness h;
+    const SwitchRender r = renderSwitch(h, [&] { REQUIRE(h.proc.loadUserIR(wav)); });
+
+    // The fade dips to exact zeros (the rest of the fade-out's block, then
+    // the hold); IR mode starts at the end of them. With no dip (a hard
+    // switch) IR mode started at the load itself.
+    const size_t irFrom = dipEnd(r.out, r.switchAt);
+    size_t zerosFrom = irFrom;
+    while (zerosFrom > r.switchAt && r.out[zerosFrom - 1] == 0.0f) --zerosFrom;
+    const size_t fadeOutFrom = irFrom > r.switchAt ? zerosFrom - static_cast<size_t>(sr::CabModeSwitcher::kFadeSamples) : r.switchAt;
+    // The IR windows start 2 ms past the end of the fade-in: a linear ramp's
+    // end is a corner in the envelope, broadband on its own (-99 dB here, the
+    // fade's, not the cab's), and the analysis high-pass rings on it ~1 ms.
+    const size_t cornerClear = 88;
+    const size_t fullFrom = (irFrom > r.switchAt ? irFrom + static_cast<size_t>(sr::CabModeSwitcher::kFadeSamples) : r.switchAt)
+                            + cornerClear;
+
+    // >7 kHz energy, 10 ms windows: while waiting (before the fade-out) it
+    // must be the built-in cab's; in the 20 ms from the end of the fade-in,
+    // the IR's. A pass-through stretch reads at CAB-off level, 40 dB above.
+    const size_t win = 441;
+    const double builtInHf = energyAbove7kDb(r.out, r.switchAt - win, win);
+    const double settledIrHf = energyAbove7kDb(r.out, r.out.size() - win, win);
+    double worstWaiting = -300.0, worstIr = -300.0;
+    for (size_t w = r.switchAt; w + win <= fadeOutFrom; w += win)
+        worstWaiting = std::max(worstWaiting, energyAbove7kDb(r.out, w, win));
+    for (size_t w = fullFrom; w < fullFrom + 2 * win; w += win)
+        worstIr = std::max(worstIr, energyAbove7kDb(r.out, w, win));
+
+    INFO(">7 kHz, dB: built-in " << builtInHf << ", settled IR " << settledIrHf
+         << ", waiting (worst 10 ms) " << worstWaiting << ", 20 ms from full IR gain " << worstIr
+         << "; IR mode from " << (irFrom - r.switchAt) / 44.1 << " ms after the load");
+    REQUIRE(settledIrHf < builtInHf - 20.0);    // the IR does cut >7 kHz
+    REQUIRE(irFrom > r.switchAt);               // it faded (dipped), it did not cut
+    REQUIRE(worstWaiting < builtInHf + 3.0);    // waiting: the built-in cab, not pass-through
+    REQUIRE(worstIr < settledIrHf + 3.0);       // IR mode is the IR from its first sample
+
+    const Steps s = stepsOf(r);
+    INFO("steps: before " << s.before << ", after " << s.after << ", across the switch " << s.post << " at " << s.where << " from the dip's end");
+    REQUIRE(s.post <= kSteadyTolerance * std::max(s.before, s.after));
+}
+
+TEST_CASE("Processor: IR -> built-in cab fades", "[processor][ir][switch]")
+{
+    ProcessorHarness h;
+    h.loadIR(neutralFixture());
+    const SwitchRender r = renderSwitch(h, [&] { restoreWithIRIndex(h, 0); });
+    const Steps s = stepsOf(r);
+    INFO("steps: before " << s.before << ", after " << s.after << ", across the switch " << s.post << " at " << s.where << " from the dip's end");
+    REQUIRE(s.post <= kSteadyTolerance * std::max(s.before, s.after));
+}
+
+TEST_CASE("Processor: switching CAB on or off fades", "[processor][ir][switch]")
+{
+    const bool withIR = GENERATE(false, true);
+    const bool turnOn = GENERATE(false, true);
+    ProcessorHarness h;
+    if (withIR) h.loadIR(neutralFixture());
+    h.set(IDs::CAB_SIM, turnOn ? 0.0f : 1.0f);
+    const SwitchRender r = renderSwitch(h, [&] { h.set(IDs::CAB_SIM, turnOn ? 1.0f : 0.0f); });
+    const Steps s = stepsOf(r);
+    INFO((withIR ? "IR" : "built-in") << (turnOn ? ", CAB off -> on" : ", CAB on -> off")
+         << ". steps: before " << s.before << ", after " << s.after << ", across the switch " << s.post << " at " << s.where << " from the dip's end");
+    REQUIRE(s.post <= kSteadyTolerance * std::max(s.before, s.after));
+}
+
+TEST_CASE("Processor: a cab mode set after prepare, before the first block, does not fade",
+          "[processor][ir][switch]")
+{
+    // Hosts set their knobs after prepareToPlay. With no output yet there is
+    // nothing to fade from, so the first block plays the requested mode, as
+    // if it had been set before prepare (sr_render relies on this too).
+    ProcessorHarness early, late;
+    early.set(IDs::CAB_SIM, 0.0f);
+    early.proc.prepareToPlay(early.sampleRate, early.blockSize);
+    late.set(IDs::CAB_SIM, 0.0f);
+    std::vector<float> a, b;
+    early.run(0.1, sine(220.0f, 0.25f), ProcessorHarness::Mode::Process, &a);
+    late.run(0.1, sine(220.0f, 0.25f), ProcessorHarness::Mode::Process, &b);
+    REQUIRE(a == b);
 }

@@ -201,7 +201,62 @@ struct CabinetSim
     // IR tail length in seconds (for getTailLengthSeconds)
     double getIRTailSeconds() const;
 
+    // ── Readiness, for the cab-mode switcher (CabModeSwitcher.h) ──
+    // Audio thread (or while processBlock can't run). Allocation-free.
+    //
+    // prime(): what processBlock does to get a new IR installed, without
+    // playing it — picks up a pending IR from bufferTransfer and runs the
+    // convolution on a silent scratch block (allocated by prepare()), which is
+    // where JUCE swaps in an engine its background thread has finished. Call
+    // it only while IR mode is NOT the active mode: it advances the
+    // convolution's state, which the switcher's commit then resets.
+    void prime(int numSamples);
+    // True once an IR has been queued and the convolution's current engine is
+    // a real one, not JUCE's pass-through. JUCE exposes no "installed" flag,
+    // so this reads getCurrentIRSize(): ready when it is the size the queued
+    // IR's engine is predicted to have (engineSizeFor), OR any size other
+    // than the pass-through's. The pass-through is a 1-sample impulse
+    // resampled from 44.1 kHz — 1, 2 or 4 samples at 44.1/96/192 kHz — so a
+    // plain "size > 1" would call it real at 96 kHz and up.
+    //
+    // Fail-open on purpose: the switcher waits with no timeout, so a
+    // misprediction (a JUCE change to its trim or resampling, rounding) must
+    // never leave IR mode unreachable. The second clause alone would do for
+    // that; the first adds the degenerate IR whose engine is exactly the
+    // pass-through's size (a silent IR, trimmed to one zero sample, or a 1–4
+    // tap one), which reads as ready at once and hands over through JUCE's own
+    // 50 ms crossfade, as before Task 3.
+    // The trade-off: any real engine counts, not only the latest IR's. An IR
+    // queued while an older real IR is still installed (picked after leaving
+    // IR mode, or an IR -> IR load) reads as ready at once; IR mode then plays
+    // the older IR until JUCE crossfades to the new one — still cabbed.
+    bool hasRealIR() const;
+
+    // Test only: replaces the predicted engine size, to show a misprediction
+    // still reaches hasRealIR() once a real engine is installed.
+    void setExpectedEngineSizeForTesting(int size) { expectedEngineSize.store(size); }
+
+    // The length JUCE's engine will have for an IR of `trimmedLength` samples
+    // (after its -80 dBFS trim) at `irRate`, played at `sessionRate`. A
+    // replica of resampleImpulseResponse() in juce_Convolution.cpp.
+    static int engineSizeFor(int trimmedLength, double irRate, double sessionRate);
+    // The length JUCE's Trim::yes leaves: first to last sample at or above
+    // IR_TRIM_THRESHOLD over the first two channels together (min 1). A
+    // replica of fixNumChannels() + trimImpulseResponse().
+    static int trimmedLength(const juce::AudioBuffer<float>& buffer);
+
+    // Where the queued IR's engine peaks, in session-rate samples from its
+    // first sample: how long a convolution started from reset() takes to
+    // reach full output on a sustained input. The switcher holds the fade-in
+    // silent that long after entering IR mode, so the onset is not heard as a
+    // step. Audio thread; 0 before any IR is queued.
+    int engineOnsetSamples() const { return engineOnset.load(); }
+
 private:
+    // Records the queued IR's engine size for hasRealIR(). Message thread or
+    // prepareToPlay, on the level-matched buffer JUCE will trim.
+    void noteQueuedIR(const juce::AudioBuffer<float>& matched, double irRate);
+
     // Scales an IR in place to the built-in cab's 100 Hz–5 kHz band level
     // (IRLevel.h): channel-averaged band power at the IR's native rate, one
     // gain for every channel. Every load path calls it on the copy it hands
@@ -216,6 +271,23 @@ private:
     BufferTransfer bufferTransfer;
     juce::dsp::ProcessSpec spec { 44100.0, 512, 2 };   // as last passed to prepare()
     bool prepared = false;                              // prepare() has run (installIRNow needs it)
+
+    juce::AudioBuffer<float> primeScratch;   // prime()'s silent block, sized by prepare()
+    // The last queued IR, for engineSizeFor() / engineOnset. Written by
+    // noteQueuedIR() (the load paths: message thread, or installIRNow from
+    // prepareToPlay) and read by publishQueuedIR() from there and from
+    // prepare(). A host may call prepareToPlay off the message thread, so
+    // they are atomics; a prepare racing a load can publish a mixed pair,
+    // which only mispredicts the size — hasRealIR() fails open on that —
+    // and the load's own publish follows with the consistent one. Never
+    // touched by the audio thread, which reads only the published atomics.
+    std::atomic<int>    queuedTrimmedLength { 0 };
+    std::atomic<int>    queuedPeakOffset { 0 };     // samples after the trim start (IR rate)
+    std::atomic<double> queuedIRRate { 0.0 };
+    std::atomic<int> expectedEngineSize { 0 };   // 0 = no IR queued yet
+    std::atomic<int> engineOnset { 0 };          // queuedPeakOffset at the session rate
+    std::atomic<int> passThroughSize { 1 };      // JUCE's pass-through engine size at spec's rate
+    void publishQueuedIR(double sessionRate);
 
     double currentSampleRate = 44100.0;
     double irNativeSampleRate = 48000.0;  // sample rate of the loaded IR

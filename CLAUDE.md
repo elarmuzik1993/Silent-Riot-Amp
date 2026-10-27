@@ -30,13 +30,13 @@ Input → Scale to guitar domain → HP 7Hz → Grid cond V1a → Triode V1a →
 → Soft conduction×2 (bias-dependent Class A/AB) → Pentode×2 → Push-pull sum
 → Report PSU → Sag update (raw plate current) → OT current scale
 → Speaker coupling (bandpass extraction) → OT saturation → OT LP 7kHz
-→ IIR cab filters → Output scale → tanh limiter → Downsample → Output
+→ IIR cab filters → Output scale → tanh limiter → Downsample → (align delay) → Cab-mode fade → Output
 ```
 
 **IR path** (IR_INDEX>0, convolution at base SR after downsample):
 ```
 ... → Speaker coupling → OT saturation → OT LP 7kHz → Downsample
-→ IR convolution → Output scale → tanh limiter → Output
+→ IR convolution → Output scale → tanh limiter (4× oversampled) → Cab-mode fade → Output
 ```
 
 ### Source Layout
@@ -96,9 +96,9 @@ cmake -B build -DSR_BUILD_TESTS=ON # Build with tests
 - Parameter smoothing per-sample at oversampled rate (target/tick model in ParamSmoother)
 - CMake target is `SilentRiot`; product name is `Silent Riot`
 - Tests use Catch2 v3 — one test file per DSP module, three test targets:
-  - `SilentRiotTests` — 299 pure C++ test cases (no JUCE dependency)
-  - `SilentRiotJuceTests` — 74 JUCE-dependent test cases (cabinet IR, convolution, IR level match, user IR loading, oversample switcher + latency, delay/reverb)
-  - `SilentRiotProcessorTests` — 15 test cases on the real `SilentRiotProcessor` (effect-tail wiring, host bypass, IR restore and first-block install, IR level, GUI meters). Links the plugin's SharedCode target `SilentRiot`, so there is no source list to keep in step; drive it through `tests/processor_harness.h` (`ProcessorHarness`: prepared processor, `set()` params in natural units, `run()` / `silence()` in host blocks, `Mode::Bypassed`, `loadIR()`). Use it for anything that lives in `processBlock`'s wiring — a unit test of the DSP class it calls cannot see that. Each case takes seconds (4× oversampled amp), so keep runs short
+  - `SilentRiotTests` — 308 pure C++ test cases (no JUCE dependency)
+  - `SilentRiotJuceTests` — 78 JUCE-dependent test cases (cabinet IR, convolution, IR level match, IR readiness, user IR loading, oversample switcher + latency, delay/reverb)
+  - `SilentRiotProcessorTests` — 19 test cases on the real `SilentRiotProcessor` (effect-tail wiring, host bypass, IR restore and first-block install, IR level, cab-mode fades, GUI meters). Links the plugin's SharedCode target `SilentRiot`, so there is no source list to keep in step; drive it through `tests/processor_harness.h` (`ProcessorHarness`: prepared processor, `set()` params in natural units, `run()` / `silence()` in host blocks, `Mode::Bypassed`, `loadIR()`). Use it for anything that lives in `processBlock`'s wiring — a unit test of the DSP class it calls cannot see that. Each case takes seconds (4× oversampled amp), so keep runs short
 
 ## Cabinet IR Loader Architecture
 
@@ -110,6 +110,7 @@ cmake -B build -DSR_BUILD_TESTS=ON # Build with tests
 - **IR level match** (`IRLevel.h`, IR plan Task 2): every load path (`loadIRFromBuffer`, `installIRNow`, test-only `loadStockIR`/`loadIRFromFile`) scales the copy it hands to the convolution, off the audio thread, so its 100 Hz–5 kHz band power (power average of |H(f)|² over 69 points, 1/12 octave, at the IR's native rate, channel-averaged, one gain for all channels) equals the built-in cab biquads' over the same band (−0.89 dB full band, designed at a fixed `IR_LEVEL_REF_DESIGN_SR`; an IR below 11.1 kHz is compared over its clamped band). Gain capped at `IR_LEVEL_MAX_GAIN_DB` (40). JUCE gets `Normalise::no`, which keeps the response — and so the level — the same at every host rate. **Never pass `Normalise::yes`**: it scales to 0.125/√energy after resampling, ~11 dB under the built-in cab and +3 dB at 96 kHz vs 48 kHz. `userIRs` and saved state keep the raw IR (pinned by a processor test). JUCE's −80 dBFS trim acts on the scaled copy. An IR with no sample at or above `IR_TRIM_THRESHOLD` is left unscaled (it still plays the silence it was saved as)
 - **IR_INDEX → convolution**: always through `applyUserIRIndex()`. An index past the IR list (automation, or a restored state with fewer IRs than its saved index) must *disable* the convolution, not leave the previous IR playing; restore and `prepareToPlay` apply it directly via `applyIRIndexParam()`, because `processBlock` only reacts when the index changes
 - `useIR` is only set to `true` AFTER the IR buffer is pushed to `bufferTransfer`
+- **Cab-mode switcher** (`CabModeSwitcher.h`, IR plan Task 3): `useIR` and CAB only *request* a mode (Off / built-in / IR); the switcher owns the **active** one, and everything in `processBlock` (in-loop tanh, IR block, `iirPathAlign`, `cabSim.setEnabled`) runs on the active mode. A change fades out (128 samples), commits at gain 0 at a block start — where `enterCabMode()` runs the B6 resets (convolution + limiter oversampler on entering IR, `iirPathAlign` on leaving it) — holds silent while the entered path comes out of reset (`cabFadeInHold()`: the IR's peak + limiter latency, or the alignment delay), then fades in. The gain is applied once, at base rate on the finished cab-path output before delay/reverb; idle it is skipped, so the steady state is bit-identical. IR mode is entered only once `CabinetSim::hasRealIR()`; until then it keeps playing the active mode and `prime()` lets JUCE install the IR on a silent scratch block — so the first IR of a session never plays JUCE's pass-through. `hasRealIR()` is true when `getCurrentIRSize()` is the engine size predicted from JUCE's trim + resample rules (pinned by a test) **or** anything but the pass-through's size — fail-open, since the wait has no timeout — and **not** `> 1`: the pass-through is 2 samples at 96 kHz and 4 at 192 kHz. The first block after `prepareToPlay` and after `tailsStale` switches without a fade (no audible output to fade from). The built-in cab's three biquads run in **every** mode (output used only in built-in), so they are live when it takes over — don't gate them on the mode again, and don't reset them at the commit (the 400 Hz notch rings in)
 - Convolution runs at base SR (after downsample), not at oversampled rate
 - `getTailLengthSeconds()` reports IR tail using the IR's native sample rate
 

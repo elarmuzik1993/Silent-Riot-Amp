@@ -27,6 +27,7 @@
 #include "dsp/cabinet/SpeakerCoupling.h"
 #include "dsp/cabinet/OTSaturation.h"
 #include "dsp/cabinet/CabinetSim.h"
+#include "dsp/cabinet/CabModeSwitcher.h"
 #include "dsp/cabinet/UserIRState.h"
 #include "dsp/effects/NoiseGate.h"
 #include "dsp/effects/Boost.h"
@@ -162,7 +163,16 @@ private:
     // reported to the host (main + limiter) is true in both cab modes (review
     // B4). Mono/stereo bus only, hence 2 channels.
     sr::IntegerDelay<2, 16> iirPathAlign;
-    bool lastIrMode = false;          // clear iirPathAlign on IR -> IIR switches
+
+    // Owns the ACTIVE cab mode (CAB off / built-in / IR) and fades every
+    // change between them; processBlock runs each block in its activeMode()
+    // and resets the path it enters at the commit (IR-path plan Task 3).
+    sr::CabModeSwitcher cabSwitcher;
+    void enterCabMode(sr::CabMode entered, sr::CabMode left);   // the commit's resets
+    int  cabFadeInHold(sr::CabMode entered, sr::CabMode left) const;   // gain-0 samples after it
+    static constexpr int kCabOnsetMarginSamples = 32;   // past the IR's peak: its main lobe
+    bool cabWaitLogged = false;       // one debug log per long WaitingForIR
+    bool cabStartFresh = false;       // set by prepareToPlay: the next block may switch without a fade
 
     // Host-bypass passthrough: the dry input delayed by the reported latency, so
     // a bypassed plugin stays time-aligned. processBlock write()s every input

@@ -232,26 +232,30 @@ shift the audio in time.
 In `PluginProcessor`, use the active mode everywhere `irMode`/`cabOn` gate processing today: the
 cab biquads, the in-loop tanh, the IR block, `iirPathAlign` and `cabSim.setEnabled`.
 
-- [ ] Write the state-machine tests first (`SilentRiotTests`):
-  - [ ] An unchanged mode gives gain exactly 1 and no commit over 10k samples.
-  - [ ] built-in → Off reaches exactly 0 before commit, commits once, and returns to 1. No
+- [x] Write the state-machine tests first (`SilentRiotTests`):
+  - [x] An unchanged mode gives gain exactly 1 and no commit over 10k samples.
+  - [x] built-in → Off reaches exactly 0 before commit, commits once, and returns to 1. No
         per-sample step is larger than 1/128 at block sizes 1, 7, 64, 512 and 4096.
-  - [ ] → IR with the IR not ready: gain stays 1 and no commit. Commit happens only once ready.
-  - [ ] A request reversed mid-fade-out never commits the abandoned mode.
-  - [ ] A request during fade-in continues from the current gain.
-- [ ] Write a JUCE test: an IR pushed while not in IR mode reaches `hasRealIR()` through
+  - [x] → IR with the IR not ready: gain stays 1 and no commit. Commit happens only once ready.
+  - [x] A request reversed mid-fade-out never commits the abandoned mode.
+  - [x] A request during fade-in continues from the current gain.
+- [x] Write a JUCE test: an IR pushed while not in IR mode reaches `hasRealIR()` through
       `prime()` within 1 s (bounded poll loop).
-- [ ] Write processor tests (harness), at P-EDGE on a sustained note, for built-in → IR,
+- [x] Write processor tests (harness), at P-EDGE on a sustained note, for built-in → IR,
       IR → built-in, CAB off → on and CAB on → off. In the 20 ms after the switch:
   - no sample-to-sample step larger than the steady-state maximum;
   - and, on the first IR load of a session, no >7 kHz energy above settled IR mode.
 
   Record the before and after numbers in the handoff doc.
-- [ ] Verify. Built-in-cab renders with no switch must be bit-identical.
-- [ ] #33's B6 tests in `processor_effects_tests.cpp` must still pass. The first four already run
+- [x] Verify. Built-in-cab renders with no switch must be bit-identical.
+- [x] #33's B6 tests in `processor_effects_tests.cpp` must still pass. The first four already run
       the IR path (`Fx::IR`, switched by CAB). The two fade tests cover only delay and reverb,
       whose wet signal fades into dry. A cab switch dips to zero instead, so Task 3's own
       processor tests are the cab's equivalent.
+
+Done 2026-10-27; deviations (readiness by predicted engine size instead of `> 1`, built-in
+biquads always running instead of reset, a gain-0 hold after the commit, no fade on the first block
+after prepare / `tailsStale`) are recorded with their measurements in the handoff's Task 3 section.
 
 ## Task 4: Fade truncated IRs
 

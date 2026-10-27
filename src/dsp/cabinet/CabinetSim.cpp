@@ -15,6 +15,14 @@ void CabinetSim::prepare(double sampleRate, int maxBlockSize, int numChannels)
     convolution.prepare(spec);
     prepared = true;
 
+    primeScratch.setSize(numChannels, maxBlockSize);
+    primeScratch.clear();
+    // JUCE's pass-through: a 1-sample impulse at 44.1 kHz, resampled here.
+    passThroughSize.store(engineSizeFor(1, 44100.0, sampleRate));
+    // The factory rebuilt the last queued IR (if any) at the new rate.
+    if (queuedTrimmedLength.load() > 0)
+        publishQueuedIR(sampleRate);
+
     // IR reload after prepare is handled by the processor (it holds user IR data).
 }
 
@@ -37,6 +45,101 @@ void CabinetSim::processBlock(juce::dsp::AudioBlock<float>& block)
 
     juce::dsp::ProcessContextReplacing<float> context(block);
     convolution.process(context);
+}
+
+void CabinetSim::prime(int numSamples)
+{
+    bufferTransfer.get([this](BufferWithSampleRate& buf)
+    {
+        queueConvolutionLoad(std::move(buf.buffer), buf.sampleRate);
+    });
+
+    const int n = std::min(numSamples, primeScratch.getNumSamples());
+    if (n <= 0 || primeScratch.getNumChannels() <= 0)
+        return;
+    primeScratch.clear();
+    juce::dsp::AudioBlock<float> block(primeScratch.getArrayOfWritePointers(),
+                                       static_cast<size_t>(primeScratch.getNumChannels()),
+                                       static_cast<size_t>(n));
+    juce::dsp::ProcessContextReplacing<float> context(block);
+    convolution.process(context);
+}
+
+bool CabinetSim::hasRealIR() const
+{
+    // See the header: the predicted size, or failing that any engine that
+    // is not the pass-through.
+    const int expected = expectedEngineSize.load();
+    const int size = convolution.getCurrentIRSize();
+    return expected > 0 && size > 0 && (size == expected || size != passThroughSize.load());
+}
+
+int CabinetSim::engineSizeFor(int trimmedLen, double irRate, double sessionRate)
+{
+    // resampleImpulseResponse(): no resampling when the rates match, else
+    // roundToInt(max(1, n / (src / dest))).
+    if (juce::approximatelyEqual(irRate, sessionRate))
+        return trimmedLen;
+    const double factorReading = irRate / sessionRate;
+    return juce::roundToInt(std::max(1.0, trimmedLen / factorReading));
+}
+
+int CabinetSim::trimmedLength(const juce::AudioBuffer<float>& buffer)
+{
+    // fixNumChannels(Stereo::yes) keeps the first two channels (a buffer
+    // with none becomes a unit impulse); trimImpulseResponse() then cuts the
+    // union span, and an IR with nothing above the threshold to one sample.
+    const int numChannels = std::min(buffer.getNumChannels(), 2);
+    const int n = buffer.getNumSamples();
+    if (numChannels == 0 || n == 0)
+        return 1;
+    int begin = n, end = n;   // samples before the first / after the last
+    for (int ch = 0; ch < numChannels; ++ch)
+    {
+        const float* d = buffer.getReadPointer(ch);
+        int first = 0;
+        while (first < n && !(std::abs(d[first]) >= IR_TRIM_THRESHOLD)) ++first;
+        int last = 0;
+        while (last < n && !(std::abs(d[n - 1 - last]) >= IR_TRIM_THRESHOLD)) ++last;
+        begin = std::min(begin, first);
+        end = std::min(end, last);
+    }
+    if (begin == n)
+        return 1;
+    return std::max(1, n - (begin + end));
+}
+
+void CabinetSim::noteQueuedIR(const juce::AudioBuffer<float>& matched, double irRate)
+{
+    queuedTrimmedLength.store(trimmedLength(matched));
+    queuedIRRate.store(irRate);
+
+    // The loudest sample over the channels JUCE convolves, from the start of
+    // the span its trim keeps (the first sample at or above the threshold).
+    const int numChannels = std::min(matched.getNumChannels(), 2);
+    int begin = matched.getNumSamples(), peakAt = 0;
+    float peak = -1.0f;
+    for (int ch = 0; ch < numChannels; ++ch)
+    {
+        const float* d = matched.getReadPointer(ch);
+        for (int i = 0; i < matched.getNumSamples(); ++i)
+        {
+            const float a = std::abs(d[i]);
+            if (a >= IR_TRIM_THRESHOLD) begin = std::min(begin, i);
+            if (a > peak) { peak = a; peakAt = i; }
+        }
+    }
+    queuedPeakOffset.store(std::max(0, peakAt - begin));
+    publishQueuedIR(spec.sampleRate);
+}
+
+void CabinetSim::publishQueuedIR(double sessionRate)
+{
+    const double irRate = queuedIRRate.load();
+    expectedEngineSize.store(engineSizeFor(queuedTrimmedLength.load(), irRate, sessionRate));
+    engineOnset.store(irRate > 0.0
+                          ? static_cast<int>(std::ceil(queuedPeakOffset.load() * sessionRate / irRate))
+                          : 0);
 }
 
 void CabinetSim::setIRIndex(int newIndex)
@@ -79,6 +182,7 @@ void CabinetSim::loadStockIR(int stockIndex)
     currentIRLengthSamples = irBuffer.getNumSamples();
     irNativeSampleRate = static_cast<double>(desc.sampleRate);
     matchBuiltInCabLevel(irBuffer, irNativeSampleRate);
+    noteQueuedIR(irBuffer, irNativeSampleRate);
 
     bufferTransfer.set(BufferWithSampleRate(std::move(irBuffer),
                                            static_cast<double>(desc.sampleRate)));
@@ -112,6 +216,7 @@ void CabinetSim::loadIRFromFile(const juce::File& file)
     currentIRLengthSamples = numSamples;
     irNativeSampleRate = reader->sampleRate;
     matchBuiltInCabLevel(irBuffer, irNativeSampleRate);
+    noteQueuedIR(irBuffer, irNativeSampleRate);
     bufferTransfer.set(BufferWithSampleRate(std::move(irBuffer),
                                            reader->sampleRate));
     useIR.store(true);
@@ -124,6 +229,7 @@ void CabinetSim::loadIRFromBuffer(juce::AudioBuffer<float>&& buffer, double samp
     currentIRLengthSamples = buffer.getNumSamples();
     irNativeSampleRate = sampleRate;
     matchBuiltInCabLevel(buffer, sampleRate);
+    noteQueuedIR(buffer, sampleRate);
     bufferTransfer.set(BufferWithSampleRate(std::move(buffer), sampleRate));
     useIR.store(true);
 }
@@ -139,6 +245,7 @@ void CabinetSim::installIRNow(juce::AudioBuffer<float>&& buffer, double sampleRa
     currentIRLengthSamples = buffer.getNumSamples();
     irNativeSampleRate = sampleRate;
     matchBuiltInCabLevel(buffer, sampleRate);
+    noteQueuedIR(buffer, sampleRate);
     queueConvolutionLoad(std::move(buffer), sampleRate);
 
     // Convolution::prepare() first runs every queued load on this thread

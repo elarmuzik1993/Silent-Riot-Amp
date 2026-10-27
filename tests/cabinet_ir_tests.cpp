@@ -3,6 +3,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
+#include <catch2/generators/catch_generators.hpp>
 #include <algorithm>
 #include <chrono>
 #include <cmath>
@@ -848,4 +849,107 @@ TEST_CASE("The level match scales a copy, one gain for both channels", "[cabinet
     INFO("L " << lDb << " dB, R " << rDb << " dB, average " << avgDb << " dB");
     CHECK_THAT(lDb - rDb, Catch::Matchers::WithinAbs(20.0 * std::log10(2.0), 0.05));
     CHECK(std::abs(avgDb - irlevel::powerToDb(irlevel::builtInCabBandPower())) < 0.3);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Readiness for the cab-mode switcher (IR-path plan Task 3): prime() and
+// hasRealIR()
+// ═══════════════════════════════════════════════════════════════
+
+TEST_CASE("A fresh convolution has no real IR, at any session rate", "[cabinet][ir][switcher]")
+{
+    // JUCE's pass-through is a 1-sample impulse at 44.1 kHz, resampled to the
+    // session rate: 1 sample at 44.1/48k, 2 at 96k, 4 at 192k. So "IR size
+    // > 1" does not tell it from a real IR at 96k and up; hasRealIR() compares
+    // against the engine size the queued IR will have instead.
+    const double rate = GENERATE(44100.0, 48000.0, 96000.0, 192000.0);
+    CabinetSim cab;
+    cab.prepare(rate, 512, 2);
+    INFO("rate " << rate);
+    REQUIRE_FALSE(cab.hasRealIR());
+    cab.loadIRFromBuffer(movingAverageIR(), 44100.0);   // queued only
+    REQUIRE_FALSE(cab.hasRealIR());
+}
+
+TEST_CASE("An IR pushed while not in IR mode becomes real through prime()", "[cabinet][ir][switcher]")
+{
+    // The switcher keeps the built-in cab (or CAB off) playing while the
+    // first IR of a session is built: processBlock is not called, so prime()
+    // must hand JUCE the IR and run its engine swap on a silent block.
+    const double rate = GENERATE(44100.0, 96000.0);
+    CabinetSim cab;
+    cab.prepare(rate, 512, 2);
+    cab.loadIRFromBuffer(movingAverageIR(), 44100.0);
+
+    bool ready = false;
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(1);
+    while (!ready && std::chrono::steady_clock::now() < deadline)
+    {
+        cab.prime(512);
+        ready = cab.hasRealIR();
+        if (!ready) std::this_thread::sleep_for(std::chrono::milliseconds(2));
+    }
+    INFO("rate " << rate);
+    REQUIRE(ready);
+
+    // And it is the IR, not the pass-through: 10 kHz is cut once JUCE's own
+    // pass-through crossfade has been dropped (the switcher's commit resets).
+    // (tenKHzGainDb's tone assumes 44.1 kHz.)
+    cab.reset();
+    if (rate == 44100.0)
+        REQUIRE(tenKHzGainDb(cab, 0) <= -20.0);
+}
+
+TEST_CASE("hasRealIR matches JUCE's engine size after an install, at any rate", "[cabinet][ir][switcher]")
+{
+    // hasRealIR() predicts the engine size from JUCE's trim and resampling
+    // rules (CabinetSim::engineSizeFor). Pin that replica against the real
+    // thing, so a JUCE upgrade that changes either rule shows up here.
+    const double sessionRate = GENERATE(44100.0, 48000.0, 88200.0, 96000.0, 192000.0);
+    const double irRate = GENERATE(8000.0, 44100.0, 48000.0, 96000.0);
+    juce::AudioBuffer<float> ir(2, 1000);
+    ir.clear();
+    for (int i = 0; i < 1000; ++i)   // quiet head and tail for the trim to cut
+    {
+        const float env = std::exp(-static_cast<float>(i) / 80.0f);
+        ir.setSample(0, i, i < 37 ? 0.0f : env * std::cos(0.3f * static_cast<float>(i)));
+        ir.setSample(1, i, i < 52 ? 0.0f : 0.5f * env * std::sin(0.2f * static_cast<float>(i)));
+    }
+    CabinetSim cab;
+    cab.prepare(sessionRate, 256, 2);
+    cab.installIRNow(juce::AudioBuffer<float>(ir), irRate);
+    INFO("session " << sessionRate << ", IR " << irRate);
+    REQUIRE(cab.hasRealIR());
+
+    // A re-prepare at another rate rebuilds the same IR there.
+    cab.prepare(sessionRate == 44100.0 ? 96000.0 : 44100.0, 256, 2);
+    REQUIRE(cab.hasRealIR());
+}
+
+TEST_CASE("hasRealIR fails open: a mispredicted engine size still becomes ready", "[cabinet][ir][switcher]")
+{
+    // The switcher waits for hasRealIR() with no timeout. If the size replica
+    // ever mispredicts (a JUCE change, rounding), IR mode must still be
+    // reachable once a real engine is installed — never stuck on the
+    // built-in cab — while the pass-through must still read as not ready.
+    const double rate = GENERATE(44100.0, 96000.0);
+    CabinetSim cab;
+    cab.prepare(rate, 512, 2);
+    cab.loadIRFromBuffer(movingAverageIR(), 44100.0);
+    cab.setExpectedEngineSizeForTesting(12345);   // wrong on purpose
+    INFO("rate " << rate);
+    REQUIRE_FALSE(cab.hasRealIR());               // the pass-through is never ready
+
+    bool ready = false;
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(1);
+    while (!ready && std::chrono::steady_clock::now() < deadline)
+    {
+        cab.prime(512);
+        ready = cab.hasRealIR();
+        if (!ready) std::this_thread::sleep_for(std::chrono::milliseconds(2));
+    }
+    REQUIRE(ready);
+    cab.reset();
+    if (rate == 44100.0)
+        REQUIRE(tenKHzGainDb(cab, 0) <= -20.0);   // and it is the IR
 }

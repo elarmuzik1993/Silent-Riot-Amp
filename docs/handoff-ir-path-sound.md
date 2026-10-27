@@ -355,3 +355,141 @@ oversampler adds nothing measurable at the new level; its −23 dBc is the engin
 by the bright IR (which passes the in-band spurs and cuts the 11 kHz carrier), i.e. E3's problem,
 not the limiter's. `alias_crank` (E3) still renders `OPTIONAL_BRIGHT_IR` → built-in cab; `S-IR` is
 not E3 and does not replace it.
+
+## Task 3 — fade every cab-mode switch, never play un-cabbed (2026-10-27)
+
+**Design.** `src/dsp/cabinet/CabModeSwitcher.h` (pure C++) owns the *active* cab mode (Off /
+built-in / IR); `requestedCabMode(cabOn, useIR)` is only a request. States Idle → (WaitingForIR)
+→ FadingOut → Silent → commit → FadingIn → Idle. The gain is an integer level / 128, so every
+per-sample step is exactly 1/128 and the fades end on exactly 0 and 1. A request during a fade-in
+fades out from the current level; a request reversed before the commit fades back in on the mode
+that never stopped playing, without committing; WaitingForIR has no timeout (a debug build logs
+once past 1 s). The commit can only be at a block start (the mode decides the whole block: the
+in-loop tanh, the cab biquads' use, the IR block, `iirPathAlign`, `cabSim.setEnabled`), so after
+the fade-out the rest of that block is silent.
+
+`processBlock` asks once per block: `prime()` while IR is requested but not active, then
+`beginBlock(requested, cabSim.hasRealIR())`; on a commit `enterCabMode()` runs #33's resets
+(convolution + limiter oversampler on entering IR mode, `iirPathAlign` on leaving it) and
+`holdSilence(cabFadeInHold())` keeps the gain at 0 while the entered path comes out of reset.
+
+**Where the gain is applied:** once, at base rate, on the finished cab-path output — after the IR
+block (convolution + oversampled limiter) and after `iirPathAlign` on the other branch, before
+delay/reverb/widener/OUTPUT trim. It is the one point both paths pass, so nothing from either path
+reaches the output un-faded; it is after both limiters, so the dip only ever lowers the level; and
+delay/reverb tails ring on through the dip instead of being cut. While Idle `applyGain` touches
+nothing, so the steady state is bit-identical. An oversample switch fading at the same moment
+multiplies with it (its fade runs earlier, on the downsampled amp): both move ≤ 1/128 per sample,
+so the product is a deeper or longer dip, never a step.
+
+**Interactions.** `prepareToPlay` resets the switcher to the requested mode with no fade (an IR
+selected there was installed by Task 1, so it is real; were it not, it would start on the built-in
+cab and wait). The first block after `prepareToPlay` and the first after `tailsStale` (power-off,
+tuner mute, host bypass, `reset()`) switch **without** a fade, running the commit's resets: the
+last output was silence (or bypass's dry signal), so there is nothing to fade from, and hosts set
+their knobs after prepare (`sr_render` does: without this every CAB-off render started with a
+dip). They still never enter an IR that isn't installed. On `tailsStale` with IR mode active the
+convolution and limiter are cleared, as `lastIrMode = false` did; `lastIrMode` is gone. IR → IR
+loads are not mode changes: JUCE's 50 ms crossfade handles them, as before.
+
+### JUCE facts (7.0.12, `juce_Convolution.cpp`), verified in the source
+
+- `getCurrentIRSize()` is `currentEngine->getIRSize()`, the length of the trimmed, **resampled**
+  IR. The pass-through is the factory's initial 1-sample impulse whose `originalSampleRate` is the
+  constructor's default 44.1 kHz, resampled to the session rate by `roundToInt(max(1, n·dest/src))`:
+  **1 sample at 44.1/48 kHz, 2 at 96 kHz, 4 at 192 kHz.** So the plan's readiness test
+  `getCurrentIRSize() > 1` reads the pass-through as a real IR at 96 kHz and up (confirmed: the new
+  "fresh convolution" test fails at 96k and 192k with it). `hasRealIR()` instead compares the size
+  with the one the queued IR's engine will have, predicted by `engineSizeFor(trimmedLength(...))`, a
+  replica of `fixNumChannels` + `trimImpulseResponse` + `resampleImpulseResponse`, pinned against
+  the real engine for 5 session × 4 IR rates. It **fails open** (review of 047cc65): ready when
+  the size is the predicted one *or* anything but the pass-through's, so a misprediction (a JUCE
+  change, rounding, a prepare racing a load) can never leave IR mode unreachable — the switcher
+  has no timeout. A test forces a wrong prediction and still reaches ready once the real engine
+  is in. Trade-off: any real engine counts, so an IR picked while an older real IR is installed
+  enters IR mode on the older IR until JUCE's crossfade to the new one (still cabbed). The
+  `queued*` fields behind the prediction are atomics: they are written by the load paths and read
+  from `prepare()`, which a host may call off the message thread. Consequence: an IR whose engine is exactly the
+  pass-through's size (a silent IR → 1 zero sample, or 1–4 taps) reads as ready at once and hands
+  over through JUCE's own crossfade, as before. After an IR → IR load of the same length it reads
+  true while the older IR still plays; JUCE's crossfade covers that.
+- The real engine is installed only inside `processSamples` (`installPendingEngine` when no
+  crossfade is running), which then starts a 50 ms crossfade from the previous engine. Hence
+  `prime()`: picks up `bufferTransfer`, runs `convolution.process()` on a silent scratch block
+  allocated in `prepare()`. The convolution's state it advances is cleared at the commit.
+- `Convolution::reset()` is audio-thread safe: outer `Mixer::reset()`, `CrossoverMixer::reset()`
+  (smoother set to 1, not smoothing → only the current engine plays), `currentEngine->reset()`
+  (zeroes buffers), and the previous engine is handed to the background queue for deletion
+  (`FixedSizeFunction`, no allocation; destroyed in place only if that queue is full). A pending
+  engine not yet installed is untouched and installs later with a fresh crossfade — which is why
+  the commit waits for `hasRealIR()` rather than relying on the reset.
+
+### Deviations from the plan (all measured)
+
+1. **Readiness** is the predicted engine size, not `> 1` (above).
+2. **The built-in cab's biquads run in every mode** (only the built-in mode uses their output), and
+   are *not* reset at the commit. With the plan's reset, the restarted biquads (the 400 Hz notch,
+   Q 2, rings in) stepped past the steady state through the fade-in: CAB off → on 0.00265 and
+   IR → built-in 0.00223 vs ≤ 0.00234 steady. Running them keeps their state live; the built-in
+   steady state is unchanged bit for bit (same operations), and in the other modes the output is
+   unchanged.
+3. **A hold at gain 0 after the commit** (`cabFadeInHold`): entering IR mode, the IR's peak
+   position (session-rate samples, from the trim start) + 32, capped at 1024, + the limiter's
+   latency (12); leaving IR mode, `iirPathAlign`'s delay (12); Off ↔ built-in, none. Without it a
+   reset convolution reached its IR's peak *during* the fade-in, and the cleared `iirPathAlign`
+   played 12 zeros then the note mid-cycle: steps of 0.0069–0.0089 (first IR, 3 kHz sinc IR,
+   peak at tap 63), 0.0044 (IR CAB off → on), 0.0024 (IR CAB on → off) vs ~0.0022 steady.
+4. **The first block after prepare / `tailsStale` switches without a fade** (above).
+
+### Tests
+
+- `cab_mode_switcher_tests.cpp` (`SilentRiotTests`, 9 cases, blocks 1/7/64/512/4096 where the
+  plan asks): unchanged mode → gain exactly 1, no commit over 10k samples; built-in → Off reaches
+  exactly 0, commits once, returns to 1, step ≤ 1/128; → IR not ready → full gain, no commit until
+  ready; never ready → never commits (100k samples); reversed mid-fade-out and reversed at gain 0
+  → no commit; a request mid-fade-in fades out from the current gain; `holdSilence` (0/12/300);
+  `requestedCabMode`.
+- `cabinet_ir_tests.cpp` (3): a fresh convolution has no real IR at 44.1/48/96/192 kHz (and not
+  after a queued load); an IR queued outside IR mode becomes real through `prime()` within 1 s
+  (bounded poll; 44.1/96 kHz), and then cuts 10 kHz ≤ −20 dB; `hasRealIR()` matches JUCE's engine
+  after `installIRNow` and after a re-prepare at another rate (5 × 4 rates); and (+1) with the
+  prediction deliberately wrong, the pass-through still reads not ready and the installed IR
+  still reads ready (44.1/96 kHz) — with an exact-match-only rule that test fails.
+- `processor_ir_tests.cpp` (4), P-EDGE, `sine(220, 0.1)`, switch mid-note after 0.6 s; max
+  |x[i] − x[i−1]| from the switch to 20 ms past the dip vs the steady state (0.2 s before, last
+  0.15 s), 1 % tolerance for the steady state's own drift:
+
+| Switch | Steady (before / after) | Before Task 3 | After |
+|---|---|---|---|
+| first IR of the session (async load, 3 kHz sinc IR) | 0.00213 / 0.00227 | 0.141 | 0.00227 |
+| IR → built-in (state restore, IR_INDEX 0) | 0.00218 / 0.00213 | 0.0312 | 0.00213 |
+| built-in, CAB on → off | 0.00213 / 0.00233 | 0.00423 | 0.00233 |
+| built-in, CAB off → on | 0.00234 / 0.00213 | 0.0415 | 0.00213 |
+| IR (neutral), CAB on → off | 0.00218 / 0.00233 | 0.0324 | 0.00233 |
+| IR (neutral), CAB off → on | 0.00234 / 0.00218 | 0.0657 | 0.00219 |
+
+  First IR, >7 kHz energy per 10 ms window: built-in −123.0 dB, settled IR −163.7 dB. While
+  waiting (before the fade-out) the worst window is −122.1 dB, the built-in cab's; in the 20 ms
+  from 2 ms past the end of the fade-in **−162.7 dB** (before Task 3, from the load: **−82.9 dB**,
+  the pass-through plus the hard cut). IR mode started 25–37 ms after the load (JUCE's background
+  build; varies run to run). The 2 ms offset is deliberate: a linear fade's end is a corner in the
+  envelope, broadband on its own (−99 dB here, the fade's and not the cab's), and the analysis
+  high-pass rings on it ~1 ms. Plus: a cab mode set after prepare, before the first block, is
+  bit-identical to one set before prepare.
+
+  `bash scripts/verify.sh`: pass, **405/405** (308 / 78 / 19). #33's B6 tests pass unchanged.
+
+### Measurements
+
+- `--diff-baseline` against Task 0's renders: **19/19 bit-identical**. `signoff.py`: all 17 gates
+  identical to Task 2 (12 built-in + 5 IR report-only), and all 13 sign-off renders bit-identical
+  to Task 2's.
+- Level table: identical to Task 2, all 36 renders (27 IR + 9 built-in) bit-identical.
+- `--startup` and `--repeat 6 --block 64 512 2048` against a Task 2 (`e195431`) `sr_render`:
+  identical tables, the three startup renders and the three repeat references bit-identical;
+  repeat 6/6 at every block size. (Before the first-block rule, the CAB-off startup render
+  differed: it opened with a built-in → Off dip.)
+
+**Dip length** at 44.1 kHz: 128 down + the rest of that host block + the hold + 128 up — about
+6 ms at block 64, 14.5 ms (built-in ↔ Off) to 17 ms (into the 3 kHz IR) at 512, ~95 ms at 4096.
+A true crossfade would need the amp loop to output both paths and a second downsampler; not done.

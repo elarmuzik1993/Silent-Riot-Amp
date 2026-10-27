@@ -252,7 +252,6 @@ void SilentRiotProcessor::resetDSPState()
     delayFading = reverbFading = false;
     tailsStale  = false;
     bypassDelay.reset();
-    lastIrMode  = false;
 
     lastShapeCoeffVal = -1.0f;   // force shape coeff recompute on first sample
     psuFrozen = false;
@@ -397,6 +396,64 @@ void SilentRiotProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 
     // Clear any state carried over from a previous configuration
     resetDSPState();
+
+    // Start in the mode the knobs ask for, with no fade pending. With an IR
+    // selected it was just installed (IRLoad::Now), so IR mode is real from
+    // the first block; should it not be (nothing installed it), start on the
+    // built-in cab and let the switcher wait for it rather than play JUCE's
+    // pass-through.
+    {
+        const bool cabOn = apvts.getRawParameterValue(Params::IDs::CAB_SIM)->load() > 0.5f;
+        sr::CabMode mode = sr::requestedCabMode(cabOn, cabSim.useIR.load());
+        if (mode == sr::CabMode::IR && !cabSim.hasRealIR())
+            mode = sr::CabMode::BuiltIn;
+        cabSwitcher.reset(mode);
+        cabWaitLogged = false;
+        cabStartFresh = true;
+    }
+}
+
+int SilentRiotProcessor::cabFadeInHold(sr::CabMode entered, sr::CabMode left) const
+{
+    // How long the path just entered needs, after enterCabMode()'s resets,
+    // before its output is the steady signal; the fade-in waits that long at
+    // gain 0, so the ramp starts on it instead of on a reset's onset.
+    //  - IR mode: the convolution reaches full output at its IR's peak, then
+    //    the limiter oversampler (also reset) adds its latency. Capped, so a
+    //    strange IR with a late peak can't hold the dip open for long.
+    //  - Leaving IR mode: iirPathAlign was cleared and plays zeros until it
+    //    refills, then the signal mid-cycle, i.e. a step.
+    //  - Off <-> built-in: nothing was reset, no hold.
+    constexpr int kMaxIRHold = 1024;   // 23 ms at 44.1 kHz
+    if (entered == sr::CabMode::IR)
+        return std::min(cabSim.engineOnsetSamples() + kCabOnsetMarginSamples, kMaxIRHold)
+               + static_cast<int>(std::lround(limiterOversampler->getLatencyInSamples()));
+    if (left == sr::CabMode::IR)
+        return iirPathAlign.getDelay();
+    return 0;
+}
+
+void SilentRiotProcessor::enterCabMode(sr::CabMode entered, sr::CabMode left)
+{
+    // The switcher's commit: a block start with the output at gain 0. Each
+    // path entered is cleared of whatever it froze with while skipped, so it
+    // starts clean under the fade-in (review B6). All allocation-free.
+    if (entered == sr::CabMode::IR)
+    {
+        // Also drops a half-finished JUCE crossfade, e.g. from the
+        // pass-through to the first IR of a session (Convolution::reset()).
+        cabSim.reset();
+        limiterOversampler->reset();
+    }
+    // The built-in cab's biquads need no reset: they run in every mode (see
+    // the amp loop), so their state is live when the built-in cab takes over.
+    // Resetting them instead would start them from zero mid-note, and the
+    // 400 Hz notch's ring-in would be heard through the fade-in.
+
+    // Leaving IR mode: the IIR path's alignment delay holds the last samples
+    // it saw before IR mode, not this signal.
+    if (left == sr::CabMode::IR)
+        iirPathAlign.reset();
 }
 
 void SilentRiotProcessor::releaseResources() {}
@@ -543,12 +600,22 @@ void SilentRiotProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
 
     // Leaving power-off / tuner mute, or after a host reset(): drop every frozen
     // effect tail. Clearing the was-on flags sends delay, reverb and widener
-    // through their off→on restart below; lastIrMode = false does the same for
-    // the IR convolution; the IIR path's alignment delay is cleared here.
+    // through their off→on restart below; the IR convolution and its limiter
+    // oversampler are cleared if IR mode is the active cab mode (any other
+    // mode clears them when it hands over to IR mode); the IIR path's
+    // alignment delay is cleared here.
+    bool cabSnap = cabStartFresh;   // first block since prepare: nothing to fade from
+    cabStartFresh = false;
     if (tailsStale.exchange(false))
     {
-        delayWasOn = reverbWasOn = widenerWasActive = lastIrMode = false;
+        cabSnap = true;   // the last output was silence (or host bypass's dry signal)
+        delayWasOn = reverbWasOn = widenerWasActive = false;
         delayFading = reverbFading = false;
+        if (cabSwitcher.activeMode() == sr::CabMode::IR)
+        {
+            cabSim.reset();
+            limiterOversampler->reset();
+        }
         iirPathAlign.reset();
     }
 
@@ -560,8 +627,6 @@ void SilentRiotProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
         if (bias != lastSagQuiescentBias) setEl84Bias(bias);
     }
 
-    cabSim.setEnabled(cabOn);
-
     // Detect IR parameter changes — defer actual loading to message thread
     if (irIndex != cachedIRIndex)
     {
@@ -570,9 +635,48 @@ void SilentRiotProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
         triggerAsyncUpdate();  // handleAsyncUpdate() applies it via applyUserIRIndex() on message thread
     }
 
-    // IR mode: cab on AND convolution has an active IR.
-    // useIR is atomic — set by message thread after IR is loaded into bufferTransfer.
-    bool irMode = cabOn && cabSim.useIR.load();
+    // ── Cab mode (IR-path plan Task 3) ──
+    // Requested: CAB off, else IR when one is selected (useIR is atomic, set
+    // by the message thread after the IR is handed to bufferTransfer), else
+    // the built-in cab. The switcher decides the ACTIVE mode, which is what
+    // the rest of the block runs: a change fades out, commits at gain 0 at a
+    // block start, and fades in; IR mode is only entered once the
+    // convolution holds the real IR. Until then prime() lets JUCE install it
+    // without playing it, so the first IR of a session never plays JUCE's
+    // pass-through (the amp with no cab).
+    {
+        const sr::CabMode requested = sr::requestedCabMode(cabOn, cabSim.useIR.load());
+        const sr::CabMode before = cabSwitcher.activeMode();
+        if (requested == sr::CabMode::IR && before != sr::CabMode::IR)
+            cabSim.prime(buffer.getNumSamples());
+        if (cabSnap)
+        {
+            // Nothing audible to fade out from: the first block since
+            // prepareToPlay (a host sets its knobs after prepare), or the first
+            // after power-off / tuner mute / host bypass / reset(). Switch at
+            // once, still never into an IR that isn't installed.
+            const bool canEnter = requested != sr::CabMode::IR || cabSim.hasRealIR();
+            const sr::CabMode mode = canEnter ? requested : before;
+            if (mode != before) enterCabMode(mode, before);
+            cabSwitcher.reset(mode);
+        }
+        if (cabSwitcher.beginBlock(requested, cabSim.hasRealIR()))
+        {
+            enterCabMode(cabSwitcher.activeMode(), before);
+            cabSwitcher.holdSilence(cabFadeInHold(cabSwitcher.activeMode(), before));
+        }
+
+        if (cabSwitcher.isWaitingForIR() && !cabWaitLogged
+            && cabSwitcher.waitedSamples() > static_cast<std::int64_t>(baseSampleRate))
+        {
+            cabWaitLogged = true;
+            DBG("Silent Riot: waiting over 1 s for the IR engine; staying on the active cab mode");
+        }
+        if (!cabSwitcher.isWaitingForIR()) cabWaitLogged = false;
+    }
+    const bool irMode     = cabSwitcher.activeMode() == sr::CabMode::IR;
+    const bool builtInCab = cabSwitcher.activeMode() == sr::CabMode::BuiltIn;
+    cabSim.setEnabled(cabSwitcher.activeMode() != sr::CabMode::Off);
 
     // Set smoother targets (per-sample tick happens inside the loop)
     gainSmoother.setTarget(gainParam);
@@ -769,11 +873,15 @@ void SilentRiotProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
         float otOut = filterBank.ot_leakageLP.process(otSat);
 
         // ── Cabinet Sim (IIR path only — IR path runs after downsample) ──
+        // The built-in cab's biquads run in every cab mode, so they are live
+        // when the built-in cab takes over from CAB off or IR mode (Task 3);
+        // only the built-in cab hears them.
         float cabOut = otOut;
-        if (cabSim.enabled && !irMode) {
-            cabOut = filterBank.cab_presence.process(cabOut);
-            cabOut = filterBank.cab_rolloff.process(cabOut);
-            cabOut = filterBank.cab_notch.process(cabOut);
+        {
+            float builtIn = filterBank.cab_presence.process(otOut);
+            builtIn = filterBank.cab_rolloff.process(builtIn);
+            builtIn = filterBank.cab_notch.process(builtIn);
+            if (builtInCab) cabOut = builtIn;
         }
 
         // ── Output: scale + limiter (skip in IR mode — applied after convolution) ──
@@ -801,17 +909,9 @@ void SilentRiotProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     // ── IR Convolution path (runs at base SR, after downsample) ──
     if (irMode)
     {
-        // IR path (re)activated — cab switched back on, an IR selected after
-        // IIR, or leaving mute/reset. The convolution and its limiter
-        // oversampler were skipped meanwhile and still hold the old tail, so
-        // clear them rather than replay it (review B6). Both resets are
-        // allocation-free; the IR engine itself is still only changed on the
-        // message thread.
-        if (!lastIrMode)
-        {
-            cabSim.reset();
-            limiterOversampler->reset();
-        }
+        // Entering IR mode cleared the convolution and its limiter
+        // oversampler (enterCabMode, and the tailsStale block above), so
+        // neither replays a tail from before (review B6).
         cabSim.processBlock(outputBlock);
 
         // Apply output scaling + tanh limiter oversampled (4x) so the
@@ -841,12 +941,25 @@ void SilentRiotProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     else
     {
         // Match the IR path's limiter-oversampler latency (review B4). Cleared
-        // on an IR -> IIR switch so it never replays a stale few samples.
-        if (lastIrMode) iirPathAlign.reset();
+        // on an IR -> IIR switch (enterCabMode) so it never replays a stale
+        // few samples.
         iirPathAlign.process(buffer.getArrayOfWritePointers(), buffer.getNumChannels(),
                              buffer.getNumSamples());
     }
-    lastIrMode = irMode;
+
+    // ── Cab-mode fade (IR-path plan Task 3) ──
+    // Here, on the finished cab-path output at base rate, because it is the
+    // one point both paths pass: after the IR path's convolution and limiter,
+    // after the IIR path's alignment delay, so neither can leak un-faded
+    // audio around a switch. Before delay/reverb, so their tails carry on
+    // through the dip instead of being cut by it. After the limiters, so the
+    // dip only lowers the level (≤ ±1 still holds). Untouched while idle: the
+    // steady state is bit-identical. An oversample switch fading at the same
+    // time multiplies with it (its fade ran on the downsampled amp above);
+    // both ramps move 1/128 per sample, so the product moves at most 2/128 —
+    // a deeper or longer dip, never a step.
+    cabSwitcher.applyGain(buffer.getArrayOfWritePointers(), buffer.getNumChannels(),
+                          buffer.getNumSamples());
 
     // ── Post-cab effects (delay → reverb) at base SR, after the amp/cab ──
     // Operate per channel: a stereo bus picks up reverb/delay width; mono
