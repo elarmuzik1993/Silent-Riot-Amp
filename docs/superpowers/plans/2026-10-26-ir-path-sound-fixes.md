@@ -280,14 +280,18 @@ called from `readUserIRFromFile`, which truncates), `tests/user_ir_state_tests.c
 
 - [ ] Tasks 1–4 merged one per commit, each with `verify.sh` green and a before/after table in
       `docs/handoff-ir-path-sound.md`.
-- [ ] With every fixture, IR mode is within ±1.5 dB of the built-in cab and within ±0.3 dB across
+- [x] With every fixture, IR mode is within ±1.5 dB of the built-in cab and within ±0.3 dB across
       44.1/48/96 kHz. IR renders are repeatable. No mode switch clicks or plays un-cabbed.
-- [ ] Every built-in-cab sign-off gate is bit-identical to Task 0. The new IR-variant gates are
+- [x] Every built-in-cab sign-off gate is bit-identical to Task 0. The new IR-variant gates are
       recorded.
-- [ ] `CLAUDE.md` updated:
+- [x] `CLAUDE.md` updated:
   - Cabinet IR Loader Architecture: add the normalisation, `installIRNow` and the mode switcher.
     Reword the user-IR-loading paragraph, which says JUCE normalises the IR.
   - Important Pitfalls: never pass `Normalise::yes` (−18 dB and rate-dependent); `installIRNow`
     only from `prepareToPlay`.
   - Signal-chain diagram: add the mode fade to the IR path.
-- [ ] `.agents/STATE.md` updated, including the ~10 dB louder IR mode in existing projects.
+- [x] `.agents/STATE.md` updated, including the ~10 dB louder IR mode in existing projects.
+
+Checked 2026-10-27 (final table in the handoff): every target met. The first box stays open
+until the branch merges: the four tasks are one commit each (`ae8593c`, `e195431`, `4a9db2e`,
+`0d619a6`), each with `verify.sh` green and a before/after table.

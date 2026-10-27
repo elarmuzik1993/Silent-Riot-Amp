@@ -542,3 +542,23 @@ impact, a few lines. The fixtures are exactly 8192 samples, so nothing they meas
 
 **Measurements.** `sr_render` rebuilt: `--diff-baseline` against Task 0's renders **19/19
 bit-identical**. `bash scripts/verify.sh`: pass, **408/408** (308 / 81 / 19).
+
+## Done when — final check (2026-10-27, after Task 4, `0d619a6`)
+
+Every measurement re-run on the Task 4 `sr_render` (44.1 kHz sign-off, `sr_irpath.py` defaults).
+
+| Target | Measured | Result |
+|---|---|---|
+| Tasks 1–4 one per commit, `verify.sh` green, before/after table each | `ae8593c`, `e195431`, `4a9db2e`, `0d619a6`; 375 → 388 → 405 → 408/408; a table in each section above | **Met** on the branch; "merged" waits on the PR |
+| IR within ±1.5 dB of the built-in cab, every fixture | 27 cells, −1.47…+0.44 dB (bright P-CLEAN 44.1k −1.47, 0.03 dB inside) — identical to Task 2 | **Met** (narrowly for bright) |
+| IR within ±0.3 dB across 44.1/48/96 kHz | worst 0.05 dB (built-in itself 0.03) | **Met** |
+| IR renders repeatable | `--repeat 6 --block 64 512 2048` under 4 busy loops: 6/6, 6/6, 6/6 bit-identical | **Met** |
+| No switch clicks | Task 3 processor tests (6 switches: max step ≤ steady state, in `verify.sh`) | **Met** — a dip, not a crossfade (Known issues) |
+| Never plays un-cabbed | `--startup`: IR's >7 kHz energy at its settled level from the first 10 ms window (−130.9 vs settled −130.0 dB; CAB off −115.3); first-IR-of-session processor test −162.7 dB vs settled −163.7 | **Met** |
+| Built-in-cab gates bit-identical to Task 0 | `--diff-baseline` 19/19 bit-identical; 12 gates identical (A2 −6.029, A4 0.0, A1 −31.583, B1 0.991, B2 7.857, B3 20.498, B4 true, D5 −10.94, D1 2.72, E1 −200.0, E2 −268.93, E3 −37.89) | **Met** — same 3 fails (A1, B1, E3 MUST-PASS) as Task 0, none from this plan |
+| IR-variant gates recorded | A2-IR −4.432 dBFS, B3-IR 21.445 %, D5-IR −11.44 dBFS, D1-IR 2.77 dB, S-IR −23.14 dBc (report-only, unchanged since Task 2) | **Met** |
+| `CLAUDE.md` | level match, `installIRNow`, mode switcher, loading paragraph, truncation fade; pitfalls `Normalise::yes` and `installIRNow` only from `prepareToPlay`; both chain diagrams end in the cab-mode fade | **Met** |
+| `.agents/STATE.md` | rewritten, incl. the louder-IR behaviour change | **Met** |
+
+`--startup` absolute IR levels are ~10.7 dB above Task 1's table (−130 vs −140.7 dB settled):
+that is Task 2's level match, not a burst; IR − CAB off is now −15.6…−18.1 dB in every window.
