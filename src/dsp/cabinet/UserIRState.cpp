@@ -89,7 +89,7 @@ std::vector<UserIREntry> userIRsFromValueTree(const juce::ValueTree& irsNode)
             entry.audioData.copyFrom(ch, 0, rawData + ch * entry.numSamples,
                                      entry.numSamples);
 
-        // A NaN/Inf, or samples whose energy overflows JUCE's normalisation,
+        // A NaN/Inf, or samples whose energy overflows the IR level match,
         // would poison or silence IR mode and be re-saved with the project
         // (review S4). Same stop-at-first-invalid rule as above.
         //
@@ -104,6 +104,26 @@ std::vector<UserIREntry> userIRsFromValueTree(const juce::ValueTree& irsNode)
     }
 
     return result;
+}
+
+void fadeTruncatedTail(juce::AudioBuffer<float>& ir, double sampleRate)
+{
+    const int numSamples = ir.getNumSamples();
+    if (numSamples <= 0)
+        return;
+
+    const long wanted = std::lround(sampleRate * IR_TRUNCATION_FADE_MS * 0.001);
+    const int fadeLen = static_cast<int>(std::clamp(wanted, 1L, static_cast<long>(numSamples)));
+    const int fadeStart = numSamples - fadeLen;
+
+    for (int i = 0; i < fadeLen; ++i)
+    {
+        const double k = static_cast<double>(i + 1) / static_cast<double>(fadeLen);
+        const float gain = static_cast<float>(
+            0.5 * (1.0 + std::cos(juce::MathConstants<double>::pi * k)));
+        for (int ch = 0; ch < ir.getNumChannels(); ++ch)
+            ir.setSample(ch, fadeStart + i, ir.getSample(ch, fadeStart + i) * gain);
+    }
 }
 
 bool readUserIRFromFile(const juce::File& file, UserIREntry& out)
@@ -134,6 +154,11 @@ bool readUserIRFromFile(const juce::File& file, UserIREntry& out)
     if (!reader->read(&out.audioData, 0, numSamples, 0, true, true))
         return false;
 
+    // Cut at the cap mid-ring: fade the tail out (IR plan Task 4). Only when
+    // the file really was longer — an IR at or under the cap stays bit for bit.
+    if (reader->lengthInSamples > static_cast<juce::int64>(MAX_USER_IR_SAMPLES))
+        fadeTruncatedTail(out.audioData, reader->sampleRate);
+
     // Float WAVs can carry NaN/Inf or absurdly large samples (the restore path
     // would drop such an entry anyway), and any file can be silent, or silent
     // in one channel, below JUCE's -80 dBFS trim — which plays silence on that
@@ -142,7 +167,8 @@ bool readUserIRFromFile(const juce::File& file, UserIREntry& out)
     return isLoadableIR(out.audioData);
 }
 
-bool applyUserIRIndex(CabinetSim& cab, const std::vector<UserIREntry>& irs, int irIndex)
+bool applyUserIRIndex(CabinetSim& cab, const std::vector<UserIREntry>& irs, int irIndex,
+                      IRLoad load)
 {
     // IR_INDEX maps directly onto user IR slots. The stock-IR table in
     // CabinetSim is intentionally NOT reachable from this parameter today —
@@ -157,7 +183,10 @@ bool applyUserIRIndex(CabinetSim& cab, const std::vector<UserIREntry>& irs, int 
 
     const auto& ir = irs[static_cast<size_t>(userIdx)];
     juce::AudioBuffer<float> bufCopy(ir.audioData);
-    cab.loadIRFromBuffer(std::move(bufCopy), ir.sampleRate);
+    if (load == IRLoad::Now)
+        cab.installIRNow(std::move(bufCopy), ir.sampleRate);
+    else
+        cab.loadIRFromBuffer(std::move(bufCopy), ir.sampleRate);
     return true;
 }
 

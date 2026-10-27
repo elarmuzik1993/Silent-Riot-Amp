@@ -2,6 +2,7 @@
 // Requires JUCE (separate test target: SilentRiotJuceTests)
 
 #include <catch2/catch_test_macros.hpp>
+#include <cmath>
 #include <cstdint>
 #include <cstring>
 #include <limits>
@@ -385,6 +386,150 @@ TEST_CASE("readUserIRFromFile loads a clean float WAV, rejects unsafe, silent or
 }
 
 // ═══════════════════════════════════════════════════════════════
+// Truncated-IR fade (IR plan Task 4)
+// ═══════════════════════════════════════════════════════════════
+
+namespace {
+
+// A ringing, non-constant body, so "untouched" can't pass by accident.
+juce::AudioBuffer<float> makeRinging(int numChannels, int numSamples)
+{
+    juce::AudioBuffer<float> b(numChannels, numSamples);
+    for (int ch = 0; ch < numChannels; ++ch)
+        for (int s = 0; s < numSamples; ++s)
+            b.setSample(ch, s, (ch == 0 ? 0.5f : -0.3f)
+                                   * std::cos(0.05f * static_cast<float>(s + 7 * ch)) + 0.6f);
+    return b;
+}
+
+int expectedFadeLength(double rate)
+{
+    return static_cast<int>(std::lround(rate * IR_TRUNCATION_FADE_MS * 0.001));
+}
+
+} // namespace
+
+TEST_CASE("fadeTruncatedTail: raised-cosine fade over the last 5 ms, earlier samples untouched",
+          "[cabinet][ir][state][fade]")
+{
+    REQUIRE(IR_TRUNCATION_FADE_MS == 5.0);
+
+    for (double rate : { 44100.0, 48000.0, 96000.0, 192000.0 })
+    {
+        const int n = MAX_USER_IR_SAMPLES;
+        const auto orig = makeRinging(2, n);
+        auto faded = orig;
+        fadeTruncatedTail(faded, rate);
+
+        const int fadeLen = expectedFadeLength(rate);
+        REQUIRE(fadeLen > 1);
+        const int fadeStart = n - fadeLen;
+
+        for (int ch = 0; ch < 2; ++ch)
+        {
+            // Every sample before the fade is bit-identical.
+            for (int s = 0; s < fadeStart; ++s)
+                REQUIRE(faded.getSample(ch, s) == orig.getSample(ch, s));
+
+            // Inside it: gain = faded / orig is a raised cosine — strictly
+            // falling from just under 1 to 0 at the last sample.
+            double prevGain = 1.0;
+            for (int s = fadeStart; s < n; ++s)
+            {
+                const double g = static_cast<double>(faded.getSample(ch, s))
+                               / static_cast<double>(orig.getSample(ch, s));
+                const double k = static_cast<double>(s - fadeStart + 1) / fadeLen;
+                const double expected = 0.5 * (1.0 + std::cos(juce::MathConstants<double>::pi * k));
+                REQUIRE(std::abs(g - expected) < 1.0e-6);
+                REQUIRE(g < prevGain);
+                prevGain = g;
+            }
+            REQUIRE(std::abs(faded.getSample(ch, n - 1)) < 1.0e-6f);
+            // Mid-fade sits at half gain (the raised cosine's centre).
+            const int mid = fadeStart + fadeLen / 2 - 1;
+            REQUIRE(std::abs(faded.getSample(ch, mid) / orig.getSample(ch, mid) - 0.5f) < 0.02f);
+        }
+    }
+}
+
+TEST_CASE("fadeTruncatedTail on a buffer shorter than the fade fades the whole buffer",
+          "[cabinet][ir][state][fade]")
+{
+    // 100 samples at 48 kHz is ~2 ms < 5 ms: the fade is clamped to the buffer,
+    // so it still ends at 0 and stays monotonic, starting just under unity.
+    const auto orig = makeRinging(1, 100);
+    auto faded = orig;
+    fadeTruncatedTail(faded, 48000.0);
+
+    double prevGain = 1.0;
+    for (int s = 0; s < 100; ++s)
+    {
+        const double g = static_cast<double>(faded.getSample(0, s)) / orig.getSample(0, s);
+        REQUIRE(g < prevGain);
+        REQUIRE(g >= 0.0);
+        prevGain = g;
+    }
+    REQUIRE(faded.getSample(0, 0) / orig.getSample(0, 0) > 0.99f);
+    REQUIRE(std::abs(faded.getSample(0, 99)) < 1.0e-6f);
+
+    // Degenerate sizes don't crash or touch anything they shouldn't.
+    juce::AudioBuffer<float> empty(2, 0);
+    fadeTruncatedTail(empty, 48000.0);
+    juce::AudioBuffer<float> one(1, 1);
+    one.setSample(0, 0, 0.7f);
+    fadeTruncatedTail(one, 48000.0);
+    REQUIRE(std::abs(one.getSample(0, 0)) < 1.0e-6f);
+}
+
+TEST_CASE("readUserIRFromFile fades only an IR longer than the cap",
+          "[cabinet][ir][state][fade]")
+{
+    const double rate = 48000.0;
+
+    SECTION("over the cap: truncated to the cap, tail faded, body bit-identical")
+    {
+        const auto src = makeRinging(2, MAX_USER_IR_SAMPLES + 1808);
+        auto f = writeFloatWav("sr_user_ir_long.wav", src, rate);
+        UserIREntry e;
+        REQUIRE(readUserIRFromFile(f, e));
+        REQUIRE(e.numSamples == MAX_USER_IR_SAMPLES);
+        REQUIRE(e.audioData.getNumSamples() == MAX_USER_IR_SAMPLES);
+
+        juce::AudioBuffer<float> expected(2, MAX_USER_IR_SAMPLES);
+        for (int ch = 0; ch < 2; ++ch)
+            expected.copyFrom(ch, 0, src, ch, 0, MAX_USER_IR_SAMPLES);
+        fadeTruncatedTail(expected, rate);
+
+        const int fadeStart = MAX_USER_IR_SAMPLES - expectedFadeLength(rate);
+        for (int ch = 0; ch < 2; ++ch)
+        {
+            for (int s = 0; s < fadeStart; ++s)
+                REQUIRE(e.audioData.getSample(ch, s) == src.getSample(ch, s));
+            for (int s = fadeStart; s < MAX_USER_IR_SAMPLES; ++s)
+                REQUIRE(e.audioData.getSample(ch, s) == expected.getSample(ch, s));
+            REQUIRE(std::abs(e.audioData.getSample(ch, MAX_USER_IR_SAMPLES - 1)) < 1.0e-6f);
+        }
+        f.deleteFile();
+    }
+
+    SECTION("at or under the cap: bit-identical to the file, last sample included")
+    {
+        for (int len : { MAX_USER_IR_SAMPLES, MAX_USER_IR_SAMPLES - 1, 300 })
+        {
+            const auto src = makeRinging(2, len);
+            auto f = writeFloatWav("sr_user_ir_at_cap.wav", src, rate);
+            UserIREntry e;
+            REQUIRE(readUserIRFromFile(f, e));
+            REQUIRE(e.numSamples == len);
+            for (int ch = 0; ch < 2; ++ch)
+                for (int s = 0; s < len; ++s)
+                    REQUIRE(e.audioData.getSample(ch, s) == src.getSample(ch, s));
+            f.deleteFile();
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
 // IR_INDEX → convolution (review S2)
 // ═══════════════════════════════════════════════════════════════
 
@@ -398,26 +543,38 @@ TEST_CASE("applyUserIRIndex disables the convolution for an index past the list"
     for (int i = 0; i < 5; ++i)
         five.push_back(makeEntry("ir_" + juce::String(i), 1, 256));
 
-    REQUIRE(applyUserIRIndex(cab, five, 5));
+    REQUIRE(applyUserIRIndex(cab, five, 5, IRLoad::Async));
     REQUIRE(cab.useIR.load());
     REQUIRE(cab.getIRTailSeconds() > 0.0);
 
     // The review's repro: IR 5 live, then a state with only three IRs but the
     // same IR_INDEX = 5 is restored. The old IR 5 must not keep playing.
     std::vector<UserIREntry> three(five.begin(), five.begin() + 3);
-    REQUIRE_FALSE(applyUserIRIndex(cab, three, 5));
+    REQUIRE_FALSE(applyUserIRIndex(cab, three, 5, IRLoad::Async));
     REQUIRE_FALSE(cab.useIR.load());
     REQUIRE(cab.getIRTailSeconds() == 0.0);
 
     // In range again → loads; 0 (IIR mode) and garbage → disabled
-    REQUIRE(applyUserIRIndex(cab, three, 2));
+    REQUIRE(applyUserIRIndex(cab, three, 2, IRLoad::Async));
     REQUIRE(cab.useIR.load());
-    REQUIRE_FALSE(applyUserIRIndex(cab, three, 0));
+    REQUIRE_FALSE(applyUserIRIndex(cab, three, 0, IRLoad::Async));
     REQUIRE_FALSE(cab.useIR.load());
-    REQUIRE(applyUserIRIndex(cab, three, 3));
-    REQUIRE_FALSE(applyUserIRIndex(cab, three, -1));
+    REQUIRE(applyUserIRIndex(cab, three, 3, IRLoad::Async));
+    REQUIRE_FALSE(applyUserIRIndex(cab, three, -1, IRLoad::Async));
     REQUIRE_FALSE(cab.useIR.load());
-    REQUIRE(applyUserIRIndex(cab, three, 1));
-    REQUIRE_FALSE(applyUserIRIndex(cab, {}, 1));  // empty list
+    REQUIRE(applyUserIRIndex(cab, three, 1, IRLoad::Async));
+    REQUIRE_FALSE(applyUserIRIndex(cab, {}, 1, IRLoad::Async));  // empty list
+    REQUIRE_FALSE(cab.useIR.load());
+
+    // The same through IRLoad::Now, the branch prepareToPlay takes
+    REQUIRE(applyUserIRIndex(cab, five, 5, IRLoad::Now));
+    REQUIRE(cab.useIR.load());
+    REQUIRE(cab.getIRTailSeconds() > 0.0);
+    REQUIRE_FALSE(applyUserIRIndex(cab, three, 5, IRLoad::Now));
+    REQUIRE_FALSE(cab.useIR.load());
+    REQUIRE(cab.getIRTailSeconds() == 0.0);
+    REQUIRE(applyUserIRIndex(cab, three, 2, IRLoad::Now));
+    REQUIRE(cab.useIR.load());
+    REQUIRE_FALSE(applyUserIRIndex(cab, three, 0, IRLoad::Now));
     REQUIRE_FALSE(cab.useIR.load());
 }

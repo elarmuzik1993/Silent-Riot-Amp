@@ -24,6 +24,7 @@ import subprocess
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+ROOT = os.path.dirname(HERE)
 sys.path.insert(0, HERE)
 import sr_analyze as A  # noqa: E402
 
@@ -35,7 +36,9 @@ def render_cmd(bin_path, r, point, out_path):
     if "in" in r:
         cmd += ["--in", r["in"]]
     if r.get("ir") and not r["ir"].startswith("OPTIONAL"):
-        cmd += ["--ir", r["ir"]]
+        # Relative IR paths (the tests/fixtures/ir/ WAVs) are relative to the
+        # repo root, so the table works from any working directory.
+        cmd += ["--ir", os.path.join(ROOT, r["ir"])]
     for k, pk in [("gain", "gain"), ("shape", "shape"), ("volume", "volume"),
                   ("7w", "7w"), ("cab", "cab")]:
         if pk in point:

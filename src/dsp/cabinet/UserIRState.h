@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "CabinetSim.h"  // MAX_USER_IR_SAMPLES
+#include "../../utils/Constants.h"  // IR_TRUNCATION_FADE_MS
 
 namespace sr {
 
@@ -47,7 +48,7 @@ juce::ValueTree userIRsToValueTree(const std::vector<UserIREntry>& userIRs);
 
 // Parse a "UserIRs" node produced by userIRsToValueTree(). Each entry is
 // validated (channel/sample counts, sample rate, blob size, and samples that
-// are safe for JUCE's normalisation — isSafeToNormaliseIR() in CabinetSim.h).
+// are safe for the IR level match — isSafeToNormaliseIR() in CabinetSim.h).
 // A silent or dead-channel IR is NOT invalid here, although a fresh load
 // refuses it: it is harmless (plays silence, as when it was saved), so it is
 // restored into its slot and later slots keep their IR_INDEX. Parsing STOPS at
@@ -60,20 +61,43 @@ juce::ValueTree userIRsToValueTree(const std::vector<UserIREntry>& userIRs);
 // At most MAX_USER_IRS entries are returned.
 std::vector<UserIREntry> userIRsFromValueTree(const juce::ValueTree& irsNode);
 
+// Fade out the last IR_TRUNCATION_FADE_MS of every channel of `ir` (an IR cut
+// at the length cap, at sample rate `sampleRate`) with a raised cosine: sample
+// i of an N-sample fade is scaled by 0.5·(1 + cos(π·(i+1)/N)), so the gain
+// falls strictly from just under 1 to exactly 0 on the last sample. Every
+// sample before the fade is left bit-for-bit untouched. A buffer shorter than
+// the fade is faded over its whole length (same curve, N = its length) so it
+// still ends at 0 — readUserIRFromFile never hits that case, since only a
+// buffer cut to MAX_USER_IR_SAMPLES is faded and 5 ms is at most 3840 samples
+// at any accepted rate. An empty buffer is left alone.
+void fadeTruncatedTail(juce::AudioBuffer<float>& ir, double sampleRate);
+
 // Read an audio file into `out` for the user-IR list. At most 2 channels and
-// MAX_USER_IR_SAMPLES samples are kept. Returns false — leaving `out` unusable —
+// MAX_USER_IR_SAMPLES samples are kept; a longer file is cut at the cap and
+// its tail faded (fadeTruncatedTail) — a file at or under the cap is kept bit
+// for bit. That fade is the one exception to "store the raw audio": what is
+// stored is already the truncated copy, so the restore path needs no flag and
+// projects saved before the fade keep their unfaded cut. Returns false — leaving `out` unusable —
 // when the file can't be read, fails isValidUserIRFormat(), or fails
-// isLoadableIR() (a NaN/Inf sample, samples whose energy overflows JUCE's
-// normalisation, or a channel with nothing at or above its -80 dBFS trim).
+// isLoadableIR() (a NaN/Inf sample, samples whose energy overflows the IR
+// level match, or a channel with nothing at or above its -80 dBFS trim).
 // Everything it accepts, the restore path accepts too; the reverse does not
 // hold, deliberately — restore keeps a silent IR rather than drop slots.
 bool readUserIRFromFile(const juce::File& file, UserIREntry& out);
+
+// How applyUserIRIndex() hands an IR to the convolution.
+//   Async: CabinetSim::loadIRFromBuffer() — safe while processBlock runs; the
+//          IR takes over a few blocks later, after JUCE's background build.
+//   Now:   CabinetSim::installIRNow() — playing from the next block, but must
+//          NOT run concurrently with processBlock. prepareToPlay only.
+enum class IRLoad { Async, Now };
 
 // Make the convolution match IR_INDEX: 0 = IIR mode, 1..N = irs[irIndex-1].
 // Anything else (an automated index past the list, or a restored state with
 // fewer IRs than its saved index) DISABLES the convolution rather than leaving
 // whatever IR was loaded before playing (review S2). Message thread only, or
 // prepareToPlay. Returns true when an IR was loaded.
-bool applyUserIRIndex(CabinetSim& cab, const std::vector<UserIREntry>& irs, int irIndex);
+bool applyUserIRIndex(CabinetSim& cab, const std::vector<UserIREntry>& irs, int irIndex,
+                      IRLoad load);
 
 } // namespace sr
