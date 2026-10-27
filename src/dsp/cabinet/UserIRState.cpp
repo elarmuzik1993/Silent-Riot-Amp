@@ -106,6 +106,26 @@ std::vector<UserIREntry> userIRsFromValueTree(const juce::ValueTree& irsNode)
     return result;
 }
 
+void fadeTruncatedTail(juce::AudioBuffer<float>& ir, double sampleRate)
+{
+    const int numSamples = ir.getNumSamples();
+    if (numSamples <= 0)
+        return;
+
+    const long wanted = std::lround(sampleRate * IR_TRUNCATION_FADE_MS * 0.001);
+    const int fadeLen = static_cast<int>(std::clamp(wanted, 1L, static_cast<long>(numSamples)));
+    const int fadeStart = numSamples - fadeLen;
+
+    for (int i = 0; i < fadeLen; ++i)
+    {
+        const double k = static_cast<double>(i + 1) / static_cast<double>(fadeLen);
+        const float gain = static_cast<float>(
+            0.5 * (1.0 + std::cos(juce::MathConstants<double>::pi * k)));
+        for (int ch = 0; ch < ir.getNumChannels(); ++ch)
+            ir.setSample(ch, fadeStart + i, ir.getSample(ch, fadeStart + i) * gain);
+    }
+}
+
 bool readUserIRFromFile(const juce::File& file, UserIREntry& out)
 {
     juce::AudioFormatManager mgr;
@@ -133,6 +153,11 @@ bool readUserIRFromFile(const juce::File& file, UserIREntry& out)
     out.audioData.setSize(numChannels, numSamples);
     if (!reader->read(&out.audioData, 0, numSamples, 0, true, true))
         return false;
+
+    // Cut at the cap mid-ring: fade the tail out (IR plan Task 4). Only when
+    // the file really was longer — an IR at or under the cap stays bit for bit.
+    if (reader->lengthInSamples > static_cast<juce::int64>(MAX_USER_IR_SAMPLES))
+        fadeTruncatedTail(out.audioData, reader->sampleRate);
 
     // Float WAVs can carry NaN/Inf or absurdly large samples (the restore path
     // would drop such an entry anyway), and any file can be silent, or silent

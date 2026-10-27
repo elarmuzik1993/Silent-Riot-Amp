@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "CabinetSim.h"  // MAX_USER_IR_SAMPLES
+#include "../../utils/Constants.h"  // IR_TRUNCATION_FADE_MS
 
 namespace sr {
 
@@ -60,8 +61,23 @@ juce::ValueTree userIRsToValueTree(const std::vector<UserIREntry>& userIRs);
 // At most MAX_USER_IRS entries are returned.
 std::vector<UserIREntry> userIRsFromValueTree(const juce::ValueTree& irsNode);
 
+// Fade out the last IR_TRUNCATION_FADE_MS of every channel of `ir` (an IR cut
+// at the length cap, at sample rate `sampleRate`) with a raised cosine: sample
+// i of an N-sample fade is scaled by 0.5·(1 + cos(π·(i+1)/N)), so the gain
+// falls strictly from just under 1 to exactly 0 on the last sample. Every
+// sample before the fade is left bit-for-bit untouched. A buffer shorter than
+// the fade is faded over its whole length (same curve, N = its length) so it
+// still ends at 0 — readUserIRFromFile never hits that case, since only a
+// buffer cut to MAX_USER_IR_SAMPLES is faded and 5 ms is at most 3840 samples
+// at any accepted rate. An empty buffer is left alone.
+void fadeTruncatedTail(juce::AudioBuffer<float>& ir, double sampleRate);
+
 // Read an audio file into `out` for the user-IR list. At most 2 channels and
-// MAX_USER_IR_SAMPLES samples are kept. Returns false — leaving `out` unusable —
+// MAX_USER_IR_SAMPLES samples are kept; a longer file is cut at the cap and
+// its tail faded (fadeTruncatedTail) — a file at or under the cap is kept bit
+// for bit. That fade is the one exception to "store the raw audio": what is
+// stored is already the truncated copy, so the restore path needs no flag and
+// projects saved before the fade keep their unfaded cut. Returns false — leaving `out` unusable —
 // when the file can't be read, fails isValidUserIRFormat(), or fails
 // isLoadableIR() (a NaN/Inf sample, samples whose energy overflows the IR
 // level match, or a channel with nothing at or above its -80 dBFS trim).

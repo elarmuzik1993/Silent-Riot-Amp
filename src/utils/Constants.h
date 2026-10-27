@@ -72,6 +72,12 @@ constexpr double IR_LEVEL_REF_DESIGN_SR = 176400.0;
 // nothing in 100 Hz–5 kHz is not raised far into the output tanh. The
 // peak-normalised test fixtures are turned DOWN (-9…-18 dB).
 constexpr double IR_LEVEL_MAX_GAIN_DB   = 40.0;
+// A user IR file longer than MAX_USER_IR_SAMPLES is cut at the cap; its last
+// IR_TRUNCATION_FADE_MS are faded out with a raised cosine (fadeTruncatedTail,
+// UserIRState.h) so the cut doesn't end mid-ring. IRs at or under the cap are
+// never faded. 5 ms is 240 samples at 48 kHz, 960 at 192 kHz — always well
+// inside the 8192-sample cap at any accepted rate (3840 at 768 kHz).
+constexpr double IR_TRUNCATION_FADE_MS  = 5.0;
 
 // ── Math constant ────────────────────────────────────────────
 constexpr float PI_F = 3.14159265358979323846f;

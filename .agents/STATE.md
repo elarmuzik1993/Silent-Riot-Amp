@@ -4,7 +4,7 @@ _Updated 2026-10-27_
 
 ## Now
 - Silent Riot v0.3.4 (JUCE 7 VST3/Standalone). `bash scripts/verify.sh` passes: static checks +
-  Release build + 405/405 ctest (308 pure C++ / 78 JUCE / 19 `SilentRiotProcessorTests`, which
+  Release build + 408/408 ctest (308 pure C++ / 81 JUCE / 19 `SilentRiotProcessorTests`, which
   drives the real processor via `tests/processor_harness.h`).
 - Work list: DSP review `docs/review-dsp-2026-10-15.md` (line refs against `b8e20a9`). Fixed: B1, B4–B8,
   S1–S7. Open: B2, B3 (tone-changing), S8. IRs: load rejects unsafe (NaN/Inf/energy overflow) and
@@ -13,12 +13,14 @@ _Updated 2026-10-27_
   grid-conduction corners in `docs/handoff-power-section-fixes.md` (probe `… -probe.cpp`, `grid` mode).
   EL84s stay class A and their grids never conduct at any corner tried (hottest 5.91 V vs 8.6 V);
   the PI charge rails from ~gain 8.
-- IR plan `docs/superpowers/plans/2026-10-26-ir-path-sound-fixes.md` (against `495c256`): Tasks 0–3
+- IR plan `docs/superpowers/plans/2026-10-26-ir-path-sound-fixes.md` (against `495c256`): Tasks 0–4
   done (record: `docs/handoff-ir-path-sound.md`). The active IR installs synchronously in
   `prepareToPlay`; every IR is level-matched to the built-in cab (`IRLevel.h`, `Normalise::no`):
   all three fixtures within 1.5 dB of it, rate dependence ≤ 0.05 dB. Every cab-mode switch
   (built-in ↔ IR, CAB on/off) fades through a short dip (`CabModeSwitcher.h`), and IR mode waits
-  for the real IR instead of playing JUCE's pass-through.
+  for the real IR instead of playing JUCE's pass-through. Task 4: a file longer than the
+  8192-sample cap is cut with a 5 ms raised-cosine fade (`fadeTruncatedTail`); shorter files and
+  restore are untouched.
 - **Behaviour change (Task 2): projects that use an IR play louder**, now matching the built-in
   cab: neutral fixture +10.3…+10.7 dB at 44.1/48 kHz, +7.0…+7.4 dB at 96 kHz; across fixtures
   +5.4 dB (dark, 96 kHz) to +13.1 dB (bright, 44.1 kHz). Release-note it.
@@ -26,7 +28,7 @@ _Updated 2026-10-27_
 ## Next (one PR per step, each with a test)
 1. Owner: delay FEEDBACK default now decays 9 dB/repeat (was 3.4); keep, or remap the knob?
 2. Owner: GRID I reads 0 in normal play (EL84 grids never conduct). Keep, or read the PI grid?
-3. IR plan Task 4 (truncated-tail fade). Independent of Phase 2: Task 2
+3. IR plan "Done when" check. Independent of Phase 2: Task 2
    matched IR mode to the built-in cab's filters, so a later re-calibration carries over.
    Task 0's `bright.wav` can replace E3's placeholder IR (`spur_crank_ir` already renders it:
    −23.1 dBc, unchanged by the level match).

@@ -266,15 +266,15 @@ ripple. Low impact at ≤ 96 kHz, but it costs a few lines.
 called from `readUserIRFromFile`, which truncates), `tests/user_ir_state_tests.cpp`
 
 - [x] Decision D2 confirmed by the owner (2026-10-26): keep 8192 samples.
-- [ ] Write the test first: `fadeTruncatedTail` ends the buffer in a monotonic raised-cosine fade
+- [x] Write the test first: `fadeTruncatedTail` ends the buffer in a monotonic raised-cosine fade
       over its last 5 ms, finishing at ~0, and leaves every earlier sample untouched.
-- [ ] Call it in `readUserIRFromFile` only when the file was longer than the cap, before the
+- [x] Call it in `readUserIRFromFile` only when the file was longer than the cap, before the
       `isLoadableIR()` check.
   - This is the one exception to "store the raw audio". What gets stored is already the
     truncated copy, not the file, so storing it faded needs no flag on restore.
   - IRs at or under the cap stay bit for bit.
   - Projects saved before this change keep their unfaded truncation.
-- [ ] Verify.
+- [x] Verify.
 
 ## Done when
 

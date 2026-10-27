@@ -493,3 +493,52 @@ loads are not mode changes: JUCE's 50 ms crossfade handles them, as before.
 **Dip length** at 44.1 kHz: 128 down + the rest of that host block + the hold + 128 up — about
 6 ms at block 64, 14.5 ms (built-in ↔ Off) to 17 ms (into the 3 kHz IR) at 512, ~95 ms at 4096.
 A true crossfade would need the amp loop to output both paths and a second downsampler; not done.
+
+## Task 4 — fade truncated IRs (2026-10-27)
+
+**Design.** `fadeTruncatedTail(buffer, rate)` (`UserIRState.{h,cpp}`) multiplies the last
+`IR_TRUNCATION_FADE_MS` = 5 ms (`Constants.h`; N = round(rate · 5 ms): 221 samples at 44.1 kHz,
+240 at 48, 480 at 96, 960 at 192, at most 3840 at the 768 kHz ceiling) of every channel by a
+raised cosine, sample i of N by 0.5·(1 + cos(π·(i+1)/N)): strictly falling from just under 1 to
+exactly 0 on the last sample. Every sample before the fade is untouched. A buffer shorter than
+the fade is faded over its whole length (same curve, N = its length) so it still ends at 0; an
+empty one is left alone. `readUserIRFromFile` never hits the short case: it calls the fade only
+when the file's `lengthInSamples` exceeded `MAX_USER_IR_SAMPLES`, on the 8192-sample copy, after
+the read and before `isLoadableIR()`. A file at or under the cap is kept bit for bit. The faded
+copy is what `userIRs` and saved state hold (the plan's stated exception to "store the raw
+audio"; the stored copy was already truncated), so restore needs no flag and is unchanged:
+projects saved before this keep their unfaded cut.
+
+**Tests** (`user_ir_state_tests.cpp`, `SilentRiotJuceTests`, written first):
+- the fade at 44.1/48/96/192 kHz on a 2-channel 8192-sample ringing buffer: every pre-fade sample
+  bit-identical; inside it the gain (faded / original) matches the raised cosine to 1e-6, falls
+  strictly, ends < 1e-6 and is 0.5 ± 0.02 mid-fade; `IR_TRUNCATION_FADE_MS` pinned at 5;
+- a 100-sample buffer at 48 kHz (~2 ms) is faded over its whole length (first gain > 0.99,
+  strictly falling, last < 1e-6); 0- and 1-sample buffers;
+- `readUserIRFromFile` on a temp 32-bit float WAV of 8192 + 1808 samples: 8192 kept, body
+  bit-identical to the file, tail equal to `fadeTruncatedTail` of the cut copy, last sample ~0;
+  files of 8192, 8191 and 300 samples: bit-identical to the file, last sample included. With the
+  call in `readUserIRFromFile` removed, this case fails.
+
+**Before / after** (scratch probe, not committed: the neutral fixture's band-pass designed at each
+rate, generated 1 s long and cut to 8192 samples; a second IR adds a +12 dB, Q 20 resonance at
+110 Hz, i.e. a ~60 ms ring, like a cab or room mode). "Step" is the last kept sample, dB re peak;
+"dev" is the max |H| deviation from the uncut IR on the 69 metric points, below / above 1 kHz.
+
+| IR | Rate (cap) | Hard cut: step, dev <1k / >1k | Faded: step, dev <1k / >1k |
+|---|---|---|---|
+| neutral | 44.1k–96k (186–85 ms) | −331…−167 dB, 0.00 / 0.000 | 0, 0.00 / 0.000 |
+| neutral | 192k (43 ms) | −100 dB, 0.00 / 0.000 | 0, 0.00 / 0.000 |
+| ringing | 44.1k (186 ms) | −84 dB, 1.12 / 0.002 | 0, 1.15 / 0.000 |
+| ringing | 48k (171 ms) | −61 dB, 1.22 / 0.011 | 0, 1.22 / 0.000 |
+| ringing | 96k (85 ms) | −67 dB, 2.21 / 0.006 | 0, 2.16 / 0.000 |
+| ringing | 192k (43 ms) | −50 dB, 2.16 / 0.041 | 0, 2.11 / 0.000 |
+
+What the fade fixes is the cut itself: the step goes to 0 and the broadband ripple it spreads
+above 1 kHz (up to 0.04 dB here) goes to 0.000. What it can't fix is the ring that the cap throws
+away: the 1–2 dB at the resonance is the 8192-sample cap (decision D2), with or without the fade.
+The band level, and so the level match, moves ≤ 0.02 dB between the two. As the plan said: low
+impact, a few lines. The fixtures are exactly 8192 samples, so nothing they measure changes.
+
+**Measurements.** `sr_render` rebuilt: `--diff-baseline` against Task 0's renders **19/19
+bit-identical**. `bash scripts/verify.sh`: pass, **408/408** (308 / 81 / 19).
