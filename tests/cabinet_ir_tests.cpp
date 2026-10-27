@@ -12,6 +12,7 @@
 
 #include "dsp/cabinet/IRLibrary.h"
 #include "dsp/cabinet/CabinetSim.h"
+#include "dsp/cabinet/IRLevel.h"
 
 using namespace sr;
 
@@ -486,11 +487,11 @@ bool settledOutputIsAudible(CabinetSim& cab)
 
 } // namespace
 
-TEST_CASE("IRs JUCE can't trim or normalise silence IR mode (why loads reject them)",
+TEST_CASE("IRs that can't be level-matched or trimmed silence IR mode (why loads reject them)",
           "[cabinet][ir]")
 {
     // loadIRFromBuffer() does not validate (callers pass entries that already
-    // passed the checks), so it shows what JUCE does without them.
+    // passed the checks), so it shows what the convolution does without them.
     auto makeIR = [](float headLevel, float bodyLevel) {
         juce::AudioBuffer<float> ir(1, 2048);
         ir.clear();
@@ -504,24 +505,30 @@ TEST_CASE("IRs JUCE can't trim or normalise silence IR mode (why loads reject th
     {
         // A fresh Convolution passes audio through at about unity (a 0.5 sine
         // comes out near 0.5), so "audible" alone would pass with no IR at all.
-        // Normalisation is what gives this IR away: JUCE scales it to
-        // 0.125/sqrt(energy), so the sine must come out at that gain times the
-        // IR's response at 1 kHz — about 0.06, an eighth of pass-through.
-        auto ir = makeIR(1.0f, 0.01f);
+        // The IR is a 64-tap moving average, whose 1 kHz response at 48 kHz
+        // sits in its first sidelobe, 13.7 dB under DC: after the level match
+        // (IRLevel.h: band level -> the built-in cab's) the 0.5 sine comes out
+        // near 0.18, far from pass-through's 0.5 and from silence.
+        juce::AudioBuffer<float> ir(1, 64);
+        for (int i = 0; i < 64; ++i)
+            ir.setSample(0, i, 1.0f / 64.0f);
         REQUIRE(isLoadableIR(ir));
 
-        double energy = 0.0, re = 0.0, im = 0.0;
+        double re = 0.0, im = 0.0;
         const double w = 2.0 * juce::MathConstants<double>::pi * 1000.0 / 48000.0;
         for (int i = 0; i < ir.getNumSamples(); ++i)
         {
             const double h = ir.getSample(0, i);
-            energy += h * h;
             re += h * std::cos(w * i);
             im -= h * std::sin(w * i);
         }
-        const float expected = static_cast<float>(
-            0.5 * (0.125 / std::sqrt(energy)) * std::sqrt(re * re + im * im));
-        REQUIRE(expected < 0.1f);   // far from pass-through's ~0.5
+        const float* ch[] = { ir.getReadPointer(0) };
+        const double gain = irlevel::levelMatchGain(
+            irlevel::bandPower(ch, 1, ir.getNumSamples(), 48000.0), 48000.0);
+        const float expected = static_cast<float>(0.5 * gain * std::sqrt(re * re + im * im));
+        INFO("expected settled peak " << expected);
+        REQUIRE(expected > 0.05f);    // not silence
+        REQUIRE(expected < 0.3f);     // and nowhere near pass-through's 0.5
 
         CabinetSim cab;
         cab.prepare(48000.0, 512, 1);
@@ -529,11 +536,18 @@ TEST_CASE("IRs JUCE can't trim or normalise silence IR mode (why loads reject th
         REQUIRE_THAT(settledPeak(cab), Catch::Matchers::WithinRel(expected, 0.05f));
     }
 
-    SECTION("finite samples whose float sum of squares overflows play silence")
+    SECTION("a NaN sample poisons the output")
     {
+        // The band power is NaN, so the level match leaves the gain at 1 and
+        // the NaN reaches the convolution. (Before Task 2 the guard's energy
+        // ceiling also mattered: finite samples whose float sum of squares
+        // overflowed turned JUCE's normalisation gain into 0. The level match
+        // sums in double and scales such an IR down, so it would now play;
+        // loads and restores still reject it, so the accepted set is unchanged.)
         CabinetSim cab;
         cab.prepare(48000.0, 512, 1);
-        auto ir = makeIR(1.0f, 1.0e18f);   // each square 1e36 is finite; the sum is not
+        auto ir = makeIR(1.0f, 0.01f);
+        ir.setSample(0, 500, std::numeric_limits<float>::quiet_NaN());
         REQUIRE_FALSE(isSafeToNormaliseIR(ir));
         cab.loadIRFromBuffer(std::move(ir), 48000.0);
         REQUIRE(cab.useIR.load());   // IR mode is on...
@@ -634,8 +648,10 @@ TEST_CASE("IR tail length is positive when IR active", "[cabinet][ir]")
 namespace {
 
 // 64-tap moving average: a low-pass whose 10 kHz response at 44.1 kHz is
-// -32.4 dB (|sin(pi f N/fs) / (N sin(pi f/fs))|). Its energy is 1/64, so
-// JUCE's normalisation (0.125/sqrt(energy)) leaves it at unity gain.
+// -32.4 dB (|sin(pi f N/fs) / (N sin(pi f/fs))|) below DC. The level match
+// raises it by 4.8 dB (band level -5.7 dB → the built-in cab's -0.9 dB), so it
+// plays 10 kHz at -27.7 dB; a unit impulse, like JUCE's pass-through, at
+// -0.9 / 0 dB. A -20 dB threshold tells them apart with margin either way.
 juce::AudioBuffer<float> movingAverageIR()
 {
     juce::AudioBuffer<float> ir(1, 64);
@@ -691,7 +707,7 @@ TEST_CASE("installIRNow plays the IR on the very first block", "[cabinet][ir]")
 
     const double gainDb = tenKHzGainDb(cab, 0);
     INFO("10 kHz through the first block: " << gainDb << " dB");
-    REQUIRE(gainDb <= -30.0);
+    REQUIRE(gainDb <= -20.0);
 }
 
 TEST_CASE("installIRNow drops a pending async load instead of replaying it", "[cabinet][ir]")
@@ -711,5 +727,125 @@ TEST_CASE("installIRNow drops a pending async load instead of replaying it", "[c
         std::this_thread::sleep_for(std::chrono::milliseconds(5));
     }
     INFO("loudest 10 kHz block: " << worstDb << " dB");
-    REQUIRE(worstDb <= -30.0);
+    REQUIRE(worstDb <= -20.0);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Level match (IR-path plan Task 2): every IR plays at the built-in cab's
+// band level (dsp/cabinet/IRLevel.h), whatever the session rate
+// ═══════════════════════════════════════════════════════════════
+
+namespace {
+
+juce::AudioBuffer<float> readFixtureIR(const char* name, double& rate)
+{
+    const juce::File f = juce::File(SOURCE_DIR).getChildFile("tests/fixtures/ir").getChildFile(name);
+    REQUIRE(f.existsAsFile());
+    juce::AudioFormatManager fm;
+    fm.registerBasicFormats();
+    std::unique_ptr<juce::AudioFormatReader> reader(fm.createReaderFor(f));
+    REQUIRE(reader != nullptr);
+    juce::AudioBuffer<float> ir(static_cast<int>(reader->numChannels),
+                                static_cast<int>(reader->lengthInSamples));
+    reader->read(&ir, 0, ir.getNumSamples(), 0, true, true);
+    rate = reader->sampleRate;
+    return ir;
+}
+
+// Feeds a unit impulse through a prepared CabinetSim and returns what comes
+// out — the IR as the convolution actually plays it at `sessionRate`.
+std::vector<float> playedIR(CabinetSim& cab, double sessionRate, int irSamples, double irRate)
+{
+    const int total = static_cast<int>(std::ceil(irSamples * sessionRate / irRate)) + 4096;
+    std::vector<float> out;
+    juce::AudioBuffer<float> buffer(1, 512);
+    for (int start = 0; start < total; start += 512)
+    {
+        buffer.clear();
+        if (start == 0)
+            buffer.setSample(0, 0, 1.0f);
+        juce::dsp::AudioBlock<float> block(buffer);
+        cab.processBlock(block);
+        out.insert(out.end(), buffer.getReadPointer(0), buffer.getReadPointer(0) + 512);
+    }
+    return out;
+}
+
+} // namespace
+
+TEST_CASE("A loaded IR plays at the built-in cab's band level at any session rate",
+          "[cabinet][ir][level]")
+{
+    double irRate = 0.0;
+    const auto fixture = readFixtureIR("neutral.wav", irRate);
+    REQUIRE(irRate == 48000.0);
+    const double refDb = irlevel::powerToDb(irlevel::builtInCabBandPower());
+
+    double levels[2] {};
+    const double rates[2] { 44100.0, 96000.0 };
+    for (int i = 0; i < 2; ++i)
+    {
+        CabinetSim cab;
+        cab.prepare(rates[i], 512, 1);
+        cab.installIRNow(juce::AudioBuffer<float>(fixture), irRate);
+        const auto played = playedIR(cab, rates[i], fixture.getNumSamples(), irRate);
+        const float* ch[] = { played.data() };
+        const auto p = irlevel::bandPower(ch, 1, static_cast<int>(played.size()), rates[i]);
+        REQUIRE(p.has_value());
+        levels[i] = irlevel::powerToDb(*p);
+    }
+    INFO("reference " << refDb << " dB; played at 44.1 kHz " << levels[0]
+         << " dB, at 96 kHz " << levels[1] << " dB");
+    // Before Task 2 (JUCE's Normalise::yes): -11.4 and -8.3 dB, i.e. ~10.5 dB
+    // under the reference and 3 dB apart.
+    CHECK(std::abs(levels[0] - refDb) < 0.3);
+    CHECK(std::abs(levels[1] - refDb) < 0.3);
+}
+
+TEST_CASE("The level match scales a copy, one gain for both channels", "[cabinet][ir][level]")
+{
+    // Left at full level, right 6 dB down: after the match the played IR keeps
+    // that 6 dB balance (one gain), and the channel average meets the reference.
+    // The buffer the caller holds (userIRs, in the processor) is not touched.
+    double irRate = 0.0;
+    const auto mono = readFixtureIR("neutral.wav", irRate);
+    juce::AudioBuffer<float> stereo(2, mono.getNumSamples());
+    stereo.copyFrom(0, 0, mono, 0, 0, mono.getNumSamples());
+    stereo.copyFrom(1, 0, mono, 0, 0, mono.getNumSamples());
+    stereo.applyGain(1, 0, mono.getNumSamples(), 0.5f);
+
+    const juce::AudioBuffer<float> before(stereo);
+    CabinetSim cab;
+    cab.prepare(48000.0, 512, 2);
+    cab.installIRNow(juce::AudioBuffer<float>(stereo), irRate);
+    {
+        CabinetSim async;   // the async path too, on its own instance
+        async.prepare(48000.0, 512, 2);
+        async.loadIRFromBuffer(juce::AudioBuffer<float>(stereo), irRate);
+    }
+    for (int ch = 0; ch < 2; ++ch)
+        REQUIRE(std::equal(stereo.getReadPointer(ch), stereo.getReadPointer(ch) + stereo.getNumSamples(),
+                           before.getReadPointer(ch)));
+
+    std::vector<float> out[2];
+    juce::AudioBuffer<float> buffer(2, 512);
+    for (int start = 0; start < mono.getNumSamples() + 4096; start += 512)
+    {
+        buffer.clear();
+        if (start == 0) { buffer.setSample(0, 0, 1.0f); buffer.setSample(1, 0, 1.0f); }
+        juce::dsp::AudioBlock<float> block(buffer);
+        cab.processBlock(block);
+        for (int ch = 0; ch < 2; ++ch)
+            out[ch].insert(out[ch].end(), buffer.getReadPointer(ch), buffer.getReadPointer(ch) + 512);
+    }
+    const int n = static_cast<int>(out[0].size());
+    const float* l[] = { out[0].data() };
+    const float* r[] = { out[1].data() };
+    const float* both[] = { out[0].data(), out[1].data() };
+    const double lDb = irlevel::powerToDb(*irlevel::bandPower(l, 1, n, 48000.0));
+    const double rDb = irlevel::powerToDb(*irlevel::bandPower(r, 1, n, 48000.0));
+    const double avgDb = irlevel::powerToDb(*irlevel::bandPower(both, 2, n, 48000.0));
+    INFO("L " << lDb << " dB, R " << rDb << " dB, average " << avgDb << " dB");
+    CHECK_THAT(lDb - rDb, Catch::Matchers::WithinAbs(20.0 * std::log10(2.0), 0.05));
+    CHECK(std::abs(avgDb - irlevel::powerToDb(irlevel::builtInCabBandPower())) < 0.3);
 }

@@ -136,7 +136,7 @@ response the same at every host rate. So we normalise once, at the IR's native r
 **Metric:** the power-average of |H(f)|² over 69 log-spaced points (1/12 octave) from 100 Hz to
 5 kHz. Log spacing means equal weight per octave. The reference is the same metric for the
 built-in cab's three biquads (`cab_presence × cab_rolloff × cab_notch`), which comes to
-**−0.90 dB**. The OT low-pass is common to both paths, so it is left out. Check of the metric:
+**−0.90 dB** (measured −0.888 dB, at a fixed 176.4 kHz design rate; see the handoff). The OT low-pass is common to both paths, so it is left out. Check of the metric:
 it predicts the neutral fixture at −11.4 dB under JUCE's normalisation, a −10.5 dB gap, and
 `sr_render` measured −10.9 dB.
 
@@ -151,39 +151,39 @@ our band metric needs exactly the same guard. Keep the check and rewrite its com
 `tests/cabinet_ir_tests.cpp`, `tests/processor_ir_tests.cpp`, `tests/CMakeLists.txt`
 
 - [x] Decision D1 confirmed by the owner (2026-10-26): match the built-in cab.
-- [ ] Write pure tests first (`ir_level_tests.cpp`):
-  - [ ] A unit impulse reads 0 dB ± 0.01, and impulse × 2 reads +6.02 dB.
-  - [ ] The same analog band-pass, designed and sampled at 48 kHz and at 96 kHz, reads within
+- [x] Write pure tests first (`ir_level_tests.cpp`):
+  - [x] A unit impulse reads 0 dB ± 0.01, and impulse × 2 reads +6.02 dB.
+  - [x] The same analog band-pass, designed and sampled at 48 kHz and at 96 kHz, reads within
         0.2 dB at both rates.
-  - [ ] The built-in-cab reference reads −0.90 ± 0.05 dB. This pins it, so a change to any
+  - [x] The built-in-cab reference reads −0.90 ± 0.05 dB. This pins it, so a change to any
         `CAB_*` constant shows up here, and with it every IR's level.
-  - [ ] An all-zero IR reads as "no level", and the caller leaves it unscaled.
-  - [ ] The band's top edge is clamped to 0.45 × rate, so an 8 kHz-rate IR still works.
-- [ ] Write JUCE tests (`cabinet_ir_tests.cpp`, using Task 1's `installIRNow`, so no waiting):
+  - [x] An all-zero IR reads as "no level", and the caller leaves it unscaled.
+  - [x] The band's top edge is clamped to 0.45 × rate, so an 8 kHz-rate IR still works.
+- [x] Write JUCE tests (`cabinet_ir_tests.cpp`, using Task 1's `installIRNow`, so no waiting):
       push the neutral fixture through a real `juce::dsp::Convolution` prepared at 44.1 kHz and
       at 96 kHz. Feed it an impulse and measure the resulting IR with the same metric. It must
       be within 0.3 dB of the reference at both rates. Today it is −10.5 dB, and 3 dB apart.
-- [ ] Write a processor test (harness): with the neutral fixture loaded, IR mode's output level
+- [x] Write a processor test (harness): with the neutral fixture loaded, IR mode's output level
       on a 220 Hz note is within ±1.5 dB of the built-in cab's. Today it is −10.9 dB.
-- [ ] Implement: one private `CabinetSim` helper that every load path calls (`loadIRFromBuffer`,
+- [x] Implement: one private `CabinetSim` helper that every load path calls (`loadIRFromBuffer`,
       `installIRNow`, and the test-only `loadStockIR`/`loadIRFromFile` for consistency). It:
   - measures the channel-averaged band power at the IR's native rate;
   - scales **all channels by one factor**, which keeps the stereo balance;
   - passes `Normalise::no`.
 
   It runs on the message thread: about 1M multiply-adds per IR at 8192 samples, a few ms.
-- [ ] Measure with `sr_irpath.py`. Targets:
+- [x] Measure with `sr_irpath.py`. Targets:
   - IR vs built-in cab within ±1.5 dB at all three points, for all three fixtures;
   - IR mode within ±0.3 dB across 44.1/48/96 kHz.
 
   Record the before and after table in the handoff doc.
-- [ ] Re-check the IR-path limiter. The output tanh now sees ~11 dB more drive in IR mode, and
+- [x] Re-check the IR-path limiter. The output tanh now sees ~11 dB more drive in IR mode, and
       the 4× limiter oversampler (`docs/handoff-IR-limiter-aliasing.md`) was only validated at the
       old, too-quiet level. Add report-only IR variants of A2 (peak ceiling), B3, D1 and D5 to
       `tools/signoff_gates.json` using `neutral.wav`, plus a spur check at P-CRANK with
       `bright.wav`. `signoff.py` must resolve `ir` paths relative to the repo root.
-- [ ] Verify, then run the full sign-off. The built-in-cab gates must be bit-identical.
-- [ ] **Behaviour change:** existing projects that use an IR will play ~10 dB louder, now
+- [x] Verify, then run the full sign-off. The built-in-cab gates must be bit-identical.
+- [x] **Behaviour change:** existing projects that use an IR will play ~10 dB louder, now
       matching the built-in cab. Put it in the release notes and `.agents/STATE.md`.
 
 ## Task 3: Fade every cab-mode switch and never play un-cabbed

@@ -35,6 +35,7 @@ add_executable(SilentRiotTests
     pitch_detector_tests.cpp
     integer_delay_tests.cpp
     idle_operating_point_tests.cpp
+    ir_level_tests.cpp
 
     # DSP source files (tests call functions defined in these)
     ${CMAKE_SOURCE_DIR}/src/dsp/tubes/TriodeWaveshaper.cpp
@@ -92,6 +93,7 @@ target_link_libraries(SilentRiotJuceTests PRIVATE
 target_compile_definitions(SilentRiotJuceTests PRIVATE
     JUCE_WEB_BROWSER=0
     JUCE_USE_CURL=0
+    SOURCE_DIR="${CMAKE_SOURCE_DIR}"
 )
 
 target_include_directories(SilentRiotJuceTests PRIVATE
@@ -128,6 +130,7 @@ target_include_directories(SilentRiotProcessorTests PRIVATE
 )
 target_compile_definitions(SilentRiotProcessorTests PRIVATE
     $<TARGET_PROPERTY:SilentRiot,COMPILE_DEFINITIONS>
+    SOURCE_DIR="${CMAKE_SOURCE_DIR}"
 )
 
 target_compile_features(SilentRiotProcessorTests PRIVATE cxx_std_17)

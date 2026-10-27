@@ -89,7 +89,7 @@ std::vector<UserIREntry> userIRsFromValueTree(const juce::ValueTree& irsNode)
             entry.audioData.copyFrom(ch, 0, rawData + ch * entry.numSamples,
                                      entry.numSamples);
 
-        // A NaN/Inf, or samples whose energy overflows JUCE's normalisation,
+        // A NaN/Inf, or samples whose energy overflows the IR level match,
         // would poison or silence IR mode and be re-saved with the project
         // (review S4). Same stop-at-first-invalid rule as above.
         //

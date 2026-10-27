@@ -54,6 +54,25 @@ constexpr float CAB_ROLLOFF_Q       = 0.5f;
 constexpr float CAB_NOTCH_FREQ      = 400.0f;   // Hz
 constexpr float CAB_NOTCH_Q         = 2.0f;
 
+// ── IR level match (dsp/cabinet/IRLevel.h) ──────────────────
+// A loaded IR is scaled so its band power (the power average of |H(f)|² over
+// log-spaced points, IR_LEVEL_POINTS_PER_OCT per octave, LO..HI) equals the
+// built-in cab's three biquads above over the same band — so IR mode plays at
+// the level OUTPUT_MAKEUP_GAIN and the sign-off were calibrated at.
+constexpr float IR_LEVEL_BAND_LO_HZ     = 100.0f;
+constexpr float IR_LEVEL_BAND_HI_HZ     = 5000.0f;   // clamped to 0.45 × the IR's rate
+constexpr int   IR_LEVEL_POINTS_PER_OCT = 12;        // 100 Hz–5 kHz → 69 points
+// Rate the built-in cab's biquads are designed at for the reference. The
+// processor designs them at the OVERSAMPLED rate (FilterBank::recalcAll), which
+// moves with host rate and OS factor; the reference reads -0.881 dB at 88.2 kHz
+// and -0.890 dB at 384 kHz, so one fixed rate (44.1 kHz × the default 4×)
+// stands for all of them and an IR's gain never depends on the session.
+constexpr double IR_LEVEL_REF_DESIGN_SR = 176400.0;
+// Ceiling on the level-match gain, so a wrong or sub-only file with almost
+// nothing in 100 Hz–5 kHz is not raised far into the output tanh. The
+// peak-normalised test fixtures are turned DOWN (-9…-18 dB).
+constexpr double IR_LEVEL_MAX_GAIN_DB   = 40.0;
+
 // ── Math constant ────────────────────────────────────────────
 constexpr float PI_F = 3.14159265358979323846f;
 

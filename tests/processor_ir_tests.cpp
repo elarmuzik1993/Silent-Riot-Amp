@@ -16,6 +16,7 @@
 #include <catch2/catch_test_macros.hpp>
 #include "processor_harness.h"
 
+#include <algorithm>
 #include <cstdint>
 #include <vector>
 
@@ -183,4 +184,71 @@ TEST_CASE("Processor: a session restored before prepare plays its IR from the fi
          << settledRatio << " dB");
     REQUIRE(settledRatio < -20.0);   // the IR does cut >7 kHz once it plays
     REQUIRE(firstRatio < settledRatio + 3.0);
+}
+
+TEST_CASE("Processor: IR mode plays a 220 Hz note at the built-in cab's level",
+          "[processor][ir][level]")
+{
+    // IR-path plan Task 2. JUCE's Normalise::yes left the neutral fixture
+    // 10.9 dB under the built-in cab at P-EDGE (sr_irpath.py, Task 0). Now the
+    // IR is scaled to the built-in cab's 100 Hz–5 kHz band level.
+    const juce::File neutral =
+        juce::File(SOURCE_DIR).getChildFile("tests/fixtures/ir/neutral.wav");
+    REQUIRE(neutral.existsAsFile());
+
+    auto noteRmsDb = [&](bool withIR) {
+        ProcessorHarness h;
+        if (withIR)
+            h.loadIR(neutral);
+        h.set(IDs::GAIN, 0.625f);   // P-EDGE
+        h.set(IDs::VOLUME, 0.5f);
+        h.set(IDs::TONE, 0.5f);    // SHAPE
+        h.silence(0.3);
+        std::vector<float> out;
+        h.run(1.0, sine(220.0f, 0.1f), ProcessorHarness::Mode::Process, &out);
+        double sum = 0.0;
+        const size_t from = out.size() / 2;
+        for (size_t i = from; i < out.size(); ++i)
+            sum += static_cast<double>(out[i]) * out[i];
+        return 10.0 * std::log10(sum / static_cast<double>(out.size() - from));
+    };
+
+    const double builtIn = noteRmsDb(false);
+    const double ir = noteRmsDb(true);
+    INFO("built-in " << builtIn << " dBFS, IR " << ir << " dBFS, IR - built-in " << ir - builtIn);
+    REQUIRE(std::abs(ir - builtIn) < 1.5);
+}
+
+TEST_CASE("Processor: saved state keeps the raw IR, not the level-matched copy",
+          "[processor][ir][state][level]")
+{
+    // The level match scales only the copy handed to the convolution, so a
+    // later retune of IRLevel.h never needs saved projects rewritten.
+    const juce::File neutral =
+        juce::File(SOURCE_DIR).getChildFile("tests/fixtures/ir/neutral.wav");
+    juce::AudioFormatManager fm;
+    fm.registerBasicFormats();
+    std::unique_ptr<juce::AudioFormatReader> reader(fm.createReaderFor(neutral));
+    REQUIRE(reader != nullptr);
+    juce::AudioBuffer<float> file(static_cast<int>(reader->numChannels),
+                                  static_cast<int>(reader->lengthInSamples));
+    reader->read(&file, 0, file.getNumSamples(), 0, true, true);
+
+    ProcessorHarness h;
+    REQUIRE(h.proc.loadUserIR(neutral));
+    h.silence(0.1);
+    juce::MemoryBlock saved;
+    h.proc.getStateInformation(saved);
+    auto xml = juce::AudioProcessor::getXmlFromBinary(saved.getData(),
+                                                      static_cast<int>(saved.getSize()));
+    REQUIRE(xml != nullptr);
+    const auto irs = sr::userIRsFromValueTree(
+        juce::ValueTree::fromXml(*xml).getChildWithName("UserIRs"));
+    REQUIRE(irs.size() == 1);
+    const auto& stored = irs[0].audioData;
+    REQUIRE(stored.getNumChannels() == file.getNumChannels());
+    REQUIRE(stored.getNumSamples() == file.getNumSamples());
+    for (int ch = 0; ch < file.getNumChannels(); ++ch)
+        REQUIRE(std::equal(file.getReadPointer(ch), file.getReadPointer(ch) + file.getNumSamples(),
+                           stored.getReadPointer(ch)));
 }
