@@ -7,6 +7,13 @@
 
 namespace sr {
 
+// Polyphase-IIR oversampler with whole-sample latency. JUCE adds a Thiran
+// all-pass after the downsampler so getLatencyInSamples() is an integer: the
+// host can be told the latency exactly instead of a truncated guess (review B4).
+// Magnitude response is unchanged; latency rounds up by 0.6–1.6 samples.
+std::unique_ptr<juce::dsp::Oversampling<float>> makeIntegerLatencyOversampler(
+    int numChannels, int factorLog2, int maxBlockSize);
+
 enum class OversampleTransition { Idle, FadingOut, Reconfiguring, FadingIn };
 
 struct OversampleSwitcher {
@@ -18,10 +25,13 @@ struct OversampleSwitcher {
 
     std::array<std::unique_ptr<juce::dsp::Oversampling<float>>, 3> oversamplers;
 
-    void init(int numChannels, int maxBlockSize);
+    // Starts in initialMode (clamped to 0..2) with no transition pending, so a
+    // session saved at 2x/8x does not fade out and back in on its first blocks
+    // after every prepare (review B5).
+    void init(int numChannels, int maxBlockSize, int initialMode = 1);
     juce::dsp::Oversampling<float>* active();
     int activeFactor() const;
-    void requestModeChange(int newMode);
+    void requestModeChange(int newMode);   // out-of-range modes are ignored
     bool isTransitioning() const { return state != OversampleTransition::Idle; }
     bool readyToSwitch() const { return state == OversampleTransition::Reconfiguring; }
     void commitSwitch();

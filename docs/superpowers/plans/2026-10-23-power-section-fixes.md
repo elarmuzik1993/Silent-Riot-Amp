@@ -22,6 +22,27 @@ only (see its status banner), so it explains why a behaviour exists, never what 
 **Order:** cheapest and least tone-changing first, so each later measurement starts from a clean
 baseline. Tasks 2–4 each change the sound; do **one per commit**, and re-run sign-off after each.
 
+## Coordination with the DSP review
+
+This plan was written without `docs/review-dsp-2026-10-15.md`, which covers the same code. The
+combined order lives in `.agents/STATE.md`. Where they meet:
+
+- **Sequencing.** Tasks 0 and 1 belong to the review's phase 1 (settled tone unchanged). Tasks 2–5
+  belong to its phase 2, after B5+B4, B1+S1, B7 and B6+B8, and share its **single**
+  re-calibration pass instead of re-tuning after each task.
+- **Task 0.** E1's −70.4 dBFS is the startup burst (review B1), not a noise floor. All sign-off
+  numbers hold only at 44.1 kHz / 4× (B7). Record the baseline there and note both.
+- **Task 2 = review B2.** Do them as one change. The sag reference is taken at *nominal* rails, so
+  at the PSU's settled idle the bias rests +0.77 V (15W) / +1.03 V (7W) warm. Adding `cond` alone
+  corrects ~2% of a ~9% error. The "pair idles" test Task 2 extends is tautological (it feeds the
+  reference back into itself): replace it with one that runs the real PSU loop on silence and
+  asserts `biasOffset() ≤ 0`. Solve the idle fixed point once (with `cond`) and share it with
+  B1's start-up seeding.
+- **Task 4 and S8.** S8 shows the 0.5-damped plate iteration (triode, and the LTP's inner loop)
+  diverges under extreme input. Task 4's load-line solve must be bracketed as specified here, and
+  should not reuse that inner loop. Fix S8 in the same pass.
+- **Task 4 recalibration** is the review's phase-2 re-calibration; do it once, at the end.
+
 ## Global constraints
 
 - All DSP constants in `Constants.h` (`_N` / `_REAL` / dimensionless). `namespace sr`.
@@ -40,14 +61,21 @@ baseline. Tasks 2–4 each change the sound; do **one per commit**, and re-run s
 
 Every later task is judged against these numbers, so record them before touching code.
 
-- [ ] `bash scripts/verify.sh` passes (308/308).
-- [ ] Build `sr_render` (`-DSR_BUILD_TOOLS=ON`, Release) and run
+> **Done 2026-10-23.** Results in `docs/handoff-power-section-fixes.md`; the diagnostic is
+> `docs/handoff-power-section-fixes-probe.cpp`. **Read its last section before Tasks 2–4:** the
+> EL84s run class A at every sign-off point and at every knob on 10 (no cut-off, plate knee
+> never approached, B+ moves 0.1 V), so Tasks 3–4 are inaudible at today's
+> `VOLUME_KNOB_HEADROOM`, and idle `cond` is 0.975 (15W) / 0.923 (7W), not ≈ 0.98. Whether the
+> power stage should ever leave class A is an owner decision that now gates Tasks 3–4.
+
+- [x] `bash scripts/verify.sh` passes (308/308).
+- [x] Build `sr_render` (`-DSR_BUILD_TOOLS=ON`, Release) and run
       `python3 tools/signoff.py --render-bin …/sr_render`. Save the full gate table to
       `docs/handoff-power-section-fixes.md` (new). Expect the 2026-10-14 figures in
       `.agents/STATE.md`: A1 −31.6 LUFS, B1 0.99 %, E1 −70.4 dBFS, E3 −37.9 dBc, other 8 pass.
-- [ ] Also record `tools/sr_thump.py`, `tools/sr_idle.py`, `tools/sr_bloom.py` at P-CLEAN,
+- [x] Also record `tools/sr_thump.py`, `tools/sr_idle.py`, `tools/sr_bloom.py` at P-CLEAN,
       P-EDGE and P-CRANK, in 15W and 7W.
-- [ ] Add a temporary diagnostic test (or `sr_render` debug output) that logs, per preset:
+- [x] Add a temporary diagnostic test (or `sr_render` debug output) that logs, per preset:
       peak and average `ipA`/`ipB`, `condA`/`condB` minimum, `sag.biasOffset()` range, and
       B+ minimum. Tasks 2–4 are each checked against these.
 
@@ -55,9 +83,9 @@ Every later task is judged against these numbers, so record them before touching
 
 **Files:** `src/dsp/tubes/PentodeWaveshaper.cpp` (`softConductionCurve`)
 
-- [ ] Replace the −0.9 / −0.96 / 1.067 example with the real values: bias −0.032 (15W) /
+- [x] Replace the −0.9 / −0.96 / 1.067 example with the real values: bias −0.032 (15W) /
       −0.023 (7W), `biasFactor` = −9.6/−7.0 ≈ 1.37, `overlapWidth` = 5 V × `biasFactor`.
-- [ ] Verify: build passes and output is bit-identical (comments only).
+- [x] Verify: build passes and output is bit-identical (comments only).
 
 ## Task 2: Feed the PSU and sag the current that actually flows
 

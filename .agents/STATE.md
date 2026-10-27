@@ -1,46 +1,60 @@
 # State
 
-_Updated 2026-10-26_
+_Updated 2026-10-27_
 
 ## Now
 - Silent Riot v0.3.4 (JUCE 7 VST3/Standalone), GPLv3, going open source with optional donations
-  (no paid tier). `bash scripts/verify.sh` passes: static + Release build + 308/308 ctest (2026-10-26).
-- `COMPETITIVE_ROADMAP.md` is the live plan (open-source 1.0; Phase C = installers + support link);
-  `ROADMAP.md` archived; DSP spec v2.13 background only; JSX prototype out of date.
-- History rewritten 2026-10-26: every commit authored `Boris Miscenco <219343213+elarmuzik1993@users.noreply.github.com>`,
-  AI trailers stripped. Commit with that identity (the cloud env sets `aidevblock@gmail.com`; override it).
-- Power-section fixes planned in `docs/superpowers/plans/2026-10-23-power-section-fixes.md`, none built.
-- Tone sign-off open: E3 (MUST-PASS) diagnosed not fixed; A1/B1 need re-ratifying.
+  (no paid tier). `bash scripts/verify.sh` passes: 408/408 ctest (308 pure C++ / 81 JUCE /
+  19 processor, via `tests/processor_harness.h`).
+- Commit as `Boris Miscenco <219343213+elarmuzik1993@users.noreply.github.com>` (history was
+  rewritten to it 2026-10-26); the cloud env sets `aidevblock@gmail.com`, so override it.
+- DSP review `docs/review-dsp-2026-10-15.md`: B1, B4–B8, S1–S7 fixed; B2, B3 (tone-changing), S8 open.
+- Power plan `docs/superpowers/plans/2026-10-23-power-section-fixes.md`: Tasks 0–1 done
+  (`docs/handoff-power-section-fixes.md`). EL84 grids never conduct (hottest 5.91 V vs 8.6 V);
+  the PI charge rails from ~gain 8.
+- IR plan `docs/superpowers/plans/2026-10-26-ir-path-sound-fixes.md` done (record:
+  `docs/handoff-ir-path-sound.md`): sync IR install in `prepareToPlay`, IRs level-matched to the
+  built-in cab (`IRLevel.h`), faded cab-mode switches (`CabModeSwitcher.h`), 5 ms fade on IRs cut
+  at 8192 samples. **Projects that use an IR play louder** (+5.4…+13.1 dB); release-note it.
 
-## Next
-1. Owner: delete every remote branch except `main`, `docs/dsp-review`, `fix/ir-restore-and-samples`,
-   `feat/neural-hybrid-blend-sketch`. The others hold pre-rewrite history (old emails, AI trailers);
-   the cloud proxy refuses branch deletion. Re-clone any local copy (hashes changed).
-2. Owner: make the repo public (Settings → General → Danger Zone).
-3. Owner: pick a donation platform (GitHub Sponsors / Ko-fi); then add `.github/FUNDING.yml`, a
-   README "Support" section and an About-panel link (roadmap Phase C).
-4. Owner: GitHub Actions fails every run since 2026-10-09 (~3–5 s, no logs); likely billing.
-   Recheck once public (free standard runners). Until then verify locally.
-5. Owner: pick the 7W option (power plan Task 5). Not blocking Tasks 0–2.
-6. Power plan Task 0 (baseline: verify, build `sr_render`, record `signoff.py`/thump/idle/bloom),
-   then Task 1 (stale comment), Task 2 (conduction-scaled PSU/sag currents).
-7. Owner: confirm the E3 plan, "repoint the gate, then fix the engine" (proposed, not agreed).
-8. E3 step 1: give `alias_crank` (`tools/signoff_gates.json`) a real bright IR (today a skipped
-   placeholder, so E3 runs the IIR path); move whole-engine aliasing to a report-only gate.
-9. E3 step 2: measure harmonic fall-off per nonlinearity; smooth the sharpest corner
-   (`TriodeWaveshaper.cpp:28`, `GridConduction.cpp:39`, `OTSaturation.h:43`); coordinate with power Task 4.
+## Next (one PR per step, each with a test)
+1. Owner: delete stale remote branches (all but `main` and `feat/neural-hybrid-blend-sketch`;
+   the proxy refuses deletion). Make the repo public; pick a donation platform, then add
+   `.github/FUNDING.yml`, a README "Support" section and an About-panel link (roadmap Phase C).
+2. Owner: delay FEEDBACK default decays 9 dB/repeat (was 3.4); keep, or remap the knob?
+3. Owner: GRID I reads 0 in normal play. Keep, or read the PI grid?
+4. Phase 2 (tone-changing; owner listening check, then ONE re-calibration of D1/A1/B1/P-*):
+   power Task 2 with B2 (replace the tautological idle test; re-pin
+   `idle_operating_point_tests.cpp`), then B3. First measure whether the PI rail is load-bearing.
+5. EL84s leaving class A (owner leans yes): after B2/B3 raise `VOLUME_KNOB_HEADROOM`, check D1
+   at knob 10, then power Tasks 3–5 (Task 4 with S8; owner picks the 7W option for Task 5).
+6. E3 last (owner: confirm "repoint the gate, then fix the engine"); repoint it to
+   `tests/fixtures/ir/bright.wav` (`spur_crank_ir` already renders it, −23.1 dBc).
+7. IR loader UI plan (see Known issues).
+8. Owner: GitHub Actions fails every run since 2026-10-09; recheck once public (free runners).
 
 ## Decisions
-- Open source + optional donations (2026-10-26): no audience to sell to yet, and GPL source makes a
-  license gate moot. Never gate features, nag, or add a trial.
-- DSP spec v2.13 is background: several designs were root-caused as bugs in USE-59. Code wins.
-- PSU's one-sample current lag is intended (spec §3.11).
-- `verify.sh` builds into `build-verify/`; `bootstrap.sh` omits webkit (`JUCE_WEB_BROWSER=0`).
-- sr_render is not built by CI or verify (`-DSR_BUILD_TOOLS=ON`); build it when touching tools/.
+- Open source + optional donations (2026-10-26): never gate features, nag, or add a trial.
+- DSP spec v2.13 is background only; code, CLAUDE.md, handoffs win. `COMPETITIVE_ROADMAP.md` is live.
+- Tone-neutral fixes first, tone-changing ones together, so the amp is re-calibrated once.
+- Delay never self-oscillates; sync ceiling 2000 ms, TIME knob 20–1000 ms (owner).
+- IR restore is laxer than load: refusing a silent IR would drop it and every later slot.
+- Latency is an exact integer, constant across cab modes; PSU's one-sample current lag is intended.
+- IR mode matches the built-in cab's level (owner D1); the 8192 cap stays (D2); state keeps raw IRs.
+- `verify.sh` builds into `build-verify/`; sr_render is not built by CI or verify.
 
 ## Known issues
-- Old commits stay reachable via closed PRs' `refs/pull/*` (GitHub-owned); only GitHub Support or a fresh repo removes them.
-- E3 = −37.9 dBc (≤ −85): engine aliasing, not the IR limiter; 8× OS only reaches −43.5.
-- `signoff.py` on `d2315b4`: A1 −31.6 LUFS, B1 0.99%, E1 −70.4 dBFS, E3 −37.9 fail; other 8 pass.
-- EL84s have no plate load line (Vp = PSU B+), so the plate knee never engages (power Task 4).
-- ~0.5 s startup thump while the PSU settles; pollutes E1's idle floor (unverified).
+- 13 commits on `main` (#33, #35) carry `aidevblock@gmail.com`, not the noreply identity.
+- Old pre-rewrite commits stay reachable via closed PRs' `refs/pull/*` (only GitHub Support fixes it).
+- `signoff.py` (44.1k/4×) fails A1 −31.6 LUFS, B1 0.99%, E3 −37.9 dBc (MUST-PASS); 9 pass.
+  IR gates are report-only. Rates above 384k effective drift −0.2…+1.2 dB (cause unknown).
+- Sag idles warm (B2) and never goes cold; a live 15W↔7W switch settles audibly.
+- `sr_bloom.py` gain 0.625 rebounds ~4 dB at 25 ms; `sr_thump.py` gain 1.0: louder in, quieter out.
+- Cab-mode switches dip rather than crossfade (~6 ms at block 64, ~95 ms at 4096); an IR picked
+  while an older one is loaded starts on the older one until JUCE's crossfade (still cabbed).
+- Bright IRs play 1.2–1.5 dB under the built-in cab; unequal stereo IRs are off the reference
+  on a mono bus. The 8192 cap still loses long rings. A stereo IR with a dead channel 1 is
+  refused on load even on a mono bus.
+- IR loader panel: no scroll past 8 (`IRLoaderPanel.cpp:116`), `.ir` accepted but unreadable,
+  AIFF/FLAC refused, no remove or way back to the built-in cab, no refresh after automation or
+  state load; `IR_INDEX` is positional.

@@ -23,6 +23,18 @@ void PowerSupplyModel::reset() {
     resetCurrentDraw();
 }
 
+void PowerSupplyModel::settle(float totalPlate, float totalScreen) {
+    resetCurrentDraw();
+    reportPowerDirect(totalPlate, totalScreen);
+    // update()'s targets with each node already at its target
+    powerNode.voltage  = std::max(0.0f, V_POWER_NOMINAL_N - (totalPlate + totalScreen) * sourceImpedance_n);
+    const float powerDroop = powerNode.voltage - V_POWER_NOMINAL_N;
+    screenNode.voltage = std::max(0.0f, V_SCREEN_NOMINAL_N + powerDroop - totalScreen * rScreen_n);
+    piNode.voltage     = std::max(0.0f, V_PI_NOMINAL_N + powerDroop);
+    const float piDroop = piNode.voltage - V_PI_NOMINAL_N;
+    preampNode.voltage = std::max(0.0f, V_PREAMP_NOMINAL_N + piDroop);
+}
+
 void PowerSupplyModel::recalcDecayCoeffs(float effectiveSR) {
     powerNode.recalcDecay(effectiveSR);
     screenNode.recalcDecay(effectiveSR);

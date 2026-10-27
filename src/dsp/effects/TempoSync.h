@@ -32,7 +32,8 @@ inline constexpr SyncDivision kSyncDivisions[] = {
 inline constexpr int kNumSyncDivisions = static_cast<int>(sizeof(kSyncDivisions) / sizeof(kSyncDivisions[0]));
 
 // Delay time in ms for a given division index (1..kNumSyncDivisions-1) at bpm,
-// clamped to the delay's usable time range. divisionIndex==0 (MANUAL) returns
+// clamped to DELAY_TIME_MIN_MS..DELAY_SYNC_MAX_MS — further than the TIME knob
+// reaches (DELAY_TIME_KNOB_MAX_MS), so slow divisions keep their length. divisionIndex==0 (MANUAL) returns
 // DELAY_TIME_MIN_MS — callers should not sync-drive the delay in that case.
 inline float computeSyncMs(int divisionIndex, double bpm)
 {
@@ -44,7 +45,7 @@ inline float computeSyncMs(int divisionIndex, double bpm)
         return DELAY_TIME_MIN_MS;
 
     const float ms = static_cast<float>(60000.0 / bpm) * kSyncDivisions[divisionIndex].qnMultiplier;
-    return std::clamp(ms, DELAY_TIME_MIN_MS, DELAY_TIME_MAX_MS);
+    return std::clamp(ms, DELAY_TIME_MIN_MS, DELAY_SYNC_MAX_MS);
 }
 
 } // namespace sr

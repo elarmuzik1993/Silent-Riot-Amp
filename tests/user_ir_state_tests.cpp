@@ -2,6 +2,9 @@
 // Requires JUCE (separate test target: SilentRiotJuceTests)
 
 #include <catch2/catch_test_macros.hpp>
+#include <cmath>
+#include <cstdint>
+#include <cstring>
 #include <limits>
 #include <vector>
 
@@ -116,6 +119,28 @@ TEST_CASE("Missing audioData property is rejected", "[cabinet][ir][state]")
     REQUIRE(userIRsFromValueTree(tree).empty());
 }
 
+TEST_CASE("A non-IR child stops parsing instead of being skipped", "[cabinet][ir][state]")
+{
+    // The writer emits only "IR" children, so a foreign child is corruption —
+    // e.g. an IR node whose type was mangled. Skipping it would shift every
+    // later IR down one slot, so IR_INDEX would play the wrong IR.
+    std::vector<UserIREntry> in;
+    in.push_back(makeEntry("ok", 1, 256));
+    in.push_back(makeEntry("mangled", 1, 256));
+    in.push_back(makeEntry("after_mangled", 1, 256));
+
+    auto tree = userIRsToValueTree(in);
+    auto mangled = tree.getChild(1).createCopy();
+    tree.removeChild(1, nullptr);
+    juce::ValueTree foreign("Iq");
+    foreign.copyPropertiesFrom(mangled, nullptr);
+    tree.addChild(foreign, 1, nullptr);
+
+    auto out = userIRsFromValueTree(tree);
+    REQUIRE(out.size() == 1);
+    REQUIRE(out[0].name == "ok");
+}
+
 TEST_CASE("Entry count is capped at MAX_USER_IRS", "[cabinet][ir][state]")
 {
     std::vector<UserIREntry> in;
@@ -156,4 +181,400 @@ TEST_CASE("isValidUserIRFormat rejects out-of-range formats", "[cabinet][ir][sta
     REQUIRE_FALSE(isValidUserIRFormat(1, 512, -48000.0));
     REQUIRE_FALSE(isValidUserIRFormat(1, 512, std::numeric_limits<double>::infinity()));
     REQUIRE_FALSE(isValidUserIRFormat(1, 512, std::numeric_limits<double>::quiet_NaN()));
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Samples JUCE can't normalise (review S4) — NaN/Inf, or energy that
+// overflows its float sum of squares — rejected on both paths. A channel
+// with nothing at or above JUCE's -80 dBFS trim is rejected on LOAD only:
+// restore keeps it (harmless silence) rather than drop it and later slots.
+// ═══════════════════════════════════════════════════════════════
+
+TEST_CASE("IR_TRIM_THRESHOLD is the very float JUCE's Convolution trims at", "[cabinet][ir][state]")
+{
+    // Computed at run time in this TU (volatile: no constant folding), so it
+    // is JUCE's own decibelsToGain(-80.0f) against the constexpr literal in
+    // CabinetSim.h, compared bit for bit.
+    volatile float minus80 = -80.0f;
+    const float juceThreshold = juce::Decibels::decibelsToGain(static_cast<float>(minus80));
+    std::uint32_t a = 0, b = 0;
+    std::memcpy(&a, &juceThreshold, sizeof a);
+    std::memcpy(&b, &IR_TRIM_THRESHOLD, sizeof b);
+    REQUIRE(a == b);
+}
+
+TEST_CASE("Restored entry with a NaN/Inf or overflowing sample is rejected and stops parsing",
+          "[cabinet][ir][state]")
+{
+    for (float bad : { std::numeric_limits<float>::quiet_NaN(),
+                       std::numeric_limits<float>::infinity(),
+                       -std::numeric_limits<float>::infinity(),
+                       1.0e20f })   // finite, but its square overflows a float
+    {
+        std::vector<UserIREntry> in;
+        in.push_back(makeEntry("ok", 1, 256));
+        in.push_back(makeEntry("poisoned", 2, 512));
+        in.push_back(makeEntry("after_poisoned", 1, 256));
+        in[1].audioData.setSample(1, 300, bad);  // inside the body, channel 2
+
+        auto out = userIRsFromValueTree(userIRsToValueTree(in));
+
+        // Stops at the bad entry, like any other invalid one, so no later
+        // entry shifts onto its 1-based IR_INDEX.
+        REQUIRE(out.size() == 1);
+        REQUIRE(out[0].name == "ok");
+    }
+}
+
+TEST_CASE("Restored entry whose channel energy overflows is rejected and stops parsing",
+          "[cabinet][ir][state]")
+{
+    // Every sample is finite and so is every square (1e36), but the float sum
+    // of squares JUCE's Convolution normalises by overflows to Inf, which
+    // silences IR mode exactly as a NaN would.
+    std::vector<UserIREntry> in;
+    in.push_back(makeEntry("ok", 1, 256));
+    in.push_back(makeEntry("too_hot", 2, 4096));
+    in.push_back(makeEntry("after_too_hot", 1, 256));
+    for (int s = 0; s < 4096; ++s)
+        in[1].audioData.setSample(1, s, (s % 2) ? 1.0e18f : -1.0e18f);
+
+    auto out = userIRsFromValueTree(userIRsToValueTree(in));
+    REQUIRE(out.size() == 1);
+    REQUIRE(out[0].name == "ok");
+}
+
+TEST_CASE("Restored silent or dead-channel entry is kept in its slot", "[cabinet][ir][state]")
+{
+    // A load refuses these (isAudibleOnEveryChannel), but a project saved
+    // before that check can hold one. It is harmless — JUCE trims it to
+    // silence, the same silence it played when saved — so restore keeps it:
+    // dropping it would stop parsing and lose every later slot, and the next
+    // save would delete them for good.
+    for (float level : { 0.0f, 0.5f * IR_TRIM_THRESHOLD })
+    {
+        std::vector<UserIREntry> in;
+        in.push_back(makeEntry("ok", 1, 256));
+        in.push_back(makeEntry("silent", 2, 512));
+        in.push_back(makeEntry("after_silent", 1, 256));
+        for (int ch = 0; ch < 2; ++ch)
+            for (int s = 0; s < 512; ++s)
+                in[1].audioData.setSample(ch, s, (s % 2) ? level : -level);
+        REQUIRE_FALSE(isAudibleOnEveryChannel(in[1].audioData));
+
+        auto out = userIRsFromValueTree(userIRsToValueTree(in));
+        REQUIRE(out.size() == 3);
+        REQUIRE(out[1].name == "silent");
+        REQUIRE(out[1].audioData.getSample(1, 511) == in[1].audioData.getSample(1, 511));
+        REQUIRE(out[2].name == "after_silent");   // still on IR_INDEX 3
+    }
+
+    // Quiet but above the threshold in one channel only, the other dead:
+    // refused at load (on a mono bus only channel 0 plays, so this one would be
+    // pure silence there), kept at restore.
+    std::vector<UserIREntry> in;
+    in.push_back(makeEntry("one_dead_channel", 2, 512));
+    in.push_back(makeEntry("after", 1, 256));
+    in[0].audioData.clear();
+    in[0].audioData.setSample(1, 100, 2.0f * IR_TRIM_THRESHOLD);
+    REQUIRE_FALSE(isAudibleOnEveryChannel(in[0].audioData));
+    auto out = userIRsFromValueTree(userIRsToValueTree(in));
+    REQUIRE(out.size() == 2);
+    REQUIRE(out[0].name == "one_dead_channel");
+    REQUIRE(out[1].name == "after");
+}
+
+namespace {
+
+juce::File writeFloatWav(const juce::String& fileName, const juce::AudioBuffer<float>& audio,
+                         double sampleRate)
+{
+    auto f = juce::File::getSpecialLocation(juce::File::tempDirectory).getChildFile(fileName);
+    f.deleteFile();
+    juce::WavAudioFormat wav;
+    std::unique_ptr<juce::AudioFormatWriter> writer(
+        wav.createWriterFor(new juce::FileOutputStream(f), sampleRate,
+                            static_cast<unsigned int>(audio.getNumChannels()), 32, {}, 0));
+    REQUIRE(writer != nullptr);
+    writer->writeFromAudioSampleBuffer(audio, 0, audio.getNumSamples());
+    return f;
+}
+
+} // namespace
+
+TEST_CASE("readUserIRFromFile loads a clean float WAV, rejects unsafe, silent or dead-channel ones",
+          "[cabinet][ir][state]")
+{
+    auto clean = makeEntry("src", 2, 300, 44100.0);
+
+    SECTION("clean IR loads with its format")
+    {
+        auto f = writeFloatWav("sr_user_ir_clean.wav", clean.audioData, 44100.0);
+        UserIREntry e;
+        REQUIRE(readUserIRFromFile(f, e));
+        REQUIRE(e.name == "sr_user_ir_clean");
+        REQUIRE(e.numChannels == 2);
+        REQUIRE(e.numSamples == 300);
+        REQUIRE(e.sampleRate == 44100.0);
+        REQUIRE(e.audioData.getSample(1, 299) == clean.audioData.getSample(1, 299));
+        f.deleteFile();
+    }
+
+    SECTION("NaN, Inf or an overflowing sample inside the body is rejected")
+    {
+        for (float bad : { std::numeric_limits<float>::quiet_NaN(),
+                           std::numeric_limits<float>::infinity(),
+                           1.0e20f })
+        {
+            auto poisoned = clean.audioData;
+            poisoned.setSample(0, 150, bad);
+            auto f = writeFloatWav("sr_user_ir_bad.wav", poisoned, 44100.0);
+            UserIREntry e;
+            REQUIRE_FALSE(readUserIRFromFile(f, e));
+            f.deleteFile();
+        }
+    }
+
+    SECTION("finite samples whose channel energy overflows are rejected")
+    {
+        auto tooHot = clean.audioData;
+        for (int s = 0; s < tooHot.getNumSamples(); ++s)
+            tooHot.setSample(0, s, 1.0e18f);   // 300 × 1e36 > FLT_MAX
+        auto f = writeFloatWav("sr_user_ir_hot.wav", tooHot, 44100.0);
+        UserIREntry e;
+        REQUIRE_FALSE(readUserIRFromFile(f, e));
+        f.deleteFile();
+    }
+
+    SECTION("a silent file (nothing at or above JUCE's -80 dBFS trim) is rejected")
+    {
+        for (float level : { 0.0f, 0.5f * IR_TRIM_THRESHOLD })
+        {
+            juce::AudioBuffer<float> silent(2, 300);
+            for (int ch = 0; ch < 2; ++ch)
+                for (int s = 0; s < 300; ++s)
+                    silent.setSample(ch, s, (s % 2) ? level : -level);
+            auto f = writeFloatWav("sr_user_ir_silent.wav", silent, 44100.0);
+            UserIREntry e;
+            REQUIRE_FALSE(readUserIRFromFile(f, e));
+            f.deleteFile();
+        }
+    }
+
+    SECTION("a stereo file with one dead channel is rejected")
+    {
+        // JUCE's trim keeps it (the trim is a union over channels), but each
+        // IR channel plays on its own output channel, and on a mono bus only
+        // channel 0 is convolved — so either dead channel silences a side,
+        // and a dead channel 0 silences a mono session outright.
+        for (int dead : { 0, 1 })
+        {
+            auto oneDead = clean.audioData;
+            oneDead.clear(dead, 0, oneDead.getNumSamples());
+            auto f = writeFloatWav("sr_user_ir_dead_channel.wav", oneDead, 44100.0);
+            UserIREntry e;
+            REQUIRE_FALSE(readUserIRFromFile(f, e));
+            f.deleteFile();
+        }
+    }
+
+    SECTION("unreadable file is rejected")
+    {
+        UserIREntry e;
+        REQUIRE_FALSE(readUserIRFromFile(juce::File("/tmp/sr_no_such_ir_98765.wav"), e));
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Truncated-IR fade (IR plan Task 4)
+// ═══════════════════════════════════════════════════════════════
+
+namespace {
+
+// A ringing, non-constant body, so "untouched" can't pass by accident.
+juce::AudioBuffer<float> makeRinging(int numChannels, int numSamples)
+{
+    juce::AudioBuffer<float> b(numChannels, numSamples);
+    for (int ch = 0; ch < numChannels; ++ch)
+        for (int s = 0; s < numSamples; ++s)
+            b.setSample(ch, s, (ch == 0 ? 0.5f : -0.3f)
+                                   * std::cos(0.05f * static_cast<float>(s + 7 * ch)) + 0.6f);
+    return b;
+}
+
+int expectedFadeLength(double rate)
+{
+    return static_cast<int>(std::lround(rate * IR_TRUNCATION_FADE_MS * 0.001));
+}
+
+} // namespace
+
+TEST_CASE("fadeTruncatedTail: raised-cosine fade over the last 5 ms, earlier samples untouched",
+          "[cabinet][ir][state][fade]")
+{
+    REQUIRE(IR_TRUNCATION_FADE_MS == 5.0);
+
+    for (double rate : { 44100.0, 48000.0, 96000.0, 192000.0 })
+    {
+        const int n = MAX_USER_IR_SAMPLES;
+        const auto orig = makeRinging(2, n);
+        auto faded = orig;
+        fadeTruncatedTail(faded, rate);
+
+        const int fadeLen = expectedFadeLength(rate);
+        REQUIRE(fadeLen > 1);
+        const int fadeStart = n - fadeLen;
+
+        for (int ch = 0; ch < 2; ++ch)
+        {
+            // Every sample before the fade is bit-identical.
+            for (int s = 0; s < fadeStart; ++s)
+                REQUIRE(faded.getSample(ch, s) == orig.getSample(ch, s));
+
+            // Inside it: gain = faded / orig is a raised cosine — strictly
+            // falling from just under 1 to 0 at the last sample.
+            double prevGain = 1.0;
+            for (int s = fadeStart; s < n; ++s)
+            {
+                const double g = static_cast<double>(faded.getSample(ch, s))
+                               / static_cast<double>(orig.getSample(ch, s));
+                const double k = static_cast<double>(s - fadeStart + 1) / fadeLen;
+                const double expected = 0.5 * (1.0 + std::cos(juce::MathConstants<double>::pi * k));
+                REQUIRE(std::abs(g - expected) < 1.0e-6);
+                REQUIRE(g < prevGain);
+                prevGain = g;
+            }
+            REQUIRE(std::abs(faded.getSample(ch, n - 1)) < 1.0e-6f);
+            // Mid-fade sits at half gain (the raised cosine's centre).
+            const int mid = fadeStart + fadeLen / 2 - 1;
+            REQUIRE(std::abs(faded.getSample(ch, mid) / orig.getSample(ch, mid) - 0.5f) < 0.02f);
+        }
+    }
+}
+
+TEST_CASE("fadeTruncatedTail on a buffer shorter than the fade fades the whole buffer",
+          "[cabinet][ir][state][fade]")
+{
+    // 100 samples at 48 kHz is ~2 ms < 5 ms: the fade is clamped to the buffer,
+    // so it still ends at 0 and stays monotonic, starting just under unity.
+    const auto orig = makeRinging(1, 100);
+    auto faded = orig;
+    fadeTruncatedTail(faded, 48000.0);
+
+    double prevGain = 1.0;
+    for (int s = 0; s < 100; ++s)
+    {
+        const double g = static_cast<double>(faded.getSample(0, s)) / orig.getSample(0, s);
+        REQUIRE(g < prevGain);
+        REQUIRE(g >= 0.0);
+        prevGain = g;
+    }
+    REQUIRE(faded.getSample(0, 0) / orig.getSample(0, 0) > 0.99f);
+    REQUIRE(std::abs(faded.getSample(0, 99)) < 1.0e-6f);
+
+    // Degenerate sizes don't crash or touch anything they shouldn't.
+    juce::AudioBuffer<float> empty(2, 0);
+    fadeTruncatedTail(empty, 48000.0);
+    juce::AudioBuffer<float> one(1, 1);
+    one.setSample(0, 0, 0.7f);
+    fadeTruncatedTail(one, 48000.0);
+    REQUIRE(std::abs(one.getSample(0, 0)) < 1.0e-6f);
+}
+
+TEST_CASE("readUserIRFromFile fades only an IR longer than the cap",
+          "[cabinet][ir][state][fade]")
+{
+    const double rate = 48000.0;
+
+    SECTION("over the cap: truncated to the cap, tail faded, body bit-identical")
+    {
+        const auto src = makeRinging(2, MAX_USER_IR_SAMPLES + 1808);
+        auto f = writeFloatWav("sr_user_ir_long.wav", src, rate);
+        UserIREntry e;
+        REQUIRE(readUserIRFromFile(f, e));
+        REQUIRE(e.numSamples == MAX_USER_IR_SAMPLES);
+        REQUIRE(e.audioData.getNumSamples() == MAX_USER_IR_SAMPLES);
+
+        juce::AudioBuffer<float> expected(2, MAX_USER_IR_SAMPLES);
+        for (int ch = 0; ch < 2; ++ch)
+            expected.copyFrom(ch, 0, src, ch, 0, MAX_USER_IR_SAMPLES);
+        fadeTruncatedTail(expected, rate);
+
+        const int fadeStart = MAX_USER_IR_SAMPLES - expectedFadeLength(rate);
+        for (int ch = 0; ch < 2; ++ch)
+        {
+            for (int s = 0; s < fadeStart; ++s)
+                REQUIRE(e.audioData.getSample(ch, s) == src.getSample(ch, s));
+            for (int s = fadeStart; s < MAX_USER_IR_SAMPLES; ++s)
+                REQUIRE(e.audioData.getSample(ch, s) == expected.getSample(ch, s));
+            REQUIRE(std::abs(e.audioData.getSample(ch, MAX_USER_IR_SAMPLES - 1)) < 1.0e-6f);
+        }
+        f.deleteFile();
+    }
+
+    SECTION("at or under the cap: bit-identical to the file, last sample included")
+    {
+        for (int len : { MAX_USER_IR_SAMPLES, MAX_USER_IR_SAMPLES - 1, 300 })
+        {
+            const auto src = makeRinging(2, len);
+            auto f = writeFloatWav("sr_user_ir_at_cap.wav", src, rate);
+            UserIREntry e;
+            REQUIRE(readUserIRFromFile(f, e));
+            REQUIRE(e.numSamples == len);
+            for (int ch = 0; ch < 2; ++ch)
+                for (int s = 0; s < len; ++s)
+                    REQUIRE(e.audioData.getSample(ch, s) == src.getSample(ch, s));
+            f.deleteFile();
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// IR_INDEX → convolution (review S2)
+// ═══════════════════════════════════════════════════════════════
+
+TEST_CASE("applyUserIRIndex disables the convolution for an index past the list",
+          "[cabinet][ir][state]")
+{
+    CabinetSim cab;
+    cab.prepare(48000.0, 512, 2);
+
+    std::vector<UserIREntry> five;
+    for (int i = 0; i < 5; ++i)
+        five.push_back(makeEntry("ir_" + juce::String(i), 1, 256));
+
+    REQUIRE(applyUserIRIndex(cab, five, 5, IRLoad::Async));
+    REQUIRE(cab.useIR.load());
+    REQUIRE(cab.getIRTailSeconds() > 0.0);
+
+    // The review's repro: IR 5 live, then a state with only three IRs but the
+    // same IR_INDEX = 5 is restored. The old IR 5 must not keep playing.
+    std::vector<UserIREntry> three(five.begin(), five.begin() + 3);
+    REQUIRE_FALSE(applyUserIRIndex(cab, three, 5, IRLoad::Async));
+    REQUIRE_FALSE(cab.useIR.load());
+    REQUIRE(cab.getIRTailSeconds() == 0.0);
+
+    // In range again → loads; 0 (IIR mode) and garbage → disabled
+    REQUIRE(applyUserIRIndex(cab, three, 2, IRLoad::Async));
+    REQUIRE(cab.useIR.load());
+    REQUIRE_FALSE(applyUserIRIndex(cab, three, 0, IRLoad::Async));
+    REQUIRE_FALSE(cab.useIR.load());
+    REQUIRE(applyUserIRIndex(cab, three, 3, IRLoad::Async));
+    REQUIRE_FALSE(applyUserIRIndex(cab, three, -1, IRLoad::Async));
+    REQUIRE_FALSE(cab.useIR.load());
+    REQUIRE(applyUserIRIndex(cab, three, 1, IRLoad::Async));
+    REQUIRE_FALSE(applyUserIRIndex(cab, {}, 1, IRLoad::Async));  // empty list
+    REQUIRE_FALSE(cab.useIR.load());
+
+    // The same through IRLoad::Now, the branch prepareToPlay takes
+    REQUIRE(applyUserIRIndex(cab, five, 5, IRLoad::Now));
+    REQUIRE(cab.useIR.load());
+    REQUIRE(cab.getIRTailSeconds() > 0.0);
+    REQUIRE_FALSE(applyUserIRIndex(cab, three, 5, IRLoad::Now));
+    REQUIRE_FALSE(cab.useIR.load());
+    REQUIRE(cab.getIRTailSeconds() == 0.0);
+    REQUIRE(applyUserIRIndex(cab, three, 2, IRLoad::Now));
+    REQUIRE(cab.useIR.load());
+    REQUIRE_FALSE(applyUserIRIndex(cab, three, 0, IRLoad::Now));
+    REQUIRE_FALSE(cab.useIR.load());
 }

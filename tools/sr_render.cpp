@@ -407,6 +407,17 @@ int main(int argc, char** argv)
 
     SilentRiotProcessor proc;
     proc.setPlayConfigDetails(2, 2, sr, block);
+
+    // --ir is loaded BEFORE prepareToPlay, which installs the active IR
+    // synchronously (CabinetSim::installIRNow): the render plays it from the
+    // first block, the same on every run. loadUserIR() needs nothing prepared;
+    // it only queues the IR and sets IR_INDEX. The knobs are set after the
+    // prepare in both cab modes, so the amp starts the same way either way.
+    if (a.str("ir").isNotEmpty() && !proc.loadUserIR(juce::File(a.str("ir"))))
+    {
+        std::fprintf(stderr, "--ir '%s' could not be loaded\n", a.str("ir").toRawUTF8());
+        return 2;
+    }
     proc.prepareToPlay(sr, block);
 
     // Parameters (knobs are already 0..1 internal; bools/choice mapped via convertTo0to1)
@@ -423,9 +434,6 @@ int main(int argc, char** argv)
     // before these flags existed.
     setParam(proc.apvts, sr::Params::IDs::INPUT_LEVEL, a.num("in-trim", 0.5f));
     setParam(proc.apvts, sr::Params::IDs::OUTPUT_LEVEL, a.num("out-trim", 0.5f));
-
-    if (a.str("ir").isNotEmpty())
-        proc.loadUserIR(juce::File(a.str("ir")));  // synchronous; enables IR path
 
     juce::MidiBuffer midi;
 

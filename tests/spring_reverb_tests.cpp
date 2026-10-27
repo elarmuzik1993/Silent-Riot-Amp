@@ -6,12 +6,15 @@
 //   - TONE controls tail brightness (loop damping)
 //   - SIZE controls decay length
 //   - Stable under sustained full-scale noise at max settings
+//   - rampSize: a SIZE turn moves the read tap at the same speed at any block
+//     size, and reset() lands a ramp in progress (review S5)
 // ═══════════════════════════════════════════════════════════════
 
 #include <catch2/catch_test_macros.hpp>
 #include "dsp/effects/SpringReverb.h"
 #include <vector>
 #include <cmath>
+#include <algorithm>
 
 using namespace sr;
 
@@ -41,6 +44,7 @@ TEST_CASE("SpringReverb tail lasts well beyond the loop length", "[spring]")
     c.prepare(kSR);
     c.setSize(0.7f);
     c.setTone(0.5f);
+    c.reset();   // land the SIZE glide from prepare()'s 0.5: measure a settled tank
 
     auto y = impulseResponse(c, static_cast<int>(1.0f * kSR));
     // Loop is tens of ms; require real energy ~0.5 s later → feedback loop works.
@@ -55,6 +59,7 @@ TEST_CASE("SpringReverb dispersion spreads energy over time", "[spring]")
     c.prepare(kSR);
     c.setSize(0.6f);
     c.setTone(0.6f);
+    c.reset();   // land the SIZE glide from prepare()'s 0.5: measure a settled tank
 
     auto y = impulseResponse(c, static_cast<int>(0.5f * kSR));
     // A single delta would put energy in one window; dispersion + feedback
@@ -74,6 +79,7 @@ TEST_CASE("SpringReverb TONE controls tail brightness", "[spring]")
         c.prepare(kSR);
         c.setSize(0.6f);
         c.setTone(tone);
+        c.reset();   // land the SIZE glide from prepare()'s 0.5: measure a settled tank
         auto y = impulseResponse(c, static_cast<int>(1.0f * kSR));
         double d = 0.0;  // total variation ~ high-frequency content
         for (size_t i = 1; i < y.size(); ++i)
@@ -90,6 +96,7 @@ TEST_CASE("SpringReverb SIZE controls decay length", "[spring]")
         c.prepare(kSR);
         c.setSize(size);
         c.setTone(0.5f);
+        c.reset();   // land the SIZE glide from prepare()'s 0.5: measure a settled tank
         auto y = impulseResponse(c, static_cast<int>(4.0f * kSR));
         int last = 0;
         for (int i = 0; i < static_cast<int>(y.size()); ++i)
@@ -105,6 +112,7 @@ TEST_CASE("SpringReverb stays finite under sustained full-scale noise", "[spring
     c.prepare(kSR);
     c.setSize(1.0f);
     c.setTone(1.0f);
+    c.reset();   // land the SIZE glide from prepare()'s 0.5: measure a settled tank
 
     unsigned r = 12345u;
     float peak = 0.0f;
@@ -120,4 +128,82 @@ TEST_CASE("SpringReverb stays finite under sustained full-scale noise", "[spring
     }
     REQUIRE(finite);
     REQUIRE(peak < 10.0f);  // bounded — downstream tanh limiter handles the rest
+}
+
+namespace {
+// Per-sample read-speed range of spring 2 (the longest loop) while SIZE turns
+// 0 → 1 in 0.25 s at 44.1 kHz, handed over once per `block` as Reverb does.
+struct SpeedRange { float lo, hi; };
+SpeedRange readSpeedDuringTurn(int block)
+{
+    constexpr float fs = 44100.0f;
+    constexpr int turnStart = 22 * 2048, turnLen = 11025;
+    SpringReverbCore c;
+    c.prepare(fs);
+    c.setSize(0.0f);
+    c.reset();
+    const Spring& s = c.springs[1];
+    float prev = s.lenTarget + s.lenOffset;
+    SpeedRange r { 1e9f, -1e9f };
+    for (int start = 0; start < turnStart + turnLen; start += block)
+    {
+        if (start >= turnStart)
+            c.rampSize(std::min(1.0f, static_cast<float>(start - turnStart) / turnLen), block);
+        for (int i = 0; i < block; ++i)
+        {
+            c.process(0.0f);
+            const float len = s.lenTarget + s.lenOffset;
+            // Skip the turn's first 6144 samples, where the glide is still
+            // catching up with the knob starting to move.
+            if (start + i >= turnStart + 3 * 2048)
+            {
+                r.lo = std::min(r.lo, len - prev);
+                r.hi = std::max(r.hi, len - prev);
+            }
+            prev = len;
+        }
+    }
+    return r;
+}
+} // namespace
+
+TEST_CASE("SpringReverb SIZE turn reads at the same speed at any block size (review S5)", "[spring]")
+{
+    // The turn moves spring 2's loop ~0.081 samples per sample: the read is
+    // pitched ~8% while the knob moves. Stepping SIZE once per block and only
+    // gliding it swung that between 0.060–0.108 at 512-sample blocks and
+    // 0.021–0.210 at 2048 (a ~21 Hz pitch warble); ramped, 0.081–0.082 at both.
+    const auto a = readSpeedDuringTurn(512);
+    const auto b = readSpeedDuringTurn(2048);
+    CAPTURE(a.lo, a.hi, b.lo, b.hi);
+    for (const auto& r : { a, b })
+    {
+        REQUIRE(r.lo > 0.075f);
+        REQUIRE(r.hi < 0.088f);
+    }
+}
+
+TEST_CASE("SpringReverb reset() lands a SIZE ramp in progress (review S5)", "[spring]")
+{
+    SpringReverbCore want;
+    want.prepare(kSR);
+    want.setSize(0.9f);
+    want.reset();
+
+    SpringReverbCore c;
+    c.prepare(kSR);
+    c.rampSize(0.9f, 4096);
+    for (int i = 0; i < 1000; ++i) c.process(0.1f);   // part-way along the ramp
+    c.reset();
+
+    for (size_t k = 0; k < c.springs.size(); ++k)
+    {
+        REQUIRE(c.springs[k].lenTarget == want.springs[k].lenTarget);
+        REQUIRE(c.springs[k].lenOffset == 0.0f);
+        REQUIRE(c.springs[k].fbTarget == want.springs[k].fbTarget);
+        REQUIRE(c.springs[k].fbOffset == 0.0f);
+    }
+    const auto y = impulseResponse(c, 4800);
+    const auto z = impulseResponse(want, 4800);
+    REQUIRE(y == z);
 }

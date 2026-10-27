@@ -17,6 +17,8 @@ DI / test signal ──► sr_render ──► <id>.f32 + .json + .wav ──►
 | `sr_render.cpp` | Headless CLI that runs the **real** `SilentRiotProcessor::processBlock` over a DI/test signal and writes a render | **yes** (build with `-DSR_BUILD_TOOLS=ON`) | ✅ builds and runs (MSVC/Ninja, Windows) |
 | `sr_analyze.py` | Pure numpy/scipy analyzer: level/LUFS, THD+harmonics, spectrum, sag, noise, aliasing spurs | no | ✅ `--selftest` passes |
 | `sr_thump.py` | Low-frequency punch: compression slope per band vs input level | no | ✅ found the OT saturation imbalance |
+| `sr_irpath.py` | Cab-IR path: IR vs built-in level per point and rate, IR start-up, render repeatability, built-in-cab bit-identity baseline (`--save-baseline` / `--diff-baseline`) | no | ✅ `docs/handoff-ir-path-sound.md` |
+| `make_ir_fixtures.py` | Writes the synthetic test IRs in `tests/fixtures/ir/` (neutral / dark / bright) | no | ✅ deterministic |
 | `sr_idle.py` | Idle self-noise: separates settling transient from self-oscillation | no | ✅ found the 17.7 Hz motorboating |
 | `sr_wobble.py` | Envelope modulation on a constant tone (free-running loops) | no | ✅ |
 | `sr_bloom.py` | Transient recovery — rebound after the decay ("delayed pluck") | no | ✅ |

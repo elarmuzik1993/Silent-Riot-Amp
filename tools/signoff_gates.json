@@ -22,8 +22,14 @@
     { "id": "note_crank",   "point": "P-CRANK", "signal": "note:110:0.5:2.0" },
     { "id": "note_7w",      "point": "P-7W",    "signal": "note:110:0.5:2.0" },
     { "id": "idle_crank",   "point": "P-CRANK", "signal": "silence:5.0" },
-    { "id": "alias_crank",  "point": "P-CRANK", "signal": "sine:11000:0.5:1.0", "probe_f0": 11000, "ir": "OPTIONAL_BRIGHT_IR" }
+    { "id": "alias_crank",  "point": "P-CRANK", "signal": "sine:11000:0.5:1.0", "probe_f0": 11000, "ir": "OPTIONAL_BRIGHT_IR" },
+
+    { "id": "thd220_crank_ir", "point": "P-CRANK", "signal": "sine:220:0.18:1.0", "probe_f0": 220, "ir": "tests/fixtures/ir/neutral.wav" },
+    { "id": "note_crank_ir",   "point": "P-CRANK", "signal": "note:110:0.5:2.0", "ir": "tests/fixtures/ir/neutral.wav" },
+    { "id": "spur_crank_ir",   "point": "P-CRANK", "signal": "sine:11000:0.5:1.0", "probe_f0": 11000, "ir": "tests/fixtures/ir/bright.wav" }
   ],
+
+  "_ir_gates_comment": "IR-mode variants (IR-path plan Task 2): report-only (target null) re-checks of the IR-path limiter now that IR mode is level-matched to the built-in cab (~11 dB more drive into the output tanh). Paths in 'ir' are relative to the repo root. spur_crank_ir is NOT E3: E3 stays on OPTIONAL_BRIGHT_IR until its own step repoints it.",
 
   "gates": [
     { "id": "A2", "render": "thd220_crank", "metric": "level", "field": "peak_dbfs",      "op": "<=",   "target": -1.0,  "must_pass": true,  "desc": "peak ceiling holds (tanh limiter)" },
@@ -40,6 +46,12 @@
 
     { "id": "E1", "render": "idle_crank",   "metric": "noise", "field": "noise_floor_dbfs", "op": "<=",   "target": -90.0, "must_pass": false, "desc": "idle noise floor" },
     { "id": "E2", "render": "idle_crank",   "metric": "noise", "field": "dc_offset_dbfs",   "op": "<=",   "target": -80.0, "must_pass": false, "desc": "idle DC / no limit cycle (real processBlock)" },
-    { "id": "E3", "render": "alias_crank",  "metric": "spurs", "field": "total_spur_dbc",   "op": "<=",   "target": -85.0, "must_pass": true,  "desc": "IR-path aliasing parity (PR #7/#9 fix target)" }
+    { "id": "E3", "render": "alias_crank",  "metric": "spurs", "field": "total_spur_dbc",   "op": "<=",   "target": -85.0, "must_pass": true,  "desc": "IR-path aliasing parity (PR #7/#9 fix target)" },
+
+    { "id": "A2-IR", "render": "thd220_crank_ir", "metric": "level", "field": "peak_dbfs",          "op": "<=",   "target": null, "must_pass": false, "desc": "IR mode: peak ceiling (report-only)" },
+    { "id": "B3-IR", "render": "thd220_crank_ir", "metric": "thd",   "field": "thd_pct",            "op": "band", "target": null, "must_pass": false, "desc": "IR mode: crank THD (report-only)" },
+    { "id": "D5-IR", "render": "note_crank_ir",   "metric": "sag",   "field": "sustain_300ms_dbfs", "op": ">=",   "target": null, "must_pass": false, "desc": "IR mode: no collapse (report-only)" },
+    { "id": "D1-IR", "render": "note_crank_ir",   "metric": "sag",   "field": "sag_depth_db",       "op": "band", "target": null, "must_pass": false, "desc": "IR mode: crank sag depth (report-only)" },
+    { "id": "S-IR",  "render": "spur_crank_ir",   "metric": "spurs", "field": "total_spur_dbc",     "op": "<=",   "target": null, "must_pass": false, "desc": "IR mode: limiter spurs, bright.wav (report-only)" }
   ]
 }

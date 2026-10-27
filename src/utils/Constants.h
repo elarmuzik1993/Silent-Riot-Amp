@@ -54,6 +54,31 @@ constexpr float CAB_ROLLOFF_Q       = 0.5f;
 constexpr float CAB_NOTCH_FREQ      = 400.0f;   // Hz
 constexpr float CAB_NOTCH_Q         = 2.0f;
 
+// ── IR level match (dsp/cabinet/IRLevel.h) ──────────────────
+// A loaded IR is scaled so its band power (the power average of |H(f)|² over
+// log-spaced points, IR_LEVEL_POINTS_PER_OCT per octave, LO..HI) equals the
+// built-in cab's three biquads above over the same band — so IR mode plays at
+// the level OUTPUT_MAKEUP_GAIN and the sign-off were calibrated at.
+constexpr float IR_LEVEL_BAND_LO_HZ     = 100.0f;
+constexpr float IR_LEVEL_BAND_HI_HZ     = 5000.0f;   // clamped to 0.45 × the IR's rate
+constexpr int   IR_LEVEL_POINTS_PER_OCT = 12;        // 100 Hz–5 kHz → 69 points
+// Rate the built-in cab's biquads are designed at for the reference. The
+// processor designs them at the OVERSAMPLED rate (FilterBank::recalcAll), which
+// moves with host rate and OS factor; the reference reads -0.881 dB at 88.2 kHz
+// and -0.890 dB at 384 kHz, so one fixed rate (44.1 kHz × the default 4×)
+// stands for all of them and an IR's gain never depends on the session.
+constexpr double IR_LEVEL_REF_DESIGN_SR = 176400.0;
+// Ceiling on the level-match gain, so a wrong or sub-only file with almost
+// nothing in 100 Hz–5 kHz is not raised far into the output tanh. The
+// peak-normalised test fixtures are turned DOWN (-9…-18 dB).
+constexpr double IR_LEVEL_MAX_GAIN_DB   = 40.0;
+// A user IR file longer than MAX_USER_IR_SAMPLES is cut at the cap; its last
+// IR_TRUNCATION_FADE_MS are faded out with a raised cosine (fadeTruncatedTail,
+// UserIRState.h) so the cut doesn't end mid-ring. IRs at or under the cap are
+// never faded. 5 ms is 240 samples at 48 kHz, 960 at 192 kHz — always well
+// inside the 8192-sample cap at any accepted rate (3840 at 768 kHz).
+constexpr double IR_TRUNCATION_FADE_MS  = 5.0;
+
 // ── Math constant ────────────────────────────────────────────
 constexpr float PI_F = 3.14159265358979323846f;
 
@@ -138,6 +163,12 @@ constexpr float GRID_R_EL84_N              = VS::r(19231.0f);        // ~19.2KΩ
 // reaching for the gain taper.
 constexpr float GRID_CLAMP_KNEE_N           = VS::v(6.0f);
 constexpr float GRID_CHARGE_RATE            = 0.003f;   // was 0.01 → caused PI grid charge saturation at gain≥5 (pumping)
+// GRID_CHARGE_RATE is a per-sample increment calibrated at this effective rate
+// (44.1 kHz × 4×, sr_render's and the sign-off's default). recalcGridChargeDecay
+// scales it by GRID_CHARGE_REF_SR / effectiveSR so the settled bias shift — and
+// with it the amp's level and blocking — is the same at every host rate and
+// oversampling factor (review B7). Without it 96 kHz / 8× was ~5.7 dB quieter.
+constexpr float GRID_CHARGE_REF_SR          = 176400.0f;
 constexpr float MAX_BIAS_SHIFT_N            = VS::v(-1.5f); // was -5V → excessive for 12AX7 (clips at ~-1.5V grid)
 // Coupling-cap charge-decay time constants (seconds) per stage
 constexpr float GRID_TAU_PREAMP_S           = 0.022f;  // V1a / V1b
@@ -331,8 +362,17 @@ constexpr float SAFETY_LIMIT_THRESH = 0.9f;
 
 // Delay (post-cab)
 constexpr float DELAY_TIME_MIN_MS   = 20.0f;
-constexpr float DELAY_TIME_MAX_MS   = 1000.0f;
-constexpr float DELAY_MAX_FEEDBACK  = 0.95f;    // clamp to keep it from self-oscillating
+// Two different ceilings on purpose (review S7). The TIME knob maps 0..1 →
+// MIN..DELAY_TIME_KNOB_MAX_MS, and saved sessions and automation store that 0..1,
+// so the knob range must not move. Tempo sync reaches further: a 1/2 note at
+// 60 BPM is 2000 ms, and the old shared 1000 ms clamp silently cut every slow
+// division short. The delay line is sized for the longer of the two.
+constexpr float DELAY_TIME_KNOB_MAX_MS = 1000.0f;
+constexpr float DELAY_SYNC_MAX_MS      = 2000.0f;
+constexpr float DELAY_LINE_MAX_MS      = DELAY_SYNC_MAX_MS;   // longest time Delay accepts
+static_assert(DELAY_LINE_MAX_MS >= DELAY_TIME_KNOB_MAX_MS && DELAY_LINE_MAX_MS >= DELAY_SYNC_MAX_MS,
+              "the delay line must hold every time the knob or tempo sync can ask for");
+constexpr float DELAY_MAX_FEEDBACK  = 0.95f;    // longest repeats; the loop's small-signal gain (see below)
 // Analog/tape voicing — feedback-path tone shaping + wow/flutter modulation.
 // The high-cut sits IN the feedback loop, so each repeat is darkened again →
 // echoes fade toward the dark, like a tape/analog echo. TONE convention
@@ -346,7 +386,10 @@ constexpr float DELAY_FLUTTER_RATE_HZ  = 6.5f;  // faster, subtler flutter LFO r
 constexpr float DELAY_FLUTTER_DEPTH_MS = 0.06f; // ± tap sway (adds high-frequency "buzz" wobble)
 // Feedback-loop saturation — soft-clips the tone-shaped repeat before it's
 // heard and fed back (models what a tape head/BBD chip actually plays back).
-// Unity gain at low level; tanh(x*k)/tanh(k) keeps it transparent until hot.
+// tanh(x*k)/tanh(k) is unity at full scale, so at low level it has a gain of
+// k/tanh(k) ≈ 1.9: the heard repeat keeps that, the recirculated copy is
+// scaled by tanh(k)/k so the loop gain is FEEDBACK itself, never above
+// DELAY_MAX_FEEDBACK — the delay cannot self-oscillate (review B8).
 constexpr float DELAY_FB_SAT_DRIVE  = 1.8f;
 
 // Reverb (post-cab) — spring tank: dispersive all-pass chain in a damped
@@ -368,6 +411,15 @@ constexpr float SPRING_MAX_LOOP_MS   = 60.0f;   // ring-buffer sizing headroom (
 constexpr float SPRING_MOD_DEPTH_SAMP = 2.0f;   // ± samples of loop-length sway
 constexpr float SPRING_MOD_RATE1_HZ   = 0.7f;   // spring 1 LFO rate
 constexpr float SPRING_MOD_RATE2_HZ   = 1.1f;   // spring 2 LFO rate (decorrelated)
+// SIZE glide (review S5): SIZE arrives once per host block and is ramped
+// linearly across the block (SpringReverbCore::rampSize), so the loop target
+// moves a whole sample at a time; the loop length and feedback one-pole toward
+// it per sample, smoothing those steps and the ramp's corners. The glide no
+// longer has to outlast a block — alone it did, and failed at 2048-sample
+// blocks (46 ms) — and 20 ms lands a turn in ~60 ms, like the 50 ms mix ramps.
+constexpr float SPRING_SIZE_GLIDE_MS   = 20.0f;
+constexpr float SPRING_GLIDE_SNAP_SAMP = 1e-4f; // land the length glide (samples)
+constexpr float SPRING_GLIDE_SNAP_FB   = 1e-6f; // land the feedback glide
 
 // ── Debug assertions ────────────────────────────────────────
 #ifdef DEBUG
