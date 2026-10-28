@@ -24,7 +24,7 @@ baseline. Tasks 2–4 each change the sound; do **one per commit**, and re-run s
 
 ## Coordination with the DSP review
 
-This plan was written without `docs/review-dsp-2026-10-15.md`, which covers the same code. The
+This plan was written without `docs/records/reviews/review-dsp-2026-10-15.md`, which covers the same code. The
 combined order lives in `.agents/STATE.md`. Where they meet:
 
 - **Sequencing.** Tasks 0 and 1 belong to the review's phase 1 (settled tone unchanged). Tasks 2–5
@@ -61,8 +61,8 @@ combined order lives in `.agents/STATE.md`. Where they meet:
 
 Every later task is judged against these numbers, so record them before touching code.
 
-> **Done 2026-10-23.** Results in `docs/handoff-power-section-fixes.md`; the diagnostic is
-> `docs/handoff-power-section-fixes-probe.cpp`. **Read its last section before Tasks 2–4:** the
+> **Done 2026-10-23.** Results in `docs/records/handoffs/handoff-power-section-fixes.md`; the diagnostic is
+> `docs/records/handoffs/handoff-power-section-fixes-probe.cpp`. **Read its last section before Tasks 2–4:** the
 > EL84s run class A at every sign-off point and at every knob on 10 (no cut-off, plate knee
 > never approached, B+ moves 0.1 V), so Tasks 3–4 are inaudible at today's
 > `VOLUME_KNOB_HEADROOM`, and idle `cond` is 0.975 (15W) / 0.923 (7W), not ≈ 0.98. Whether the
@@ -71,7 +71,7 @@ Every later task is judged against these numbers, so record them before touching
 - [x] `bash scripts/verify.sh` passes (308/308).
 - [x] Build `sr_render` (`-DSR_BUILD_TOOLS=ON`, Release) and run
       `python3 tools/signoff.py --render-bin …/sr_render`. Save the full gate table to
-      `docs/handoff-power-section-fixes.md` (new). Expect the 2026-10-14 figures in
+      `docs/records/handoffs/handoff-power-section-fixes.md` (new). Expect the 2026-10-14 figures in
       `.agents/STATE.md`: A1 −31.6 LUFS, B1 0.99 %, E1 −70.4 dBFS, E3 −37.9 dBc, other 8 pass.
 - [x] Also record `tools/sr_thump.py`, `tools/sr_idle.py`, `tools/sr_bloom.py` at P-CLEAN,
       P-EDGE and P-CRANK, in 15W and 7W.
@@ -167,7 +167,7 @@ nears the knee on the biggest peaks. That is the behaviour we want.
       as a gain change *after* the tubes. Step 1 uses a fixed `Raa` and leaves speaker coupling
       as it is. Folding `zEffective` into the load line is a possible follow-up only.
 - [ ] **Solve it, don't relax it.** `ip` depends on Vp (through the knee) and Vp depends on `ip`,
-      which is the same trap as the LTP (`docs/handoff-ltp-convergence.md`). Above the knee
+      which is the same trap as the LTP (`docs/records/handoffs/handoff-ltp-convergence.md`). Above the knee
       dIp/dVp is tiny, so a plain fixed-point step contracts strongly. Near the knee it may not.
       Use a 1-D solve on `v` with a bracket: `v ∈ [−B+, B+]`, residual
       `f(v) = (ipA(B+−v) − ipB(B+ + v))·Raa/4 − v`, which decreases strictly in `v`. Use secant
@@ -193,8 +193,8 @@ nears the knee on the biggest peaks. That is the behaviour we want.
 - [ ] Verify, then run full sign-off plus thump, idle and bloom. Report every gate that moved.
       E3 must not get worse. If it does, a softer knee (`V_PLATE_KNEE_N`) is the first thing to
       try.
-- [ ] Write the defect record into `docs/handoff-power-section-fixes.md` in the style of
-      `handoff-power-section-calibration.md`, then update CLAUDE.md (signal chain, Pentode model,
+- [ ] Write the defect record into `docs/records/handoffs/handoff-power-section-fixes.md` in the style of
+      `docs/records/handoffs/handoff-power-section-calibration.md`, then update CLAUDE.md (signal chain, Pentode model,
       Important Pitfalls) and `.agents/STATE.md`.
 
 ## Task 5: 7W mode supply behaviour (owner decision before any code)

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Boris Miscenco
-// Amp-loop probe for docs/review-dsp-2026-10-15.md — evidence, not product code.
+// Amp-loop probe for docs/records/reviews/review-dsp-2026-10-15.md — evidence, not product code.
 //
 // Replicates SilentRiotProcessor::processBlock's per-sample amp loop
 // (src/PluginProcessor.cpp, main at b8e20a9) with the repo's own DSP classes,
@@ -9,7 +9,7 @@
 // processBlock changes, this copy does not follow it.
 //
 // Build from the repo root (pure C++, no JUCE; one command, wrapped here):
-//   g++ -O2 -std=c++17 -Isrc docs/review-dsp-2026-10-15-probe.cpp
+//   g++ -O2 -std=c++17 -Isrc docs/records/reviews/review-dsp-2026-10-15-probe.cpp
 //       src/dsp/tubes/TriodeWaveshaper.cpp src/dsp/tubes/PentodeWaveshaper.cpp
 //       src/dsp/tubes/GridConduction.cpp src/dsp/filters/FilterBank.cpp
 //       src/dsp/power/PowerSupplyModel.cpp src/dsp/power/LTPSolver.cpp

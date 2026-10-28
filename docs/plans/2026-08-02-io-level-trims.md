@@ -57,7 +57,7 @@ A `vswhere.exe is not recognized` line on the way through is benign.
 | `src/PluginProcessor.cpp` | param layout, sanitized reads, smoother init, both trim applications, meter taps, softClip condition | 3 |
 | `src/gui/EffectsPanel.h/.cpp` | two knobs in the UTILITY card | 4 |
 | `src/PluginEditor.h/.cpp` | two slider attachments | 4 |
-| `docs/SilentRiot_UI_Spec.md`, `CLAUDE.md` | doc updates | 5 |
+| `docs/design/ui-spec.md`, `CLAUDE.md` | doc updates | 5 |
 
 ---
 
@@ -676,7 +676,7 @@ Refs USE-59"
 ### Task 5: Documentation and sign-off regression
 
 **Files:**
-- Modify: `docs/SilentRiot_UI_Spec.md` (UTILITY described as two-knob near lines 590, 600, 649)
+- Modify: `docs/design/ui-spec.md` (UTILITY described as two-knob near lines 590, 600, 649)
 - Modify: `CLAUDE.md` (UTILITY card description; meters are now post-trim)
 
 **Interfaces:**
@@ -685,7 +685,7 @@ Refs USE-59"
 
 - [ ] **Step 1: Update the UI spec**
 
-In `docs/SilentRiot_UI_Spec.md`, three passages describe UTILITY as a two-knob card.
+In `docs/design/ui-spec.md`, three passages describe UTILITY as a two-knob card.
 
 Card diagram (~line 589) — change this line:
 
@@ -750,7 +750,7 @@ Expected — these four must be **unchanged** from before this work:
 | B3 crank THD | 20.5 |
 | A2 peak | −6.00 |
 
-`signoff.py` exits non-zero while any gate fails. **A1, B1, E1 and E3 fail for pre-existing reasons** (documented in `docs/handoff-power-section-calibration.md`) — read the table, do not trust the exit code. If any of the four gates above moved, the trims are not unity-transparent; go back to Task 3 Step 10.
+`signoff.py` exits non-zero while any gate fails. **A1, B1, E1 and E3 fail for pre-existing reasons** (documented in `docs/records/handoffs/handoff-power-section-calibration.md`) — read the table, do not trust the exit code. If any of the four gates above moved, the trims are not unity-transparent; go back to Task 3 Step 10.
 
 - [ ] **Step 4: Run both test suites one final time**
 
@@ -764,7 +764,7 @@ Expected: both `All tests passed`.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add docs/SilentRiot_UI_Spec.md CLAUDE.md
+git add docs/design/ui-spec.md CLAUDE.md
 git commit -m "Document the INPUT/OUTPUT level trims
 
 UI spec described UTILITY as a two-knob card. Also records that the level

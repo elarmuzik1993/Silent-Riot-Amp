@@ -3,7 +3,7 @@
 # Copyright (C) 2026 Boris Miscenco
 """IR-path diagnostic: level, startup and repeatability of the cab convolution.
 
-Measures the findings in docs/superpowers/plans/2026-10-26-ir-path-sound-fixes.md
+Measures the findings in docs/plans/2026-10-26-ir-path-sound-fixes.md
 against the real processBlock (sr_render), with the synthetic IRs from
 tools/make_ir_fixtures.py (tests/fixtures/ir/).
 

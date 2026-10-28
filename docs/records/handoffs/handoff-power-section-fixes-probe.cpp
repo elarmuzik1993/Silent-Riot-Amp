@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Boris Miscenco
-// Power-stage telemetry probe for docs/handoff-power-section-fixes.md (plan
-// docs/superpowers/plans/2026-10-23-power-section-fixes.md, Task 0) — evidence,
+// Power-stage telemetry probe for docs/records/handoffs/handoff-power-section-fixes.md (plan
+// docs/plans/2026-10-23-power-section-fixes.md, Task 0) — evidence,
 // not product code.
 //
 // Logs, per sign-off operating point: min / average / peak EL84 plate current
@@ -10,14 +10,14 @@
 // (what flows), the minimum softConductionCurve factor, the sag biasOffset()
 // range and the minimum B+ / screen. Tasks 2-4 are each checked against these numbers.
 //
-// The amp loop is copied from docs/review-dsp-2026-10-15-probe.cpp (main at
+// The amp loop is copied from docs/records/reviews/review-dsp-2026-10-15-probe.cpp (main at
 // b8e20a9; re-checked against processBlock at c6e276d): processBlock's per-sample loop
 // minus the oversampling filters, input fed at the oversampled rate. When a
 // task changes the power stage, mirror it in Amp::tick here before re-running,
 // or the numbers stop describing the plugin.
 //
 // Build from the repo root (pure C++, no JUCE; one command, wrapped here):
-//   g++ -O2 -std=c++17 -Isrc docs/handoff-power-section-fixes-probe.cpp
+//   g++ -O2 -std=c++17 -Isrc docs/records/handoffs/handoff-power-section-fixes-probe.cpp
 //       src/dsp/tubes/TriodeWaveshaper.cpp src/dsp/tubes/PentodeWaveshaper.cpp
 //       src/dsp/tubes/GridConduction.cpp src/dsp/filters/FilterBank.cpp
 //       src/dsp/power/PowerSupplyModel.cpp src/dsp/power/LTPSolver.cpp
@@ -35,7 +35,7 @@
 // JUCE's oversampler. JUCE's polyphase-IIR half-band filters are not linear
 // phase anywhere in the band, so harmonics reaching V1a's grid clamp and
 // triode (before the 5 kHz gain-loading LP) are shaped slightly differently;
-// docs/handoff-power-section-fixes.md lists the corners checked against the
+// docs/records/handoffs/handoff-power-section-fixes.md lists the corners checked against the
 // real processBlock (grid peak within 0.02 V). Shape is the
 // knob's value, applied the way processBlock applies it on its first sample.
 
@@ -116,7 +116,7 @@ struct Amp {
     }
 
     // One oversampled sample of processBlock's oversampled loop (IIR cab on, no IR).
-    // Copied from docs/review-dsp-2026-10-15-probe.cpp. Shape is noon for the Task 0
+    // Copied from docs/records/reviews/review-dsp-2026-10-15-probe.cpp. Shape is noon for the Task 0
     // presets; `grid` mode sets the knob in seedIdleAndShape().
     float tick(float in, float gainKnob, float volKnob) {
         const float gainDrive = gainDriveTaper(gainKnob);

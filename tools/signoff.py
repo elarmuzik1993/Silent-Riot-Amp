@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Copyright (C) 2026 Boris Miscenco
 """
-signoff.py — orchestrate the tone sign-off (docs/Tone_SignOff_Protocol.md).
+signoff.py — orchestrate the tone sign-off (docs/dev/tone-signoff.md).
 
 For each render in tools/signoff_gates.json:
   1. run `sr_render` to produce a <id>.f32 / .json / .wav at the point's params,

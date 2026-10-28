@@ -1,6 +1,6 @@
 # Handoff — IR-path sound fixes
 
-Record for `docs/superpowers/plans/2026-10-26-ir-path-sound-fixes.md`. Every number here is a
+Record for `docs/plans/2026-10-26-ir-path-sound-fixes.md`. Every number here is a
 measurement you can re-run; each task appends its own section below with the same tables.
 
 ## Task 0 — baseline (2026-10-27, branch `docs/ir-path-sound-plan` at `b576323`; `src/`, `tools/`

@@ -24,10 +24,10 @@ project's best asset for contributors; the job is to file them, not trim them.
 | F1 | **"All rights reserved" next to GPLv3.** Contradicts the licence grant; a packager will flag it | `README.md:14`, `CREDITS.md:4` |
 | F2 | **Bundled fonts not credited.** Space Mono and DM Sans (SIL OFL 1.1) ship in the binary; OFL requires the licence text to travel with them. No licence files, no CREDITS row | `resources/fonts/`, `CREDITS.md` "Third-Party Libraries" |
 | F3 | No licence header / SPDX tag in any source file; "GPL-3.0-only" vs "-or-later" never stated | `src/`, `tests/`, `tools/` |
-| F4 | **Personal details in public docs**: a Windows home path, the Obsidian vault link, the cloud-env email notes | `docs/superpowers/plans/2026-08-02-io-level-trims.md:38,741`, `AGENTS.md:3`, `.agents/STATE.md:10,47` |
+| F4 | **Personal details in public docs**: a Windows home path, the Obsidian vault link, the cloud-env email notes | `docs/plans/2026-08-02-io-level-trims.md:38,741`, `AGENTS.md:3`, `.agents/STATE.md:10,47` |
 | F5 | README is a 50-line dev note: no screenshot, no download/install, no status, no "known limitations", no support, no docs map. "ai-assisted" wording sits in the Originality line | `README.md` |
-| F6 | `docs/` is flat: 2 specs, a JSX mock, 6 handoffs, a review, 2 `.cpp` probes, and plans under a tool-named `docs/superpowers/`. No index; nothing says which are current | `docs/` |
-| F7 | Two roadmaps at the root, one archived. `ROADMAP.md` is the *archived* one, so the obvious filename points at the dead plan | `ROADMAP.md`, `COMPETITIVE_ROADMAP.md` |
+| F6 | `docs/` is flat: 2 specs, a JSX mock, 6 handoffs, a review, 2 `.cpp` probes, and plans under a tool-named `docs/plans/`. No index; nothing says which are current | `docs/` |
+| F7 | Two roadmaps at the root, one archived. `ROADMAP.md` is the *archived* one, so the obvious filename points at the dead plan | `ROADMAP.md`, `ROADMAP.md` |
 | F8 | Missing community files: `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `SECURITY.md`, `CHANGELOG.md`, issue/PR templates, `FUNDING.yml` | `.github/`, root |
 | F9 | No user manual. Controls, effects, IR loading, presets and tuner are documented only in the UI spec and CLAUDE.md, both written for builders | — |
 | F10 | Human architecture overview exists only inside the 43 KB agent file `CLAUDE.md` | `CLAUDE.md` |
@@ -44,7 +44,7 @@ CODE_OF_CONDUCT.md      Contributor Covenant 2.1 (new)
 SECURITY.md             private reporting via GitHub advisories (new)
 CREDITS.md              + fonts, + IR fixtures, GPL-consistent notice (F1, F2)
 LICENSE                 unchanged
-ROADMAP.md              the live plan (today's COMPETITIVE_ROADMAP.md, renamed, F7)
+ROADMAP.md              the live plan (today's ROADMAP.md, renamed, F7)
 CLAUDE.md / AGENTS.md   agent instructions, kept; personal bits removed (F4)
 .github/
   ISSUE_TEMPLATE/       bug.yml, tone-feedback.yml, feature.yml, config.yml (new)

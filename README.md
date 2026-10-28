@@ -43,8 +43,8 @@ others). See `CREDITS.md` for the full originality statement and attribution det
 
 | File | Purpose |
 |---|---|
-| `docs/Silent Riot DSP Model Spec v2.13.md` | Original DSP design rationale — background only; superseded where it disagrees with the code (see its status banner) |
-| `docs/SilentRiot_UI_Spec.md` | GUI layout, components, colours |
+| `docs/design/dsp-model-spec-v2.13.md` | Original DSP design rationale — background only; superseded where it disagrees with the code (see its status banner) |
+| `docs/design/ui-spec.md` | GUI layout, components, colours |
 | `CREDITS.md` | Originality statement, attribution, third-party licenses |
 | `LICENSE` | GNU GPL v3.0 |
 

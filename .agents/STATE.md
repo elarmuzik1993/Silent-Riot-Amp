@@ -8,12 +8,12 @@ _Updated 2026-10-27_
   19 processor, via `tests/processor_harness.h`).
 - Commit as `Boris Miscenco <219343213+elarmuzik1993@users.noreply.github.com>` (history was
   rewritten to it 2026-10-26); the cloud env sets its own default identity, so override it.
-- DSP review `docs/review-dsp-2026-10-15.md`: B1, B4–B8, S1–S7 fixed; B2, B3 (tone-changing), S8 open.
-- Power plan `docs/superpowers/plans/2026-10-23-power-section-fixes.md`: Tasks 0–1 done
-  (`docs/handoff-power-section-fixes.md`). EL84 grids never conduct (hottest 5.91 V vs 8.6 V);
+- DSP review `docs/records/reviews/review-dsp-2026-10-15.md`: B1, B4–B8, S1–S7 fixed; B2, B3 (tone-changing), S8 open.
+- Power plan `docs/plans/2026-10-23-power-section-fixes.md`: Tasks 0–1 done
+  (`docs/records/handoffs/handoff-power-section-fixes.md`). EL84 grids never conduct (hottest 5.91 V vs 8.6 V);
   the PI charge rails from ~gain 8.
-- IR plan `docs/superpowers/plans/2026-10-26-ir-path-sound-fixes.md` done (record:
-  `docs/handoff-ir-path-sound.md`): sync IR install in `prepareToPlay`, IRs level-matched to the
+- IR plan `docs/plans/2026-10-26-ir-path-sound-fixes.md` done (record:
+  `docs/records/handoffs/handoff-ir-path-sound.md`): sync IR install in `prepareToPlay`, IRs level-matched to the
   built-in cab (`IRLevel.h`), faded cab-mode switches (`CabModeSwitcher.h`), 5 ms fade on IRs cut
   at 8192 samples. **Projects that use an IR play louder** (+5.4…+13.1 dB); release-note it.
 
@@ -35,7 +35,7 @@ _Updated 2026-10-27_
 
 ## Decisions
 - Open source + optional donations (2026-10-26): never gate features, nag, or add a trial.
-- DSP spec v2.13 is background only; code, CLAUDE.md, handoffs win. `COMPETITIVE_ROADMAP.md` is live.
+- DSP spec v2.13 is background only; code, CLAUDE.md, handoffs win. `ROADMAP.md` is live.
 - Tone-neutral fixes first, tone-changing ones together, so the amp is re-calibrated once.
 - Delay never self-oscillates; sync ceiling 2000 ms, TIME knob 20–1000 ms (owner).
 - IR restore is laxer than load: refusing a silent IR would drop it and every later slot.

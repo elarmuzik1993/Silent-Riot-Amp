@@ -14,8 +14,8 @@ impulse response of an analog-style filter, peak-normalised to 1.0:
 "4th-order" is scipy's N = 4 for `butter(..., btype="bandpass")`. Every file
 passes isValidUserIRFormat() (1 channel, 8192 = MAX_USER_IR_SAMPLES samples,
 48 kHz) and isLoadableIR() (finite, peak 1.0 >= the -80 dBFS trim threshold).
-They stand in for real cab IRs in docs/handoff-ir-path-sound.md and in the
-IR-path plan (docs/superpowers/plans/2026-10-26-ir-path-sound-fixes.md).
+They stand in for real cab IRs in docs/records/handoffs/handoff-ir-path-sound.md and in the
+IR-path plan (docs/plans/2026-10-26-ir-path-sound-fixes.md).
 
 Usage:
   python3 tools/make_ir_fixtures.py [out-dir]   # default tests/fixtures/ir

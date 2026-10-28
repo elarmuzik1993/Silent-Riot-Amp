@@ -83,7 +83,7 @@ They don't change what an IR sounds like. They need their own plan.
       `--warmup-ms 0` and prints >7 kHz energy per 10 ms window next to a CAB-off render, and a
       `--repeat N` mode that renders N times under CPU load and reports where they differ.
 - [x] Build `sr_render`. Record `signoff.py` and every `sr_irpath.py` mode in
-      `docs/handoff-ir-path-sound.md` (new). Expect the numbers in the findings table.
+      `docs/records/handoffs/handoff-ir-path-sound.md` (new). Expect the numbers in the findings table.
 - [x] Save built-in-cab renders of every sign-off point (`.f32`). Later tasks diff against them.
 
 ## Task 1: Install the active IR synchronously in `prepareToPlay`
@@ -178,7 +178,7 @@ our band metric needs exactly the same guard. Keep the check and rewrite its com
 
   Record the before and after table in the handoff doc.
 - [x] Re-check the IR-path limiter. The output tanh now sees ~11 dB more drive in IR mode, and
-      the 4× limiter oversampler (`docs/handoff-IR-limiter-aliasing.md`) was only validated at the
+      the 4× limiter oversampler (`docs/records/handoffs/handoff-IR-limiter-aliasing.md`) was only validated at the
       old, too-quiet level. Add report-only IR variants of A2 (peak ceiling), B3, D1 and D5 to
       `tools/signoff_gates.json` using `neutral.wav`, plus a spur check at P-CRANK with
       `bright.wav`. `signoff.py` must resolve `ir` paths relative to the repo root.
@@ -279,7 +279,7 @@ called from `readUserIRFromFile`, which truncates), `tests/user_ir_state_tests.c
 ## Done when
 
 - [ ] Tasks 1–4 merged one per commit, each with `verify.sh` green and a before/after table in
-      `docs/handoff-ir-path-sound.md`.
+      `docs/records/handoffs/handoff-ir-path-sound.md`.
 - [x] With every fixture, IR mode is within ±1.5 dB of the built-in cab and within ±0.3 dB across
       44.1/48/96 kHz. IR renders are repeatable. No mode switch clicks or plays un-cabbed.
 - [x] Every built-in-cab sign-off gate is bit-identical to Task 0. The new IR-variant gates are

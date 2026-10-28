@@ -6,7 +6,7 @@ sr_analyze.py — Silent Riot tone-sign-off analyzer.
 
 Reads a raw float32 render produced by `sr_render` (an interleaved `.f32` file
 plus a `.json` sidecar describing sample rate / channels / frames) and computes
-the objective metrics defined in docs/Tone_SignOff_Protocol.md §4:
+the objective metrics defined in docs/dev/tone-signoff.md §4:
 
     level    : peak dBFS, RMS dBFS, integrated loudness (LUFS, ITU-R BS.1770)
     thd      : THD %, per-harmonic dBc table, H2/H3 balance      (needs --f0)

@@ -7,7 +7,7 @@
 **Dev OS**: Ubuntu 24.x (build with CMake + clangd)  
 **Version**: 1.0.0  
 **Date**: 2026-03-07  
-**Reference file**: `SilentRiot_Final.jsx` (interactive React prototype)
+**Reference file**: `ui-prototype.jsx` (interactive React prototype)
 
 ---
 
@@ -928,4 +928,4 @@ void timerCallback() override {
 
 ---
 
-*End of specification. Reference `SilentRiot_Final.jsx` for pixel-accurate interactive prototype.*
+*End of specification. Reference `ui-prototype.jsx` for pixel-accurate interactive prototype.*

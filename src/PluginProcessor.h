@@ -157,7 +157,7 @@ private:
     // Oversamples just the IR-path output limiter (tanh) so its harmonics
     // don't alias back into the band — the IIR path's limiter already runs
     // inside the main oversampled loop and doesn't need this (see
-    // docs/handoff-IR-limiter-aliasing.md). Fixed 4x, independent of the
+    // docs/records/handoffs/handoff-IR-limiter-aliasing.md). Fixed 4x, independent of the
     // main engine's switchable oversample factor.
     std::unique_ptr<juce::dsp::Oversampling<float>> limiterOversampler;
 

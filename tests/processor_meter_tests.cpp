@@ -15,7 +15,7 @@
 // conduction threshold at every corner measured (sines, a band-limited square,
 // a six-note chord) — hottest 5.91 V, a 3.3 dB margin (gain 10, volume 10,
 // +12 dB INPUT, BOOST LEVEL and BRIGHT max, SHAPE 10, 1.6 kHz square at 0.5
-// peak; docs/handoff-power-section-fixes.md, "Grid conduction corners"). So
+// peak; docs/records/handoffs/handoff-power-section-fixes.md, "Grid conduction corners"). So
 // the gridCurrentMA == 0 checks below are smoke checks: GRID I reads 0 anyway.
 // ═══════════════════════════════════════════════════════════════
 #include <catch2/catch_test_macros.hpp>
