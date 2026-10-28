@@ -17,6 +17,11 @@ public:
 
     void setPowered(bool on);
 
+    // A faceted jewel pilot lamp of lens radius r centred on c. brightness
+    // runs 0 (off: dark tinted glass) to 1 (lit, with bloom onto the panel).
+    static void paintLamp(juce::Graphics&, juce::Point<float> c, float r,
+                          juce::Colour colour, float brightness);
+
     // Width the right end reserves for the lamp.
     static constexpr int sideW = 104;
 
