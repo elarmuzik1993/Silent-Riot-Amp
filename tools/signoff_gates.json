@@ -1,5 +1,5 @@
 {
-  "_comment": "Tone sign-off gates + test matrix (docs/Tone_SignOff_Protocol.md §3-4). Targets marked TBM are ratified by the Calibration Pass (§5) against the real processBlock, then frozen. op: '<=','>=','band'[lo,hi],'==' with tol. 'null' target = report-only until calibrated.",
+  "_comment": "Tone sign-off gates + test matrix (docs/dev/tone-signoff.md §3-4). Targets marked TBM are ratified by the Calibration Pass (§5) against the real processBlock, then frozen. op: '<=','>=','band'[lo,hi],'==' with tol. 'null' target = report-only until calibrated.",
   "input_rms_dbfs": -18.0,
 
   "_points_comment": "Knob positions rescaled by 1/GAIN_KNOB_HEADROOM (1/0.8 = 1.25) when the gain knob's full sweep was remapped onto the lower 80% of the drive curve. These gates test clean/edge/crank OPERATING POINTS, so when the knob->drive mapping changes by design the knob positions must follow, or the gates silently start measuring something else. P-CRANK is now the top of the knob (1.00) — which delivers what 0.80 used to.",

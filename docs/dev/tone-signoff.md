@@ -1,6 +1,6 @@
 # Silent Riot — Tone Sign-Off Protocol (Phase A)
 
-_Created: 2026-06-24 · Branch: `feature/competitive-1.0-fixes` · Expands `COMPETITIVE_ROADMAP.md` Phase A_
+_Created: 2026-06-24 · Branch: `feature/competitive-1.0-fixes` · Expands `ROADMAP.md` Phase A_
 
 This is the concrete, reproducible procedure that decides **when the tone is frozen**.
 It exists so "ear-tuning is done" stops being a feeling and becomes a **signed measurement

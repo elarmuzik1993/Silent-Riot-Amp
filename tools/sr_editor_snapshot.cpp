@@ -1,0 +1,98 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Boris Miscenco
+// ── Offline editor screenshot (tools/README.md) ─────────────────────────────
+// Renders the full plugin editor to a PNG for the user manual
+// (docs/manual/, resources/images/). Built only when -DSR_BUILD_TOOLS=ON.
+//
+//   sr_editor_snapshot <out.png> [fx] [ir] [adv] [scale=<0..n>]
+//
+// The flags open the matching panels (EFFECTS, IR LOADER, ADVANCED). With
+// the CAB toggle on (the default) the editor opens the IR LOADER itself. Panel states go through the same apvts.state
+// properties the editor restores from, so the panels snap open with no
+// animation. Paints offscreen via paintEntireComponent; on Linux the editor
+// still opens an X11 connection, so run it under Xvfb (xvfb-run) when
+// there is no display.
+
+#include "PluginProcessor.h"
+#include "PluginEditor.h"
+
+#include <juce_gui_basics/juce_gui_basics.h>
+
+#include <memory>
+
+int main(int argc, char** argv)
+{
+    juce::ScopedJuceInitialiser_GUI juceInit;
+
+    const juce::String outPath = (argc > 1) ? argv[1] : "sr_editor.png";
+
+    auto proc = std::make_unique<SilentRiotProcessor>();
+    proc->setRateAndBufferSizeDetails(48000.0, 512);
+    proc->prepareToPlay(48000.0, 512);
+    {
+        // One block of silence publishes the readouts the footer and the
+        // ADVANCED panel show (oversample factor, supply rails).
+        juce::AudioBuffer<float> buffer(2, 512);
+        buffer.clear();
+        juce::MidiBuffer midi;
+        proc->processBlock(buffer, midi);
+    }
+
+    auto& state = proc->apvts.state;
+    state.setProperty("fxPanelOpen",  false, nullptr);
+    state.setProperty("irPanelOpen",  false, nullptr);
+    state.setProperty("advPanelOpen", false, nullptr);
+    state.setProperty("tooltips",     false, nullptr);
+
+    for (int i = 2; i < argc; ++i)
+    {
+        const juce::String arg(argv[i]);
+        if (arg == "fx")  state.setProperty("fxPanelOpen",  true, nullptr);
+        if (arg == "ir")  state.setProperty("irPanelOpen",  true, nullptr);
+        if (arg == "adv") state.setProperty("advPanelOpen", true, nullptr);
+        if (arg.startsWith("scale="))
+            state.setProperty("uiScale", arg.fromFirstOccurrenceOf("=", false, false).getIntValue(), nullptr);
+    }
+
+    std::unique_ptr<juce::AudioProcessorEditor> editor(proc->createEditor());
+
+    // The "Made with JUCE" splash is a transient overlay that fades out a few
+    // seconds after the editor opens; a manual screenshot shows the editor
+    // the player looks at, so leave it out of the picture.
+    for (auto* child : editor->getChildren())
+        if (dynamic_cast<juce::JUCESplashScreen*>(child) != nullptr)
+            child->setVisible(false);
+
+    // Toggle thumbs, meters and panel heights animate on the editor's timers
+    // from their initial values (the CAB toggle opens the IR LOADER as it
+    // syncs, as it does in a host); run the message loop until they come to
+    // rest, then size the picture to the window the editor settled on.
+    juce::MessageManager::getInstance()->runDispatchLoopUntil(1500);
+    const int W = editor->getWidth();
+    const int H = editor->getHeight();
+
+    juce::Image image(juce::Image::ARGB, W, H, true);
+    {
+        juce::Graphics g(image);
+        editor->paintEntireComponent(g, false);
+    }
+
+    editor.reset();
+    proc->releaseResources();
+
+    juce::File out(juce::File::getCurrentWorkingDirectory().getChildFile(outPath));
+    out.deleteFile();
+    juce::FileOutputStream stream(out);
+    if (stream.openedOk())
+    {
+        juce::PNGImageFormat png;
+        png.writeImageToStream(image, stream);
+        stream.flush();
+        juce::Logger::writeToLog("Wrote " + out.getFullPathName()
+                                 + " (" + juce::String(W) + "x" + juce::String(H) + ")");
+        return 0;
+    }
+
+    juce::Logger::writeToLog("Failed to open output: " + out.getFullPathName());
+    return 1;
+}

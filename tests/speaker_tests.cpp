@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Boris Miscenco
 // ═══════════════════════════════════════════════════════════════
 // Speaker Coupling Tests — Spec Section 3.9
 //

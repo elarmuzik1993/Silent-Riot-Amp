@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Boris Miscenco
 // ═══════════════════════════════════════════════════════════════
 // PSU & Sag Tests — Spec Sections 3.8, 3.11
 //

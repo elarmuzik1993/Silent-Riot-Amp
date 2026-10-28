@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 Boris Miscenco
 # The one verification command for this repo. Same checks locally, in CI and in cloud sessions.
 #
 #   bash scripts/verify.sh           full run: static checks + the CI `test` job
@@ -31,15 +33,18 @@ done
 # 2. sr_render's source list is a hand-copy of the plugin's (tools/README.md:
 #    "if you add a plugin .cpp to the root CMakeLists.txt, add it here too or
 #    the link fails"). Both lists are read from the files on every run.
-render_srcs=$(sed -n '/^target_sources(sr_render/,/^)/p' tools/CMakeLists.txt \
-              | grep -oE 'src/[A-Za-z0-9_/]+\.cpp' | sort -u)
-if [ -z "$render_srcs" ]; then
-    bad "could not find sr_render's source list in tools/CMakeLists.txt"
-else
+# sr_editor_snapshot links the same full plugin list, so it is held to it too.
+for tool in sr_render sr_editor_snapshot; do
+    tool_srcs=$(sed -n "/^target_sources(${tool} /,/^)/p" tools/CMakeLists.txt \
+                | grep -oE 'src/[A-Za-z0-9_/]+\.cpp' | sort -u)
+    if [ -z "$tool_srcs" ]; then
+        bad "could not find ${tool}'s source list in tools/CMakeLists.txt"
+        continue
+    fi
     for f in $plugin_srcs; do
-        grep -qx "$f" <<<"$render_srcs" || bad "$f is in CMakeLists.txt but missing from sr_render in tools/CMakeLists.txt"
+        grep -qx "$f" <<<"$tool_srcs" || bad "$f is in CMakeLists.txt but missing from ${tool} in tools/CMakeLists.txt"
     done
-fi
+done
 
 # 3. Shell scripts parse.
 for f in scripts/*.sh .agents/*.sh; do
@@ -51,6 +56,23 @@ done
 if command -v python3 >/dev/null; then
     python3 -c 'import json,sys; json.load(open(sys.argv[1]))' tools/signoff_gates.json 2>/dev/null \
         || bad "tools/signoff_gates.json is not valid JSON"
+fi
+
+# 5. Every hand-written source file carries its licence tag (CREDITS.md,
+#    GPL-3.0-or-later) in its first 3 lines, after any shebang.
+while IFS= read -r f; do
+    head -n 3 "$f" | grep -q 'SPDX-License-Identifier: GPL-3.0-or-later' \
+        || bad "$f has no 'SPDX-License-Identifier: GPL-3.0-or-later' in its first 3 lines"
+done < <(git ls-files 'src/*.h' 'src/*.cpp' 'tests/*.h' 'tests/*.cpp' 'tools/*.cpp' 'tools/*.py' \
+                      'scripts/*.sh' 'scripts/*.py' 'docs/*.cpp' '.agents/*.sh')
+
+# 6. Every repo path the docs and code comments name exists: Markdown links and
+#    backticked paths in *.md, docs/... mentions in src/, tests/, tools/.
+#    Known non-file mentions: scripts/linkcheck-allow.txt.
+if command -v python3 >/dev/null; then
+    while IFS= read -r line; do
+        bad "$line"
+    done < <(python3 scripts/check_links.py)
 fi
 
 say "static checks: $([ $fail -eq 0 ] && echo pass || echo FAIL)"

@@ -1,204 +1,216 @@
-# Silent Riot — Engineering Roadmap
+# Silent Riot — Competitive Roadmap (to an open-source 1.0)
 
-> **Archived (2026-10-23). Do not plan from this file.** It is the June 2026 engineering audit;
-> its P0–P4 work is merged and several of its findings are no longer true (the `docs/` files
-> exist, the test count is 308, the X11 shape-mask window strategy it audits is gone).
-> The live plan is **`COMPETITIVE_ROADMAP.md`**, and current status is in `.agents/STATE.md`.
-> Open items here that the competitive roadmap already carries: stock-IR browser, real cabinet
-> IRs, ear-tuning, golden render lock, signing, neural model. Small leftovers it does not:
-> GUI layout magic numbers (`PluginEditor.cpp`), `.clang-format`/`.clang-tidy`, dead-code sweep.
+_Created: 2026-06-24 · Version at planning: v0.3.4 · Branch: `claude/plugin-audit-rating-ngbq53`_
 
-_Audit date: 2026-06-16 · Version at audit: v0.3.4 · Branch: `claude/plugin-audit-roadmap-0f43q6`_
+_Checkboxes last checked against the code: 2026-10-23. `[~]` = partial. This is the live
+plan; `docs/records/roadmap-2026-06-audit.md` is archived._
 
-This roadmap is the output of a full read-only audit of the codebase (DSP core, GUI,
-build/test/CI). It captures the gap between what the project _claims_ (CLAUDE.md /
-README) and what the code _does_, then sequences the work to get to a shippable 1.0.
+This roadmap takes the project from "excellent engine, unfinished product" (audit
+rating **7.5/10**) to a **competitive 1.0**. It is scoped to three deliberate decisions:
 
-Findings are tagged **[H]/[M]/[L]** (High/Medium/Low) and reference `file:line`.
+- **Business model:** Free and open source (GPLv3), funded by optional support
+  (pay-what-you-want / sponsorship). _Changed 2026-10-26 from "Commercial / paid": there
+  is no audience to sell to yet, and GPLv3 (the project's license, and JUCE's free
+  license) lets anyone rebuild and redistribute the source, so a license gate could not
+  hold anyway. Phase C was rewritten accordingly._
+- **Differentiation bet:** _Perfect one amp + real cabs_ — depth over breadth, the
+  boutique route. The product is the **feel and tone of a single EL84 voicing**, not a
+  feature checklist.
+- **Platform priority:** Polish **Windows + Linux** first. macOS / AU / AAX explicitly
+  deferred.
 
----
-
-## Executive summary
-
-The DSP engine is mature and well-tested (190 tests, CI green on `main`). The biggest
-risks are **not** in the audio math — they are in:
-
-1. **Missing source-of-truth docs.** `docs/` (DSP spec v2.13, UI spec, JSX prototype)
-   and `CREDITS.md` are referenced everywhere in CLAUDE.md/README but **do not exist in
-   the repo**. The "authoritative source for all signal-chain math" is absent.
-2. **A real-time correctness gap.** `prepareToPlay` never resets DSP state; `reset()`
-   methods exist but are dead code.
-3. **Cross-thread data races** on the GUI telemetry path and `cachedIRIndex`.
-4. **UI features that are wired to nothing** — the entire Settings panel (theme, meter
-   ballistics, knob mode, peak-hold, tooltips) saves/restores state but no code consumes
-   it; stock IRs are not browsable; "TEMP ~420°C" is a fabricated readout.
-5. **No release engineering** — no pluginval, no sanitizers, no packaging/signing, no
-   macOS build, VST3 + Standalone only.
-
-Recommended sequencing: **P0 correctness → P1 docs/spec → P2 finish-the-UI →
-P3 release engineering → P4 reach/polish.**
+> Companion to `docs/records/roadmap-2026-06-audit.md` (the engineering-to-1.0 audit). That doc closed the
+> correctness/CI/release-eng gaps (P0–P4, all merged). This doc is about turning the
+> finished engine into a **product people want to use — and choose to support**.
 
 ---
 
-## P0 — Correctness & safety (do first; these are latent bugs) — ✅ DONE
+## Positioning — what "competitive" means here
 
-- [x] **[H] Reset DSP state in `prepareToPlay`.** Added `reset()` to the structs that
-  lacked one (`PowerSupplyModel`, `SagEnvelope`, `GridConductionModel`, `TriodeState`,
-  `LTPModel`) and a `SilentRiotProcessor::resetDSPState()` helper that clears all filter
-  state, integrators, cached plate voltages, and grid charge; called at the end of
-  `prepareToPlay`. Regression tests added for PSU/Sag reset.
-- [x] **[H] Fix the `getDSPReadout()` data race.** PSU/sag/bias/osFactor are now published
-  once per block as `std::atomic` snapshots from the audio thread (`*ForGUI` members);
-  `getDSPReadout()` reads only those atomics — no torn reads of live DSP state.
-- [x] **[M] Make `cachedIRIndex` atomic.** Now `std::atomic<int>` shared between the
-  message and audio threads.
-- [x] **[M] Fix/document the stock-IR load path.** `handleAsyncUpdate` now falls back to
-  IIR mode for any out-of-range index (no more stale-IR state), and the user-IR-only
-  index mapping is documented inline (stock-IR wiring deferred to the "ship real IRs"
-  item).
-- [x] **[M] Clamp/guard the OT saturation integrator.** Added a `std::isfinite` reset +
-  hard clamp to `OT_SAT_FLUX_MAX` on the flux integrator, with a regression test for a
-  sustained-DC blow-up. (`OTSaturation.h`)
-- [x] **[L] Add a final NaN/Inf guard** on both output paths (per-sample IIR path and
-  post-convolution IR path).
+The bar is the boutique single-amp tier (think STL, Mercuriall, ML Sound Lab single amps;
+the tier _below_ Neural DSP) — being free does not lower it. It is won on three things,
+in order:
 
-## P1 — Restore the source-of-truth documentation
+1. **Feel under the fingers** — dynamics, sag, pick response. This engine already models
+   the physics (PSU droop, cathode sag, grid conduction, LTP). The job is to _finalize
+   and prove_ it, not build it.
+2. **Cabs that sound like real speakers** — currently the single biggest gap (all stock
+   IRs are synthetic placeholders).
+3. **Trust to install it** — easy installers, clear releases, presets that sell the sound
+   in 10 seconds, and an obvious way to support the project.
 
-- [x] **[H] Recover the missing `docs/`.** Root cause found: commit `cad9dff`
-  ("Add project agent instructions") accidentally deleted them alongside removing the
-  Obsidian-vault startup note. Recovered byte-for-byte from `cad9dff^`:
-  `docs/Silent Riot DSP Model Spec v2.13.md` (the authoritative signal-chain math),
-  `docs/SilentRiot_UI_Spec.md`, and `docs/SilentRiot_Final.jsx`.
-- [x] **[H] Restore `CREDITS.md`.** Recovered from `cad9dff^` (originality statement +
-  third-party license attribution; referenced by README.md and CLAUDE.md).
-- [x] **[M] Reconcile CLAUDE.md against the code.** Fixed the stale claims: the
-  speaker-coupling pitfall now describes the complementary OnePole 3-way crossover (not
-  `makeBandPass`); README's "Vox-style cut" → the 3-band Shape EQ (and "Tone" control →
-  "Shape"); CLAUDE.md's IRLoaderPanel "Category tabs" note now flags it as not-yet-built.
-
-## P2 — Finish the half-built UI — mostly ✅
-
-- [x] **[H] Wire up the Settings panel.** All controls now consume their state and
-  persist via the ValueTree:
-  - Theme **DARK/LIGHT** — `ColourPalette.h` converted to runtime-swappable palette
-    globals + `setTheme()`; editor applies it and repaints. (Light values are sensible
-    but not yet visually fine-tuned — flagged below.)
-  - Meter ballistics FAST/MED/SLOW — `VUMeter::setBallistics()` sets the smoothing factor.
-  - Knob mode LINEAR/ROTARY — `NotchKnob::setKnobMode()` switches slider drag style.
-  - Peak hold — `VUMeter::setPeakHold()` + held-peak segment marker.
-  - Tooltips — editor owns a `TooltipWindow` gated by the toggle; controls have tooltip
-    text. `ToggleSwitch` is now a `SettableTooltipClient`.
-- [x] **[M] Restore PresetSelector display from the parameter on editor open.**
-- [x] **[M] Remove the fabricated "TEMP ~420°C" readout** (dropped the `tempC` field +
-  Engine-state row).
-- [x] **[L] Fix the dead dashed-border in IRLoaderPanel** (distinct source/dest paths).
-- [x] **[L] Fix stale version string** — Settings "About" now uses `JucePlugin_VersionString`
-  and shows a clean Product/Version/Format/Developer grid.
-- [ ] **[M] Surface stock IRs in the IR loader.** Still user-IR-only; the 8 stock IRs
-  aren't browsable, and "Category tabs" (ALL/STOCK/ORANGE/3RD PARTY/USER per UI spec
-  §5.7) aren't implemented. **Deferred** — tied to the parked "ship real cabinet IRs"
-  item (stock IRs are synthetic placeholders today).
-- [x] **[M] Keyboard & accessibility coverage** (main interactive surface). All the
-  previously click-only widgets are now keyboard-operable, focus-ringed, and expose an
-  `AccessibilityHandler` with the right role: PresetSelector (←/→, comboBox),
-  SectionBars (Space/Return, button), the gear (new focusable `GearButton`, button),
-  ToggleSwitch (Space/Return, toggleButton with checked state), SegmentedSelector (←/→,
-  comboBox). Fixed a latent bug — tab order was set on the **hidden** toggle buttons, so
-  the 7W/CAB/PWR switches weren't actually keyboard-reachable; the `ToggleSwitch` is now
-  the focusable element. Explicit tab order: preset → gain → shape → volume → 7W → CAB →
-  PWR → IR → ADV. _Remaining (deferred):_ IRLoaderPanel's user-IR **list/drop-zone**
-  keyboard navigation and the Settings **close-X** (closable via the gear) are still
-  pointer-only.
-- [x] **[M] _(newly surfaced)_ Presets now recall values.** Added a factory-preset table
-  (`sr::Presets::table`, single source of truth — `PresetSelector` reads its names from
-  it) and `SilentRiotProcessor::applyPreset()`, which sets GAIN/SHAPE/VOLUME/7W/CAB +
-  PRESET_IDX. Applied on explicit selection only (not on state restore, so user tweaks
-  saved over a preset survive). The 5 presets have starter values — worth ear-tuning.
-
-## P3 — Release engineering (gate for any public 1.0)
-
-- [x] **[H] Add a `pluginval` CI job.** _(PR #4)_ Validates the shipped Linux VST3
-  (strictness 8, in-process, under Xvfb) — the standard JUCE release gate for state
-  save/restore, parameter automation, threading, and fuzzing.
-- [x] **[H] Add ASan/UBSan CI job** for the test target. _(PR #4)_ Builds the test targets
-  with `-fsanitize=address,undefined -fno-sanitize-recover=all` and runs ctest.
-  invariant. Would catch the data races above under TSan.
-- [~] **[H] Packaging & signing pipeline.** _(PR #4, partial)_ Git-tag-driven release
-  automation added (`release.yml`): builds Release on Linux + Windows, packages versioned
-  archives with SHA256 sums, publishes a GitHub Release on `v*` tags. **Still open:**
-  OS installers (`.pkg`/NSIS/`.deb`), Windows Authenticode, macOS notarization — all need
-  maintainer-provided certs/secrets (placeholder slots are in the workflow).
-- [x] **[M] Run tests on Windows** (was Linux-only) and **run CI on `develop` PRs**.
-  _(PR #4)_ Added a `windows-latest` test job; `pull_request` now triggers on `main` and
-  `develop`.
-- [x] **[M] Add FetchContent/build caching.** _(PR #4)_ ccache on every compile job + a
-  persistent `FETCHCONTENT_BASE_DIR` cache so JUCE/Catch2 aren't re-cloned each run.
-- [x] **[M] Validate the Release artifact, not a separate Debug build.** _(PR #4)_ The
-  test job now configures Release; pluginval runs on the actual built VST3; the Standalone
-  is uploaded; all uploads use `if-no-files-found: error`.
-- [x] **[M] Fix `install-deps.sh` ↔ CI drift** — local script omitted `libxext-dev`,
-  which `CMakeLists.txt:159` hard-requires (`X11::Xext`); added so a clean local build
-  matches CI. _(Done alongside P0 — it blocked the local verification build.)_
-- [x] **[L] Harden CI** _(PR #4)_: Windows "Verify VST3" step now locates MSVC via
-  `vswhere` (no hardcoded VS edition path); added `timeout-minutes` on every job, a
-  `concurrency` group with cancel-in-progress, and deduped the apt list into a composite
-  action (`.github/actions/setup-linux-deps`).
-
-## P4 — Reach, quality bar & tech-debt cleanup
-
-- [x] **[M] Decide macOS / AU / LV2 scope.** **Decision (2026-06-19): stay VST3 +
-  Standalone for now; macOS / AU / LV2 deferred.** macOS VST3 + AU need a macOS CI runner
-  and Apple signing/notarization tooling; revisit once those are available.
-- [~] **[M] Audit the Linux X11 Shape-Extension window strategy for the plugin case.**
-  _(partial)_ The per-call `XOpenDisplay(nullptr)`/`XCloseDisplay` churn (it ran every
-  animation frame in `applyShapeMask`, plus `setWindowBackground` and the compositor
-  bypass) is now a single connection opened lazily and cached for the editor's lifetime,
-  closed in the destructor. **Still open:** reusing the host peer's *own* display for the
-  embedded-VST3 case needs JUCE internals (`XWindowSystem`) — deferred as higher-risk.
-- [~] **[M] Centralize layout & DSP magic numbers.** **DSP side done** _(PR #5)_: cab IIR
-  coefficients, sag-clamp, OT LP Q, and grid-charge taus are now named constants in
-  `Constants.h`. **Settings-panel contradiction fixed:** the dead/wrong `maxH=600` is gone;
-  `SettingsPanel::panelW/panelH` (340×420) are now public and the editor positions the
-  panel from them instead of hardcoded literals. **Still open:** the broader GUI
-  paint()/resized() positional ladders (`PluginEditor.cpp:428-479`) — a larger refactor
-  best done with visual verification.
-- [x] **[M] Extract the duplicated coefficient-recalc block** _(PR #5)_ → single
-  `SilentRiotProcessor::recalcRateDependentCoeffs()` shared by `prepareToPlay` and the
-  oversample-switch commit path.
-- [~] **[M] Add a golden-file / null-test** regression for rendered output. _(PR #5,
-  partial)_ Added `tests/regression_tests.cpp`: a chain-render guard asserting finite +
-  limiter-bounded + deterministic + stable-under-drive (the less-brittle alternative to a
-  strict golden file, which would fight the ongoing ear-tuning). **Still open:** a true
-  null/golden against the real `processBlock` (needs a plugin-host test target). _Note:_
-  the reconstructed chain shows a small idle DC + slow limit-cycle at max gain — likely a
-  harness artifact (omits PSU/sag, comp=1.5); worth a check against real `processBlock`.
-- [x] **[M] Unit-test `OversampleSwitcher` and `ParamSmoother`** _(PR #5)_ — +6 / +5
-  cases covering the deferred crossfade state machine + fade envelope and the one-pole
-  smoother's convergence/time-constant behaviour.
-- [~] **[L] Add `.clang-format`, `.clang-tidy`, `.editorconfig`** _(PR #5, partial)_ —
-  config files added, tuned to the existing hand-aligned style. **Still open:** the CI
-  lint/format check + a baseline reformat decision (the codebase uses manual column
-  alignment, so a blanket reformat would be invasive — needs maintainer buy-in).
-- [~] **[L] Remove dead constants/code** _(PR #5, partial)_ — removed the 8 referenced
-  nowhere: `V_THERMAL`, `R_470`, `R_820`, `EL84_GAIN_BASE`, `TRIODE_BIAS_N`, `SPK_RE_N`,
-  `SPK_FS`, `segSpanDeg`. **Kept** `R_1K5/R_68K/R_500K/R_1M`: still exercised by the
-  VoltageScale resistance-reference-table tests, so removing them means deleting passing
-  spec-characterization tests — left for a separate call.
-
-## Parked — explicit "later" items (tracked, not scheduled)
-
-- [ ] **Finalize ear-tuning** of `outputGainCompensation` (1.0), `V1B_RSOURCE_MAX_REAL`
-  (150KΩ), `XCUR_SENSITIVITY` (2.0), Shape EQ gain ranges, and dynamics feel —
-  per CLAUDE.md "Next" step. **Blocks the neural model.**
-- [ ] **Ship real cabinet IRs.** All 8 stock IRs are synthetic placeholders
-  (`IRLibrary.h` `generateSyntheticIR`, "until real WAVs arrive").
-- [ ] **Neural model.** On hold until the DSP target is frozen (retraining churn).
+Everything below serves those three. Anything that doesn't is deferred.
 
 ---
 
-### Status snapshot at audit
+## Phase A — Freeze the tone _(this IS the product)_ — **do first**
 
-- **Tests:** 190 total (177 pure C++ + 13 JUCE) — count verified accurate; ~18 of the
-  177 are diagnostic/trace rather than assertion-based.
-- **CI:** green on `main`; Linux + Windows build, tests Linux-only/Debug-only.
-- **No open issues / no open PRs** on the repo at audit time.
+The differentiation bet is "perfect one amp." Until the tone is frozen, nothing
+downstream (cabs, presets, marketing demos, the parked neural model) can be finalized —
+they all train/tune against a moving target.
+
+- [x] **[H] Define a tone sign-off protocol.** _(done: `docs/dev/tone-signoff.md` +
+  `tools/signoff.py` / `signoff_gates.json`. The gates still fail on A1/B1/E1/E3; see
+  `.agents/STATE.md`.)_ Pick reference material (DI clips at
+  clean / edge-of-breakup / crank; a real AC30/Orange reference or target artist clips).
+  Standardize gain-staging and A/B method. Without a written target, "ear-tuning" never
+  terminates.
+- [ ] **[H] Finalize the parked tuning constants** against that protocol and freeze them:
+  `outputGainCompensation` (1.0), `V1B_RSOURCE_MAX_REAL` (150KΩ), `XCUR_SENSITIVITY`
+  (2.0), the Shape EQ gain ranges, and the dynamics feel (sag clamp, grid charge).
+  _(CLAUDE.md "Next" + ROADMAP Parked.)_
+- [x] **[H] Fix the two known DSP defects that affect the sound** _(done: IR-path limiter
+  now runs 4× oversampled, `508c842`; `LTPModel::reset()` restores `vCathode`, `093fddf`)_:
+  - **IR-path limiter aliasing** (PR #7/#9): the output `tanh` runs at base SR in the IR
+    convolution path (`PluginProcessor.cpp:398-414`) but oversampled in the IIR path —
+    folds harmonics back to **-28 dBc** under drive through a bright IR. Fix: surgically
+    oversample just the IR-path limiter. **This directly degrades the cab tone**, so it
+    must land before cabs are finalized.
+  - **LTP `reset()` stale `vCathode`** (PR #8): a sample-rate change mid-playback leaves
+    the phase-inverter solver half-reset. Real-time correctness bug; merge the fix.
+- [~] **[H] Lock the tone with a golden/null regression** _(partial: `sr_render` now drives
+  the real `processBlock` and `tests/regression_tests.cpp` checks invariants, but no golden
+  renders are committed and no CI job compares against them; see `tools/README.md`
+  "How this becomes the golden lock")_ — the one open item from
+  ROADMAP P4. Build a true render test against the real `processBlock` (needs a small
+  plugin-host test target) so that **once frozen, the tone cannot silently drift** with
+  later refactors. This is the safety net that makes "frozen" mean something.
+- [ ] **[M] Document the frozen voicing** in a handoff doc + `CLAUDE.md` (final constants +
+  the reference clips that signed it off) so it's reproducible. _(Not in the DSP spec: that
+  is background-only since 2026-10-23.)_
+
+**Exit criteria:** tone constants frozen and documented; both DSP defects fixed; a golden
+test guards the rendered output; you can A/B against your reference and sign off.
+
+---
+
+## Phase B — Real cabinets _(the other half of the tone)_
+
+All 8 stock IRs are synthetic placeholders (`IRLibrary.h::generateSyntheticIR`). For a
+boutique amp sim the cab is half the sound — this is the highest-impact _product_ gap.
+
+- [ ] **[H] Source real cabinet IRs.** Two paths — pick one:
+  - **License** an IR pack with redistribution rights (fastest; verify the license
+    explicitly permits bundling in a GPLv3 project's public repo and releases —
+    CC0 / CC-BY packs are the safe fit).
+  - **Capture your own** (real cab + mics) — slower, but becomes a genuine
+    differentiator and avoids licensing ambiguity. On-brand for the boutique bet.
+  - Curate **quality over quantity** — ~6–10 great cab/mic/position combos beats 100
+    mediocre ones, and matches the depth-over-breadth strategy.
+- [ ] **[H] Wire the stock-IR browser** (ROADMAP P2, deferred). Today the loader is
+  user-IR-only; the stock table isn't reachable from `IR_INDEX` and the category tabs
+  (ALL/STOCK/USER, UI spec §5.7) aren't built. Make the bundled cabs browsable and set a
+  real cab as the factory default.
+- [ ] **[M] IR UX polish** — level-match IRs so switching doesn't jump in loudness; show
+  mic/position labels; keep the waveform display.
+- [ ] **[M] Re-validate the IR path** under the Phase-A aliasing fix with the real IRs
+  (bright real cabs are exactly what exposed the aliasing).
+
+**Exit criteria:** N real, redistributable/owned cabs ship and are browsable; factory default
+uses one; no level jumps; IR path is clean under drive.
+
+---
+
+## Phase C — Release readiness _(people can install it and support it)_
+
+Free does not mean "devs only" — players expect an installer. Keep it lean.
+
+- [ ] **[H] Installers.** Windows: NSIS or Inno Setup placing the VST3 in the standard
+  dir + Standalone. Linux: `.deb` + the existing tarball. Currently the release pipeline
+  ships raw archives only — fine for devs, not for players.
+- [ ] **[M] Code signing.** Windows **Authenticode** cert (placeholder slots already exist
+  in `release.yml`). Unsigned plugins trip SmartScreen and some hosts' security prompts.
+  Optional for a free release — weigh the cert's cost against support donations. Linux:
+  ship SHA256 sums (done) + clear install instructions.
+- [ ] **[H] Support channel.** `.github/FUNDING.yml` (GitHub Sponsors and/or Ko-fi), a
+  "Support the project" section in the README, and a support link in Settings → About
+  (which now reads "Free & open source — GPLv3"). Donations are optional: never gate
+  features, nag, or add a trial.
+- [x] **[M] Open-source basics.** _(done 2026-10-28: `docs/plans/2026-10-28-open-source-docs-prep.md`.)_ `CONTRIBUTING.md`, issue templates, version/changelog
+  discipline, and GitHub Releases as the update channel. Keep the GPLv3 obligations
+  straight: every binary release links its exact source tag.
+
+**Exit criteria:** installers for Win/Linux on GitHub Releases; a working support link in
+the README, repo and About panel; a contributor can build from the README alone.
+
+---
+
+## Phase D — Product polish & feel
+
+The finishing layer that separates "works" from "feels premium."
+
+- [ ] **[H] Curated factory presets** built on the _frozen_ tone + real cabs. Today's 5
+  presets are "starter values" (ROADMAP P2). For a boutique amp, presets are the
+  first impression — they demo the sound instantly. Name them by use-case/feel.
+- [x] **[M] Front-of-amp essentials** (kept minimal, per depth-over-breadth):
+  - [x] **Noise gate** _(done: `NoiseGate.h`, UTILITY card)_ — near-essential for high-gain guitar; its absence is conspicuous.
+  - [x] **Boost / tight EQ** _(done: `Boost.h`, level/tight/bright)_ in front — very on-brand for an EL84 amp (everyone runs a
+    Tubescreamer into a Vox/Orange). High value, low scope. _Optional but recommended._
+- [ ] **[M] GUI finish.** Fine-tune the light theme (functional but not polished),
+  complete the deferred keyboard/accessibility coverage (IRLoaderPanel list/drop-zone,
+  Settings close-X), and clean up the remaining layout magic-number ladders
+  (`PluginEditor.cpp` paint/resized).
+- [x] **[M] Global output trim + clear metering** so users can level-match the plugin in
+  a mix (done, USE-59) — INPUT (±12dB) and OUTPUT (silence..+12dB) gain-staging trims in
+  the UTILITY card; input/output level meters read post-trim.
+
+**Exit criteria:** presets that sell the sound; a gate (and ideally a boost); a GUI with
+no rough edges; level-matchable output.
+
+---
+
+## Phase E — Launch & growth
+
+- [ ] **[H] Demo assets.** Audio demos (raw DI + processed, multiple genres), a short
+  video walkthrough, clean screenshots, a product page. For an amp sim, _the audio demo
+  is the pitch_.
+- [ ] **[M] Closed beta.** Get it into the hands of a handful of guitarists for real
+  tone/feel feedback before a public 1.0 — the cheapest insurance against shipping a voicing
+  only you like.
+- [ ] **[M] Manual + support.** A short user manual, a changelog, and an update
+  mechanism. Boutique buyers expect responsiveness.
+- [ ] **[L] Post-launch backlog** (only after 1.0 finds players): revisit the parked **neural
+  capture** (now trainable against the frozen DSP), then **AU/macOS** if Mac demand
+  shows up. These are growth bets, not launch blockers.
+
+---
+
+## Explicitly out of scope for 1.0
+
+Deferred by the chosen strategy — tracked so they don't creep into the launch:
+
+- **macOS / AU / AAX** — biggest reach-per-effort _later_, but needs a macOS CI runner +
+  Apple notarization (and an Avid agreement for AAX). Revisit post-launch on demand.
+- **Neural / NAM-style capture** — parked until the DSP target is frozen (Phase A does
+  that). A strong _v1.x_ differentiator, not a 1.0 gate.
+- **Multi-amp / FX suite** — directly contradicts the depth-over-breadth bet. Not now.
+
+---
+
+## Suggested sequencing
+
+```
+A (freeze tone + fix DSP defects + golden test)   ← unblocks everything
+        │
+        ▼
+B (real cabs + browser)        C (installers/signing/support link)   ← can run in parallel
+        │                                   │
+        └───────────────┬───────────────────┘
+                        ▼
+              D (presets, gate, GUI finish)
+                        │
+                        ▼
+              E (demos, beta, launch)
+```
+
+**Critical path is A → B → D → E.** Phase C (release plumbing) has no dependency on
+the audio work and should run in parallel to avoid being a last-minute scramble.
+
+## Why this gets to competitive territory
+
+The engine already out-classes most indie amp sims on DSP and engineering hygiene (the
+audit's strong scores). The 7.5 ceiling came entirely from _product_ gaps: synthetic
+cabs, an unfrozen tone, two known defects, and no release plumbing. This roadmap
+closes exactly those, in dependency order, without diluting the boutique bet — turning a
+strong engine into a free, open-source amp that can stand next to the established
+single-amp boutique releases on Windows and Linux.

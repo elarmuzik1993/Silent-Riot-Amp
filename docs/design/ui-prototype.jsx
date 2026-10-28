@@ -675,7 +675,7 @@ function SettingsPanel({ isOpen, onClose, theme, setTheme, meterBallistics, setM
             }} />
             <div>
               <div style={{ fontSize: 9, fontFamily: FONT, color: C.green, fontWeight: 700, letterSpacing: 1 }}>LICENSED</div>
-              <div style={{ fontSize: 7, fontFamily: FONT, color: C.dim, marginTop: 2 }}>Registered to: boris@monolitbeatz.com</div>
+              <div style={{ fontSize: 7, fontFamily: FONT, color: C.dim, marginTop: 2 }}>Free &amp; open source — GPLv3</div>
             </div>
           </div>
 

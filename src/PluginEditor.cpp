@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Boris Miscenco
 #include "PluginEditor.h"
 #include "gui/ColourPalette.h"
 #include "gui/FontData.h"

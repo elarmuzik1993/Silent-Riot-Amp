@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Boris Miscenco
 // Cabinet IR Loader Tests — exercises convolution pipeline, mode switching, IR registry
 // Requires JUCE (separate test target: SilentRiotJuceTests)
 

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Boris Miscenco
 // ── Offline GUI snapshot (tools/README.md) ──────────────────────────────────
 // Renders the EFFECTS panel to a PNG so knob sizing can be reviewed without
 // launching the plugin. Built only when -DSR_BUILD_TOOLS=ON.

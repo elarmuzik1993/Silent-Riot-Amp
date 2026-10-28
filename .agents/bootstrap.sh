@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 Boris Miscenco
 # Installs what a fresh clone needs before `bash scripts/verify.sh` can build.
 # Cloud sessions run this at start. Package list mirrors
 # .github/actions/setup-linux-deps/action.yml, minus libwebkit2gtk-4.1-dev:

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Boris Miscenco
 // ═══════════════════════════════════════════════════════════════
 // IntegerDelay tests — the whole-sample delay that aligns the IIR cab
 // path with the IR path's limiter-oversampler latency (review B4).

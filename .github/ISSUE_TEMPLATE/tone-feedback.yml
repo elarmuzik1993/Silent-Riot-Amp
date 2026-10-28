@@ -1,0 +1,55 @@
+name: Tone feedback
+description: Something about the sound or feel of the amp that seems off.
+labels: ["tone"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Tone reports are most useful with a **DI clip**: the dry guitar signal recorded *before*
+        the plugin (a few seconds is plenty). With it we can render exactly what you heard.
+  - type: input
+    id: version
+    attributes:
+      label: Plugin version
+      placeholder: v0.3.4
+    validations:
+      required: true
+  - type: textarea
+    id: settings
+    attributes:
+      label: Amp settings
+      description: GAIN / SHAPE / VOLUME (0–10), 15W or 7W, cabinet mode and IR (if any), effects in use, oversampling.
+      placeholder: |
+        GAIN 7, SHAPE 4, VOLUME 6, 15W
+        Cab: built-in (or IR: name)
+        Effects: none
+        Oversampling: 4×
+    validations:
+      required: true
+  - type: input
+    id: guitar
+    attributes:
+      label: Guitar and pickup
+      placeholder: Strat, bridge single coil / Les Paul, neck humbucker
+  - type: input
+    id: interface
+    attributes:
+      label: Audio interface and input gain
+      description: Helps us match the level you play into the plugin at.
+  - type: textarea
+    id: issue
+    attributes:
+      label: What sounds off?
+      description: Describe what you hear and how it differs from what you expected (fizzy, flat, too compressed, boomy, ...).
+    validations:
+      required: true
+  - type: textarea
+    id: reference
+    attributes:
+      label: Reference
+      description: What are you comparing against? A real amp, another plugin, a recording (a link is fine).
+  - type: textarea
+    id: clips
+    attributes:
+      label: DI clip and rendered clip
+      description: Drag in a zipped WAV of the DI, and optionally the plugin's output for the same passage.

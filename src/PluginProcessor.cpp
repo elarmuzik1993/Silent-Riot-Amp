@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Boris Miscenco
 #include "PluginProcessor.h"
 #include "dsp/IdleOperatingPoint.h"
 #include "PluginEditor.h"
@@ -332,7 +334,7 @@ void SilentRiotProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
     oversampleSwitcher.init(getTotalNumOutputChannels(), samplesPerBlock, osMode);
 
     // 4x polyphase-IIR oversampler dedicated to the IR-path output limiter
-    // (see docs/handoff-IR-limiter-aliasing.md). Runs at base SR -> 4x base SR,
+    // (see docs/records/handoffs/handoff-IR-limiter-aliasing.md). Runs at base SR -> 4x base SR,
     // independent of the main engine's oversample factor.
     limiterOversampler = sr::makeIntegerLatencyOversampler(getTotalNumOutputChannels(), 2,
                                                            samplesPerBlock);
@@ -917,7 +919,7 @@ void SilentRiotProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
         // Apply output scaling + tanh limiter oversampled (4x) so the
         // harmonics tanh generates don't fold back into the band — running
         // it at base SR (as before) aliased audibly on bright/cranked IR
-        // tones (see docs/handoff-IR-limiter-aliasing.md).
+        // tones (see docs/records/handoffs/handoff-IR-limiter-aliasing.md).
         auto limiterBlock = limiterOversampler->processSamplesUp(outputBlock);
         for (size_t ch = 0; ch < limiterBlock.getNumChannels(); ++ch)
         {

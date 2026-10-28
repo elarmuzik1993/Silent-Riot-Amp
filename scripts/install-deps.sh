@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 Boris Miscenco
 set -euo pipefail
 echo "Installing Ubuntu build deps for SilentRiot..."
 sudo apt-get update && sudo apt-get install -y \

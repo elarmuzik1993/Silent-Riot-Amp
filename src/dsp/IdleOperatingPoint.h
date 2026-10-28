@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Boris Miscenco
 #pragma once
 // Idle operating point (review B1).
 //
@@ -29,7 +31,7 @@ namespace sr {
 // Bracketed, not a plain substitution: the sag loop's gain per step (cathode
 // resistor × the pair's transconductance) is above 1, so substituting the
 // drawn current back in oscillates instead of converging, the same trap as
-// the old LTP solver (docs/handoff-ltp-convergence.md). Assuming a cathode
+// the old LTP solver (docs/records/handoffs/handoff-ltp-convergence.md). Assuming a cathode
 // current P and evaluating what the pair then draws gives a residual that falls
 // strictly with P (more current → colder bias, lower rails), so bisection
 // always lands on the one root.

@@ -244,7 +244,7 @@ inside `if (irMode)` at `:655-674`.
 
 **What happens.** The IR-path limiter oversampler's latency is always added to
 `setLatencySamples`. That is deliberate — the comment at `:255-258` and
-`docs/handoff-IR-limiter-aliasing.md:143-144` choose a constant latency across
+`docs/records/handoffs/handoff-IR-limiter-aliasing.md:143-144` choose a constant latency across
 cab modes — but nothing delays the IIR path to match. So whenever the IR path is
 not active (IIR cab, the default `IR_INDEX = 0`, or the cab switched off) the
 report is too high.

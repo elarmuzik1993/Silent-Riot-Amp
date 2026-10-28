@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 Boris Miscenco
 """Idle self-noise / low-frequency instability diagnostic.
 
 With a SILENT input the amp must go quiet and stay quiet. Anything left over is

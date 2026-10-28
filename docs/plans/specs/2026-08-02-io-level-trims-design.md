@@ -9,7 +9,7 @@ Context: USE-59 follow-up
 The `VOLUME_KNOB_HEADROOM` change that restored the amp's give cost ~20 dB of
 level, of which `OUTPUT_MAKEUP_GAIN = 3.5` recovers ~11 dB. The remaining gap is
 crest factor and cannot be reclaimed internally without re-compressing — see
-defect 8 in `handoff-power-section-calibration.md`. That leaves two real needs
+defect 8 in `docs/records/handoffs/handoff-power-section-calibration.md`. That leaves two real needs
 the amp has no control for:
 
 - **Output**: the player wants to set the plugin's level for their mix without
@@ -215,7 +215,7 @@ as with every other knob.
 | `src/PluginEditor.cpp` | two `SliderAttachment`s |
 | `tests/signal_chain_tests.cpp` | taper tests |
 | `tests/param_sanitize_tests.cpp` | sanitize coverage for both |
-| `docs/SilentRiot_UI_Spec.md` | UTILITY card is described as two-knob at lines ~590/600/649 |
+| `docs/design/ui-spec.md` | UTILITY card is described as two-knob at lines ~590/600/649 |
 | `CLAUDE.md` | UTILITY card description; note that meters are now post-trim |
 
 `prepareToPlay` must seed both smoothers from **sanitized** parameter values

@@ -25,7 +25,7 @@ out on the way down. In the IR path they are created at base SR with nothing
 above to catch them, so they alias.
 
 This also **deviates from the spec**, which places the limiter inside the
-oversampled loop (`docs/Silent Riot DSP Model Spec v2.13.md:1293`,
+oversampled loop (`docs/design/dsp-model-spec-v2.13.md:1293`,
 `finalOut = std::tanh(finalOut);  // gentle limiter`).
 
 ---

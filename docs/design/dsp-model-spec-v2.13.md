@@ -6,10 +6,10 @@
 > still useful background. Its **constants and many function bodies are out of date**: 11 shared
 > constants have different values in `src/utils/Constants.h`, 82 of its constants no longer
 > exist, and 109 constants in the code are not in it. Where this spec and the code disagree,
-> **the code, `CLAUDE.md` and `docs/handoff-*.md` win**. Do not change code to match this spec.
+> **the code, `CLAUDE.md` and `docs/records/handoffs/handoff-*.md` win**. Do not change code to match this spec.
 >
 > Superseded designs. Several were root-caused as bugs; see
-> `docs/handoff-power-section-calibration.md` and `docs/handoff-ltp-convergence.md`:
+> `docs/records/handoffs/handoff-power-section-calibration.md` and `docs/records/handoffs/handoff-ltp-convergence.md`:
 >
 > | Area | This spec | Current code |
 > |---|---|---|

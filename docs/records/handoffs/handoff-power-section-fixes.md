@@ -1,9 +1,9 @@
 # Handoff — power-section fixes
 
-Record for `docs/superpowers/plans/2026-10-23-power-section-fixes.md`. Every number here is a
+Record for `docs/plans/2026-10-23-power-section-fixes.md`. Every number here is a
 measurement you can re-run; each task appends its own section below with the same tables.
 
-Companion: `review-dsp-2026-10-15.md` (DSP review). The combined fix order is in
+Companion: `docs/records/reviews/review-dsp-2026-10-15.md` (DSP review). The combined fix order is in
 `.agents/STATE.md`; the plan's *Coordination with the DSP review* section maps the overlap.
 
 ## Task 0 — baseline (2026-10-23, `main` at `9970ddd`, src unchanged since `b8e20a9`)
@@ -76,7 +76,7 @@ band's output **falls** going from input 0.20 to 0.40 (e.g. 110 Hz −5.8 → �
 7W was measured by wrapping `sr_render` to append `--7w 1`; the tools themselves have no 7W
 option and fix volume at 0.7.
 
-### Power-stage telemetry (`docs/handoff-power-section-fixes-probe.cpp`)
+### Power-stage telemetry (`docs/records/handoffs/handoff-power-section-fixes-probe.cpp`)
 
 Amp loop copied from the review probe (no oversampling filters, input at the oversampled rate),
 1 s silent warm-up, then the gate's own signals. Currents per tube in mA; `diff` is the peak of

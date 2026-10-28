@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Boris Miscenco
 #include "UserIRState.h"
 
 #include <algorithm>
@@ -173,7 +175,7 @@ bool applyUserIRIndex(CabinetSim& cab, const std::vector<UserIREntry>& irs, int 
     // IR_INDEX maps directly onto user IR slots. The stock-IR table in
     // CabinetSim is intentionally NOT reachable from this parameter today —
     // the loader UI only populates user IRs, and the stock entries are
-    // synthetic placeholders (see ROADMAP.md "Ship real cabinet IRs").
+    // synthetic placeholders (see docs/records/roadmap-2026-06-audit.md "Ship real cabinet IRs").
     const int userIdx = irIndex - 1;
     if (userIdx < 0 || userIdx >= static_cast<int>(irs.size()))
     {

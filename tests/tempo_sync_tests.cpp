@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Boris Miscenco
 // ═══════════════════════════════════════════════════════════════
 // TempoSync Tests — pure BPM/division → delay-ms mapping (no JUCE deps)
 // ═══════════════════════════════════════════════════════════════

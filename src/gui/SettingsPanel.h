@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Boris Miscenco
 #pragma once
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "SegmentedSelector.h"
