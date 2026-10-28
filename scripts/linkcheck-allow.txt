@@ -1,0 +1,33 @@
+# Paths that scripts/check_links.py may find missing. One per line:
+#   <source file or fnmatch glob> <referenced path>
+# Only for mentions that are not meant to be files in this tree. Fix stale links instead.
+# An entry whose path comes to exist fails the check: delete it then.
+
+# A path relative to the docs/ row it sits in.
+AGENTS.md Tone_SignOff_Protocol.md
+
+# Built outputs and directories the tone protocol proposes but the repo does not carry.
+docs/Tone_SignOff_Protocol.md tests/tone/
+docs/Tone_SignOff_Protocol.md tools/sr_render
+tools/README.md tests/tone/golden/
+
+# Git branch names, not paths.
+docs/handoff-ir-path-sound.md docs/ir-path-sound-plan
+
+# Files a plan or roadmap item has yet to create.
+docs/superpowers/plans/2026-10-23-power-section-fixes.md tests/power_loadline_tests.cpp
+.agents/STATE.md .github/FUNDING.yml
+COMPETITIVE_ROADMAP.md .github/FUNDING.yml
+COMPETITIVE_ROADMAP.md CONTRIBUTING.md
+docs/superpowers/plans/2026-10-28-open-source-docs-prep.md .github/FUNDING.yml
+docs/superpowers/plans/2026-10-28-open-source-docs-prep.md CHANGELOG.md
+docs/superpowers/plans/2026-10-28-open-source-docs-prep.md CODE_OF_CONDUCT.md
+docs/superpowers/plans/2026-10-28-open-source-docs-prep.md CONTRIBUTING.md
+docs/superpowers/plans/2026-10-28-open-source-docs-prep.md SECURITY.md
+docs/superpowers/plans/2026-10-28-open-source-docs-prep.md architecture.md
+docs/superpowers/plans/2026-10-28-open-source-docs-prep.md building.md
+docs/superpowers/plans/2026-10-28-open-source-docs-prep.md docs/README.md
+docs/superpowers/plans/2026-10-28-open-source-docs-prep.md docs/dev/
+docs/superpowers/plans/2026-10-28-open-source-docs-prep.md docs/manual/
+docs/superpowers/plans/2026-10-28-open-source-docs-prep.md docs/records/
+docs/superpowers/plans/2026-10-28-open-source-docs-prep.md docs/records/roadmap-2026-06-audit.md

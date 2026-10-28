@@ -61,7 +61,16 @@ while IFS= read -r f; do
     head -n 3 "$f" | grep -q 'SPDX-License-Identifier:' \
         || bad "$f has no SPDX-License-Identifier in its first 3 lines"
 done < <(git ls-files 'src/*.h' 'src/*.cpp' 'tests/*.h' 'tests/*.cpp' 'tools/*.cpp' 'tools/*.py' \
-                      'scripts/*.sh' 'docs/*.cpp' '.agents/*.sh')
+                      'scripts/*.sh' 'scripts/*.py' 'docs/*.cpp' '.agents/*.sh')
+
+# 6. Every repo path the docs and code comments name exists: Markdown links and
+#    backticked paths in *.md, docs/... mentions in src/, tests/, tools/.
+#    Known non-file mentions: scripts/linkcheck-allow.txt.
+if command -v python3 >/dev/null; then
+    while IFS= read -r line; do
+        bad "$line"
+    done < <(python3 scripts/check_links.py)
+fi
 
 say "static checks: $([ $fail -eq 0 ] && echo pass || echo FAIL)"
 [ "$QUICK" -eq 1 ] && exit $fail
