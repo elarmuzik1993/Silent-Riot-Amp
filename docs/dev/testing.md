@@ -22,6 +22,7 @@ The static checks, run in both modes:
 | 4 | `tools/signoff_gates.json` is valid JSON |
 | 5 | Every hand-written source file has an `SPDX-License-Identifier` in its first 3 lines |
 | 6 | Every repo path named in the docs and in code comments exists (`scripts/check_links.py`; deliberate exceptions in `scripts/linkcheck-allow.txt`) |
+| 7 | Every non-ASCII character in a `src/` string literal can render (`scripts/check_text.py`): spelled as `\x` escapes inside `juce::CharPointer_UTF8` (a raw literal turns to mojibake) and present in every embedded font in `resources/fonts/` (a missing glyph draws as an empty box) |
 
 The full run then configures Release with `SR_BUILD_TESTS=ON`, builds, and runs `ctest`.
 

@@ -43,6 +43,7 @@ Silent Riot is a JUCE 7 amp simulator plugin built with C++17, CMake, and Ninja 
 - The window is sized to content height by `applyShapeMask()` (the X11 shape-mask approach it replaced is gone). Note it does **not** clamp to the display work area, so tall panel combinations can exceed the screen.
 - **Size a child against what it needs to paint, not against the row it sits in.** JUCE clips `paint()` to a component's own bounds and reports nothing, so an under-sized control loses part of its graphic while still handling clicks — it looks broken but keeps changing the parameter. `ToggleSwitch::minHeight(Style)` exists for this reason and `EffectsPanel` static_asserts against it; follow that pattern for new controls.
 - Keep UI state in the APVTS `ValueTree` when it needs to persist with plugin state.
+- Non-ASCII UI text goes in `juce::CharPointer_UTF8("\x..")`, and only with characters the embedded fonts have (JUCE does not fall back to a system font). Draw symbols such as arrows or flat/sharp as paths. `scripts/check_text.py` (in `verify.sh`) enforces both.
 
 ## Commit & PR conventions
 

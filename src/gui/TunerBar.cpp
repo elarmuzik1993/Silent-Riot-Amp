@@ -94,6 +94,29 @@ void TunerBar::refresh()
     repaint();
 }
 
+// The flat/sharp markers are drawn, not typed: the embedded fonts have no
+// \u266D / \u266F glyph, and at this size an ASCII '#' antialiases into a blob.
+// Both are about 8 x 9 px, centred on (cx, cy), on whole pixels so the strokes stay crisp.
+static void drawFlat(juce::Graphics& g, float cx, float cy)
+{
+    const float x = std::round(cx - 3.5f), y = std::round(cy - 4.5f);
+    g.fillRect(x + 1.0f, y, 1.0f, 9.0f);                        // stem
+    juce::Path bowl;
+    bowl.startNewSubPath(x + 1.5f, y + 5.0f);
+    bowl.quadraticTo(x + 6.5f, y + 3.0f, x + 5.0f, y + 6.5f);
+    bowl.quadraticTo(x + 3.5f, y + 8.5f, x + 1.5f, y + 8.5f);
+    g.strokePath(bowl, juce::PathStrokeType(1.0f));
+}
+
+static void drawSharp(juce::Graphics& g, float cx, float cy)
+{
+    const float x = std::round(cx - 3.5f), y = std::round(cy - 4.5f);
+    g.fillRect(x + 2.0f, y,        1.0f, 9.0f);                 // verticals
+    g.fillRect(x + 5.0f, y,        1.0f, 9.0f);
+    g.fillRect(x,        y + 3.0f, 8.0f, 1.0f);                 // bars
+    g.fillRect(x,        y + 6.0f, 8.0f, 1.0f);
+}
+
 void TunerBar::paint(juce::Graphics& g)
 {
     auto bounds = getLocalBounds().toFloat();
@@ -147,7 +170,9 @@ void TunerBar::paint(juce::Graphics& g)
     }
 
     // ── Note name + octave, left of the meter ──
-    auto noteBox = juce::Rectangle<float>(meterX - 78.0f, 0.0f, 70.0f, bounds.getHeight());
+    // Ends clear of the flat marker (meterX - 14 to meterX - 7): ending at
+    // meterX - 8, as it did, laid the note name and the "--" over the marker.
+    auto noteBox = juce::Rectangle<float>(meterX - 90.0f, 0.0f, 70.0f, bounds.getHeight());
     if (hasPitch)
     {
         g.setColour(liveColour);
@@ -162,15 +187,10 @@ void TunerBar::paint(juce::Graphics& g)
         g.drawText("--", noteBox, juce::Justification::centredRight, false);
     }
 
-    // ── Cents value + flat/sharp markers around the meter ──
-    g.setFont(Fonts::spaceMono(Fonts::Sizes::value, true));
+    // ── Flat/sharp markers around the meter ──
     g.setColour(Colours::dim);
-    g.drawText(juce::CharPointer_UTF8("\xe2\x99\xad"),  // flat
-               juce::Rectangle<float>(meterX - 16.0f, 0.0f, 12.0f, bounds.getHeight()),
-               juce::Justification::centred, false);
-    g.drawText(juce::CharPointer_UTF8("\xe2\x99\xaf"),  // sharp
-               juce::Rectangle<float>(meterX + meterW + 4.0f, 0.0f, 12.0f, bounds.getHeight()),
-               juce::Justification::centred, false);
+    drawFlat (g, meterX - 10.0f, midY);
+    drawSharp(g, meterX + meterW + 10.0f, midY);
 
     // ── Frequency + cents readout, right (left of the MUTE button) ──
     auto readBox = juce::Rectangle<float>(bounds.getWidth() - 162.0f, 0.0f, 100.0f, bounds.getHeight());

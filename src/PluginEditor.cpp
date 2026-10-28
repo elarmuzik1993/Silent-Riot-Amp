@@ -218,9 +218,9 @@ SilentRiotEditor::SilentRiotEditor(SilentRiotProcessor& p)
     powerToggle.setDescription("Amp power");
 
     // Tooltips (shown only while a TooltipWindow exists — see applySettings)
-    gs.setTooltip("Gain — preamp drive");
-    ts.setTooltip("Shape — mid scoop (CW) to mid boost (CCW)");
-    vs.setTooltip("Volume — master / power-amp drive");
+    gs.setTooltip(juce::CharPointer_UTF8("Gain \xe2\x80\x94 preamp drive"));
+    ts.setTooltip(juce::CharPointer_UTF8("Shape \xe2\x80\x94 mid scoop (CW) to mid boost (CCW)"));
+    vs.setTooltip(juce::CharPointer_UTF8("Volume \xe2\x80\x94 master / power-amp drive"));
     halfPowerToggle.setTooltip("7W half-power mode");
     cabSimToggle.setTooltip("Cabinet simulation on/off");
     powerToggle.setTooltip("Amp power on/off");

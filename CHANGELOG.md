@@ -76,5 +76,9 @@ tagged release will collect everything below.
   screen). [#15]
 - The aliasing of the output limiter in IR mode is fixed. The phase inverter starts
   cleanly after a sample-rate or oversampling change. [#9]
+- The preset arrows and the tuner's flat/sharp marks draw properly instead of as empty
+  boxes, and the GAIN, SHAPE and VOLUME tooltips no longer show garbled characters. The
+  tuner's note name no longer overlaps its flat mark.
+- The PI and PRE supply bars in ADVANCED no longer read full at idle, so they show sag.
 
 [Unreleased]: https://github.com/elarmuzik1993/Silent-Riot-Amp/commits/main
