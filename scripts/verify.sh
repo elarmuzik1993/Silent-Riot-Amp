@@ -33,15 +33,18 @@ done
 # 2. sr_render's source list is a hand-copy of the plugin's (tools/README.md:
 #    "if you add a plugin .cpp to the root CMakeLists.txt, add it here too or
 #    the link fails"). Both lists are read from the files on every run.
-render_srcs=$(sed -n '/^target_sources(sr_render/,/^)/p' tools/CMakeLists.txt \
-              | grep -oE 'src/[A-Za-z0-9_/]+\.cpp' | sort -u)
-if [ -z "$render_srcs" ]; then
-    bad "could not find sr_render's source list in tools/CMakeLists.txt"
-else
+# sr_editor_snapshot links the same full plugin list, so it is held to it too.
+for tool in sr_render sr_editor_snapshot; do
+    tool_srcs=$(sed -n "/^target_sources(${tool} /,/^)/p" tools/CMakeLists.txt \
+                | grep -oE 'src/[A-Za-z0-9_/]+\.cpp' | sort -u)
+    if [ -z "$tool_srcs" ]; then
+        bad "could not find ${tool}'s source list in tools/CMakeLists.txt"
+        continue
+    fi
     for f in $plugin_srcs; do
-        grep -qx "$f" <<<"$render_srcs" || bad "$f is in CMakeLists.txt but missing from sr_render in tools/CMakeLists.txt"
+        grep -qx "$f" <<<"$tool_srcs" || bad "$f is in CMakeLists.txt but missing from ${tool} in tools/CMakeLists.txt"
     done
-fi
+done
 
 # 3. Shell scripts parse.
 for f in scripts/*.sh .agents/*.sh; do

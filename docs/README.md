@@ -4,7 +4,7 @@ Start here to find the right document, and to know whether you can trust it.
 
 ## Which documents are current
 
-- **`dev/`** (and the planned user manual) are **maintained**. They describe the code as
+- **`dev/`** and **`manual/`** are **maintained**. They describe the code as
   it is. If one disagrees with the code, the doc is wrong; fix it in the same PR.
 - **`design/`** and **`records/`** are **dated and frozen**. They record what was
   designed or measured at the time, and are not updated as the code moves on.
@@ -24,7 +24,16 @@ When two sources disagree, trust them in this order: **the code** > `CLAUDE.md` 
 | [`../tools/README.md`](../tools/README.md) | The sign-off render and analysis tools | maintained |
 | [`../CLAUDE.md`](../CLAUDE.md) | Detailed engineering notes and pitfalls (written for coding agents, useful to anyone) | maintained |
 
-A user manual (controls, effects, cabinets and IRs, presets, tuner) is planned.
+## User manual
+
+| Doc | What it covers | Status |
+|---|---|---|
+| [`manual/README.md`](manual/README.md) | Overview, quick start, keyboard, signal flow | maintained |
+| [`manual/controls.md`](manual/controls.md) | GAIN, SHAPE, VOLUME, 15W/7W, CAB, PWR, oversampling | maintained |
+| [`manual/effects.md`](manual/effects.md) | UTILITY, BOOST, DELAY, REVERB | maintained |
+| [`manual/cabinets-and-irs.md`](manual/cabinets-and-irs.md) | Built-in cab vs IRs, formats, level matching, loader limits | maintained |
+| [`manual/presets-and-settings.md`](manual/presets-and-settings.md) | Presets, settings panel, saved state | maintained |
+| [`manual/tuner.md`](manual/tuner.md) | The live tuner | maintained |
 
 ## Design background
 
