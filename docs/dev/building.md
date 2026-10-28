@@ -86,7 +86,7 @@ The VST3 lands in `<dir>\SilentRiot_artefacts\Release\VST3\Silent Riot.vst3`; co
 | Option | Default | What it does |
 |---|---|---|
 | `SR_BUILD_TESTS` | `OFF` | Builds the three Catch2 test executables and registers them with CTest. See [Testing](testing.md) |
-| `SR_BUILD_TOOLS` | `OFF` | Builds the headless `sr_render` and `sr_snapshot` tools used by the tone sign-off. See [`../../tools/README.md`](../../tools/README.md) |
+| `SR_BUILD_TOOLS` | `OFF` | Builds the tools: `sr_render` (headless renders for the tone sign-off), `sr_snapshot` (EFFECTS panel PNG) and `sr_editor_snapshot` (full-editor PNG for the manual). See [`../../tools/README.md`](../../tools/README.md) |
 
 For example, a Release build with tests:
 
@@ -102,8 +102,9 @@ ctest --test-dir build --output-on-failure
   GitHub. Check your network or proxy, then re-run the configure.
 - **Reconfiguring is slow on every clean build.** Set `FETCHCONTENT_BASE_DIR` to a folder
   outside the build tree (CI does this) so JUCE is cloned once and reused.
-- **A new `.cpp` file builds but fails to link `sr_render`.** `tools/CMakeLists.txt` keeps
-  its own copy of the plugin's source list; add the file there as well.
+- **A new `.cpp` file builds but fails to link `sr_render` or `sr_editor_snapshot`.**
+  `tools/CMakeLists.txt` keeps its own copy of the plugin's source list for each of them;
+  add the file to both (`verify.sh` check 2 flags a missing one).
   `bash scripts/verify.sh --quick` catches this.
 - **The plugin doesn't appear in the host.** Check the bundle was copied to the host's
   VST3 folder (above) and force a rescan; some hosts cache plugin lists.

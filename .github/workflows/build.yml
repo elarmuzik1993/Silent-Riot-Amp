@@ -132,6 +132,9 @@ jobs:
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
+      # verify.sh's static checks (source lists, licence headers, repo links); no build.
+      - name: Static checks
+        run: bash scripts/verify.sh --quick
       - uses: ./.github/actions/setup-linux-deps
       - name: Cache dependencies (JUCE/Catch2)
         uses: actions/cache@v4

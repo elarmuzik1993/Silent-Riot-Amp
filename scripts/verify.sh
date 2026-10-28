@@ -61,8 +61,8 @@ fi
 # 5. Every hand-written source file carries its licence tag (CREDITS.md,
 #    GPL-3.0-or-later) in its first 3 lines, after any shebang.
 while IFS= read -r f; do
-    head -n 3 "$f" | grep -q 'SPDX-License-Identifier:' \
-        || bad "$f has no SPDX-License-Identifier in its first 3 lines"
+    head -n 3 "$f" | grep -q 'SPDX-License-Identifier: GPL-3.0-or-later' \
+        || bad "$f has no 'SPDX-License-Identifier: GPL-3.0-or-later' in its first 3 lines"
 done < <(git ls-files 'src/*.h' 'src/*.cpp' 'tests/*.h' 'tests/*.cpp' 'tools/*.cpp' 'tools/*.py' \
                       'scripts/*.sh' 'scripts/*.py' 'docs/*.cpp' '.agents/*.sh')
 

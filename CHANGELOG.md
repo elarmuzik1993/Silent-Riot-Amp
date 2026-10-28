@@ -41,7 +41,7 @@ tagged release will collect everything below.
 ### Added
 
 - **EFFECTS panel** [#13, #18]:
-  - UTILITY card: noise gate, a mono-to-stereo widener, and INPUT/OUTPUT level trims [#20].
+  - UTILITY card: noise gate, a stereo widener (stereo tracks), and INPUT/OUTPUT level trims [#20].
   - BOOST: LEVEL, TIGHT and BRIGHT.
   - DELAY: an analog/tape-voiced delay with ping-pong and tempo sync.
   - REVERB: a spring reverb.

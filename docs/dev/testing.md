@@ -8,7 +8,8 @@ bash scripts/verify.sh --quick   # static checks only: no build, no network, sil
 ```
 
 Nothing is done until the full run passes. It mirrors the CI `test` job
-(`.github/workflows/build.yml`) and builds into `build-verify/`, so it never touches the
+(`.github/workflows/build.yml`), which runs `--quick` and then the build and tests. It
+builds into `build-verify/`, so it never touches the
 `build/` tree that `scripts/build.sh` uses. Logs go to `build-verify/verify-*.log`.
 
 The static checks, run in both modes:
@@ -16,7 +17,7 @@ The static checks, run in both modes:
 | # | Check |
 |---|---|
 | 1 | Every `.cpp` under `src/` is listed in the root `CMakeLists.txt` |
-| 2 | `sr_render`'s source list in `tools/CMakeLists.txt` contains every plugin `.cpp` |
+| 2 | `sr_render`'s and `sr_editor_snapshot`'s source lists in `tools/CMakeLists.txt` contain every plugin `.cpp` |
 | 3 | Every shell script in `scripts/` and `.agents/` parses |
 | 4 | `tools/signoff_gates.json` is valid JSON |
 | 5 | Every hand-written source file has an `SPDX-License-Identifier` in its first 3 lines |

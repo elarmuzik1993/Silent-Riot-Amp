@@ -16,10 +16,10 @@ _Updated 2026-10-28_
   headers, repo links (`scripts/check_links.py` + allowlist), `sr_editor_snapshot`'s sources.
 
 ## Next (one PR per step, each with a test)
-1. Owner: delete stale remote branches (all but `main`, `feat/neural-hybrid-blend-sketch`; the
-   proxy refuses). Create the `tone` issue label. Make the repo public; pick a
-   donation platform, then docs plan step 9: `.github/FUNDING.yml`, README "Support" link and an
-   About-panel link (roadmap Phase C).
+1. Owner, then go public: delete stale branches (all but `main`, `feat/neural-hybrid-blend-sketch`;
+   the proxy refuses); create the `tone` label; enable private vulnerability reporting (CoC and
+   SECURITY.md route); confirm `tests/di_sample_82hz.raw` is self-recorded (CREDITS). Pick a
+   donation platform → docs plan step 9 (FUNDING.yml, README + About-panel links).
 2. Owner: delay FEEDBACK default decays 9 dB/repeat (was 3.4): keep or remap? GRID I reads 0
    in normal play: keep, or read the PI grid?
 3. Phase 2 (tone-changing; owner listening check, then ONE re-calibration of D1/A1/B1/P-*):

@@ -47,7 +47,8 @@ Gain staging, not tone controls. Both are unity (no change) at 5.
 - **OUTPUT**: the final level. Above 5 it boosts up to +12 dB; below 5 it fades
   faster (knob 4 ≈ −12 dB, knob 2 ≈ −36 dB) and 0 is silence. It comes after the
   amp's output limiter, so turning it up makes the plugin louder without adding
-  compression.
+  amp compression (a safety soft-clip still catches peaks near full scale while
+  OUTPUT boosts).
 
 The IN and OUT meters show the signal **after** these trims.
 

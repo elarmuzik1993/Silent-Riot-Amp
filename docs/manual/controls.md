@@ -37,7 +37,7 @@ The master volume — but on this amp it sits **in front of the power tubes**, s
 it is really the **power-stage drive** control, as on a real non-master-volume
 EL84 amp:
 
-- Low VOLUME: the EL84s idle in class A, the amp is tight and stays out of the
+- Low VOLUME: the power tubes run clean, the amp is tight and stays out of the
   way of the preamp's tone.
 - Turning it up: more power-tube saturation, more **sag** (the supply voltage
   drops as you play hard and recovers when you let a chord ring), more give and
@@ -98,8 +98,10 @@ updates (10 samples at 2×, 12 at 4× and 8×).
 
 A read-only view of the model's state: the supply rails (B+, screen, phase
 inverter, preamp, in volts) dropping as the amp sags, the sag amount, whether
-the power tubes are in class A or AB, the oversampling factor, the effective
-EL84 bias and the power-tube grid current.
+the power mode's class (CLASS reads A in 7W and AB in 15W — a label for the
+mode's voicing, not a measurement), the oversampling factor, the effective
+EL84 bias and the power-tube grid current (GRID I normally reads 0: the
+power-tube grids don't conduct in ordinary playing).
 
 ## Parameters
 

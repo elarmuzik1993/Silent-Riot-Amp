@@ -53,6 +53,8 @@ jobs:
           cp -r "build/SilentRiot_artefacts/Release/VST3/." "$STAGE/"
           cp -r "build/SilentRiot_artefacts/Release/Standalone/." "$STAGE/"
           cp README.md LICENSE "$STAGE/" 2>/dev/null || true
+          # The fonts are embedded in the binary; OFL 1.1 needs their licences to travel with it.
+          cp CREDITS.md resources/fonts/OFL-*.txt "$STAGE/"
           tar -czf "${STAGE}.tar.gz" "$STAGE"
           sha256sum "${STAGE}.tar.gz" > "${STAGE}.tar.gz.sha256"
       # - name: Sign (placeholder — requires GPG secret) ...
@@ -89,6 +91,8 @@ jobs:
           Copy-Item -Recurse "build\SilentRiot_artefacts\Release\VST3\*" $stage
           Copy-Item -Recurse "build\SilentRiot_artefacts\Release\Standalone\*" $stage
           Copy-Item README.md, LICENSE $stage -ErrorAction SilentlyContinue
+          # The fonts are embedded in the binary; OFL 1.1 needs their licences to travel with it.
+          Copy-Item CREDITS.md, resources\fonts\OFL-*.txt $stage -ErrorAction Stop
           Compress-Archive -Path "$stage\*" -DestinationPath "$stage.zip" -Force
           (Get-FileHash "$stage.zip" -Algorithm SHA256).Hash | Out-File "$stage.zip.sha256"
       - name: Upload package
@@ -112,15 +116,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Extract release notes from CHANGELOG.md
-        # The body is this version's "## [x.y.z]" section; GitHub's generated
-        # notes are appended after it. No section → an empty body, so the
-        # release gets the generated notes alone (the previous behaviour).
+        # The body is this version's "## [x.y.z]" section, else "## [Unreleased]"
+        # (a tag pushed before the section was renamed); GitHub's generated
+        # notes are appended after it. Neither → an empty body, so the release
+        # gets the generated notes alone (the previous behaviour).
         run: |
           VER="${GITHUB_REF_NAME#v}"
-          awk -v ver="$VER" '
-            /^## \[/ { if (found) exit; if (index($0, "## [" ver "]") == 1) { found = 1; next } }
-            found
-          ' CHANGELOG.md > release-notes.md || true
+          section() {
+            awk -v h="$1" '
+              /^## \[/ { if (found) exit; if (index($0, "## [" h "]") == 1) { found = 1; next } }
+              found
+            ' CHANGELOG.md
+          }
+          section "$VER" > release-notes.md || true
+          [ -s release-notes.md ] || section Unreleased > release-notes.md || true
           echo "release notes: $(wc -l < release-notes.md) lines for $VER"
       - name: Download all packages
         uses: actions/download-artifact@v4

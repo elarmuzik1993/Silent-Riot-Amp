@@ -129,7 +129,7 @@ cabinet.
 
 ## Trademarks
 
-Vox, AC15, AC30, Orange, Marshall and Fender are trademarks of their respective owners.
+Vox, AC15, AC30, Orange, Tiny Terror, Marshall and Fender are trademarks of their respective owners.
 They are named in this project only to describe a style or circuit family. Silent Riot is
 not affiliated with, endorsed by or sponsored by any of them.
 

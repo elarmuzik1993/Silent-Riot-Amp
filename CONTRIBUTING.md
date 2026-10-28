@@ -60,8 +60,11 @@ Pitfalls* section, which records mistakes that have already cost real debugging 
 
   ```cpp
   // SPDX-License-Identifier: GPL-3.0-or-later
-  // Copyright (C) 2026 Boris Miscenco
+  // Copyright (C) <year> <your name>
   ```
+
+  You keep the copyright in what you write; contributing it means licensing it under
+  GPL-3.0-or-later, the project's licence.
 
 ## Commits
 
@@ -76,6 +79,15 @@ AI-assisted work is welcome on the same terms as any other: you are responsible 
 must pass `verify.sh`, and it follows the commit rule above. [`AGENTS.md`](AGENTS.md) and
 [`CLAUDE.md`](CLAUDE.md) are the project instructions for coding agents, and
 [`.agents/STATE.md`](.agents/STATE.md) is the current-state note they read first.
+
+## Releasing
+
+1. In `CHANGELOG.md`, rename `## [Unreleased]` to `## [x.y.z] - YYYY-MM-DD` and add a fresh,
+   empty `## [Unreleased]` above it.
+2. Bump `VERSION` in the `project(SilentRiot ...)` call at the top of `CMakeLists.txt`.
+3. Merge that, then tag the merge commit `vx.y.z` and push the tag. `release.yml` builds the
+   packages and uses the `[x.y.z]` section as the release notes (falling back to
+   `[Unreleased]` if the section was not renamed).
 
 ## Licence
 

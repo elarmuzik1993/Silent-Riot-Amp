@@ -65,7 +65,9 @@ def ignorable(ref):
             or re.match(r"^(\./)?build[^/]*/", ref))
 
 
-def exists(ref, base_dir):
+def exists(ref, base_dir, root_fallback=True):
+    """A Markdown link resolves only against its own file's directory (that is how
+    GitHub renders it); a backticked path may also name a file from the repo root."""
     ref = ref.split("#", 1)[0]
     if not ref:
         return True
@@ -73,15 +75,18 @@ def exists(ref, base_dir):
     pair = re.fullmatch(r"(.+)\.(\w+)/\.(\w+)", ref)
     if pair:
         stem, a, b = pair.groups()
-        return exists(f"{stem}.{a}", base_dir) and exists(f"{stem}.{b}", base_dir)
-    cands = [os.path.normpath(os.path.join(base_dir, ref)), os.path.normpath(ref)]
+        return (exists(f"{stem}.{a}", base_dir, root_fallback)
+                and exists(f"{stem}.{b}", base_dir, root_fallback))
+    cands = [os.path.normpath(os.path.join(base_dir, ref))]
+    if root_fallback:
+        cands.append(os.path.normpath(ref))
     return any(os.path.exists(c) for c in cands)
 
 
 def looks_like_repo_path(s):
     if s.startswith(TOP_DIRS):
         return True
-    return re.fullmatch(r"[A-Za-z_]+\.md", s) is not None
+    return re.fullmatch(r"[A-Za-z0-9_-]+\.md", s) is not None
 
 
 def main():
@@ -102,18 +107,19 @@ def main():
             if ignorable(ref) or not ref:
                 continue
             ref = ref.replace("%20", " ")
-            if not exists(ref, base):
+            if not exists(ref, base, root_fallback=False):
                 report(md, ref)
         for m in BACKTICK.finditer(text):
             raw = m.group(1).strip()
             if not looks_like_repo_path(raw):
                 continue
             ref = clean(raw)
-            if ignorable(ref) or exists(ref, ""):
+            # Own directory first (a bare `sibling.md`), then the repo root.
+            if ignorable(ref) or exists(ref, base):
                 continue
             # A command line (`tools/signoff.py --render-bin ...`): check its first word.
             first = clean(ref.split()[0]) if " " in ref else ref
-            if first != ref and (ignorable(first) or exists(first, "")):
+            if first != ref and (ignorable(first) or exists(first, base)):
                 continue
             report(md, ref)
 
