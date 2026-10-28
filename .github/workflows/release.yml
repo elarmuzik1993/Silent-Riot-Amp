@@ -110,6 +110,18 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v4
+      - name: Extract release notes from CHANGELOG.md
+        # The body is this version's "## [x.y.z]" section; GitHub's generated
+        # notes are appended after it. No section → an empty body, so the
+        # release gets the generated notes alone (the previous behaviour).
+        run: |
+          VER="${GITHUB_REF_NAME#v}"
+          awk -v ver="$VER" '
+            /^## \[/ { if (found) exit; if (index($0, "## [" ver "]") == 1) { found = 1; next } }
+            found
+          ' CHANGELOG.md > release-notes.md || true
+          echo "release notes: $(wc -l < release-notes.md) lines for $VER"
       - name: Download all packages
         uses: actions/download-artifact@v4
         with:
@@ -118,6 +130,7 @@ jobs:
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          body_path: release-notes.md
           generate_release_notes: true
           files: |
             dist/SilentRiot-*-Linux.tar.gz

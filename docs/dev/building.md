@@ -85,7 +85,7 @@ The VST3 lands in `<dir>\SilentRiot_artefacts\Release\VST3\Silent Riot.vst3`; co
 
 | Option | Default | What it does |
 |---|---|---|
-| `SR_BUILD_TESTS` | `OFF` | Builds the three Catch2 test executables and registers them with CTest. See [`testing.md`](testing.md) |
+| `SR_BUILD_TESTS` | `OFF` | Builds the three Catch2 test executables and registers them with CTest. See [Testing](testing.md) |
 | `SR_BUILD_TOOLS` | `OFF` | Builds the headless `sr_render` and `sr_snapshot` tools used by the tone sign-off. See [`../../tools/README.md`](../../tools/README.md) |
 
 For example, a Release build with tests:
