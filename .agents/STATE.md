@@ -27,6 +27,8 @@ _Updated 2026-10-28_
    power Tasks 3–5 (`docs/plans/2026-10-23-power-section-fixes.md`).
 5. E3 last: repoint the gate to `tests/fixtures/ir/bright.wav`, then fix the engine aliasing.
 6. GitHub Actions has failed every run since 2026-10-09; recheck once public (free runners).
+7. Owner: review the amp-faceplate mock-up (`feat/amp-faceplate`, `src/gui/AmpFaceplate.*`): wordmark
+   text, lamp colour, weave strength, keep the "POWER" label? Then refresh `resources/images/`.
 
 ## Decisions
 - Never gate features, nag, or add a trial (open source + donations).

@@ -47,6 +47,7 @@ SilentRiotEditor::SilentRiotEditor(SilentRiotProcessor& p)
     tuner.readSamples = [this](float* dest, int maxN) {
         return proc.readLatestTunerSamples(dest, maxN);
     };
+    contentArea.addAndMakeVisible(faceplate);
     contentArea.addAndMakeVisible(vuIn);
     contentArea.addAndMakeVisible(vuOut);
     contentArea.addAndMakeVisible(gainKnob);
@@ -518,6 +519,7 @@ void SilentRiotEditor::timerCallback()
 
     // Live VU meters
     bool powerOn = proc.apvts.getRawParameterValue(sr::Params::IDs::POWER)->load() > 0.5f;
+    faceplate.setPowered(powerOn);
     if (powerOn)
     {
         vuIn.setLevel(proc.inputLevelForGUI.load(std::memory_order_relaxed));
@@ -610,6 +612,7 @@ void SilentRiotEditor::layoutContent()
 
     vuIn.setBounds(body.removeFromLeft(vuW).reduced(8, 20));
     vuOut.setBounds(body.removeFromRight(vuW).reduced(8, 20));
+    faceplate.setBounds(body.reduced(8, 8));
 
     int cx = body.getCentreX();
 

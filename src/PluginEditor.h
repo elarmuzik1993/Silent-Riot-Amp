@@ -5,6 +5,7 @@
 #include "gui/LookAndFeel.h"
 #include "gui/NotchKnob.h"
 #include "gui/VUMeter.h"
+#include "gui/AmpFaceplate.h"
 #include "gui/ToggleSwitch.h"
 #include "gui/HeaderBar.h"
 #include "gui/TunerBar.h"
@@ -58,6 +59,7 @@ private:
     sr::HeaderBar header;
     sr::TunerBar  tuner;
     sr::FooterBar footer;
+    sr::AmpFaceplate faceplate;   // behind the amp row; added first so it paints under it
     sr::VUMeter vuIn{"IN"}, vuOut{"OUT"};
 
     // Knobs
