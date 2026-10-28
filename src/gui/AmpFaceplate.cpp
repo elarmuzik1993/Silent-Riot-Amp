@@ -67,17 +67,8 @@ void AmpFaceplate::paint(juce::Graphics& g)
     drawScrew(g, b.getX() + inset, b.getBottom() - inset);
     drawScrew(g, b.getRight() - inset, b.getBottom() - inset);
 
-    // ── Wordmark, left end ──
-    const float midY = b.getY() + 62.0f;  // level with the knob dials
-    auto left = juce::Rectangle<float>(b.getX(), midY - 26.0f, static_cast<float>(sideW), 52.0f);
-    g.setColour(Colours::bright);
-    g.setFont(Fonts::spaceMono(Fonts::Sizes::title, true));
-    g.drawText("SILENT", left.removeFromTop(18.0f), juce::Justification::centred, false);
-    g.drawText("RIOT", left.removeFromTop(18.0f), juce::Justification::centred, false);
-    g.setColour(Colours::accent);
-    g.fillRect(left.getCentreX() - 18.0f, left.getY() + 4.0f, 36.0f, 2.0f);
-
     // ── Jewel pilot lamp, right end ──
+    const float midY = b.getY() + 62.0f;  // level with the knob dials
     const float lx = b.getRight() - sideW * 0.5f, r = 11.0f;
     // Chrome bezel
     g.setGradientFill(juce::ColourGradient(Colours::text, lx - r, midY - r,
