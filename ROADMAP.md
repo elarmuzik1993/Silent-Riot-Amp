@@ -126,7 +126,7 @@ Free does not mean "devs only" — players expect an installer. Keep it lean.
   "Support the project" section in the README, and a support link in Settings → About
   (which now reads "Free & open source — GPLv3"). Donations are optional: never gate
   features, nag, or add a trial.
-- [ ] **[M] Open-source basics.** `CONTRIBUTING.md`, issue templates, version/changelog
+- [x] **[M] Open-source basics.** _(done 2026-10-28: `docs/plans/2026-10-28-open-source-docs-prep.md`.)_ `CONTRIBUTING.md`, issue templates, version/changelog
   discipline, and GitHub Releases as the update channel. Keep the GPLv3 obligations
   straight: every binary release links its exact source tag.
 
