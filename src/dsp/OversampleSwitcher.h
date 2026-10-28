@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Boris Miscenco
 #pragma once
 // Oversampling State Machine (Spec §5.1)
 // Deferred crossfade: FadingOut → Reconfiguring → FadingIn

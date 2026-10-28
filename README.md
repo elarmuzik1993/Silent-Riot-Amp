@@ -7,11 +7,11 @@ switchable 15W/7W power mode, a built-in effects section and a live tuner.
 
 ## Licensing
 
-This project is licensed under the GNU General Public License v3.0. See `LICENSE`.
+This project is licensed under the GNU General Public License v3.0 or later. See `LICENSE`.
 
 ## Copyright
 
-Copyright © 2026 Boris Miscenco (Monolit Beatz). All rights reserved.
+Copyright © 2026 Boris Miscenco (Monolit Beatz). Licensed under the GNU GPL v3 or later; see `LICENSE`.
 
 ## Originality
 

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Boris Miscenco
 #pragma once
 // Long-Tail Pair Phase Inverter — Nodal Solver (Spec §3.5)
 #include "../../utils/VoltageScale.h"

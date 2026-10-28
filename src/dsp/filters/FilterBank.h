@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Boris Miscenco
 #pragma once
 // Central Filter Management (Spec §2.6.2 Filter Registry)
 // All 24 filter instances, bulk recalc/reset

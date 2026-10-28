@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 Boris Miscenco
 set -euo pipefail
 [ ! -d ".git" ] && git init
 git branch -M main 2>/dev/null || true

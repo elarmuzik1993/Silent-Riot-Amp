@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Boris Miscenco
 // ═══════════════════════════════════════════════════════════════
 // Idle operating point (review B1) — dsp/IdleOperatingPoint.h
 //

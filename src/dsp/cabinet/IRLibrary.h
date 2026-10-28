@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Boris Miscenco
 #pragma once
 // IRLibrary — Stock IR metadata registry + synthetic IR generator (Spec §3.10)
 //

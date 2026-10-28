@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Boris Miscenco
 // Level trace diagnostic — measures signal levels through the full DSP chain
 // to calibrate outputGainCompensation.
 

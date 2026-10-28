@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Boris Miscenco
 // ═══════════════════════════════════════════════════════════════
 // DI Chain Trace — feeds real DI sample through the signal chain
 // and records RMS envelopes at key tap points to identify which

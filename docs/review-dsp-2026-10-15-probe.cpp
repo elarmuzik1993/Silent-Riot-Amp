@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Boris Miscenco
 // Amp-loop probe for docs/review-dsp-2026-10-15.md — evidence, not product code.
 //
 // Replicates SilentRiotProcessor::processBlock's per-sample amp loop

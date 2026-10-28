@@ -7,7 +7,7 @@ _Updated 2026-10-27_
   (no paid tier). `bash scripts/verify.sh` passes: 408/408 ctest (308 pure C++ / 81 JUCE /
   19 processor, via `tests/processor_harness.h`).
 - Commit as `Boris Miscenco <219343213+elarmuzik1993@users.noreply.github.com>` (history was
-  rewritten to it 2026-10-26); the cloud env sets `aidevblock@gmail.com`, so override it.
+  rewritten to it 2026-10-26); the cloud env sets its own default identity, so override it.
 - DSP review `docs/review-dsp-2026-10-15.md`: B1, B4–B8, S1–S7 fixed; B2, B3 (tone-changing), S8 open.
 - Power plan `docs/superpowers/plans/2026-10-23-power-section-fixes.md`: Tasks 0–1 done
   (`docs/handoff-power-section-fixes.md`). EL84 grids never conduct (hottest 5.91 V vs 8.6 V);
@@ -44,7 +44,7 @@ _Updated 2026-10-27_
 - `verify.sh` builds into `build-verify/`; sr_render is not built by CI or verify.
 
 ## Known issues
-- 13 commits on `main` (#33, #35) carry `aidevblock@gmail.com`, not the noreply identity.
+- 13 commits on `main` (#33, #35) carry the cloud env's default identity, not the noreply one.
 - Old pre-rewrite commits stay reachable via closed PRs' `refs/pull/*` (only GitHub Support fixes it).
 - `signoff.py` (44.1k/4×) fails A1 −31.6 LUFS, B1 0.99%, E3 −37.9 dBc (MUST-PASS); 9 pass.
   IR gates are report-only. Rates above 384k effective drift −0.2…+1.2 dB (cause unknown).
@@ -55,6 +55,6 @@ _Updated 2026-10-27_
 - Bright IRs play 1.2–1.5 dB under the built-in cab; unequal stereo IRs are off the reference
   on a mono bus. The 8192 cap still loses long rings. A stereo IR with a dead channel 1 is
   refused on load even on a mono bus.
-- IR loader panel: no scroll past 8 (`IRLoaderPanel.cpp:116`), `.ir` accepted but unreadable,
+- IR loader panel: no scroll past 8 (`IRLoaderPanel.cpp:118`), `.ir` accepted but unreadable,
   AIFF/FLAC refused, no remove or way back to the built-in cab, no refresh after automation or
   state load; `IR_INDEX` is positional.

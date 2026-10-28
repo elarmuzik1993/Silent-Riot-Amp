@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Boris Miscenco
 // ═══════════════════════════════════════════════════════════════
 // StereoWidth tests — MONO↔STEREO widener invariants.
 // Pure C++ (no JUCE): operates on raw float channel buffers.

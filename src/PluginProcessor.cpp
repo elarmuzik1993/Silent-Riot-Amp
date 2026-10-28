@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Boris Miscenco
 #include "PluginProcessor.h"
 #include "dsp/IdleOperatingPoint.h"
 #include "PluginEditor.h"

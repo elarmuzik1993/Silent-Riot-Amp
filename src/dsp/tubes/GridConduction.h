@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Boris Miscenco
 #pragma once
 // Grid Conduction Model (Spec §4.1.1) — MVP model
 // Dynamic input impedance + coupling cap bias shift

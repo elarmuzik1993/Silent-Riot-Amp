@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Boris Miscenco
 // Power-stage telemetry probe for docs/handoff-power-section-fixes.md (plan
 // docs/superpowers/plans/2026-10-23-power-section-fixes.md, Task 0) — evidence,
 // not product code.

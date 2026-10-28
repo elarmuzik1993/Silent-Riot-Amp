@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Boris Miscenco
 #pragma once
 // Multi-stage PSU droop (Spec §3.11)
 #include "../../utils/VoltageScale.h"

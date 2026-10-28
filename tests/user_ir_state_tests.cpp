@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Boris Miscenco
 // User IR State Tests — ValueTree (de)serialization + untrusted-state validation
 // Requires JUCE (separate test target: SilentRiotJuceTests)
 

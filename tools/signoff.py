@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 Boris Miscenco
 """
 signoff.py — orchestrate the tone sign-off (docs/Tone_SignOff_Protocol.md).
 

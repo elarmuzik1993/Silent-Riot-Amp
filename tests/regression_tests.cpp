@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Boris Miscenco
 // Rendered-output regression guard (roadmap P4).
 //
 // Not a bit-exact golden file — that fights the ongoing ear-tuning. Instead

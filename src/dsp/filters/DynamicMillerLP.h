@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Boris Miscenco
 #pragma once
 // Dynamic Miller Capacitance LP (Spec §3.3 / §2.6.2)
 // Per-sample fc modulated by voltage gain estimate

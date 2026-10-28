@@ -35,7 +35,7 @@
 set VS=C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools
 call "%VS%\VC\Auxiliary\Build\vcvars64.bat" >nul
 set CMAKE=%VS%\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe
-cd /d C:\Users\boris\Silent-Riot-Amp
+cd /d %USERPROFILE%\Silent-Riot-Amp
 "%CMAKE%" --build build-win --target %*
 ```
 
@@ -738,7 +738,7 @@ In the **GUI Architecture** section, extend the UTILITY sentence in the stereo-w
 
 ```
 build.bat sr_render
-python tools\signoff.py --render-bin "build-win\tools\sr_render_artefacts\Release\sr_render.exe" --out-dir C:\Users\boris\AppData\Local\Temp\so_trims
+python tools\signoff.py --render-bin "build-win\tools\sr_render_artefacts\Release\sr_render.exe" --out-dir %TEMP%\so_trims
 ```
 
 Expected — these four must be **unchanged** from before this work:

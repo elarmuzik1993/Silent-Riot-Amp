@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 Boris Miscenco
 """Envelope-modulation ("wobble" / motorboating) detector.
 
 A steady input must produce a steady output envelope. If it doesn't, some

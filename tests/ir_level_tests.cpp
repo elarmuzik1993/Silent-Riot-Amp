@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Boris Miscenco
 // IR level metric (dsp/cabinet/IRLevel.h) — IR-path plan Task 2.
 // Pure C++: the band-power metric every loaded IR is scaled by, and the
 // built-in cab reference it is scaled to.

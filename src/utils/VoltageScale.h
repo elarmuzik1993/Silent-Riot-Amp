@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Boris Miscenco
 #pragma once
 // ═══════════════════════════════════════════════════════════════
 // VoltageScale — Normalized Voltage Domain (Spec Section 2.5)

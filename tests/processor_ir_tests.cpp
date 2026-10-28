@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Boris Miscenco
 // ═══════════════════════════════════════════════════════════════
 // Processor wiring of IR_INDEX on state restore (review S2) — the real
 // SilentRiotProcessor, driven like a host that loads a project or preset

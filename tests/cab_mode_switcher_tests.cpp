@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Boris Miscenco
 // CabModeSwitcher (IR-path plan Task 3): the fade state machine behind every
 // change between CAB off, the built-in cab and IR mode. Pure C++; the
 // processor wiring is tested in processor_ir_tests.cpp.

@@ -1,7 +1,5 @@
 # Silent Riot Project Instructions
 
-Obsidian: [[Silent Riot]]
-
 ## Current state
 
 @.agents/STATE.md

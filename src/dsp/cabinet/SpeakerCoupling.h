@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Boris Miscenco
 #pragma once
 // Dynamic Speaker-Amp Coupling (Spec §3.9)
 #include "../filters/OnePole.h"

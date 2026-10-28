@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Boris Miscenco
 #include "ToggleSwitch.h"
 #include "ColourPalette.h"
 #include "FontData.h"

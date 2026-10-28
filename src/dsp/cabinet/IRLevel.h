@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Boris Miscenco
 #pragma once
 // ═══════════════════════════════════════════════════════════════
 // IR level match (IR-path plan Task 2) — pure C++, header-only.

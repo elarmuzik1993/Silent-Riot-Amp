@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 Boris Miscenco
 # The one verification command for this repo. Same checks locally, in CI and in cloud sessions.
 #
 #   bash scripts/verify.sh           full run: static checks + the CI `test` job
@@ -52,6 +54,14 @@ if command -v python3 >/dev/null; then
     python3 -c 'import json,sys; json.load(open(sys.argv[1]))' tools/signoff_gates.json 2>/dev/null \
         || bad "tools/signoff_gates.json is not valid JSON"
 fi
+
+# 5. Every hand-written source file carries its licence tag (CREDITS.md,
+#    GPL-3.0-or-later) in its first 3 lines, after any shebang.
+while IFS= read -r f; do
+    head -n 3 "$f" | grep -q 'SPDX-License-Identifier:' \
+        || bad "$f has no SPDX-License-Identifier in its first 3 lines"
+done < <(git ls-files 'src/*.h' 'src/*.cpp' 'tests/*.h' 'tests/*.cpp' 'tools/*.cpp' 'tools/*.py' \
+                      'scripts/*.sh' 'docs/*.cpp' '.agents/*.sh')
 
 say "static checks: $([ $fail -eq 0 ] && echo pass || echo FAIL)"
 [ "$QUICK" -eq 1 ] && exit $fail

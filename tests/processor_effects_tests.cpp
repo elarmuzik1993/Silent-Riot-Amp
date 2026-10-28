@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Boris Miscenco
 // ═══════════════════════════════════════════════════════════════
 // Processor wiring of the effect tails (review B6) — the real
 // SilentRiotProcessor, driven through processBlock like a host.

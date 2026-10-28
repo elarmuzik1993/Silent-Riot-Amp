@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Boris Miscenco
 #pragma once
 // Triode Waveshaper — 12AX7/ECC83 Koren Model (Spec §4.1 Option B)
 #include "../../utils/VoltageScale.h"

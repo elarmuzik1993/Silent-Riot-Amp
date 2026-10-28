@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 Boris Miscenco
 """Transient recovery ("bloom" / delayed-pluck) diagnostic.
 
 After a note attack the amp's envelope should decay monotonically. If it dips and

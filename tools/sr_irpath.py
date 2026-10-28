@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 Boris Miscenco
 """IR-path diagnostic: level, startup and repeatability of the cab convolution.
 
 Measures the findings in docs/superpowers/plans/2026-10-26-ir-path-sound-fixes.md
