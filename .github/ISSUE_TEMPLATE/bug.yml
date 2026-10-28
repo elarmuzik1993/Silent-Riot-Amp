@@ -1,0 +1,96 @@
+name: Bug report
+description: A crash, glitch, host problem or anything that behaves wrongly.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. For a security problem, use the private process in SECURITY.md instead.
+        If the problem is how the amp *sounds*, the Tone feedback form is a better fit.
+  - type: input
+    id: version
+    attributes:
+      label: Plugin version
+      description: Settings → About, or the release you downloaded.
+      placeholder: v0.3.4
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      placeholder: Ubuntu 24.04 / Windows 11 23H2
+    validations:
+      required: true
+  - type: input
+    id: host
+    attributes:
+      label: Host / DAW and version
+      placeholder: Reaper 7.22, Bitwig 5.2, Standalone
+    validations:
+      required: true
+  - type: dropdown
+    id: format
+    attributes:
+      label: Plugin format
+      options:
+        - VST3
+        - Standalone
+    validations:
+      required: true
+  - type: input
+    id: sample-rate
+    attributes:
+      label: Sample rate
+      placeholder: 48000
+  - type: input
+    id: buffer
+    attributes:
+      label: Buffer size
+      placeholder: "256"
+  - type: dropdown
+    id: oversample
+    attributes:
+      label: Oversampling
+      options:
+        - 2×
+        - 4×
+        - 8×
+        - Not sure
+  - type: dropdown
+    id: cab
+    attributes:
+      label: Cabinet mode
+      options:
+        - Built-in cab
+        - User IR
+        - Cab off
+        - Not sure
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Load the plugin on a guitar track
+        2. Set GAIN to 8
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behaviour
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behaviour
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs, crash reports or screenshots
+      description: Paste text logs here; drag files or screenshots in.
+      render: text
