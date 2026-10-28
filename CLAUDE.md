@@ -15,6 +15,8 @@
 
 ## Architecture
 
+Human overview: `docs/dev/architecture.md`.
+
 All processing uses a **normalized voltage domain**: 300V B+ = 1.0. See `VoltageScale.h`. Ohm's law is preserved: V_n = I_n × R_n.
 
 ### Signal Chain (dual-path)

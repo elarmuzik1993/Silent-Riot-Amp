@@ -23,7 +23,6 @@ docs/plans/2026-10-28-open-source-docs-prep.md CONTRIBUTING.md
 docs/plans/2026-10-28-open-source-docs-prep.md SECURITY.md
 docs/plans/2026-10-28-open-source-docs-prep.md architecture.md
 docs/plans/2026-10-28-open-source-docs-prep.md building.md
-docs/plans/2026-10-28-open-source-docs-prep.md docs/README.md
 docs/plans/2026-10-28-open-source-docs-prep.md docs/manual/
 
 # Pre-move names the plan's re-filing step describes.
