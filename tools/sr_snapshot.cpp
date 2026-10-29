@@ -69,7 +69,7 @@ int main(int argc, char** argv)
 
     const int W = 720;
     const int refH = 160;
-    const int fxH  = EffectsPanel::panelHeight; // 320
+    const int fxH  = EffectsPanel::panelHeight;
     const int H = refH + fxH + 24;
 
     // Build the composite: reference row on top, effects panel below.

@@ -5,10 +5,12 @@
 // (docs/manual/, resources/images/). Built only when -DSR_BUILD_TOOLS=ON.
 //
 //   sr_editor_snapshot <out.png> [fx] [ir] [adv] [off] [scale=<0..n>] [theme=<n>]
+//                      [set=<paramID>:<0..1>]...
 //
 // The flags open the matching panels (EFFECTS, IR LOADER, ADVANCED). With
 // the CAB toggle on (the default) the editor opens the IR LOADER itself. `off`
-// switches PWR off; `theme=` picks a SettingsPanel theme index. Panel states go through the same apvts.state
+// switches PWR off; `set=` sets any parameter by ID to a normalised value
+// (e.g. set=boostOn:1 to light a card's jewel); `theme=` picks a SettingsPanel theme index. Panel states go through the same apvts.state
 // properties the editor restores from, so the panels snap open with no
 // animation. Paints offscreen via paintEntireComponent; on Linux the editor
 // still opens an X11 connection, so run it under Xvfb (xvfb-run) when
@@ -53,6 +55,14 @@ int main(int argc, char** argv)
         if (arg == "adv") state.setProperty("advPanelOpen", true, nullptr);
         if (arg == "off")
             proc->apvts.getParameter(sr::Params::IDs::POWER)->setValueNotifyingHost(0.0f);
+        if (arg.startsWith("set="))
+        {
+            const auto spec = arg.fromFirstOccurrenceOf("=", false, false);
+            if (auto* p = proc->apvts.getParameter(spec.upToFirstOccurrenceOf(":", false, false)))
+                p->setValueNotifyingHost(spec.fromFirstOccurrenceOf(":", false, false).getFloatValue());
+            else
+                juce::Logger::writeToLog("Unknown parameter in " + arg);
+        }
         if (arg.startsWith("theme="))
             state.setProperty("theme", arg.fromFirstOccurrenceOf("=", false, false).getIntValue(), nullptr);
         if (arg.startsWith("scale="))

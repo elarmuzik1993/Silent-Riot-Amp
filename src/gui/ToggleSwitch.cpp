@@ -3,6 +3,7 @@
 #include "ToggleSwitch.h"
 #include "ColourPalette.h"
 #include "FontData.h"
+#include "AmpFaceplate.h"
 #include <cmath>
 #include <initializer_list>
 #include <iterator>
@@ -94,42 +95,40 @@ void ToggleSwitch::paint(juce::Graphics& g)
 {
     auto bounds = getLocalBounds().toFloat();
 
-    // Label above — shared by both styles
+    if (style == Style::Jewel)
+    {
+        paintJewel(g, bounds);
+        return;
+    }
+
+    // Label above the lever
     g.setFont(Fonts::spaceMono(Fonts::Sizes::small));
     g.setColour(Colours::label);
     g.drawText(label.toUpperCase(), juce::Rectangle<float>(0, 0, bounds.getWidth(), kLabelH),
                juce::Justification::centred, false);
 
-    if (style == Style::Led)
-        paintLed(g, bounds);
-    else
-        paintSwitch(g, bounds);
+    paintSwitch(g, bounds);
 }
 
-void ToggleSwitch::paintLed(juce::Graphics& g, juce::Rectangle<float> bounds)
+void ToggleSwitch::paintJewel(juce::Graphics& g, juce::Rectangle<float> bounds)
 {
-    const auto led = juce::Rectangle<float>(kLedW, kLedH)
-                         .withCentre({ bounds.getWidth() * 0.5f,
-                                       kLabelH + kLabelGap + kLedH * 0.5f });
-    const float r = kLedH * 0.5f;   // fully rounded caps
+    // The lamp hugs the right edge with exactly its glow's room, so a row of
+    // jewel toggles right-aligns on their lamps whatever the label length.
+    const juce::Point<float> c(bounds.getRight() - kJewelGlowR, bounds.getCentreY());
 
-    // Halo only once lit, and scaled by thumbPos so the bar fades up on the
-    // same animation the pill uses to slide its thumb.
-    if (thumbPos > 0.01f)
-    {
-        g.setColour(activeColor.withAlpha(0.20f * thumbPos));
-        g.fillRoundedRectangle(led.expanded(kLedGlow), r + kLedGlow);
-    }
+    g.setFont(Fonts::spaceMono(Fonts::Sizes::small, true));
+    g.setColour(Colours::label.interpolatedWith(Colours::bright, thumbPos));
+    g.drawText(label.toUpperCase(),
+               bounds.withRight(c.x - kJewelBezelR - kJewelLabelGap),
+               juce::Justification::centredRight, false);
 
-    // Unlit stays a visible dark bar, not an empty gap — an absent indicator and
-    // an off one have to look different or the control reads as missing.
-    g.setColour(Colours::track.interpolatedWith(activeColor, thumbPos));
-    g.fillRoundedRectangle(led, r);
+    AmpFaceplate::paintLamp(g, c, kJewelR, activeColor, thumbPos, kJewelGlowR / kJewelR);
 
     if (hasKeyboardFocus(false))
     {
         g.setColour(Colours::accent.withAlpha(0.7f));
-        g.drawRoundedRectangle(led.expanded(kLedGlow + 1.5f), r + kLedGlow + 1.5f, 1.0f);
+        g.drawEllipse(juce::Rectangle<float>(2.0f * (kJewelGlowR - 1.0f), 2.0f * (kJewelGlowR - 1.0f))
+                          .withCentre(c), 1.0f);
     }
 }
 

@@ -80,5 +80,8 @@ tagged release will collect everything below.
   boxes, and the GAIN, SHAPE and VOLUME tooltips no longer show garbled characters. The
   tuner's note name no longer overlaps its flat mark.
 - The PI and PRE supply bars in ADVANCED no longer read full at idle, so they show sag.
+- The EFFECTS panel matches the amp's faceplate: its knobs are the same satin pointer
+  knobs at a smaller size, the knob names are larger, the cards sit on the same panel, and
+  the ON and PP switches are small glass jewels that light up instead of faint thin bars.
 
 [Unreleased]: https://github.com/elarmuzik1993/Silent-Riot-Amp/commits/main

@@ -18,13 +18,15 @@ public:
     void paint(juce::Graphics&) override;
     void resized() override;
 
-    // Two compact card rows sized to the half-scale effect knobs (knob + value
-    // readout + label ≈ 64 px) plus each card's title strip (and the delay
-    // card's sync row). Kept in sync with kCardH/kCardGap in EffectsPanel.cpp.
-    // The DELAY card is the binding constraint — it carries the sync-division
-    // row *and* a knob row, so it is the first place a too-short panel shows up
-    // as knob names drawn past the bottom edge and silently clipped.
-    static constexpr int panelHeight = 284;
+    // Two card rows sized to the scaled pointer knobs (name + dial + engraved
+    // value, see kKnobH) plus each card's jewel-toggle title row (and the delay
+    // card's sync row): 2 × kCardH + kCardGap + the 10 px margin either side.
+    // Kept in sync with the card metrics in EffectsPanel.cpp, which
+    // static_assert it. The DELAY card is the binding constraint — it carries
+    // the sync-division row *and* a knob row, so it is the first place a
+    // too-short panel shows up as knob values drawn past the bottom edge and
+    // silently clipped.
+    static constexpr int panelHeight = 312;
 
     // Toggles (the UTILITY card's gate/width knobs self-gate — no toggle)
     ToggleSwitch& boostToggle()  { return boostTgl; }

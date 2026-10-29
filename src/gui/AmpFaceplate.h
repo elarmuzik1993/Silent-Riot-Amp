@@ -19,8 +19,16 @@ public:
 
     // A domed deep-ruby glass pilot lamp of lens radius r centred on c. brightness
     // runs 0 (off: dark tinted glass) to 1 (lit, with bloom onto the panel).
+    // bloom is the glow's radius in lens radii; the bezel alone reaches r + 4,
+    // so a small lamp in a tight component passes less to keep its glow inside
+    // the bounds JUCE clips paint() to.
     static void paintLamp(juce::Graphics&, juce::Point<float> c, float r,
-                          juce::Colour colour, float brightness);
+                          juce::Colour colour, float brightness, float bloom = 3.2f);
+
+    // The panel itself: raised gradient, grille-cloth weave and piping, without
+    // the screws or lamp. The EFFECTS cards are painted with it too, so the two
+    // sections read as the same hardware.
+    static void paintPlate(juce::Graphics&, juce::Rectangle<float> bounds, float radius);
 
     // Where the editor's layout puts the lamp, in this component's coordinates.
     void setLampCentre(juce::Point<float> centre);
