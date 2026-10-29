@@ -142,3 +142,35 @@ target_compile_definitions(SilentRiotProcessorTests PRIVATE
 target_compile_features(SilentRiotProcessorTests PRIVATE cxx_std_17)
 
 catch_discover_tests(SilentRiotProcessorTests)
+
+# ── Real-time stress harness (tests/rt_stress.cpp) ──
+# Not registered with ctest: it runs for minutes and is meant to be run on
+# demand (and before a release), not on every build. It is still built by
+# `scripts/verify.sh`, so it cannot rot.
+#
+# Links the plugin's SharedCode target like the processor tests, and installs
+# its own global operator new / pthread_mutex_lock in the executable, which is
+# why it needs its own main() instead of Catch2's.
+add_executable(SilentRiotRTStress rt_stress.cpp)
+
+target_link_libraries(SilentRiotRTStress PRIVATE
+    SilentRiot
+    ${CMAKE_DL_LIBS}                     # dlsym, dladdr for the interposers
+)
+
+target_include_directories(SilentRiotRTStress PRIVATE
+    $<TARGET_PROPERTY:SilentRiot,INCLUDE_DIRECTORIES>
+    ${CMAKE_SOURCE_DIR}/tests
+)
+
+target_compile_definitions(SilentRiotRTStress PRIVATE
+    $<TARGET_PROPERTY:SilentRiot,COMPILE_DEFINITIONS>
+    SOURCE_DIR="${CMAKE_SOURCE_DIR}"
+)
+
+target_compile_features(SilentRiotRTStress PRIVATE cxx_std_17)
+
+if(UNIX AND NOT APPLE)
+    # Exported symbols, so backtrace()/dladdr() can name the frame that allocated.
+    target_link_options(SilentRiotRTStress PRIVATE -rdynamic)
+endif()
