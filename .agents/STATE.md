@@ -24,18 +24,18 @@ _Updated 2026-10-29 (tone frozen at tone-v1)_
   `GIT_AUTHOR_EMAIL`/`GIT_COMMITTER_EMAIL`; the cloud env's values beat `git -c`.
 
 ## Next
-1. Owner, before going public: enable private vulnerability reporting; create the `tone` label;
-   confirm `tests/di_sample_82hz.raw` is self-recorded (then credit it in CREDITS.md); delete stale
-   branches (all but `main`, `feat/neural-hybrid-blend-sketch`; `feat/black-bat-toggles` is folded
-   into the delay-sync work). Then make the repo public.
-2. Owner picks a donation platform → docs plan step 9 (`docs/plans/2026-10-28-open-source-docs-prep.md`).
-3. Owner: delay FEEDBACK default decays 9 dB/repeat — keep or remap? GRID I reads 0 — keep, or read PI?
+1. With owner OK: tag the tone-lock merge commit `tone-v1` and push the tag (`docs/dev/tone-lock.md`).
+2. Owner, before going public: enable private vulnerability reporting; create the `tone` label;
+   confirm `tests/di_sample_82hz.raw` is self-recorded (credit it in CREDITS.md); delete stale
+   branches (keep `main`, `feat/neural-hybrid-blend-sketch`). Then make the repo public.
+3. Owner picks a donation platform → docs plan step 9 (`docs/plans/2026-10-28-open-source-docs-prep.md`).
+4. Owner: delay FEEDBACK default decays 9 dB/repeat — keep or remap? GRID I reads 0 — keep, or read PI?
    Faceplate: lamp colour, weave strength, keep the "POWER" label, jewel size/colour?
-4. E3 (the one tone change still allowed): repoint the gate to `tests/fixtures/ir/bright.wav`, fix
+5. E3 (the one tone change still allowed): repoint the gate to `tests/fixtures/ir/bright.wav`, fix
    the engine aliasing, owner A/Bs it, then new references + `tone-v2` (`docs/dev/tone-lock.md`).
-5. GitHub Actions has failed every run since 2026-10-09; recheck once public (free runners), and
+6. GitHub Actions has failed every run since 2026-10-09; recheck once public (free runners), and
    check the tone lock passes on Linux/GCC (references are from MSVC).
-6. Owner, cab view: the light theme keeps white tolex around the black grille — OK? Should the cab
+7. Owner, cab view: the light theme keeps white tolex around the black grille — OK? Should the cab
    dim while CAB is off?
 
 ## Decisions
