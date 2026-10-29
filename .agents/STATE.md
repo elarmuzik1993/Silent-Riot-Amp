@@ -27,12 +27,10 @@ _Updated 2026-10-29_
    power Tasks 3–5 (`docs/plans/2026-10-23-power-section-fixes.md`).
 5. E3 last: repoint the gate to `tests/fixtures/ir/bright.wav`, then fix the engine aliasing.
 6. GitHub Actions has failed every run since 2026-10-09; recheck once public (free runners).
-7. Owner: amp faceplate (`feat/amp-faceplate`, `src/gui/AmpFaceplate.*`) approved, wordmark removed.
-   Pilot lamp is a deep-ruby glass dome (8 px lens), vertically centred right of VOLUME; amp knob
-   labels on top; SHAPE dead centre, toggles grouped under it as chrome bat switches on lit glass
-   rings (all orange, 15% larger); amp knobs are satin pointer knobs with engraved values, 155 px
-   apart (effects knobs stay flat and boxed). Screenshot refreshed. Open: lamp
-   colour, weave strength, keep the "POWER" label?
+7. Amp faceplate is on `main` (`src/gui/AmpFaceplate.*`): deep-ruby glass pilot lamp, satin pointer
+   knobs with engraved values, chrome bat toggles on orange glass rings. Owner still open: lamp
+   colour, weave strength, keep the "POWER" label? Next GUI pass: bring the EFFECTS panel (flat
+   knobs, faint LED toggles, small text) into the same hardware style.
 
 ## Decisions
 - Never gate features, nag, or add a trial (open source + donations).
