@@ -54,7 +54,10 @@ SilentRiotEditor::SilentRiotEditor(SilentRiotProcessor& p)
     contentArea.addAndMakeVisible(toneKnob);
     contentArea.addAndMakeVisible(volumeKnob);
     for (auto* k : { &gainKnob, &toneKnob, &volumeKnob })
+    {
         k->setLabelOnTop(true);
+        k->getSlider().getProperties().set(sr::SilentRiotLookAndFeel::kPointerKnobProperty, true);
+    }
     contentArea.addAndMakeVisible(halfPowerToggle);
     contentArea.addAndMakeVisible(cabSimToggle);
     contentArea.addAndMakeVisible(powerToggle);
