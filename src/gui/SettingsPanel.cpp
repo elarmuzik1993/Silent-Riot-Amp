@@ -46,6 +46,16 @@ SettingsPanel::SettingsPanel()
     };
 }
 
+void SettingsPanel::attachInputSelector(juce::AudioDeviceManager& deviceManager)
+{
+    if (inputSel != nullptr)
+        return;
+    inputSel = std::make_unique<InputSelector>(deviceManager);
+    addAndMakeVisible(*inputSel);
+    resized();
+    repaint();
+}
+
 void SettingsPanel::syncControls()
 {
     themeSelector.setSelectedIndex(themeIndex);
@@ -89,6 +99,24 @@ void SettingsPanel::paint(juce::Graphics& g)
     g.setColour(Colours::label);
     g.drawText("X", juce::Rectangle<float>(bounds.getWidth() - 32.0f, 8.0f, 24.0f, 24.0f),
                juce::Justification::centred, false);
+
+    // ── AUDIO INPUT (standalone only) ──
+    if (hasInputSelector())
+    {
+        g.setFont(Fonts::spaceMono(Fonts::Sizes::small, true));
+        g.setColour(Colours::accent);
+        g.drawText("AUDIO INPUT", juce::Rectangle<float>(px, y, w, 14.0f),
+                   juce::Justification::centredLeft, false);
+
+        g.setFont(Fonts::spaceMono(Fonts::Sizes::small));
+        g.setColour(Colours::label);
+        g.drawText("Input", juce::Rectangle<float>(px, y + 24.0f, 100.0f, 20.0f),
+                   juce::Justification::centredLeft, false);
+
+        y += prefsTop();
+        g.setColour(Colours::border);
+        g.fillRect(px, y - 10.0f, w, 1.0f);
+    }
 
     // ── UI PREFERENCES ──
     g.setFont(Fonts::spaceMono(Fonts::Sizes::small, true));
@@ -172,6 +200,13 @@ void SettingsPanel::resized()
     float selectorW = w - 110.0f;
     float selectorX = px + 110.0f;
     float y = 40.0f;
+
+    if (inputSel != nullptr)
+    {
+        inputSel->setBounds(static_cast<int>(selectorX), static_cast<int>(y),
+                            static_cast<int>(selectorW), 22);
+        y += prefsTop();
+    }
 
     themeSelector.setBounds(static_cast<int>(selectorX), static_cast<int>(y),
                             static_cast<int>(selectorW), 22);

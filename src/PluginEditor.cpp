@@ -3,6 +3,7 @@
 #include "PluginEditor.h"
 #include "gui/ColourPalette.h"
 #include "gui/FontData.h"
+#include "StandaloneDevice.h"
 #include "utils/Parameters.h"
 
 #if JUCE_LINUX
@@ -232,6 +233,11 @@ SilentRiotEditor::SilentRiotEditor(SilentRiotProcessor& p)
     // Settings overlay
     addChildComponent(settingsPanel);
     header.onGearClick = [this] {
+        // Standalone only: the AUDIO INPUT section. Attached on first open,
+        // when the app's window (and so its device manager) surely exists.
+        if (!settingsPanel.hasInputSelector())
+            if (auto* deviceManager = sr::standaloneDeviceManager())
+                settingsPanel.attachInputSelector(*deviceManager);
         settingsPanel.setVisible(!settingsPanel.isVisible());
         resized();
     };
@@ -765,7 +771,7 @@ void SilentRiotEditor::layoutContent()
 
     if (settingsPanel.isVisible())
     {
-        int sw = sr::SettingsPanel::panelW, sh = sr::SettingsPanel::panelH;
+        int sw = sr::SettingsPanel::panelW, sh = settingsPanel.panelHeight();
         int sy = static_cast<int>(kHeaderH * currentScale);
         settingsPanel.setBounds(getWidth() - sw, sy, sw, sh);
         settingsPanel.toFront(false);

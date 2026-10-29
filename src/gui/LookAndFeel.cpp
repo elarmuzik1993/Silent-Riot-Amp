@@ -269,4 +269,14 @@ void SilentRiotLookAndFeel::drawToggleButton(juce::Graphics& g, juce::ToggleButt
     g.drawText(btn.getButtonText(), bounds, juce::Justification::centred);
 }
 
+juce::Font SilentRiotLookAndFeel::getComboBoxFont(juce::ComboBox&)
+{
+    return Fonts::spaceMono(Fonts::Sizes::body);
+}
+
+juce::Font SilentRiotLookAndFeel::getPopupMenuFont()
+{
+    return Fonts::spaceMono(Fonts::Sizes::value);
+}
+
 } // namespace sr
