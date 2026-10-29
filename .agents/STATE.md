@@ -1,10 +1,10 @@
 # State
 
-_Updated 2026-10-29 (IR loader cab view)_
+_Updated 2026-10-29 (standalone INPUT selector)_
 
 ## Now
 - Silent Riot v0.3.4 (JUCE 7 VST3/Standalone), GPL-3.0-or-later, free + optional donations. No tagged
-  release. `bash scripts/verify.sh` passes: 421/421 ctest (312 pure C++ / 81 JUCE / 28 processor).
+  release. `bash scripts/verify.sh` passes: 429/429 ctest (312 pure C++ / 81 JUCE / 36 processor).
 - Docs are open-source ready (README, `docs/manual/`, `docs/dev/`, CONTRIBUTING/CoC/SECURITY, issue
   forms, CHANGELOG); `docs/README.md` indexes them. `dev/` + `manual/` track the code; `design/` +
   `records/` are frozen. `verify.sh --quick` (also CI) checks SPDX, links, tool source lists, UI text.
@@ -15,6 +15,9 @@ _Updated 2026-10-29 (IR loader cab view)_
   piping, black expanded-metal grille) with arrows that cycle the built-in cab + every IR; a
   CAB | LIBRARY switch brings back the list (`irView` UI property). The IR LOADER sits directly under
   the amp, above EFFECTS (section order IR LOADER, EFFECTS, ADVANCED).
+- Standalone: Settings (gear) has an AUDIO INPUT list (`src/gui/InputSelector.*`) that opens the
+  interface with one input active, so Input 2 of a pair plays (the amp reads channel 0 only).
+  Saved with the device setup, not presets; hidden in VST3. Owner confirmed Input 2 plays on a KA6. Plan: `docs/plans/2026-10-29-standalone-input-select.md`.
 - Contributor issues #37–#48 are open (GUI bugs, IR loader, installers, README screenshot).
 - Commit as `Boris Miscenco <219343213+elarmuzik1993@users.noreply.github.com>`: export
   `GIT_AUTHOR_EMAIL`/`GIT_COMMITTER_EMAIL`; the cloud env's values beat `git -c`.

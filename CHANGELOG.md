@@ -64,6 +64,11 @@ tagged release will collect everything below.
 
 ### Fixed
 
+- Standalone: the second input of an interface (Input 2 on a Komplete Audio 6, for example)
+  can now play through the amp. The audio dialog offers inputs only in pairs and the amp
+  hears the first of the pair, so Input 2 was silent. Settings (gear) now has an **INPUT**
+  choice, shown only in the standalone, that plays through any single input and is
+  remembered with your audio device.
 - No more burst of noise or level when a session starts or the plugin is re-enabled. [#33]
 - No more 17.7 Hz motorboating with nothing plugged in at gain 9 and above. [#20]
 - The phase inverter no longer oscillates at a constant input (its solver did not converge). [#20]
