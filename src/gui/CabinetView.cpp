@@ -31,20 +31,22 @@ void CabinetView::setDragOver(bool over)
     repaint();
 }
 
-// The cab fills the component edge to edge, above the name strip: wider
-// than a real 2x12's 3:2 front.
+// The cab takes all the height above the name strip at kCabAspect, centred,
+// narrowed if the arrows either side would not fit.
 juce::Rectangle<float> CabinetView::cabBounds() const
 {
-    return { kMargin, 4.0f, static_cast<float>(getWidth()) - 2.0f * kMargin,
-             static_cast<float>(getHeight()) - kNameH - 6.0f };
+    const float h = static_cast<float>(getHeight()) - kNameH - 6.0f;
+    const float maxW = static_cast<float>(getWidth()) - 2.0f * (kArrowGap + kArrowR + 8.0f);
+    const float w = juce::jmin(h * kCabAspect, maxW);
+    return { (static_cast<float>(getWidth()) - w) * 0.5f, 4.0f, w, w / kCabAspect };
 }
 
-// Either side of the name, centred on the strip under the cab
+// Either side of the cab, level with its middle
 juce::Point<float> CabinetView::arrowCentre(int direction) const
 {
     const auto cab = cabBounds();
-    return { cab.getCentreX() + static_cast<float>(direction) * kArrowOffset,
-             cab.getBottom() + 4.0f + kNameH * 0.5f };
+    return { cab.getCentreX() + static_cast<float>(direction) * (cab.getWidth() * 0.5f + kArrowGap),
+             cab.getCentreY() };
 }
 
 int CabinetView::arrowAt(juce::Point<float> p) const
@@ -270,9 +272,7 @@ void CabinetView::paint(juce::Graphics& g)
     for (int dir : { -1, 1 })
         paintArrowButton(g, arrowCentre(dir), dir, canStep, hoverArrow == dir);
 
-    // Name and detail fill the gap between the arrows
-    const float textW = 2.0f * (kArrowOffset - kArrowR - 8.0f);
-    const float textX = cab.getCentreX() - textW * 0.5f;
+    const float textW = static_cast<float>(getWidth()) - 32.0f, textX = 16.0f;
     g.setFont(Fonts::spaceMono(Fonts::Sizes::value, true));
     g.setColour(Colours::bright);
     g.drawText(name, juce::Rectangle<float>(textX, cab.getBottom() + 6.0f, textW, 16.0f),
