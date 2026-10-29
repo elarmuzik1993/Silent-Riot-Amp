@@ -53,6 +53,8 @@ SilentRiotEditor::SilentRiotEditor(SilentRiotProcessor& p)
     contentArea.addAndMakeVisible(gainKnob);
     contentArea.addAndMakeVisible(toneKnob);
     contentArea.addAndMakeVisible(volumeKnob);
+    for (auto* k : { &gainKnob, &toneKnob, &volumeKnob })
+        k->setLabelOnTop(true);
     contentArea.addAndMakeVisible(halfPowerToggle);
     contentArea.addAndMakeVisible(cabSimToggle);
     contentArea.addAndMakeVisible(powerToggle);
@@ -612,32 +614,45 @@ void SilentRiotEditor::layoutContent()
 
     vuIn.setBounds(body.removeFromLeft(vuW).reduced(8, 20));
     vuOut.setBounds(body.removeFromRight(vuW).reduced(8, 20));
-    faceplate.setBounds(body.reduced(8, 8));
+    const auto plate = body.reduced(8, 8);
+    faceplate.setBounds(plate);
 
-    int cx = body.getCentreX();
+    // GAIN, SHAPE, VOLUME and the lamp share one row, spaced evenly across the
+    // faceplate by what each one visibly occupies (the 80px dial; the lamp and
+    // its POWER label), so the gaps between them and to the edges all match.
+    // Each toggle sits under its knob's column.
+    constexpr int dialW = 80, lampW = 40;
+    const float gap = static_cast<float>(plate.getWidth() - dialW * 3 - lampW) / 5.0f;
+    const auto columnX = [&](int i) {
+        return static_cast<float>(plate.getX()) + gap * static_cast<float>(i + 1)
+             + static_cast<float>(dialW * i) + (i < 3 ? dialW : lampW) * 0.5f;
+    };
 
-    // knobH only reserves paint space: NotchKnob draws the dial (80px) plus the
-    // value readout and label, bottoming out at 108px. The slider hit area is
-    // the top 80px, so the extra rows below were pure dead space.
-    int knobW = 100, knobH = 110, knobGap = 36;
-    int totalKnobW = knobW * 3 + knobGap * 2;
-    int knobStartX = cx - totalKnobW / 2;
-    int knobY = body.getY() + 16;
-
-    gainKnob.setBounds(knobStartX, knobY, knobW, knobH);
-    toneKnob.setBounds(knobStartX + knobW + knobGap, knobY, knobW, knobH);
-    volumeKnob.setBounds(knobStartX + (knobW + knobGap) * 2, knobY, knobW, knobH);
-
-    int toggleW = 50, toggleH = 36, toggleGap = 32;
-    int totalToggleW = toggleW * 3 + toggleGap * 2;
-    int toggleStartX = cx - totalToggleW / 2;
+    // knobH only reserves paint space: NotchKnob draws the label, the dial
+    // (80px) and the value readout, 108px in all. The knob + toggle stack is
+    // centred top to bottom.
+    int knobW = 100, knobH = 110;
+    int toggleW = 50, toggleH = 36;
     // 16px below the knob's paint extent — ToggleSwitch draws its own label in
     // the top 14px, so the visible gap between knob label and toggle label ~24px.
+    const int stackH = knobH + 16 + toggleH;
+    int knobY = plate.getY() + (plate.getHeight() - stackH) / 2;
     int toggleY = knobY + knobH + 16;
 
-    halfPowerToggle.setBounds(toggleStartX, toggleY, toggleW, toggleH);
-    cabSimToggle.setBounds(toggleStartX + toggleW + toggleGap, toggleY, toggleW, toggleH);
-    powerToggle.setBounds(toggleStartX + (toggleW + toggleGap) * 2, toggleY, toggleW, toggleH);
+    sr::NotchKnob* knobs[] = { &gainKnob, &toneKnob, &volumeKnob };
+    sr::ToggleSwitch* toggles[] = { &halfPowerToggle, &cabSimToggle, &powerToggle };
+    for (int i = 0; i < 3; ++i)
+    {
+        const int x = juce::roundToInt(columnX(i));
+        knobs[i]->setBounds(x - knobW / 2, knobY, knobW, knobH);
+        toggles[i]->setBounds(x - toggleW / 2, toggleY, toggleW, toggleH);
+    }
+
+    // The lamp sits level with the dial centres: below the label strip, in the
+    // middle of the dial NotchKnob fits between label and readout.
+    const float dialCentreY = static_cast<float>(gainKnob.getSlider().getBounds().getCentreY() + knobY);
+    faceplate.setLampCentre({ columnX(3) - static_cast<float>(plate.getX()),
+                              dialCentreY - static_cast<float>(plate.getY()) });
 
     fxSectionBar.setBounds(area.removeFromTop(kSectionH));
     int fxH = static_cast<int>(fxPanelAnimH);

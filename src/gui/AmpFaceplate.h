@@ -22,11 +22,12 @@ public:
     static void paintLamp(juce::Graphics&, juce::Point<float> c, float r,
                           juce::Colour colour, float brightness);
 
-    // Width the right end reserves for the lamp.
-    static constexpr int sideW = 104;
+    // Where the editor's layout puts the lamp, in this component's coordinates.
+    void setLampCentre(juce::Point<float> centre);
 
 private:
     bool powered = true;
+    juce::Point<float> lampCentre;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(AmpFaceplate)
 };

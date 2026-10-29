@@ -15,6 +15,14 @@ AmpFaceplate::AmpFaceplate()
     setInterceptsMouseClicks(false, false);
 }
 
+void AmpFaceplate::setLampCentre(juce::Point<float> centre)
+{
+    if (centre == lampCentre)
+        return;
+    lampCentre = centre;
+    repaint();
+}
+
 void AmpFaceplate::setPowered(bool on)
 {
     if (on == powered)
@@ -202,9 +210,8 @@ void AmpFaceplate::paint(juce::Graphics& g)
     drawScrew(g, b.getX() + inset, b.getBottom() - inset);
     drawScrew(g, b.getRight() - inset, b.getBottom() - inset);
 
-    // ── Glass pilot lamp, right end ──
-    const float midY = b.getY() + 62.0f;  // level with the knob dials
-    const float lx = b.getRight() - sideW * 0.5f, r = 9.5f;
+    // ── Glass pilot lamp, placed by the editor in the knob row ──
+    const float midY = lampCentre.y, lx = lampCentre.x, r = 9.5f;
     paintLamp(g, { lx, midY }, r, Colours::red, powered ? 1.0f : 0.0f);
 
     g.setColour(Colours::dim);

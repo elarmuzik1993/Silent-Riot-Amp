@@ -44,13 +44,28 @@ void NotchKnob::setScale(float s)
     repaint();
 }
 
+void NotchKnob::setLabelOnTop(bool onTop)
+{
+    labelOnTop = onTop;
+    resized();
+    repaint();
+}
+
 void NotchKnob::resized()
 {
     // Reserve the readout + label strip, then centre a square knob in what's
     // left — drawRotarySlider takes jmin(w,h), so a non-square slider would
     // just pad one axis.
     auto area = getLocalBounds();
-    area.removeFromBottom(juce::roundToInt(stripH()));
+    if (labelOnTop)
+    {
+        area.removeFromTop(juce::roundToInt(labelH + readoutGap));
+        area.removeFromBottom(juce::roundToInt(readoutH));
+    }
+    else
+    {
+        area.removeFromBottom(juce::roundToInt(stripH()));
+    }
     const int side = juce::jmin(area.getWidth(), area.getHeight());
     slider.setBounds(area.withSizeKeepingCentre(side, side));
 }
@@ -58,8 +73,9 @@ void NotchKnob::resized()
 void NotchKnob::paint(juce::Graphics& g)
 {
     auto bounds     = getLocalBounds().toFloat();
-    auto labelBox   = bounds.removeFromBottom(labelH);
-    bounds.removeFromBottom(readoutGap);
+    auto labelBox   = labelOnTop ? bounds.removeFromTop(labelH) : bounds.removeFromBottom(labelH);
+    if (! labelOnTop)
+        bounds.removeFromBottom(readoutGap);
     auto readoutRow = bounds.removeFromBottom(readoutH);
 
     // Value readout — knobs are 0..1 internally, displayed ×10 unless the owner
