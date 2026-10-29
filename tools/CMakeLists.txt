@@ -47,6 +47,7 @@ target_sources(sr_render PRIVATE
     ${CMAKE_SOURCE_DIR}/src/gui/SegmentedSelector.cpp
     ${CMAKE_SOURCE_DIR}/src/gui/SettingsPanel.cpp
     ${CMAKE_SOURCE_DIR}/src/gui/IRWaveformDisplay.cpp
+    ${CMAKE_SOURCE_DIR}/src/gui/CabinetView.cpp
     ${CMAKE_SOURCE_DIR}/src/gui/IRLoaderPanel.cpp
     ${CMAKE_SOURCE_DIR}/src/gui/TunerBar.cpp
     ${CMAKE_SOURCE_DIR}/src/gui/EffectsPanel.cpp
@@ -156,6 +157,7 @@ target_sources(sr_editor_snapshot PRIVATE
     ${CMAKE_SOURCE_DIR}/src/gui/SegmentedSelector.cpp
     ${CMAKE_SOURCE_DIR}/src/gui/SettingsPanel.cpp
     ${CMAKE_SOURCE_DIR}/src/gui/IRWaveformDisplay.cpp
+    ${CMAKE_SOURCE_DIR}/src/gui/CabinetView.cpp
     ${CMAKE_SOURCE_DIR}/src/gui/IRLoaderPanel.cpp
     ${CMAKE_SOURCE_DIR}/src/gui/TunerBar.cpp
     ${CMAKE_SOURCE_DIR}/src/gui/EffectsPanel.cpp

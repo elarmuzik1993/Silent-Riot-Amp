@@ -1,10 +1,10 @@
 # State
 
-_Updated 2026-10-29_
+_Updated 2026-10-29 (IR loader cab view)_
 
 ## Now
 - Silent Riot v0.3.4 (JUCE 7 VST3/Standalone), GPL-3.0-or-later, free + optional donations. No tagged
-  release yet. `bash scripts/verify.sh` passes: 408/408 ctest (308 pure C++ / 81 JUCE / 19 processor).
+  release yet. `bash scripts/verify.sh` passes: 413/413 ctest (308 pure C++ / 81 JUCE / 24 processor).
 - Docs are open-source ready: README, `docs/manual/`, `docs/dev/`, CONTRIBUTING/CoC/SECURITY, issue
   forms, CHANGELOG (feeds release notes). `docs/README.md` indexes every doc; `dev/` + `manual/` track
   the code, `design/` + `records/` are frozen. `verify.sh --quick` (also in CI) checks SPDX headers,
@@ -31,6 +31,9 @@ _Updated 2026-10-29_
    knobs with engraved values, chrome bat toggles on orange glass rings. The EFFECTS panel now uses
    the same hardware style (faceplate cards, 0.7× pointer knobs, orange glass jewel ON/PP toggles).
    Owner still open: lamp colour, weave strength, keep the "POWER" label? Jewel size/colour OK?
+8. IR LOADER now opens on a drawn 2x12 cab (`src/gui/CabinetView.*`) with arrows that cycle the
+   built-in cab + every IR; a CAB | LIBRARY switch brings back the list. Owner: check the drawing
+   (light theme renders a white-tolex cab), and whether the cab should dim while CAB is off.
 
 ## Decisions
 - Never gate features, nag, or add a trial (open source + donations).

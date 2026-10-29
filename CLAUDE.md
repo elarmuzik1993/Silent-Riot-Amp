@@ -51,7 +51,7 @@ src/
 │   ├── tubes/       TriodeWaveshaper, PentodeWaveshaper, GridConduction
 │   ├── power/       PowerSupplyModel, SagEnvelope, LTPSolver
 │   └── cabinet/     SpeakerCoupling, CabinetSim, IRLibrary, OTSaturation
-├── gui/             18 custom components (see GUI Architecture below)
+├── gui/             19 custom components (see GUI Architecture below)
 ├── PluginProcessor  Full signal chain (§2.5 processBlock)
 └── PluginEditor     GUI shell (window sized to content height)
 ```
@@ -101,7 +101,7 @@ cmake -B build -DSR_BUILD_TESTS=ON # Build with tests
 - Tests use Catch2 v3 — one test file per DSP module, three test targets:
   - `SilentRiotTests` — 308 pure C++ test cases (no JUCE dependency)
   - `SilentRiotJuceTests` — 81 JUCE-dependent test cases (cabinet IR, convolution, IR level match, IR readiness, user IR loading and truncation fade, oversample switcher + latency, delay/reverb)
-  - `SilentRiotProcessorTests` — 19 test cases on the real `SilentRiotProcessor` (effect-tail wiring, host bypass, IR restore and first-block install, IR level, cab-mode fades, GUI meters). Links the plugin's SharedCode target `SilentRiot`, so there is no source list to keep in step; drive it through `tests/processor_harness.h` (`ProcessorHarness`: prepared processor, `set()` params in natural units, `run()` / `silence()` in host blocks, `Mode::Bypassed`, `loadIR()`). Use it for anything that lives in `processBlock`'s wiring — a unit test of the DSP class it calls cannot see that. Each case takes seconds (4× oversampled amp), so keep runs short
+  - `SilentRiotProcessorTests` — 24 test cases on the real `SilentRiotProcessor` (effect-tail wiring, host bypass, IR restore and first-block install, IR level, cab-mode fades, built-in cab selection, GUI meters) and on GUI components that need the plugin's code (`gui_ir_loader_tests.cpp`: the CAB view's IR cycle). Links the plugin's SharedCode target `SilentRiot`, so there is no source list to keep in step; drive it through `tests/processor_harness.h` (`ProcessorHarness`: prepared processor, `set()` params in natural units, `run()` / `silence()` in host blocks, `Mode::Bypassed`, `loadIR()`). Use it for anything that lives in `processBlock`'s wiring — a unit test of the DSP class it calls cannot see that. Each case takes seconds (4× oversampled amp), so keep runs short
 
 ## Cabinet IR Loader Architecture
 
@@ -119,7 +119,7 @@ cmake -B build -DSR_BUILD_TESTS=ON # Build with tests
 
 ## GUI Architecture
 
-18 custom components in `src/gui/`, all in `namespace sr`:
+19 custom components in `src/gui/`, all in `namespace sr`:
 
 - **ColourPalette.h** — 28 inline colour constants (dark theme), incl. the `knobBody`/`knobFace`/`knobTick` ramp. Text tiers hold ≥4.5:1 against `panel`; `muted` (3.5:1) is decoration only, never a glyph
 - **FontData.h/.cpp** — Embedded Space Mono + DM Sans fonts via BinaryData, plus the `Fonts::Sizes` type scale (micro 9 / small 10 / body 11 / value 12.5 / title 14 / hero 22). No bare numeric font sizes anywhere in `src/gui/` — tune type from that one block. Note these are JUCE font *heights* (ascent+descent), which render ~25% smaller than the same number in CSS px
@@ -135,7 +135,8 @@ cmake -B build -DSR_BUILD_TESTS=ON # Build with tests
 - **PresetSelector.h/.cpp** — `[◂ | name | ▸]` cyclic preset browser
 - **SegmentedSelector.h/.cpp** — Row of mutually-exclusive buttons
 - **SettingsPanel.h/.cpp** — Overlay (340px) with UI preferences + About section
-- **IRLoaderPanel.h/.cpp** — Scrollable IR list, waveform display, drag-and-drop (category tabs per UI spec §5.7 not yet implemented — user-IR-only today)
+- **IRLoaderPanel.h/.cpp** — Two views behind a `CAB | LIBRARY` `SegmentedSelector` (top right; the editor persists it as the `irView` property, default CAB). **CAB**: a `CabinetView` plus a LOAD IR chip; its arrows call `stepIR()`, which cycles IR_INDEX 0 (built-in cab) → each loaded IR → wrap, and reports through `onIRSelected` — the editor maps 0 to `selectBuiltInCab()` (sets IR_INDEX 0 and applies it at once, like `selectUserIR`). **LIBRARY**: scrollable IR list, waveform display, drop zone. Drag-and-drop works in both (category tabs per UI spec §5.7 not yet implemented — user-IR-only today)
+- **CabinetView.h/.cpp** — the CAB view: a 2x12 cab front painted in code (`paintCabinet()`: tolex with pebble grain, chrome corners, light piping, grille cloth over two speakers that show through), round drawn arrow buttons either side, the playing name + detail line under it. Display only — `onStep(±1)` goes to the panel
 - **IRWaveformDisplay.h/.cpp** — Waveform plot with envelope fill
 - **EffectsPanel.h/.cpp** — 2×2 card grid (UTILITY / BOOST / DELAY / REVERB), in the faceplate's hardware style: each card is an `AmpFaceplate::paintPlate` panel, the knobs are the amp row's pointer knobs at `setScale(0.7)` (name on top, engraved value, 70×80px), and ON/PP are `Style::Jewel` toggles beside the card title. `panelHeight` (312) is driven by the DELAY card, which is the tightest: it carries an extra sync-division row *and* a knob row. The card metrics static_assert against `NotchKnob::stripHeight`, `ToggleSwitch::minHeight` and `panelHeight`; shrink them and DELAY's knob values are the first thing to disappear
 - **AmpFaceplate.h/.cpp** — the amp head's front panel behind GAIN/SHAPE/VOLUME: `paintPlate()` (raised gradient, grille-cloth weave, piping — shared with the EFFECTS cards), corner screws, and the glass pilot lamp `paintLamp()` (shared with the jewel toggles; `bloom` sets its glow radius)

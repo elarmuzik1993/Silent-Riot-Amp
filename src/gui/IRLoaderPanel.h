@@ -3,7 +3,9 @@
 #pragma once
 #include <juce_gui_basics/juce_gui_basics.h>
 #include <juce_audio_formats/juce_audio_formats.h>
+#include "CabinetView.h"
 #include "IRWaveformDisplay.h"
+#include "SegmentedSelector.h"
 
 namespace sr {
 
@@ -17,14 +19,27 @@ public:
     // FileDragAndDropTarget
     bool isInterestedInFileDrag(const juce::StringArray& files) override;
     void filesDropped(const juce::StringArray& files, int x, int y) override;
-    void fileDragEnter(const juce::StringArray&, int, int) override { dragOver = true; repaint(); }
-    void fileDragExit(const juce::StringArray&) override { dragOver = false; repaint(); }
+    void fileDragEnter(const juce::StringArray&, int, int) override { setDragOver(true); }
+    void fileDragExit(const juce::StringArray&) override { setDragOver(false); }
 
     void mouseDown(const juce::MouseEvent&) override;
     void mouseWheelMove(const juce::MouseEvent&, const juce::MouseWheelDetails&) override;
 
     void setSelectedIR(int index);
     int getSelectedIR() const { return selectedIRIndex; }
+
+    // CAB shows the 2x12 cabinet with arrows that step through the built-in
+    // cab (IR_INDEX 0) and every loaded IR; LIBRARY is the list, waveform and
+    // details. The editor persists the choice with the UI state.
+    enum class View { Cab = 0, Library = 1 };
+    void setView(View v);
+    View getView() const { return view; }
+
+    // Select the entry `delta` steps away in the CAB view's cycle (built-in
+    // cab, then the loaded IRs in list order, wrapping), and report it
+    // through onIRSelected. An index that is in neither starts from the
+    // built-in cab.
+    void stepIR(int delta);
 
     // User IR list management
     void addUserIR(const juce::String& name, int samples, double sampleRate,
@@ -33,13 +48,21 @@ public:
 
     std::function<void(int)> onIRSelected;
     std::function<void(const juce::File&)> onUserIRLoaded;
+    std::function<void(View)> onViewChanged;
 
     static constexpr int panelHeight = 240;
 
 private:
     void refreshWaveform();
+    void refreshCabView();
+    void setDragOver(bool over);
+    void openFileBrowser();
+    juce::Rectangle<float> loadButtonArea() const;
 
     IRWaveformDisplay waveformDisplay;
+    CabinetView cabView;
+    SegmentedSelector viewSwitch { { "CAB", "LIBRARY" }, 0 };
+    View view = View::Cab;
 
     struct IREntry {
         juce::String name;
@@ -53,6 +76,7 @@ private:
     int scrollOffset = 0;
     bool dragOver = false;
 
+    static constexpr int headerH = 28;   // title + view switch row, both views
     static constexpr int listRowH = 20;
     static constexpr int listVisibleRows = 8;
 

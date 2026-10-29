@@ -116,6 +116,7 @@ add_executable(SilentRiotProcessorTests
     processor_effects_tests.cpp
     processor_ir_tests.cpp
     processor_meter_tests.cpp
+    gui_ir_loader_tests.cpp
 )
 
 target_link_libraries(SilentRiotProcessorTests PRIVATE

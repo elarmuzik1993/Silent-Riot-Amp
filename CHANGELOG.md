@@ -49,6 +49,9 @@ tagged release will collect everything below.
   mute the output while you tune. [#17]
 - User cabinet IR loading, by drag-and-drop or file browser, with up to 32 IRs per
   session. [#16]
+- The IR LOADER opens on a drawn 2x12 cabinet with arrows that step through the
+  built-in cab and every loaded IR; a CAB | LIBRARY switch brings back the list. The
+  arrows are the first way back to the built-in cab from the plugin itself.
 - The plugin reports its latency exactly, so hosts line it up with other tracks. [#33]
 - Keyboard control of every knob (arrows, Page Up/Down). Presets recall. A Settings panel
   with UI scale, meter ballistics and theme. [#3]

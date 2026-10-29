@@ -108,6 +108,7 @@ public:
     // sr::MAX_USER_IRS — callers must not assume a new entry was appended.
     bool loadUserIR(const juce::File& file);
     void selectUserIR(int userIndex);  // 0-based index into userIRs
+    void selectBuiltInCab();           // IR_INDEX 0: the IIR cab, convolution off
     int getNumUserIRs() const { return static_cast<int>(userIRs.size()); }
     const UserIREntry& getUserIR(int index) const { return userIRs[static_cast<size_t>(index)]; }
 
