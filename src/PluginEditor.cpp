@@ -617,15 +617,12 @@ void SilentRiotEditor::layoutContent()
     const auto plate = body.reduced(8, 8);
     faceplate.setBounds(plate);
 
-    // GAIN, SHAPE, VOLUME and the lamp share one row, spaced evenly across the
-    // faceplate by what each one visibly occupies (the 80px dial; the lamp and
-    // its POWER label), so the gaps between them and to the edges all match.
-    // Each toggle sits under its knob's column.
-    constexpr int dialW = 80, lampW = 40;
-    const float gap = static_cast<float>(plate.getWidth() - dialW * 3 - lampW) / 5.0f;
+    // SHAPE sits dead centre on the faceplate with GAIN and VOLUME a fixed pitch
+    // either side. Each toggle sits under its knob's column.
+    constexpr int dialW = 80, knobPitch = 145;
+    const float plateCentreX = static_cast<float>(plate.getX()) + plate.getWidth() * 0.5f;
     const auto columnX = [&](int i) {
-        return static_cast<float>(plate.getX()) + gap * static_cast<float>(i + 1)
-             + static_cast<float>(dialW * i) + (i < 3 ? dialW : lampW) * 0.5f;
+        return plateCentreX + static_cast<float>(knobPitch * (i - 1));
     };
 
     // knobH only reserves paint space: NotchKnob draws the label, the dial
@@ -648,11 +645,12 @@ void SilentRiotEditor::layoutContent()
         toggles[i]->setBounds(x - toggleW / 2, toggleY, toggleW, toggleH);
     }
 
-    // The lamp sits level with the dial centres: below the label strip, in the
-    // middle of the dial NotchKnob fits between label and readout.
-    const float dialCentreY = static_cast<float>(gainKnob.getSlider().getBounds().getCentreY() + knobY);
-    faceplate.setLampCentre({ columnX(3) - static_cast<float>(plate.getX()),
-                              dialCentreY - static_cast<float>(plate.getY()) });
+    // The lamp sits midway between VOLUME's dial and the faceplate's right
+    // edge, centred top to bottom.
+    const float volumeDialRight = columnX(2) + dialW * 0.5f;
+    faceplate.setLampCentre({ (volumeDialRight + static_cast<float>(plate.getRight())) * 0.5f
+                                  - static_cast<float>(plate.getX()),
+                              plate.getHeight() * 0.5f });
 
     fxSectionBar.setBounds(area.removeFromTop(kSectionH));
     int fxH = static_cast<int>(fxPanelAnimH);

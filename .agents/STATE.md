@@ -28,8 +28,8 @@ _Updated 2026-10-29_
 5. E3 last: repoint the gate to `tests/fixtures/ir/bright.wav`, then fix the engine aliasing.
 6. GitHub Actions has failed every run since 2026-10-09; recheck once public (free runners).
 7. Owner: amp faceplate (`feat/amp-faceplate`, `src/gui/AmpFaceplate.*`) approved, wordmark removed.
-   Pilot lamp is a deep-ruby glass dome (9.5 px lens); amp knob labels sit on top; knobs + lamp share
-   one evenly spaced row, toggles under their knobs. Main screenshot refreshed. Still open: lamp
+   Pilot lamp is a deep-ruby glass dome (8 px lens), vertically centred right of VOLUME; amp knob
+   labels on top; SHAPE dead centre, toggles under their knobs. Screenshot refreshed. Open: lamp
    colour, weave strength, keep the "POWER" label?
 
 ## Decisions

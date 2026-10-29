@@ -211,7 +211,7 @@ void AmpFaceplate::paint(juce::Graphics& g)
     drawScrew(g, b.getRight() - inset, b.getBottom() - inset);
 
     // ── Glass pilot lamp, placed by the editor in the knob row ──
-    const float midY = lampCentre.y, lx = lampCentre.x, r = 9.5f;
+    const float midY = lampCentre.y, lx = lampCentre.x, r = 8.0f;
     paintLamp(g, { lx, midY }, r, Colours::red, powered ? 1.0f : 0.0f);
 
     g.setColour(Colours::dim);
