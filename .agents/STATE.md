@@ -30,7 +30,8 @@ _Updated 2026-10-29_
 7. Amp faceplate is on `main` (`src/gui/AmpFaceplate.*`): deep-ruby glass pilot lamp, satin pointer
    knobs with engraved values, chrome bat toggles on orange glass rings. The EFFECTS panel now uses
    the same hardware style (faceplate cards, 0.7× pointer knobs, orange glass jewel ON/PP toggles).
-   DELAY's sync-division row is now a SYNC jewel that turns TIME into the division knob.
+   DELAY's sync-division row is gone: SYNC and PP are bat toggles stacked left of TIME, and
+   SYNC turns TIME into the division knob.
    Owner still open: lamp colour, weave strength, keep the "POWER" label? Jewel size/colour OK?
 
 ## Decisions
@@ -50,7 +51,7 @@ _Updated 2026-10-29_
 - IR path: cab-mode switches dip (~6–95 ms by block size); bright IRs sit 1.2–1.5 dB under the
   built-in cab; long IRs lose their ring at the 8192 cap. GUI bugs are tracked in #37–#45.
 - GUI review 2026-10-28, still open: small low-contrast text (section titles, footer), window
-  can outgrow the screen with EFFECTS + IR LOADER open (EFFECTS is now 272 px, 12 px under its
+  can outgrow the screen with EFFECTS + IR LOADER open (EFFECTS is now 304 px, 20 px over its
   pre-restyle height). The REVERB/DELAY knob-row offset is gone with the sync row.
 - 13 commits on `main` and the docs plan's first commit carry the env email, not the noreply one;
   pre-rewrite commits stay reachable via closed PRs' `refs/pull/*` (only GitHub Support can purge).

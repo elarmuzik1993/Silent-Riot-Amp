@@ -23,7 +23,7 @@ DI / test signal ──► sr_render ──► <id>.f32 + .json + .wav ──►
 | `sr_wobble.py` | Envelope modulation on a constant tone (free-running loops) | no | ✅ |
 | `sr_bloom.py` | Transient recovery — rebound after the decay ("delayed pluck") | no | ✅ |
 | `signoff.py` | Orchestrates renders → analysis → §4 gate table + exit code | no | ✅ end-to-end against a stub render |
-| `sr_editor_snapshot.cpp` | Paints the real editor offscreen to a PNG (the manual's screenshots in `resources/images/`). `sr_editor_snapshot out.png [fx] [ir] [adv] [off] [scale=N] [theme=N] [set=<paramID>:<0..1>]...`, run under `xvfb-run` (`set=` sets any parameter, e.g. `set=boostOn:1`; `effects-panel.png` is the `fx set=boostOn:1 set=reverbOn:1` render cropped to 0,270 700×300); links the full plugin source list (checked by `verify.sh`) | **yes** (`-DSR_BUILD_TOOLS=ON`) | ✅ Linux/Xvfb |
+| `sr_editor_snapshot.cpp` | Paints the real editor offscreen to a PNG (the manual's screenshots in `resources/images/`). `sr_editor_snapshot out.png [fx] [ir] [adv] [off] [scale=N] [theme=N] [set=<paramID>:<0..1>]...`, run under `xvfb-run` (`set=` sets any parameter, e.g. `set=boostOn:1`; `effects-panel.png` is the `fx set=boostOn:1 set=reverbOn:1` render cropped to 0,270 700×332); links the full plugin source list (checked by `verify.sh`) | **yes** (`-DSR_BUILD_TOOLS=ON`) | ✅ Linux/Xvfb |
 | `signoff_gates.json` | The §4 gates + test matrix as data (targets `TBM` until the Calibration Pass) | no | ✅ parses |
 
 > **Build note.** `sr_render` was unbuilt for a long time and had accumulated two

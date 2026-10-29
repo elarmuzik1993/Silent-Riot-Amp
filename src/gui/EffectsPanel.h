@@ -17,13 +17,14 @@ public:
     void paint(juce::Graphics&) override;
     void resized() override;
 
-    // Two card rows sized to the scaled pointer knobs (name + dial + engraved
-    // value, see kKnobH) plus each card's jewel-toggle title row:
+    // Two card rows, each a jewel-toggle title row over the tallest thing a
+    // card holds — DELAY's SYNC/PP bat-toggle stack, which out-measures the
+    // scaled pointer knobs (kKnobH):
     // 2 × kCardH + kCardGap + the 10 px margin either side. Kept in sync with
     // the card metrics in EffectsPanel.cpp, which static_assert it — a
     // too-short panel shows up as knob values drawn past the bottom edge and
     // silently clipped.
-    static constexpr int panelHeight = 272;
+    static constexpr int panelHeight = 304;
 
     // Toggles (the UTILITY card's gate/width knobs self-gate — no toggle)
     ToggleSwitch& boostToggle()  { return boostTgl; }
