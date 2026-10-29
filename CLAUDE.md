@@ -51,7 +51,7 @@ src/
 │   ├── tubes/       TriodeWaveshaper, PentodeWaveshaper, GridConduction
 │   ├── power/       PowerSupplyModel, SagEnvelope, LTPSolver
 │   └── cabinet/     SpeakerCoupling, CabinetSim, IRLibrary, OTSaturation
-├── gui/             18 custom components (see GUI Architecture below)
+├── gui/             19 custom components (see GUI Architecture below)
 ├── PluginProcessor  Full signal chain (§2.5 processBlock)
 └── PluginEditor     GUI shell (window sized to content height)
 ```
@@ -101,7 +101,7 @@ cmake -B build -DSR_BUILD_TESTS=ON # Build with tests
 - Tests use Catch2 v3 — one test file per DSP module, three test targets:
   - `SilentRiotTests` — 312 pure C++ test cases (no JUCE dependency)
   - `SilentRiotJuceTests` — 81 JUCE-dependent test cases (cabinet IR, convolution, IR level match, IR readiness, user IR loading and truncation fade, oversample switcher + latency, delay/reverb)
-  - `SilentRiotProcessorTests` — 23 test cases on the real `SilentRiotProcessor` (effect-tail wiring, host bypass, IR restore and first-block install, IR level, cab-mode fades, GUI meters, the DELAY TIME/SYNC knob binding). Links the plugin's SharedCode target `SilentRiot`, so there is no source list to keep in step; drive it through `tests/processor_harness.h` (`ProcessorHarness`: prepared processor, `set()` params in natural units, `run()` / `silence()` in host blocks, `Mode::Bypassed`, `loadIR()`). Use it for anything that lives in `processBlock`'s wiring — a unit test of the DSP class it calls cannot see that. Each case takes seconds (4× oversampled amp), so keep runs short
+  - `SilentRiotProcessorTests` — 28 test cases on the real `SilentRiotProcessor` (effect-tail wiring, host bypass, IR restore and first-block install, IR level, cab-mode fades, GUI meters, the DELAY TIME/SYNC knob binding, built-in cab selection) and on GUI components that need the plugin's code (`gui_ir_loader_tests.cpp`: the CAB view's IR cycle). Links the plugin's SharedCode target `SilentRiot`, so there is no source list to keep in step; drive it through `tests/processor_harness.h` (`ProcessorHarness`: prepared processor, `set()` params in natural units, `run()` / `silence()` in host blocks, `Mode::Bypassed`, `loadIR()`). Use it for anything that lives in `processBlock`'s wiring — a unit test of the DSP class it calls cannot see that. Each case takes seconds (4× oversampled amp), so keep runs short
 
 ## Cabinet IR Loader Architecture
 
@@ -119,7 +119,7 @@ cmake -B build -DSR_BUILD_TESTS=ON # Build with tests
 
 ## GUI Architecture
 
-18 custom components in `src/gui/`, all in `namespace sr`:
+19 custom components in `src/gui/`, all in `namespace sr`:
 
 - **ColourPalette.h** — 28 inline colour constants (dark theme), incl. the `knobBody`/`knobFace`/`knobTick` ramp. Text tiers hold ≥4.5:1 against `panel`; `muted` (3.5:1) is decoration only, never a glyph
 - **FontData.h/.cpp** — Embedded Space Mono + DM Sans fonts via BinaryData, plus the `Fonts::Sizes` type scale (micro 9 / small 10 / body 11 / value 12.5 / title 14 / hero 22). No bare numeric font sizes anywhere in `src/gui/` — tune type from that one block. Note these are JUCE font *heights* (ascent+descent), which render ~25% smaller than the same number in CSS px
@@ -135,7 +135,8 @@ cmake -B build -DSR_BUILD_TESTS=ON # Build with tests
 - **PresetSelector.h/.cpp** — `[◂ | name | ▸]` cyclic preset browser
 - **SegmentedSelector.h/.cpp** — Row of mutually-exclusive buttons
 - **SettingsPanel.h/.cpp** — Overlay (340px) with UI preferences + About section
-- **IRLoaderPanel.h/.cpp** — Scrollable IR list, waveform display, drag-and-drop (category tabs per UI spec §5.7 not yet implemented — user-IR-only today)
+- **IRLoaderPanel.h/.cpp** — Two views behind a `CAB | LIBRARY` `SegmentedSelector` (top right; the editor persists it as the `irView` property, default CAB). **CAB**: a `CabinetView` plus a LOAD IR chip; its arrows call `stepIR()`, which cycles IR_INDEX 0 (built-in cab) → each loaded IR → wrap, and reports through `onIRSelected` — the editor maps 0 to `selectBuiltInCab()` (sets IR_INDEX 0 and applies it at once, like `selectUserIR`). **LIBRARY**: scrollable IR list, waveform display, drop zone. Drag-and-drop works in both (category tabs per UI spec §5.7 not yet implemented — user-IR-only today)
+- **CabinetView.h/.cpp** — the CAB view: a 2x12 cab front painted in code (`paintCabinet()`: tolex with pebble grain, plain black corner caps (owner prefers them simple), orange accent piping, a black expanded-metal grille — staggered diamond openings filled even-odd — over two speakers that show through. Grille, baffle, speakers and caps are fixed black in both themes, like the real parts; only the tolex and piping follow the theme), at `kCabAspect` 2:1 (a little wider than a real 2x12's 3:2; trim scales with the cab's *height*, and the two speakers sit side by side in the middle, so a wider box still reads as a 2x12), round drawn arrow buttons either side of it, the playing name + detail line under it. Display only — `onStep(±1)` goes to the panel
 - **IRWaveformDisplay.h/.cpp** — Waveform plot with envelope fill
 - **EffectsPanel.h/.cpp** — 2×2 card grid (UTILITY / BOOST / DELAY / REVERB), in the faceplate's hardware style: each card is an `AmpFaceplate::paintPlate` panel, the knobs are the amp row's pointer knobs at `setScale(0.7)` (name on top, engraved value, 70×80px), and each card's ON is a `Style::Jewel` toggle beside its title. DELAY's **SYNC** and **PP** are the amp row's `Style::Switch` bat toggles, stacked SYNC over PP down the card's left before TIME; that stack (2 × `minHeight(Switch)`) is the tallest thing in any card and sets `kCardH` (136, `panelHeight` 304) — every card shares it so the knob rows stay level. DELAY has no division row: **SYNC** turns its TIME knob into the division selector — `DelayTimeAttachment` (`PluginEditor.h`) binds the one knob to `DELAY_TIME` with SYNC off and to `DELAY_SYNC_DIV` with it on (one detent per division, `syncDivisionFromKnob()` in `TempoSync.h`; MANUAL, index 0, *is* SYNC off), and keeps the last division in the `delayLastSyncDiv` state property. The parameters are unchanged, so sessions and automation still load. The card metrics static_assert against `NotchKnob::stripHeight`, `ToggleSwitch::minHeight` and `panelHeight`
 - **AmpFaceplate.h/.cpp** — the amp head's front panel behind GAIN/SHAPE/VOLUME: `paintPlate()` (raised gradient, grille-cloth weave, piping — shared with the EFFECTS cards), corner screws, and the glass pilot lamp `paintLamp()` (shared with the jewel toggles; `bloom` sets its glow radius)

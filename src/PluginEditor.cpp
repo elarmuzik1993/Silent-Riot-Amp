@@ -194,7 +194,10 @@ SilentRiotEditor::SilentRiotEditor(SilentRiotProcessor& p)
 
     // IR loader panel wiring
     irLoaderPanel.onIRSelected = [this](int irIdx) {
-        proc.selectUserIR(irIdx - 1);  // convert 1-based to 0-based
+        if (irIdx == 0)
+            proc.selectBuiltInCab();
+        else
+            proc.selectUserIR(irIdx - 1);  // convert 1-based to 0-based
         if (irIdx >= 1 && irIdx <= proc.getNumUserIRs())
             irSectionBar.setHintText(proc.getUserIR(irIdx - 1).name);
         else
@@ -411,6 +414,7 @@ void SilentRiotEditor::saveUIState()
     state.setProperty("fxPanelOpen",  fxPanelOpen,  nullptr);
     state.setProperty("irPanelOpen",  irPanelOpen,  nullptr);
     state.setProperty("advPanelOpen", advPanelOpen,  nullptr);
+    state.setProperty("irView",       static_cast<int>(irLoaderPanel.getView()), nullptr);
     state.setProperty("uiScale",      settingsPanel.uiScale, nullptr);
     state.setProperty("theme",        settingsPanel.themeIndex, nullptr);
     state.setProperty("meterBallistics", settingsPanel.meterBallistics, nullptr);
@@ -434,6 +438,10 @@ void SilentRiotEditor::loadUIState()
         irPanelAnimH = static_cast<float>(sr::IRLoaderPanel::panelHeight);
         irSectionBar.setOpen(true);
     }
+    if (state.hasProperty("irView"))
+        irLoaderPanel.setView(static_cast<int>(state.getProperty("irView")) == 1
+                                  ? sr::IRLoaderPanel::View::Library
+                                  : sr::IRLoaderPanel::View::Cab);
     if (state.hasProperty("advPanelOpen") && static_cast<bool>(state.getProperty("advPanelOpen")))
     {
         advPanelAnimH = static_cast<float>(sr::AdvancedPanel::panelHeight);

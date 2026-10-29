@@ -465,3 +465,34 @@ TEST_CASE("Processor: a cab mode set after prepare, before the first block, does
     late.run(0.1, sine(220.0f, 0.25f), ProcessorHarness::Mode::Process, &b);
     REQUIRE(a == b);
 }
+
+// The IR loader's CAB view steps to the built-in cab as well as to each IR.
+// selectBuiltInCab() applies IR_INDEX 0 itself, as selectUserIR() does for an
+// IR, so the convolution is off before the next block, not after the message
+// loop has run processBlock's async update.
+TEST_CASE("Processor: selectBuiltInCab turns the IR off, selectUserIR brings it back",
+          "[processor][ir]")
+{
+    juce::TemporaryFile irFile(".wav");
+    ProcessorHarness h;
+    h.loadIR(writeWav(irFile, longDecayIR(777u), 8000.0));
+    REQUIRE(irIndex(h) == 1);
+    REQUIRE(tailAfterNote(h) > dB(-100.0));
+
+    h.proc.selectBuiltInCab();
+    REQUIRE(irIndex(h) == 0);
+    REQUIRE(h.proc.getTailLengthSeconds() <= 0.0);
+    h.silence(0.5);   // past the cab-mode fade
+    INFO("the IR kept ringing after the built-in cab was selected");
+    REQUIRE(tailAfterNote(h) < dB(-100.0));
+
+    h.proc.selectUserIR(0);
+    REQUIRE(irIndex(h) == 1);
+    for (int i = 0; i < 60; ++i)   // JUCE builds the engine on its own thread
+    {
+        h.silence(512.0 / 44100.0);
+        std::this_thread::sleep_for(std::chrono::milliseconds(5));
+    }
+    h.silence(0.5);
+    REQUIRE(tailAfterNote(h) > dB(-100.0));
+}

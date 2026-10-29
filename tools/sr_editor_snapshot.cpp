@@ -5,12 +5,14 @@
 // (docs/manual/, resources/images/). Built only when -DSR_BUILD_TOOLS=ON.
 //
 //   sr_editor_snapshot <out.png> [fx] [ir] [adv] [off] [scale=<0..n>] [theme=<n>]
-//                      [set=<paramID>:<0..1>]...
+//                      [set=<paramID>:<0..1>]... [loadir=<file.wav>]... [irview=<0|1>]
 //
 // The flags open the matching panels (EFFECTS, IR LOADER, ADVANCED). With
 // the CAB toggle on (the default) the editor opens the IR LOADER itself. `off`
 // switches PWR off; `set=` sets any parameter by ID to a normalised value
-// (e.g. set=boostOn:1 to light a card's jewel); `theme=` picks a SettingsPanel theme index. Panel states go through the same apvts.state
+// (e.g. set=boostOn:1 to light a card's jewel); `theme=` picks a SettingsPanel theme index.
+// `loadir=` loads a user IR as the IR loader does (the last one stays selected);
+// `irview=` picks the IR LOADER view (0 = CAB, 1 = LIBRARY). Panel states go through the same apvts.state
 // properties the editor restores from, so the panels snap open with no
 // animation. Paints offscreen via paintEntireComponent; on Linux the editor
 // still opens an X11 connection, so run it under Xvfb (xvfb-run) when
@@ -63,6 +65,12 @@ int main(int argc, char** argv)
             else
                 juce::Logger::writeToLog("Unknown parameter in " + arg);
         }
+        if (arg.startsWith("loadir="))
+            if (!proc->loadUserIR(juce::File::getCurrentWorkingDirectory().getChildFile(
+                    arg.fromFirstOccurrenceOf("=", false, false))))
+                juce::Logger::writeToLog("Couldn't load " + arg);
+        if (arg.startsWith("irview="))
+            state.setProperty("irView", arg.fromFirstOccurrenceOf("=", false, false).getIntValue(), nullptr);
         if (arg.startsWith("theme="))
             state.setProperty("theme", arg.fromFirstOccurrenceOf("=", false, false).getIntValue(), nullptr);
         if (arg.startsWith("scale="))

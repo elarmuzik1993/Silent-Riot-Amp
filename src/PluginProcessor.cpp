@@ -1252,6 +1252,16 @@ void SilentRiotProcessor::selectUserIR(int userIndex)
         param->setValueNotifyingHost(param->convertTo0to1(static_cast<float>(paramIndex)));
 }
 
+void SilentRiotProcessor::selectBuiltInCab()
+{
+    // Message thread. Applied here rather than left to processBlock's change
+    // detection, like selectUserIR: the convolution turns off now, and the
+    // audio thread sees an index it already knows.
+    if (auto* param = apvts.getParameter(sr::Params::IDs::IR_INDEX))
+        param->setValueNotifyingHost(param->convertTo0to1(0.0f));
+    applyIRIndexParam(sr::IRLoad::Async);
+}
+
 void SilentRiotProcessor::saveUserIRsToState()
 {
     // Remove any existing UserIRs node

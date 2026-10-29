@@ -23,10 +23,19 @@ speaker IRs yet — for the most realistic cab sound, load your own.
 
 The IR LOADER is the lower panel in the [main window screenshot](../../resources/images/silent-riot-main.png).
 
-Open the **IR LOADER** bar, then either drag a file onto the panel or click
-**DROP .WAV OR CLICK TO BROWSE**. The new IR is added to the list on the left and
-selected; the right side shows its waveform, and the IR LOADER bar shows its
-name. Click another entry in the list to switch to it.
+The panel has two views, picked with the **CAB | LIBRARY** switch at its top
+right (the choice is saved with the project):
+
+- **CAB** (the default) shows a 2x12 cabinet with the name of what is playing
+  under it. The arrow buttons either side of the cab step through the **built-in cab**
+  and every IR you have loaded, wrapping around at either end. Click
+  **LOAD IR** to add a file.
+- **LIBRARY** shows the full list on the left and the selected IR's waveform
+  and details on the right. Click an entry to switch to it, or click
+  **DROP .WAV OR CLICK TO BROWSE** to add a file.
+
+In either view you can drag a file onto the panel. The new IR is added to the
+list and selected, and the IR LOADER bar shows its name.
 
 **What loads:**
 
@@ -64,12 +73,11 @@ The IR plays from the first audio block when the project loads.
 
 The IR loader is still basic. Known gaps:
 
-- **No way to remove an IR**, and no list entry for "back to the built-in cab".
-  To use the built-in cabinet again, set the **IR Selection** parameter to 0
-  from your host.
-- The list shows 8 rows. Scrolling past them uses the mouse wheel only, and on
-  many mice one wheel step is too small to move the list, so IRs after the
-  eighth can be hard to reach.
+- **No way to remove an IR**, and the LIBRARY list has no entry for "back to
+  the built-in cab": step to **BUILT-IN CAB** with the CAB view's arrows.
+- The LIBRARY list shows 8 rows. Scrolling past them uses the mouse wheel only,
+  and on many mice one wheel step is too small to move the list; the CAB view's
+  arrows reach every IR.
 - The file browser and drag-and-drop accept only `.wav` (and `.ir`, which
   doesn't actually load). Convert AIFF or FLAC files to WAV first.
 - The panel doesn't refresh when the IR changes from automation or when a

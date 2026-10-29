@@ -140,6 +140,8 @@ target_sources(SilentRiot
         src/gui/SettingsPanel.cpp
         src/gui/IRWaveformDisplay.h
         src/gui/IRWaveformDisplay.cpp
+        src/gui/CabinetView.h
+        src/gui/CabinetView.cpp
         src/gui/IRLoaderPanel.h
         src/gui/IRLoaderPanel.cpp
         src/gui/EffectsPanel.h

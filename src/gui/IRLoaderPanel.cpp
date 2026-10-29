@@ -4,11 +4,95 @@
 #include "ColourPalette.h"
 #include "FontData.h"
 
+#include <algorithm>
+
 namespace sr {
 
 IRLoaderPanel::IRLoaderPanel()
 {
-    addAndMakeVisible(waveformDisplay);
+    addChildComponent(waveformDisplay);
+    addAndMakeVisible(cabView);
+    addAndMakeVisible(viewSwitch);
+    viewSwitch.setTitleText("IR view");
+    viewSwitch.onChange = [this](int idx) {
+        setView(idx == 0 ? View::Cab : View::Library);
+        if (onViewChanged) onViewChanged(view);
+    };
+    cabView.onStep = [this](int delta) { stepIR(delta); };
+    refreshCabView();
+}
+
+void IRLoaderPanel::setView(View v)
+{
+    view = v;
+    viewSwitch.setSelectedIndex(view == View::Cab ? 0 : 1);
+    cabView.setVisible(view == View::Cab);
+    waveformDisplay.setVisible(view == View::Library);
+    repaint();
+}
+
+void IRLoaderPanel::stepIR(int delta)
+{
+    // The cycle: the built-in cab (IR_INDEX 0), then the IRs in list order
+    std::vector<int> cycle { 0 };
+    for (auto& entry : irList)
+        cycle.push_back(entry.irIndex);
+    const int n = static_cast<int>(cycle.size());
+    if (n < 2) return;
+
+    const auto it = std::find(cycle.begin(), cycle.end(), selectedIRIndex);
+    const int pos = it == cycle.end() ? 0 : static_cast<int>(it - cycle.begin());
+    const int next = cycle[static_cast<size_t>(((pos + delta) % n + n) % n)];
+    setSelectedIR(next);
+    if (onIRSelected) onIRSelected(next);
+}
+
+void IRLoaderPanel::refreshCabView()
+{
+    const int numIRs = static_cast<int>(irList.size());
+    for (size_t i = 0; i < irList.size(); ++i)
+    {
+        const auto& entry = irList[i];
+        if (entry.irIndex != selectedIRIndex)
+            continue;
+        const int rateKHz = static_cast<int>(entry.sampleRate / 1000.0);
+        cabView.setSelection(entry.name,
+                             "IR " + juce::String(static_cast<int>(i) + 1) + " OF " + juce::String(numIRs)
+                                 + "   " + juce::String(rateKHz) + " KHZ   "
+                                 + juce::String(entry.samples) + " SMP",
+                             true);
+        return;
+    }
+    cabView.setSelection("BUILT-IN CAB",
+                         numIRs == 0 ? juce::String("DROP A .WAV HERE OR LOAD IR TO ADD ONE")
+                                     : "IIR CAB MODEL   " + juce::String(numIRs)
+                                           + (numIRs == 1 ? " IR LOADED" : " IRS LOADED"),
+                         numIRs > 0);
+}
+
+void IRLoaderPanel::setDragOver(bool over)
+{
+    dragOver = over;
+    cabView.setDragOver(over);
+    repaint();
+}
+
+// The CAB view's click-to-browse chip, left of the view switch
+juce::Rectangle<float> IRLoaderPanel::loadButtonArea() const
+{
+    return viewSwitch.getBounds().toFloat().withWidth(72.0f).translated(-80.0f, 0.0f);
+}
+
+void IRLoaderPanel::openFileBrowser()
+{
+    auto chooser = std::make_shared<juce::FileChooser>("Load IR",
+        juce::File::getSpecialLocation(juce::File::userHomeDirectory), "*.wav;*.ir");
+    chooser->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
+        [this, chooser](const juce::FileChooser& fc) {
+            auto result = fc.getResult();
+            if (result.existsAsFile() && onUserIRLoaded)
+                onUserIRLoaded(result);
+        });
 }
 
 void IRLoaderPanel::addUserIR(const juce::String& name, int samples, double sampleRate,
@@ -16,6 +100,7 @@ void IRLoaderPanel::addUserIR(const juce::String& name, int samples, double samp
 {
     irList.push_back({ name, samples, sampleRate, irIndex,
                        juce::AudioBuffer<float>(audioData) });
+    refreshCabView();
     repaint();
 }
 
@@ -25,6 +110,7 @@ void IRLoaderPanel::clearIRList()
     selectedIRIndex = 0;
     scrollOffset = 0;
     waveformDisplay.clear();
+    refreshCabView();
     repaint();
 }
 
@@ -32,6 +118,7 @@ void IRLoaderPanel::setSelectedIR(int index)
 {
     selectedIRIndex = index;
     refreshWaveform();
+    refreshCabView();
     repaint();
 }
 
@@ -61,7 +148,7 @@ bool IRLoaderPanel::isInterestedInFileDrag(const juce::StringArray& files)
 
 void IRLoaderPanel::filesDropped(const juce::StringArray& files, int, int)
 {
-    dragOver = false;
+    setDragOver(false);
     for (auto& f : files)
     {
         juce::File file(f);
@@ -76,6 +163,13 @@ void IRLoaderPanel::filesDropped(const juce::StringArray& files, int, int)
 
 void IRLoaderPanel::mouseDown(const juce::MouseEvent& e)
 {
+    if (view == View::Cab)
+    {
+        if (loadButtonArea().contains(e.position))
+            openFileBrowser();
+        return;
+    }
+
     auto bounds = getLocalBounds();
     float leftW = bounds.getWidth() * 0.45f;
     float listY = 34.0f;
@@ -100,20 +194,12 @@ void IRLoaderPanel::mouseDown(const juce::MouseEvent& e)
     float dropY = listY + listH + 6.0f;
     auto dropArea = juce::Rectangle<float>(8.0f, dropY, leftW - 16.0f, 30.0f);
     if (dropArea.contains(e.position))
-    {
-        auto chooser = std::make_shared<juce::FileChooser>("Load IR",
-            juce::File::getSpecialLocation(juce::File::userHomeDirectory), "*.wav;*.ir");
-        chooser->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
-            [this, chooser](const juce::FileChooser& fc) {
-                auto result = fc.getResult();
-                if (result.existsAsFile() && onUserIRLoaded)
-                    onUserIRLoaded(result);
-            });
-    }
+        openFileBrowser();
 }
 
 void IRLoaderPanel::mouseWheelMove(const juce::MouseEvent&, const juce::MouseWheelDetails& wheel)
 {
+    if (view != View::Library) return;
     int maxScroll = std::max(0, static_cast<int>(irList.size()) - listVisibleRows);
     scrollOffset = juce::jlimit(0, maxScroll, scrollOffset - static_cast<int>(wheel.deltaY * 3.0f));
     repaint();
@@ -126,6 +212,24 @@ void IRLoaderPanel::paint(juce::Graphics& g)
 
     g.setColour(Colours::panelLight);
     g.fillRect(bounds);
+
+    if (view == View::Cab)
+    {
+        g.setFont(Fonts::spaceMono(Fonts::Sizes::micro, true));
+        g.setColour(Colours::dim);
+        g.drawText("CABINET", juce::Rectangle<float>(8.0f, 5.0f, 200.0f, 20.0f),
+                   juce::Justification::centredLeft, false);
+
+        const auto load = loadButtonArea();
+        g.setColour(dragOver ? Colours::accent.withAlpha(0.2f) : Colours::surface);
+        g.fillRoundedRectangle(load, 4.0f);
+        g.setColour(dragOver ? Colours::accent : Colours::border);
+        g.drawRoundedRectangle(load, 4.0f, 1.0f);
+        g.setFont(Fonts::spaceMono(Fonts::Sizes::small, true));
+        g.setColour(Colours::label);
+        g.drawText("LOAD IR", load, juce::Justification::centred, false);
+        return;
+    }
 
     float leftW = bounds.getWidth() * 0.45f;
 
@@ -216,7 +320,7 @@ void IRLoaderPanel::paint(juce::Graphics& g)
 
     // ── Right column: Detail grid ──
     float rx = leftW + 12.0f;
-    float ry = 84.0f;
+    float ry = static_cast<float>(headerH) + 82.0f;
     float rw = bounds.getWidth() - leftW - 24.0f;
 
     // Find selected entry
@@ -263,10 +367,14 @@ void IRLoaderPanel::resized()
 {
     float leftW = getWidth() * 0.45f;
 
-    // Waveform display at top of right column
+    viewSwitch.setBounds(getWidth() - 8 - 140, 5, 140, 20);
+
+    // Waveform display at top of right column, under the view switch
     float rx = leftW + 8.0f;
-    waveformDisplay.setBounds(static_cast<int>(rx), 6,
+    waveformDisplay.setBounds(static_cast<int>(rx), headerH + 4,
                               static_cast<int>(getWidth() - rx - 8.0f), 72);
+
+    cabView.setBounds(getLocalBounds().withTrimmedTop(headerH));
 }
 
 } // namespace sr
