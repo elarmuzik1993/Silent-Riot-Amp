@@ -33,12 +33,9 @@ void NotchKnob::setKnobMode(int mode)
 void NotchKnob::setScale(float s)
 {
     scale = juce::jmax(0.1f, s);
-    // Floors, not plain products — the strip carries text. At scale 0.5 an
-    // unfloored label row is 7px and the name disappears, which is the exact
-    // failure preferredHeight exists to warn about.
-    readoutH    = juce::jmax(13.0f, kReadoutHBase    * scale);
-    readoutGap  = juce::jmax( 2.0f, kReadoutGapBase  * scale);
-    labelH      = juce::jmax(12.0f, kLabelHBase      * scale);
+    readoutH    = readoutHFor(scale);
+    readoutGap  = readoutGapFor(scale);
+    labelH      = labelHFor(scale);
     readoutMinW = juce::jmax(28.0f, kReadoutMinWBase * scale);
     resized();
     repaint();
@@ -90,7 +87,7 @@ void NotchKnob::paint(juce::Graphics& g)
     const float pos = static_cast<float>(slider.getValue());
     const juce::String valText = valueFormatter ? valueFormatter(pos)
                                                 : juce::String(pos * 10.0f, 1);
-    auto valFont = Fonts::spaceMono(juce::jmax(Fonts::Sizes::micro,
+    auto valFont = Fonts::spaceMono(juce::jmax(Fonts::Sizes::small,
                                                Fonts::Sizes::value * scale));
     g.setFont(valFont);
 
@@ -116,9 +113,8 @@ void NotchKnob::paint(juce::Graphics& g)
         g.drawText(valText, valBox, juce::Justification::centred, false);
     }
 
-    // Parameter name
-    g.setFont(Fonts::spaceMono(juce::jmax(Fonts::Sizes::micro,
-                                          Fonts::Sizes::body * scale), true));
+    // Parameter name — full size at any scale (see setScale)
+    g.setFont(Fonts::spaceMono(Fonts::Sizes::body, true));
     g.setColour(Colours::label);
     g.drawText(label.toUpperCase(), labelBox, juce::Justification::centred, false);
 }

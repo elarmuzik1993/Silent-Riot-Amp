@@ -40,7 +40,8 @@ public:
     // dimension from jmin(w,h), so shrinking the component shrinks the knob for
     // free. What this scales is the reserved text strip, which does not shrink
     // for free: readout and label stop being readable long before the knob does,
-    // so each metric below carries a floor.
+    // so each metric below carries a floor. The parameter name does not shrink
+    // at all — a scaled knob keeps the full-size name.
     void setScale(float s);
 
     // Draw the parameter name above the knob instead of below the readout. The
@@ -59,6 +60,14 @@ public:
     // used to happen to the DELAY card's knobs. Scaled knobs need proportionally
     // less; the effects cards size against their own compact figure.
     static constexpr int preferredHeight = 112;
+
+    // Height of the readout + label strip at a given scale — what a knob needs
+    // on top of its dial. Same figures setScale() applies, so a layout can
+    // static_assert against it rather than carry a copy of the arithmetic.
+    static constexpr float stripHeight(float s, bool engraved)
+    {
+        return readoutHFor(s) - (engraved ? kEngravedSaving : 0) + readoutGapFor(s) + labelHFor(s);
+    }
 
 private:
     // Custom slider with keyboard step overrides.
@@ -99,6 +108,13 @@ private:
     static constexpr float kReadoutGapBase  =  4.0f;
     static constexpr float kLabelHBase      = 14.0f;
     static constexpr float kReadoutMinWBase = 44.0f;
+
+    // Floors, not plain products — the strip carries text. At scale 0.5 an
+    // unfloored label row is 7px and the name disappears, which is the exact
+    // failure preferredHeight exists to warn about.
+    static constexpr float readoutHFor(float s)   { return juce::jmax(14.0f, kReadoutHBase   * s); }
+    static constexpr float readoutGapFor(float s) { return juce::jmax( 2.0f, kReadoutGapBase * s); }
+    static constexpr float labelHFor(float s)     { return juce::jmax(14.0f, kLabelHBase     * s); }
 
     // Scaled strip metrics (recomputed in setScale()).
     float scale       = 1.0f;

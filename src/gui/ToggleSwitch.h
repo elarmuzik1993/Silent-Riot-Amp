@@ -22,23 +22,26 @@ public:
     // How the state is drawn under the label.
     //   Switch — a chrome bat toggle through a hex nut on a glass ring that
     //            lights in activeColor; lever up is on. The amp row uses this.
-    //   Led    — a flat bar, lit in activeColor. Used in the effects cards,
-    //            where a pill per card reads as heavy chrome next to
-    //            half-scale knobs.
-    // Both animate off the same thumbPos, so the LED fades rather than snaps.
-    enum class Style { Switch, Led };
+    //   Jewel  — a small glass jewel in a chrome bezel (the pilot lamp's glass,
+    //            AmpFaceplate::paintLamp), lit in activeColor, with the label
+    //            to its left rather than above, so it fits a card's title row.
+    //            The effects cards use this.
+    // Both animate off the same thumbPos, so the jewel fades rather than snaps.
+    enum class Style { Switch, Jewel };
     void setStyle(Style s);
 
     // Vertical room paint() needs: the label, the gap under it, and the state
     // graphic. JUCE clips paint() to the component's own bounds, so a
-    // ToggleSwitch laid out shorter than this loses its track/lamp *silently* —
+    // ToggleSwitch laid out shorter than this loses its lever/lamp *silently* —
     // the label still draws, the control looks like a plain text label, and
     // clicks keep working with no visible feedback. Lay one out against this,
     // not against a title-strip height that happens to fit the label.
+    // Jewel puts its label beside the lamp, so only the lamp's glow counts.
     static constexpr int minHeight(Style s)
     {
-        return static_cast<int>(kLabelH + kLabelGap
-                                + (s == Style::Led ? kLedH + kLedGlow : kBatH));
+        if (s == Style::Jewel)
+            return static_cast<int>(2.0f * kJewelGlowR);
+        return static_cast<int>(kLabelH + kLabelGap + kBatH);
     }
 
 private:
@@ -46,7 +49,7 @@ private:
     std::unique_ptr<juce::AccessibilityHandler> createAccessibilityHandler() override;
 
     void paintSwitch(juce::Graphics&, juce::Rectangle<float> bounds);
-    void paintLed(juce::Graphics&, juce::Rectangle<float> bounds);
+    void paintJewel(juce::Graphics&, juce::Rectangle<float> bounds);
 
     juce::ToggleButton button;
     juce::String label;
@@ -61,12 +64,12 @@ private:
     static constexpr float kBatScale = 1.15f;
     static constexpr float kBatH     = 30.0f;
     static constexpr float kBatPivot = 14.0f;
-    // A hairline, not a pill. kLedH + kLedGlow is deliberately chosen to make
-    // minHeight() land on a whole number — it truncates, so a fractional sum
-    // would leave the bar half a pixel short of its own reserved space.
-    static constexpr float kLedW     = 16.0f;  // flat bar, not a round lamp
-    static constexpr float kLedH     =  1.5f;
-    static constexpr float kLedGlow  =  1.5f;  // halo radius, lit state only
+    // Jewel: lens radius, and the glow's radius from the lamp's centre. The
+    // glow shows as a ring ~3 px wide around the bezel; minHeight() is the glow's diameter, so it never clips.
+    static constexpr float kJewelR        =  4.5f;
+    static constexpr float kJewelBezelR   = kJewelR + 4.0f;  // paintLamp's bezel
+    static constexpr float kJewelGlowR    = 12.0f;
+    static constexpr float kJewelLabelGap =  1.5f;  // label to bezel
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(ToggleSwitch)
 };

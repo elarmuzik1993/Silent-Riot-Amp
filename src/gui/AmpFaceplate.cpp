@@ -42,7 +42,7 @@ static void drawScrew(juce::Graphics& g, float cx, float cy)
 }
 
 void AmpFaceplate::paintLamp(juce::Graphics& g, juce::Point<float> c, float r,
-                             juce::Colour colour, float brightness)
+                             juce::Colour colour, float brightness, float bloom)
 {
     using juce::Colours::black;
     using juce::Colours::white;
@@ -56,8 +56,8 @@ void AmpFaceplate::paintLamp(juce::Graphics& g, juce::Point<float> c, float r,
     if (lit > 0.0f)
     {
         g.setGradientFill(juce::ColourGradient(colour.withAlpha(0.38f * lit), c.x, c.y,
-                                               colour.withAlpha(0.0f), c.x + r * 3.2f, c.y, true));
-        g.fillEllipse(circle(r * 3.2f));
+                                               colour.withAlpha(0.0f), c.x + r * bloom, c.y, true));
+        g.fillEllipse(circle(r * bloom));
     }
 
     // Drop shadow, then a knurled chrome bezel
@@ -172,11 +172,8 @@ void AmpFaceplate::paintLamp(juce::Graphics& g, juce::Point<float> c, float r,
     fillTiltedEllipse(-0.4f, -0.56f, 0.11f, 0.0605f, -30.0f);
 }
 
-void AmpFaceplate::paint(juce::Graphics& g)
+void AmpFaceplate::paintPlate(juce::Graphics& g, juce::Rectangle<float> b, float radius)
 {
-    const auto b = getLocalBounds().toFloat().reduced(0.5f);
-    const float radius = 6.0f;
-
     // Raised panel
     g.setGradientFill(juce::ColourGradient(Colours::panelLight, 0.0f, b.getY(),
                                            Colours::surface, 0.0f, b.getBottom(), false));
@@ -202,6 +199,12 @@ void AmpFaceplate::paint(juce::Graphics& g)
     g.drawRoundedRectangle(b, radius, 1.0f);
     g.setColour(Colours::bg.withAlpha(0.8f));
     g.drawRoundedRectangle(b.reduced(2.0f), radius - 1.5f, 1.0f);
+}
+
+void AmpFaceplate::paint(juce::Graphics& g)
+{
+    const auto b = getLocalBounds().toFloat().reduced(0.5f);
+    paintPlate(g, b, 6.0f);
 
     // Corner screws
     const float inset = 10.0f;

@@ -28,9 +28,9 @@ _Updated 2026-10-29_
 5. E3 last: repoint the gate to `tests/fixtures/ir/bright.wav`, then fix the engine aliasing.
 6. GitHub Actions has failed every run since 2026-10-09; recheck once public (free runners).
 7. Amp faceplate is on `main` (`src/gui/AmpFaceplate.*`): deep-ruby glass pilot lamp, satin pointer
-   knobs with engraved values, chrome bat toggles on orange glass rings. Owner still open: lamp
-   colour, weave strength, keep the "POWER" label? Next GUI pass: bring the EFFECTS panel (flat
-   knobs, faint LED toggles, small text) into the same hardware style.
+   knobs with engraved values, chrome bat toggles on orange glass rings. The EFFECTS panel now uses
+   the same hardware style (faceplate cards, 0.7× pointer knobs, orange glass jewel ON/PP toggles).
+   Owner still open: lamp colour, weave strength, keep the "POWER" label? Jewel size/colour OK?
 
 ## Decisions
 - Never gate features, nag, or add a trial (open source + donations).
@@ -47,8 +47,8 @@ _Updated 2026-10-29_
 - **Projects that use an IR play louder** (+5.4…+13.1 dB) since the IR level match; in CHANGELOG.
 - IR path: cab-mode switches dip (~6–95 ms by block size); bright IRs sit 1.2–1.5 dB under the
   built-in cab; long IRs lose their ring at the 8192 cap. GUI bugs are tracked in #37–#45.
-- GUI review 2026-10-28, still open: small low-contrast text (section titles, footer, effects
-  labels), faint LED on/off toggles in EFFECTS, REVERB knob row ~30 px above DELAY's, small
-  effects knobs, window can outgrow the screen with EFFECTS + IR LOADER open.
+- GUI review 2026-10-28, still open: small low-contrast text (section titles, footer), REVERB
+  knob row ~30 px above DELAY's, window can outgrow the screen with EFFECTS + IR LOADER open
+  (EFFECTS grew 28 px with the hardware restyle).
 - 13 commits on `main` and the docs plan's first commit carry the env email, not the noreply one;
   pre-rewrite commits stay reachable via closed PRs' `refs/pull/*` (only GitHub Support can purge).
