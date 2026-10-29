@@ -32,9 +32,19 @@ intensity chosen at the same time: level envelope + sag hue, subtle / hardware r
 
 ## Global Constraints
 
-- **No audio change.** Nothing in this plan alters a sample. `tests/tone_lock_tests.cpp` must pass
-  untouched — a failing tone lock means find out why, never rewrite the references
-  (`docs/dev/tone-lock.md`).
+- **No audio change.** Nothing in this plan alters a sample, and this holds by construction, not
+  by care: Tasks 2–4 are GUI only and the tone lock never builds an editor (it drives the real
+  `processBlock` through `tests/processor_harness.h`), while Task 1's only audio-thread work is a
+  **read-only** scan of a finished buffer — it sits where `outputLevelForGUI` is already published,
+  after the last write, with nothing but atomic stores below it. A new named constant in
+  `src/utils/Constants.h` is additive; unlike APVTS parameters, nothing there is order-sensitive.
+  `tests/tone_lock_tests.cpp` must pass untouched — a failing tone lock means find out why, never
+  rewrite the references (`docs/dev/tone-lock.md`).
+- **Three places a careless implementation would change the tone anyway**, none of them required
+  by this plan: reaching past `meterPeak` into DSP state inside `reset()` (B1 — that replays the
+  startup burst); editing neighbouring lines while adding the decay to `prepareToPlay` (B5); and
+  injecting an anti-denormal into the audio path to deal with the meter's own decay (Task 1).
+  Touch only what each task names.
 - No new parameter, no change to presets or saved plugin state.
 - No dynamic allocation in `processBlock` (AGENTS.md); the peak scan allocates nothing.
 - GUI rules (AGENTS.md): colours from `src/gui/ColourPalette.h`, no bare numeric font sizes, no
@@ -139,6 +149,10 @@ and ask:
       silent); the delayed dry passthrough's own peak in `processBlockBypassed`.
 - [ ] Clear `meterPeak` in `prepareToPlay` and in `reset()`. This is metering state, not DSP
       state — the rule that `reset()` must not touch the amp (B1, the startup burst) still holds.
+- [ ] Flush `meterPeak` to exactly 0 below a small threshold. Decaying toward zero across silence
+      drives it denormal, and denormals are slow on some CPUs. Flush the **meter's own value**;
+      never reach for `ANTI_DENORMAL` here, which belongs in IIR filter state inside the audio
+      path and would be a tone change.
 
 **Verification:**
 - [ ] A single-sample spike in an otherwise silent block raises `outputPeakForGUI` where
