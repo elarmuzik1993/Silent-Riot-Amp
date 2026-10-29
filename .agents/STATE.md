@@ -30,7 +30,8 @@ _Updated 2026-10-29_
 7. Owner: amp faceplate (`feat/amp-faceplate`, `src/gui/AmpFaceplate.*`) approved, wordmark removed.
    Pilot lamp is a deep-ruby glass dome (8 px lens), vertically centred right of VOLUME; amp knob
    labels on top; SHAPE dead centre, toggles grouped under it as chrome bat switches on lit glass
-   rings; amp knobs are satin pointer knobs (effects knobs stay flat). Screenshot refreshed. Open: lamp
+   rings (all orange, 15% larger); amp knobs are satin pointer knobs with engraved values, 155 px
+   apart (effects knobs stay flat and boxed). Screenshot refreshed. Open: lamp
    colour, weave strength, keep the "POWER" label?
 
 ## Decisions

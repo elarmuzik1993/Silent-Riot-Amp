@@ -144,6 +144,9 @@ void ToggleSwitch::paintSwitch(juce::Graphics& g, juce::Rectangle<float> bounds)
     const auto lighten = [](juce::Colour c, float t) { return c.interpolatedWith(juce::Colours::white, t); };
     const auto darken = [](juce::Colour c, float t) { return c.interpolatedWith(juce::Colours::black, t); };
     const auto circle = [](float x, float y, float r) { return juce::Rectangle<float>(x - r, y - r, r * 2.0f, r * 2.0f); };
+    // Every dimension below is at scale 1; the whole switch grows about the nut.
+    juce::Graphics::ScopedSaveState scaled(g);
+    g.addTransform(juce::AffineTransform::scale(kBatScale, kBatScale, cx, cy));
     const auto withStops = [](juce::ColourGradient grad, Stops stops) {
         for (const auto& [p, col] : stops)
             if (p > 0.0f && p < 1.0f)

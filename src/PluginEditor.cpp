@@ -56,6 +56,7 @@ SilentRiotEditor::SilentRiotEditor(SilentRiotProcessor& p)
     for (auto* k : { &gainKnob, &toneKnob, &volumeKnob })
     {
         k->setLabelOnTop(true);
+        k->setEngravedReadout(true);
         k->getSlider().getProperties().set(sr::SilentRiotLookAndFeel::kPointerKnobProperty, true);
     }
     contentArea.addAndMakeVisible(halfPowerToggle);
@@ -623,16 +624,16 @@ void SilentRiotEditor::layoutContent()
     // SHAPE sits dead centre on the faceplate with GAIN and VOLUME a fixed pitch
     // either side. The toggles stay a tight group under SHAPE, so they read as
     // secondary to the knobs.
-    constexpr int dialW = 80, knobPitch = 145;
+    constexpr int dialW = 80, knobPitch = 155;
     const float plateCentreX = static_cast<float>(plate.getX()) + plate.getWidth() * 0.5f;
     const auto columnX = [&](int i) {
         return plateCentreX + static_cast<float>(knobPitch * (i - 1));
     };
 
     // knobH only reserves paint space: NotchKnob draws the label, the dial
-    // (80px) and the value readout, 108px in all. The knob + toggle stack is
-    // centred top to bottom.
-    int knobW = 100, knobH = 110;
+    // (76px) and the engraved value, which is kEngravedSaving shorter than a
+    // boxed readout. The knob + toggle stack is centred top to bottom.
+    int knobW = 100, knobH = 110 - sr::NotchKnob::kEngravedSaving;
     int toggleW = 50, toggleH = sr::ToggleSwitch::minHeight(sr::ToggleSwitch::Style::Switch), toggleGap = 32;
     // 10px below the knob's paint extent — ToggleSwitch draws its own label in
     // the top 14px, so the visible gap between knob readout and toggle label ~12px.

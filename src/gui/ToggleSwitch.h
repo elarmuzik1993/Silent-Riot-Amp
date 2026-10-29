@@ -56,10 +56,11 @@ private:
 
     static constexpr float kLabelH   = 14.0f;
     static constexpr float kLabelGap =  4.0f;
-    // Bat toggle: the nut is centred kBatPivot below the label gap; the lever
-    // tip, its ball and their shadows need kBatH in all.
-    static constexpr float kBatH     = 26.0f;
-    static constexpr float kBatPivot = 12.0f;
+    // Bat toggle: drawn at kBatScale around a nut centred kBatPivot below the
+    // label gap; the lever tip, its ball and their shadows need kBatH in all.
+    static constexpr float kBatScale = 1.15f;
+    static constexpr float kBatH     = 30.0f;
+    static constexpr float kBatPivot = 14.0f;
     // A hairline, not a pill. kLedH + kLedGlow is deliberately chosen to make
     // minHeight() land on a whole number — it truncates, so a fractional sum
     // would leave the bar half a pixel short of its own reserved space.
