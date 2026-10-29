@@ -204,7 +204,7 @@ void AmpFaceplate::paint(juce::Graphics& g)
 
     // ── Glass pilot lamp, right end ──
     const float midY = b.getY() + 62.0f;  // level with the knob dials
-    const float lx = b.getRight() - sideW * 0.5f, r = 11.0f;
+    const float lx = b.getRight() - sideW * 0.5f, r = 9.5f;
     paintLamp(g, { lx, midY }, r, Colours::red, powered ? 1.0f : 0.0f);
 
     g.setColour(Colours::dim);
