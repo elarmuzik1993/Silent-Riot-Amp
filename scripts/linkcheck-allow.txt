@@ -5,6 +5,7 @@
 
 # Built outputs and directories the tone protocol proposes but the repo does not carry.
 docs/dev/tone-signoff.md tools/sr_render
+docs/plans/2026-10-29-reactive-panel-glow.md tools/sr_editor_snapshot
 
 # Git branch names, not paths.
 docs/records/handoffs/handoff-ir-path-sound.md docs/ir-path-sound-plan
@@ -16,6 +17,9 @@ ROADMAP.md .github/FUNDING.yml
 docs/plans/2026-10-28-open-source-docs-prep.md .github/FUNDING.yml
 docs/plans/2026-10-28-open-source-docs-prep.md architecture.md
 docs/plans/2026-10-28-open-source-docs-prep.md building.md
+docs/plans/2026-10-29-reactive-panel-glow.md docs/records/handoffs/handoff-sag-travel-probe.cpp
+docs/plans/2026-10-29-reactive-panel-glow.md tests/glow_colour_tests.cpp
+docs/plans/2026-10-29-reactive-panel-glow.md tests/gui_faceplate_glow_tests.cpp
 
 # Pre-move names the plan's re-filing step describes.
 docs/plans/2026-10-28-open-source-docs-prep.md COMPETITIVE_ROADMAP.md
