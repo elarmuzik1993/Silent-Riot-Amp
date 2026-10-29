@@ -31,7 +31,7 @@ _Updated 2026-10-29 (IR loader cab view)_
    knobs with engraved values, chrome bat toggles on orange glass rings. The EFFECTS panel now uses
    the same hardware style (faceplate cards, 0.7× pointer knobs, orange glass jewel ON/PP toggles).
    Owner still open: lamp colour, weave strength, keep the "POWER" label? Jewel size/colour OK?
-8. IR LOADER now opens on a drawn 2x12 cab (`src/gui/CabinetView.*`, 2:1, moulded black corner
+8. IR LOADER now opens on a drawn 2x12 cab (`src/gui/CabinetView.*`, 2:1, plain black corner
    caps, orange piping, black expanded-metal grille in the old-school Randall spirit; owner picked
    each from mockups) with arrows that cycle the built-in cab + every IR; a CAB | LIBRARY switch
    brings back the list. Owner still open: the light theme keeps white tolex around the black

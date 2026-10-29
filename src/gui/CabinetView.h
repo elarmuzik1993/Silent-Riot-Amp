@@ -5,7 +5,7 @@
 
 namespace sr {
 
-// The IR LOADER's CAB view: a 2x12 cabinet front (tolex, moulded black
+// The IR LOADER's CAB view: a 2x12 cabinet front (tolex, plain black
 // corner caps, orange piping, a black expanded-metal grille with the two
 // speakers showing through) at 2:1, round arrow buttons either side of it
 // that step the cab, and the name of what is playing underneath. Drawn in code so it follows the theme and the UI scale.

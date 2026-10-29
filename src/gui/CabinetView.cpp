@@ -145,73 +145,15 @@ static void paintSpeaker(juce::Graphics& g, juce::Point<float> c, float r)
     g.fillEllipse(c.x - cap * 0.6f, c.y - cap * 0.62f, cap * 0.55f, cap * 0.32f);
 }
 
-// A moulded black plastic corner cap over the box corner (sx, sy: -1 = left /
-// top, +1 = right / bottom). Its outer corner follows the box's radius, its
-// inner corner is rounded off; satin black lit from the upper left, with a
-// bevelled rim, a soft dome and a recessed screw. Black in both themes, like
-// the real part.
-static void paintCorner(juce::Graphics& g, juce::Rectangle<float> r, int sx, int sy, float boxRadius)
+// A plain black plastic corner cap. Black in both themes, like the real part.
+static void paintCorner(juce::Graphics& g, juce::Rectangle<float> r)
 {
-    using juce::Colours::black;
-    using juce::Colours::white;
-    const float s = r.getWidth();
-    const float inner = s * 0.42f;
-    const float outer = juce::jmax(boxRadius, 1.0f);
-
-    // One outline, rounded off at `inner` everywhere but the corner that sits
-    // on the box's own corner, which follows the box's radius
-    const auto radius = [&](int cx, int cy) { return cx == sx && cy == sy ? outer : inner; };
-    const float tl = radius(-1, -1), tr = radius(1, -1), br = radius(1, 1), bl = radius(-1, 1);
-    const float x0 = r.getX(), y0 = r.getY(), x1 = r.getRight(), y1 = r.getBottom();
-    juce::Path body;
-    body.startNewSubPath(x0 + tl, y0);
-    body.lineTo(x1 - tr, y0);
-    body.quadraticTo(x1, y0, x1, y0 + tr);
-    body.lineTo(x1, y1 - br);
-    body.quadraticTo(x1, y1, x1 - br, y1);
-    body.lineTo(x0 + bl, y1);
-    body.quadraticTo(x0, y1, x0, y1 - bl);
-    body.lineTo(x0, y0 + tl);
-    body.quadraticTo(x0, y0, x0 + tl, y0);
-    body.closeSubPath();
-
-    g.setColour(black.withAlpha(0.55f));          // contact shadow on the tolex
-    g.fillPath(body, juce::AffineTransform::translation(0.0f, 1.2f));
-
-    // Satin black body, lit from the upper left
-    g.setGradientFill(juce::ColourGradient(juce::Colour(0xFF2B2E36), r.getX(), r.getY(),
-                                           juce::Colour(0xFF050607), r.getRight(), r.getBottom(), false));
-    g.fillPath(body);
-
-    // Soft dome: a broad sheen up and left of centre
-    const auto c = r.getCentre();
-    g.setGradientFill(juce::ColourGradient(white.withAlpha(0.07f), c.x - s * 0.12f, c.y - s * 0.14f,
-                                           white.withAlpha(0.0f), c.x + s * 0.35f, c.y + s * 0.35f, true));
-    g.fillPath(body);
-
-    // Bevelled rim: light on the upper-left edges, dark on the lower right
-    {
-        juce::Graphics::ScopedSaveState save(g);
-        g.reduceClipRegion(body);
-        g.setGradientFill(juce::ColourGradient(white.withAlpha(0.2f), r.getX(), r.getY(),
-                                               white.withAlpha(0.0f), c.x, c.y, false));
-        g.strokePath(body, juce::PathStrokeType(1.6f));
-        g.setGradientFill(juce::ColourGradient(black.withAlpha(0.0f), c.x, c.y,
-                                               black.withAlpha(0.6f), r.getRight(), r.getBottom(), false));
-        g.strokePath(body, juce::PathStrokeType(1.6f));
-    }
-
-    // Recessed screw: a dark well, its lower rim catching the light
-    const float wr = s * 0.13f;
-    g.setColour(black.withAlpha(0.75f));
-    g.fillEllipse(c.x - wr, c.y - wr, wr * 2.0f, wr * 2.0f);
-    g.setColour(white.withAlpha(0.18f));
-    juce::Path rim;
-    rim.addCentredArc(c.x, c.y, wr, wr, 0.0f, juce::degreesToRadians(100.0f), juce::degreesToRadians(260.0f), true);
-    g.strokePath(rim, juce::PathStrokeType(0.7f));
-    g.setColour(juce::Colour(0xFF2A2D36));
-    g.drawLine(c.x - wr * 0.55f, c.y, c.x + wr * 0.55f, c.y, 0.8f);
-    g.drawLine(c.x, c.y - wr * 0.55f, c.x, c.y + wr * 0.55f, 0.8f);
+    const float cs = r.getWidth() * 0.32f;
+    g.setGradientFill(juce::ColourGradient(juce::Colour(0xFF2A2D36), r.getX(), r.getY(),
+                                           juce::Colour(0xFF050507), r.getRight(), r.getBottom(), false));
+    g.fillRoundedRectangle(r, cs);
+    g.setColour(juce::Colours::white.withAlpha(0.12f));
+    g.drawRoundedRectangle(r.reduced(0.5f), cs, 0.8f);
 }
 
 void CabinetView::paintCabinet(juce::Graphics& g, juce::Rectangle<float> b)
@@ -309,8 +251,7 @@ void CabinetView::paintCabinet(juce::Graphics& g, juce::Rectangle<float> b)
     for (int sy : { -1, 1 })
         for (int sx : { -1, 1 })
             paintCorner(g, { sx < 0 ? b.getX() - 1.0f : b.getRight() - s + 1.0f,
-                             sy < 0 ? b.getY() - 1.0f : b.getBottom() - s + 1.0f, s, s },
-                        sx, sy, rad);
+                             sy < 0 ? b.getY() - 1.0f : b.getBottom() - s + 1.0f, s, s });
 }
 
 // The arrows are drawn, not typed: the embedded fonts have no arrow glyphs.
