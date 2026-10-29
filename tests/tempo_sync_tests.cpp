@@ -96,3 +96,34 @@ TEST_CASE("computeSyncMs: a non-finite or NaN host bpm never poisons the result"
     REQUIRE(std::isfinite(negInfResult));
     REQUIRE(negInfResult == Catch::Approx(DELAY_TIME_MIN_MS));
 }
+
+TEST_CASE("Sync knob: every division round-trips through its detent", "[tempoSync]")
+{
+    for (int idx = 1; idx < kNumSyncDivisions; ++idx)
+        REQUIRE(syncDivisionFromKnob(knobFromSyncDivision(idx)) == idx);
+}
+
+TEST_CASE("Sync knob: the travel spans every division, MANUAL never", "[tempoSync]")
+{
+    REQUIRE(knobFromSyncDivision(1) == Catch::Approx(0.0f));
+    REQUIRE(knobFromSyncDivision(kNumSyncDivisions - 1) == Catch::Approx(1.0f));
+    REQUIRE(syncDivisionFromKnob(0.0f) == 1);
+    REQUIRE(syncDivisionFromKnob(1.0f) == kNumSyncDivisions - 1);
+
+    // Out of range and non-finite positions still land on a real division
+    REQUIRE(syncDivisionFromKnob(-0.5f) == 1);
+    REQUIRE(syncDivisionFromKnob(2.0f) == kNumSyncDivisions - 1);
+    REQUIRE(syncDivisionFromKnob(std::numeric_limits<float>::quiet_NaN()) == 1);
+}
+
+TEST_CASE("Sync knob: a position between detents snaps to the nearest", "[tempoSync]")
+{
+    const float step = knobFromSyncDivision(2) - knobFromSyncDivision(1);
+    REQUIRE(syncDivisionFromKnob(knobFromSyncDivision(3) + 0.4f * step) == 3);
+    REQUIRE(syncDivisionFromKnob(knobFromSyncDivision(3) - 0.4f * step) == 3);
+}
+
+TEST_CASE("Sync knob: the default division is the quarter note", "[tempoSync]")
+{
+    REQUIRE(kDefaultSyncDivision == findDivisionIndex("1/4"));
+}
