@@ -20,6 +20,7 @@ When two sources disagree, trust them in this order: **the code** > `CLAUDE.md` 
 | [`dev/building.md`](dev/building.md) | Building on Linux and Windows, CMake options, where the plugin lands | maintained |
 | [`dev/testing.md`](dev/testing.md) | `verify.sh`, the three test targets, the processor test harness | maintained |
 | [`dev/architecture.md`](dev/architecture.md) | Voltage domain, signal chain, source layout, threading, state | maintained |
+| [`dev/tone-lock.md`](dev/tone-lock.md) | The frozen sound (`tone-v1`): what the tone lock test guards and how the sound may change | maintained |
 | [`dev/tone-signoff.md`](dev/tone-signoff.md) | The tone sign-off protocol: references, gates, how "tone is frozen" is decided | maintained (2026-06; gates in `tools/signoff_gates.json`) |
 | [`../tools/README.md`](../tools/README.md) | The sign-off render and analysis tools | maintained |
 | [`../CLAUDE.md`](../CLAUDE.md) | Detailed engineering notes and pitfalls (written for coding agents, useful to anyone) | maintained |

@@ -45,6 +45,11 @@ Everything below serves those three. Anything that doesn't is deferred.
 
 ## Phase A — Freeze the tone _(this IS the product)_ — **do first**
 
+> **Frozen at `tone-v1`, 2026-10-29.** The owner signed off the sound by ear at `059b209`;
+> `tests/tone_lock_tests.cpp` guards it (`docs/dev/tone-lock.md`). The constants below are
+> frozen as they are; the amp re-calibration is cancelled. Only the E3 aliasing fix stays
+> open, behind an owner A/B.
+
 The differentiation bet is "perfect one amp." Until the tone is frozen, nothing
 downstream (cabs, presets, marketing demos, the parked neural model) can be finalized —
 they all train/tune against a moving target.
@@ -55,7 +60,8 @@ they all train/tune against a moving target.
   clean / edge-of-breakup / crank; a real AC30/Orange reference or target artist clips).
   Standardize gain-staging and A/B method. Without a written target, "ear-tuning" never
   terminates.
-- [ ] **[H] Finalize the parked tuning constants** against that protocol and freeze them:
+- [x] **[H] Finalize the parked tuning constants** _(done: frozen as they are at `tone-v1`,
+  owner decision 2026-10-29; values in `docs/dev/tone-lock.md`)_ against that protocol and freeze them:
   `outputGainCompensation` (1.0), `V1B_RSOURCE_MAX_REAL` (150KΩ), `XCUR_SENSITIVITY`
   (2.0), the Shape EQ gain ranges, and the dynamics feel (sag clamp, grid charge).
   _(CLAUDE.md "Next" + ROADMAP Parked.)_
@@ -68,14 +74,13 @@ they all train/tune against a moving target.
     must land before cabs are finalized.
   - **LTP `reset()` stale `vCathode`** (PR #8): a sample-rate change mid-playback leaves
     the phase-inverter solver half-reset. Real-time correctness bug; merge the fix.
-- [~] **[H] Lock the tone with a golden/null regression** _(partial: `sr_render` now drives
-  the real `processBlock` and `tests/regression_tests.cpp` checks invariants, but no golden
-  renders are committed and no CI job compares against them; see `tools/README.md`
-  "How this becomes the golden lock")_ — the one open item from
+- [x] **[H] Lock the tone with a golden/null regression** _(done: `tests/tone_lock_tests.cpp`
+  renders 24 settings through the real `processBlock` and compares band-level fingerprints
+  with `tests/tone/golden/` in ctest and `verify.sh`)_ — the one open item from
   ROADMAP P4. Build a true render test against the real `processBlock` (needs a small
   plugin-host test target) so that **once frozen, the tone cannot silently drift** with
   later refactors. This is the safety net that makes "frozen" mean something.
-- [ ] **[M] Document the frozen voicing** in a handoff doc + `CLAUDE.md` (final constants +
+- [x] **[M] Document the frozen voicing** _(done: `docs/dev/tone-lock.md`)_ in a handoff doc + `CLAUDE.md` (final constants +
   the reference clips that signed it off) so it's reproducible. _(Not in the DSP spec: that
   is background-only since 2026-10-23.)_
 

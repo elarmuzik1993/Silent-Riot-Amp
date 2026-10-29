@@ -77,3 +77,11 @@ and analysis harness ([`../../tools/README.md`](../../tools/README.md)) that run
 `processBlock` offline and gates level, THD, sag, noise and aliasing. Any change that
 alters the sound needs a sign-off run as well as `verify.sh`. The render tool is not built
 by CI or by `verify.sh`; build it with `-DSR_BUILD_TOOLS=ON`.
+
+## Tone lock
+
+The sound is frozen at `tone-v1`. `tests/tone_lock_tests.cpp` (in `SilentRiotProcessorTests`)
+renders 24 settings through the real `processBlock` and compares each with a reference
+fingerprint in `tests/tone/golden/`; `tests/tone_lock_core_tests.cpp` tests the fingerprint
+itself. A failure there means your change moves the sound. See [`tone-lock.md`](tone-lock.md)
+for what is locked and the only way to change it.

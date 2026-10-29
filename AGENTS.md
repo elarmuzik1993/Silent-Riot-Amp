@@ -28,6 +28,11 @@ Silent Riot is a JUCE 7 amp simulator plugin built with C++17, CMake, and Ninja 
 
 ## DSP Rules
 
+- **The tone is frozen at `tone-v1`** (owner sign-off, 2026-10-29). `tests/tone_lock_tests.cpp`
+  fails on any change to the steady-state sound of the amp, cab or effects. Never rewrite its
+  references (`SR_TONE_LOCK_WRITE=1`) without the owner's explicit approval after an A/B; a
+  failing tone lock means find out why. Transition and glitch fixes are allowed if the lock
+  still passes. Procedure: `docs/dev/tone-lock.md`.
 - Do not allocate dynamically in `processBlock`; pre-allocate buffers and state.
 - Inject `ANTI_DENORMAL` into IIR filter state where needed.
 - Smooth parameters per sample at the oversampled rate using the existing `ParamSmoother` target/tick pattern.

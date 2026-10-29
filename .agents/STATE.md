@@ -1,10 +1,11 @@
 # State
 
-_Updated 2026-10-29 (standalone INPUT selector)_
+_Updated 2026-10-29 (tone frozen at tone-v1)_
 
 ## Now
+- **Tone frozen at `tone-v1`** (059b209): `tests/tone_lock_tests.cpp` guards it (`docs/dev/tone-lock.md`).
 - Silent Riot v0.3.4 (JUCE 7 VST3/Standalone), GPL-3.0-or-later, free + optional donations. No tagged
-  release. `bash scripts/verify.sh` passes: 429/429 ctest (312 pure C++ / 81 JUCE / 36 processor).
+  release. `bash scripts/verify.sh` passes: 445/445 ctest (312 pure C++ / 81 JUCE / 52 processor).
 - Docs are open-source ready (README, `docs/manual/`, `docs/dev/`, CONTRIBUTING/CoC/SECURITY, issue
   forms, CHANGELOG); `docs/README.md` indexes them. `dev/` + `manual/` track the code; `design/` +
   `records/` are frozen. `verify.sh --quick` (also CI) checks SPDX, links, tool source lists, UI text.
@@ -30,16 +31,16 @@ _Updated 2026-10-29 (standalone INPUT selector)_
 2. Owner picks a donation platform → docs plan step 9 (`docs/plans/2026-10-28-open-source-docs-prep.md`).
 3. Owner: delay FEEDBACK default decays 9 dB/repeat — keep or remap? GRID I reads 0 — keep, or read PI?
    Faceplate: lamp colour, weave strength, keep the "POWER" label, jewel size/colour?
-4. Tone phase (one re-calibration of D1/A1/B1/P-* after an owner listening check): power Task 2 with
-   review B2, then B3 (`docs/records/reviews/review-dsp-2026-10-15.md`); first measure whether the PI
-   rail is load-bearing. Then raise `VOLUME_KNOB_HEADROOM`, re-check D1 at knob 10, power Tasks 3–5
-   (`docs/plans/2026-10-23-power-section-fixes.md`).
-5. E3 last: repoint the gate to `tests/fixtures/ir/bright.wav`, then fix the engine aliasing.
-6. GitHub Actions has failed every run since 2026-10-09; recheck once public (free runners).
-7. Owner, cab view: the light theme keeps white tolex around the black grille — OK? Should the cab
+4. E3 (the one tone change still allowed): repoint the gate to `tests/fixtures/ir/bright.wav`, fix
+   the engine aliasing, owner A/Bs it, then new references + `tone-v2` (`docs/dev/tone-lock.md`).
+5. GitHub Actions has failed every run since 2026-10-09; recheck once public (free runners), and
+   check the tone lock passes on Linux/GCC (references are from MSVC).
+6. Owner, cab view: the light theme keeps white tolex around the black grille — OK? Should the cab
    dim while CAB is off?
 
 ## Decisions
+- Tone frozen at `tone-v1` (amp + cab + effects, steady state). Re-calibration (power Tasks 2–5,
+  `VOLUME_KNOB_HEADROOM`) cancelled; glitch/transition fixes allowed while the lock passes.
 - Never gate features, nag, or add a trial (open source + donations).
 - Code, CLAUDE.md and handoffs beat the DSP spec v2.13; `ROADMAP.md` is the live plan.
 - Tone-neutral fixes first; tone-changing ones together, so the amp is re-calibrated once.
@@ -49,7 +50,7 @@ _Updated 2026-10-29 (standalone INPUT selector)_
 - Latency is an exact integer, constant across cab modes.
 
 ## Known issues
-- `signoff.py` (44.1k/4×) fails A1 −31.6 LUFS, B1 0.99%, E3 −37.9 dBc (MUST-PASS); 9 pass.
+- `signoff.py` (44.1k/4×): A1 −31.6 LUFS and B1 0.99% fail but are accepted (frozen); E3 −37.9 dBc open.
 - Sag idles warm (B2), never goes cold; a live 15W↔7W switch settles audibly.
 - **Projects that use an IR play louder** (+5.4…+13.1 dB) since the IR level match; in CHANGELOG.
 - IR path: cab-mode switches dip (~6–95 ms by block size); bright IRs sit 1.2–1.5 dB under the

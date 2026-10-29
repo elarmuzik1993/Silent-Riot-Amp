@@ -134,10 +134,10 @@ never a quiet render.
 Knobs `--gain/--shape/--volume` are internal `0..1`. Toggles `--7w/--cab/--power`
 are `0|1`. `--os 0|1|2` = 2×/4×/8×. `--ir file.wav` enables the convolution path.
 
-## How this becomes the golden lock
+## The golden lock
 
-After the Calibration Pass (§5) ratifies the gates and the tone is frozen, commit
-the `.f32` renders of the canonical matrix under `tests/tone/golden/`. A CI job
-re-renders and byte/tolerance-compares against them — any later code change that
-moves the rendered output fails. One harness, two jobs: `[tone-signoff]` (gates)
-and `[tone-golden]` (drift).
+Done: the sound is frozen at `tone-v1` and guarded by `tests/tone_lock_tests.cpp`, which
+renders 24 settings through the real `processBlock` and compares band-level fingerprints
+(not raw `.f32` renders) with `tests/tone/golden/`. It runs in ctest and `verify.sh`. Use
+`sr_render` for the A/B that must come before any approved tone change; see
+[`../docs/dev/tone-lock.md`](../docs/dev/tone-lock.md).

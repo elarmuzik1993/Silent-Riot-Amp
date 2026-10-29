@@ -4,9 +4,7 @@
 # An entry whose path comes to exist fails the check: delete it then.
 
 # Built outputs and directories the tone protocol proposes but the repo does not carry.
-docs/dev/tone-signoff.md tests/tone/
 docs/dev/tone-signoff.md tools/sr_render
-tools/README.md tests/tone/golden/
 
 # Git branch names, not paths.
 docs/records/handoffs/handoff-ir-path-sound.md docs/ir-path-sound-plan

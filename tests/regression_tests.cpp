@@ -2,9 +2,9 @@
 // Copyright (C) 2026 Boris Miscenco
 // Rendered-output regression guard (roadmap P4).
 //
-// Not a bit-exact golden file — that fights the ongoing ear-tuning. Instead
-// these assert the properties that must hold no matter how the voicing is
-// tuned: finite output, the limiter bound, determinism, a true null (silence
+// Not a golden file: the frozen sound itself is pinned by tone_lock_tests.cpp
+// (docs/dev/tone-lock.md). These assert the properties that must hold no
+// matter how the voicing is tuned: finite output, the limiter bound, determinism, a true null (silence
 // in -> silence out), and a decaying tail (no stuck/self-oscillating state).
 // The render mirrors the PluginProcessor::processBlock order (§2.5) and reads
 // the same Constants.h values production uses, so constant-level regressions
