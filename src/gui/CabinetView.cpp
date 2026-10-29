@@ -91,32 +91,36 @@ static void paintSpeaker(juce::Graphics& g, juce::Point<float> c, float r)
 {
     using juce::Colours::black;
     using juce::Colours::white;
+    // The dark-theme ramp, fixed: speakers are black in both themes and sit
+    // behind the black grille on a black baffle
+    const juce::Colour body { 0xFF15171E }, bodyEdge { 0xFF272B36 }, faceEdge { 0xFF20242E },
+                       well { 0xFF08080C }, bolt { 0xFF6A6A80 }, roll { 0xFF7E7E96 };
     const auto circle = [c](float rad) {
         return juce::Rectangle<float>(c.x - rad, c.y - rad, rad * 2.0f, rad * 2.0f);
     };
 
     // Basket rim and bolts
-    g.setGradientFill(juce::ColourGradient(Colours::knobBodyEdge, c.x - r, c.y - r,
-                                           Colours::knobBody, c.x + r, c.y + r, false));
+    g.setGradientFill(juce::ColourGradient(bodyEdge, c.x - r, c.y - r,
+                                           body, c.x + r, c.y + r, false));
     g.fillEllipse(circle(r));
     for (int i = 0; i < 4; ++i)
     {
         const float a = juce::MathConstants<float>::pi * (0.25f + 0.5f * static_cast<float>(i));
         const float br = r * 0.05f;
         const juce::Point<float> b { c.x + std::cos(a) * r * 0.93f, c.y + std::sin(a) * r * 0.93f };
-        g.setColour(Colours::muted);
+        g.setColour(bolt);
         g.fillEllipse(b.x - br, b.y - br, br * 2.0f, br * 2.0f);
     }
 
     // Surround: a roll lit from the upper left
-    g.setColour(Colours::bg);
+    g.setColour(well);
     g.fillEllipse(circle(r * 0.87f));
-    g.setGradientFill(juce::ColourGradient(Colours::dim.withAlpha(0.7f), c.x - r, c.y - r,
+    g.setGradientFill(juce::ColourGradient(roll.withAlpha(0.7f), c.x - r, c.y - r,
                                            black.withAlpha(0.0f), c.x + r * 0.5f, c.y + r * 0.5f, false));
     g.drawEllipse(circle(r * 0.83f), r * 0.07f);
 
     // Cone: deep at the centre, lit across the upper left, with pressed ribs
-    g.setGradientFill(juce::ColourGradient(Colours::bg, c.x, c.y, Colours::knobFaceEdge,
+    g.setGradientFill(juce::ColourGradient(well, c.x, c.y, faceEdge,
                                            c.x + r * 0.78f, c.y, true));
     g.fillEllipse(circle(r * 0.78f));
     g.setGradientFill(juce::ColourGradient(white.withAlpha(0.08f), c.x - r * 0.6f, c.y - r * 0.6f,
@@ -132,8 +136,8 @@ static void paintSpeaker(juce::Graphics& g, juce::Point<float> c, float r)
 
     // Dust cap: a dome with its highlight up and left
     const float cap = r * 0.27f;
-    g.setGradientFill(juce::ColourGradient(Colours::knobBodyEdge.brighter(0.4f), c.x - cap * 0.35f, c.y - cap * 0.35f,
-                                           Colours::knobBody, c.x + cap, c.y + cap, true));
+    g.setGradientFill(juce::ColourGradient(bodyEdge.brighter(0.4f), c.x - cap * 0.35f, c.y - cap * 0.35f,
+                                           body, c.x + cap, c.y + cap, true));
     g.fillEllipse(circle(cap));
     g.setColour(black.withAlpha(0.45f));
     g.drawEllipse(circle(cap), 1.0f);
@@ -141,15 +145,73 @@ static void paintSpeaker(juce::Graphics& g, juce::Point<float> c, float r)
     g.fillEllipse(c.x - cap * 0.6f, c.y - cap * 0.62f, cap * 0.55f, cap * 0.32f);
 }
 
-// A moulded black plastic corner cap. Black in both themes, like the real part.
-static void paintCorner(juce::Graphics& g, juce::Rectangle<float> r)
+// A moulded black plastic corner cap over the box corner (sx, sy: -1 = left /
+// top, +1 = right / bottom). Its outer corner follows the box's radius, its
+// inner corner is rounded off; satin black lit from the upper left, with a
+// bevelled rim, a soft dome and a recessed screw. Black in both themes, like
+// the real part.
+static void paintCorner(juce::Graphics& g, juce::Rectangle<float> r, int sx, int sy, float boxRadius)
 {
-    const float cs = r.getWidth() * 0.32f;
-    g.setGradientFill(juce::ColourGradient(juce::Colour(0xFF2A2D36), r.getX(), r.getY(),
-                                           juce::Colour(0xFF050507), r.getRight(), r.getBottom(), false));
-    g.fillRoundedRectangle(r, cs);
-    g.setColour(juce::Colours::white.withAlpha(0.12f));
-    g.drawRoundedRectangle(r.reduced(0.5f), cs, 0.8f);
+    using juce::Colours::black;
+    using juce::Colours::white;
+    const float s = r.getWidth();
+    const float inner = s * 0.42f;
+    const float outer = juce::jmax(boxRadius, 1.0f);
+
+    // One outline, rounded off at `inner` everywhere but the corner that sits
+    // on the box's own corner, which follows the box's radius
+    const auto radius = [&](int cx, int cy) { return cx == sx && cy == sy ? outer : inner; };
+    const float tl = radius(-1, -1), tr = radius(1, -1), br = radius(1, 1), bl = radius(-1, 1);
+    const float x0 = r.getX(), y0 = r.getY(), x1 = r.getRight(), y1 = r.getBottom();
+    juce::Path body;
+    body.startNewSubPath(x0 + tl, y0);
+    body.lineTo(x1 - tr, y0);
+    body.quadraticTo(x1, y0, x1, y0 + tr);
+    body.lineTo(x1, y1 - br);
+    body.quadraticTo(x1, y1, x1 - br, y1);
+    body.lineTo(x0 + bl, y1);
+    body.quadraticTo(x0, y1, x0, y1 - bl);
+    body.lineTo(x0, y0 + tl);
+    body.quadraticTo(x0, y0, x0 + tl, y0);
+    body.closeSubPath();
+
+    g.setColour(black.withAlpha(0.55f));          // contact shadow on the tolex
+    g.fillPath(body, juce::AffineTransform::translation(0.0f, 1.2f));
+
+    // Satin black body, lit from the upper left
+    g.setGradientFill(juce::ColourGradient(juce::Colour(0xFF2B2E36), r.getX(), r.getY(),
+                                           juce::Colour(0xFF050607), r.getRight(), r.getBottom(), false));
+    g.fillPath(body);
+
+    // Soft dome: a broad sheen up and left of centre
+    const auto c = r.getCentre();
+    g.setGradientFill(juce::ColourGradient(white.withAlpha(0.07f), c.x - s * 0.12f, c.y - s * 0.14f,
+                                           white.withAlpha(0.0f), c.x + s * 0.35f, c.y + s * 0.35f, true));
+    g.fillPath(body);
+
+    // Bevelled rim: light on the upper-left edges, dark on the lower right
+    {
+        juce::Graphics::ScopedSaveState save(g);
+        g.reduceClipRegion(body);
+        g.setGradientFill(juce::ColourGradient(white.withAlpha(0.2f), r.getX(), r.getY(),
+                                               white.withAlpha(0.0f), c.x, c.y, false));
+        g.strokePath(body, juce::PathStrokeType(1.6f));
+        g.setGradientFill(juce::ColourGradient(black.withAlpha(0.0f), c.x, c.y,
+                                               black.withAlpha(0.6f), r.getRight(), r.getBottom(), false));
+        g.strokePath(body, juce::PathStrokeType(1.6f));
+    }
+
+    // Recessed screw: a dark well, its lower rim catching the light
+    const float wr = s * 0.13f;
+    g.setColour(black.withAlpha(0.75f));
+    g.fillEllipse(c.x - wr, c.y - wr, wr * 2.0f, wr * 2.0f);
+    g.setColour(white.withAlpha(0.18f));
+    juce::Path rim;
+    rim.addCentredArc(c.x, c.y, wr, wr, 0.0f, juce::degreesToRadians(100.0f), juce::degreesToRadians(260.0f), true);
+    g.strokePath(rim, juce::PathStrokeType(0.7f));
+    g.setColour(juce::Colour(0xFF2A2D36));
+    g.drawLine(c.x - wr * 0.55f, c.y, c.x + wr * 0.55f, c.y, 0.8f);
+    g.drawLine(c.x, c.y - wr * 0.55f, c.x, c.y + wr * 0.55f, 0.8f);
 }
 
 void CabinetView::paintCabinet(juce::Graphics& g, juce::Rectangle<float> b)
@@ -184,34 +246,51 @@ void CabinetView::paintCabinet(juce::Graphics& g, juce::Rectangle<float> b)
     g.setColour(Colours::borderHi);
     g.drawRoundedRectangle(b, rad, 1.0f);
 
-    // Baffle, and the two speakers on it
+    // Baffle, and the two speakers on it. The baffle is black in both themes:
+    // it is what shows through the black steel grille's openings.
     const auto grille = b.reduced(side * 0.095f);
     const float gr = rad * 0.5f;
-    g.setColour(Colours::bg);
+    g.setColour(juce::Colour(0xFF060608));
     g.fillRoundedRectangle(grille, gr);
     const float spkR = juce::jmin(grille.getWidth() * 0.235f, grille.getHeight() * 0.45f);
     // Side by side in the middle, as in a real 2x12, however wide the box
     for (float dir : { -1.0f, 1.0f })
         paintSpeaker(g, { grille.getCentreX() + dir * spkR * 1.12f, grille.getCentreY() }, spkR);
 
-    // Perforated steel grille over them: a plate punched with a hex grid of
-    // holes (even-odd fill), so the speakers show through every hole
+    // Expanded-metal grille over them, as on old-school metal cabs: a black
+    // steel plate with staggered diamond openings (filled even-odd), so the
+    // speakers show through every opening. Black in both themes, like the
+    // real part; the upper edges of each opening catch the light.
     {
         juce::Graphics::ScopedSaveState save(g);
         juce::Path clip;
         clip.addRoundedRectangle(grille, gr);
         g.reduceClipRegion(clip);
-        juce::Path plate;
+        juce::Path plate, edges;
         plate.setUsingNonZeroWinding(false);
         plate.addRectangle(grille);
-        const float pitch = 4.2f, hole = 1.35f;
+        const float dw = 9.0f, dh = 4.4f;   // diamond opening
         int row = 0;
-        for (float y = grille.getY() + pitch * 0.5f; y < grille.getBottom(); y += pitch * 0.866f, ++row)
-            for (float x = grille.getX() + ((row & 1) != 0 ? pitch : pitch * 0.5f); x < grille.getRight(); x += pitch)
-                plate.addEllipse(x - hole, y - hole, hole * 2.0f, hole * 2.0f);
-        g.setGradientFill(juce::ColourGradient(Colours::knobBodyEdge.brighter(0.25f), grille.getX(), grille.getY(),
-                                               Colours::knobBody, grille.getRight(), grille.getBottom(), false));
+        for (float y = grille.getY(); y < grille.getBottom() + dh; y += dh * 0.5f + 0.9f, ++row)
+            for (float x = grille.getX() + ((row & 1) != 0 ? dw * 0.5f : 0.0f) - dw;
+                 x < grille.getRight() + dw; x += dw + 1.6f)
+            {
+                juce::Path d;
+                d.startNewSubPath(x, y);
+                d.lineTo(x + dw * 0.5f, y - dh * 0.5f);
+                d.lineTo(x + dw, y);
+                d.lineTo(x + dw * 0.5f, y + dh * 0.5f);
+                d.closeSubPath();
+                plate.addPath(d);
+                edges.startNewSubPath(x, y);
+                edges.lineTo(x + dw * 0.5f, y - dh * 0.5f);
+                edges.lineTo(x + dw, y);
+            }
+        g.setGradientFill(juce::ColourGradient(juce::Colour(0xFF24262C), grille.getX(), grille.getY(),
+                                               juce::Colour(0xFF0C0D10), grille.getRight(), grille.getBottom(), false));
         g.fillPath(plate);
+        g.setColour(white.withAlpha(0.13f));
+        g.strokePath(edges, juce::PathStrokeType(0.6f));
         // The frame's shadow falls across the top of the cloth
         g.setGradientFill(juce::ColourGradient(black.withAlpha(0.4f), 0.0f, grille.getY(),
                                                black.withAlpha(0.0f), 0.0f, grille.getY() + 10.0f, false));
@@ -227,10 +306,11 @@ void CabinetView::paintCabinet(juce::Graphics& g, juce::Rectangle<float> b)
 
     // Corner protectors
     const float s = side * 0.11f;
-    paintCorner(g, { b.getX() - 1.0f, b.getY() - 1.0f, s, s });
-    paintCorner(g, { b.getRight() - s + 1.0f, b.getY() - 1.0f, s, s });
-    paintCorner(g, { b.getX() - 1.0f, b.getBottom() - s + 1.0f, s, s });
-    paintCorner(g, { b.getRight() - s + 1.0f, b.getBottom() - s + 1.0f, s, s });
+    for (int sy : { -1, 1 })
+        for (int sx : { -1, 1 })
+            paintCorner(g, { sx < 0 ? b.getX() - 1.0f : b.getRight() - s + 1.0f,
+                             sy < 0 ? b.getY() - 1.0f : b.getBottom() - s + 1.0f, s, s },
+                        sx, sy, rad);
 }
 
 // The arrows are drawn, not typed: the embedded fonts have no arrow glyphs.
