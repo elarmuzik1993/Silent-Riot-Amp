@@ -207,7 +207,12 @@ TEST_CASE("Tone lock: 7W, CAB off and a loaded IR", "[tone-lock]")
 {
     Case ir;
     ir.name = "switch-ir-neutral";
-    ir.setup = [](ProcessorHarness& h) { h.loadIR(juce::File(SOURCE_DIR "/tests/fixtures/ir/neutral.wav")); };
+    ir.setup = [](ProcessorHarness& h) {
+        h.loadIR(juce::File(SOURCE_DIR "/tests/fixtures/ir/neutral.wav"));
+        // prepareToPlay installs the active IR on this thread (IRLoad::Now), so
+        // the render never depends on when JUCE's loader thread finished.
+        h.proc.prepareToPlay(h.sampleRate, kBlock);
+    };
     lock({
         knob("switch-7w", IDs::HALF_POWER, 1.0f),
         knob("switch-cab-off", IDs::CAB_SIM, 0.0f),
