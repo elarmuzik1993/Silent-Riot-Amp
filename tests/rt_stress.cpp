@@ -210,7 +210,11 @@ void warmUp()
 #endif
 #if SR_RT_INTERPOSE_PTHREAD
     srResolvePthread();
+    // PTHREAD_MUTEX_INITIALIZER is a brace-init of zeros, which GCC's
+    // -Wzero-as-null-pointer-constant reports on the owner field.
+    JUCE_BEGIN_IGNORE_WARNINGS_GCC_LIKE("-Wzero-as-null-pointer-constant")
     pthread_mutex_t m = PTHREAD_MUTEX_INITIALIZER;
+    JUCE_END_IGNORE_WARNINGS_GCC_LIKE
     pthread_mutex_lock(&m);
     pthread_mutex_unlock(&m);
 #endif
@@ -1237,6 +1241,64 @@ void scenarioStability(double secs)
     }));
 }
 
+// ── 9b. Mono bus ────────────────────────────────────────────────
+// isBusesLayoutSupported() accepts mono in / mono out, and a mono bus takes
+// different paths: the widener is skipped outright, JUCE's convolution plays
+// IR channel 0 only, and every per-channel loop in processBlock runs once.
+// Nothing else in the suite exercises that.
+void scenarioMono(double secs)
+{
+    std::cout << "\n[mono] 1 in / 1 out\n";
+
+    keep(measure("mono", "effects on, DI", [&](Row& row)
+    {
+        Amp a(48000.0, 128, 1);
+        crank(a);
+        allEffectsOn(a);
+        a.prepare();
+        SignalGen g { Sig::DI, 48000.0, std::mt19937 { 41 } };
+        a.seconds(secs, std::ref(g), row);
+    }));
+
+    keep(measure("mono", "IR mode + IR_INDEX churn", [&](Row& row)
+    {
+        juce::TemporaryFile tmp(".wav");
+        const juce::File ir = writeIR(tmp, 2048, 48000.0, true);
+        Amp a(48000.0, 128, 1);
+        crank(a);
+        a.prepare();
+        if (ir.existsAsFile()) a.proc.loadUserIR(ir);
+        SignalGen warm { Sig::Sine, 48000.0, std::mt19937 { 42 } };
+        Row settle; settle.t.reserve(2048);
+        a.seconds(0.5, std::ref(warm), settle);
+        SignalGen g { Sig::DI, 48000.0, std::mt19937 { 43 } };
+        const long long total = static_cast<long long>(secs * 48000.0);
+        int n = 0;
+        for (long long done = 0; done < total; done += 128, ++n)
+        {
+            a.set(P::IR_INDEX, static_cast<float>(n % 3));
+            a.block(128, std::ref(g), row);
+        }
+    }));
+
+    keep(measure("mono", "hostile input then recovery", [&](Row& row)
+    {
+        Amp a(48000.0, 128, 1);
+        crank(a);
+        allEffectsOn(a);
+        a.prepare();
+        SignalGen g { Sig::Nyquist, 48000.0, std::mt19937 { 44 } };
+        a.seconds(secs, std::ref(g), row);
+        Row after; after.t.reserve(4096);
+        SignalGen clean { Sig::Sine, 48000.0, std::mt19937 { 45 } };
+        a.seconds(1.0, std::ref(clean), after, 128);
+        if (after.a.nonFinite > 0 || after.a.rms() < 1.0e-7)
+            report("CRITICAL", "mono",
+                   std::string("mono bus did not recover after full-scale Nyquist input: rms ")
+                   + std::to_string(after.a.rms()));
+    }));
+}
+
 // ── 10. Opt-in: blocks larger than the host promised ────────────
 void scenarioOverBlock()
 {
@@ -1276,8 +1338,8 @@ int main(int argc, char* argv[])
                 "  --scale=N          multiply every run length by N\n"
                 "  --overblock        also run the opt-in over-sized-block scenario\n"
                 "  --md=PATH          write a Markdown report\n"
-                "scenarios: load blocks params hostile modes ir threads recover overhead denormals\n"
-                "           stability\n";
+                "scenarios: load blocks params hostile modes ir threads recover overhead mono\n"
+                "           denormals stability\n";
             return 0;
         }
         if (arg == "--quick") quick = true;
@@ -1303,7 +1365,9 @@ int main(int argc, char* argv[])
             volatile auto* p = new int[16];
             delete[] const_cast<int*>(p);
 #if SR_RT_INTERPOSE_PTHREAD
+            JUCE_BEGIN_IGNORE_WARNINGS_GCC_LIKE("-Wzero-as-null-pointer-constant")
             pthread_mutex_t m = PTHREAD_MUTEX_INITIALIZER;
+            JUCE_END_IGNORE_WARNINGS_GCC_LIKE
             pthread_mutex_lock(&m);
             pthread_mutex_unlock(&m);
 #endif
@@ -1350,6 +1414,7 @@ int main(int argc, char* argv[])
         if (wanted("recover"))   scenarioRecover();
         if (wanted("overhead"))  scenarioOverhead();
         if (wanted("denormals")) scenarioDenormals();
+        if (wanted("mono"))      scenarioMono(3.0 * s);
         if (wanted("stability")) scenarioStability(20.0 * s);
         if (overblock)           scenarioOverBlock();
         juce::MessageManager::getInstance()->stopDispatchLoop();

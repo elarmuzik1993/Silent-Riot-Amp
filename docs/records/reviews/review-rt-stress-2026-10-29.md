@@ -21,7 +21,7 @@ Frozen record. Re-run it with the commands at the end.
 | Base commit | `e56ab9f` (tone frozen at `tone-v1`) |
 | Machine | Intel Xeon @ 2.10 GHz, 4 vCPU, Linux 6.18 — a **cloud vCPU**, roughly 2–3× slower per core than a current desktop |
 | Build | GCC 13, Release (`-O3`, LTO), JUCE 7.0.12 |
-| Coverage | 99 runs, 129 s of rendered audio, 11 scenarios, plus a ThreadSanitizer pass |
+| Coverage | 12 scenarios, 102 runs, 138 s of rendered audio; plus a ThreadSanitizer run and an AddressSanitizer + UndefinedBehaviorSanitizer run |
 
 ## Findings
 
@@ -225,6 +225,25 @@ Segmentation fault
 #2 SilentRiotProcessor::processBlock(juce::AudioBuffer<float>&, juce::MidiBuffer&)
 ```
 
+Under AddressSanitizer, with the exact fault:
+
+```
+ERROR: AddressSanitizer: heap-buffer-overflow
+WRITE of size 4 at 0x51d000010cc0 thread T2
+    #0 juce::dsp::Oversampling2TimesPolyphaseIIR<float>::processSamplesUp(...)
+         juce_dsp/processors/juce_Oversampling.cpp:346
+    #1 juce::dsp::Oversampling<float>::processSamplesUp(...)
+         juce_dsp/processors/juce_Oversampling.cpp:707
+    #2 SilentRiotProcessor::processBlock(...)   src/PluginProcessor.cpp:767
+
+0x51d000010cc0 is located 0 bytes after 2112-byte region
+  allocated by juce::HeapBlock<char, true>::mallocWrapper
+```
+
+It writes straight off the end of the buffer the oversampler sized in
+`prepareToPlay` — a write past the heap block, not a read, so it can corrupt
+whatever the allocator put next.
+
 The oversamplers size their buffers from `prepareToPlay`'s `samplesPerBlock`, and
 a larger block walks off the end of them. The host is at fault — the VST3 and AU
 contracts both say the block may not exceed the declared maximum — but the
@@ -250,15 +269,16 @@ absolutes.
 
 | Base rate | 2× | 4× | 8× |
 |---|---:|---:|---:|
-| 44.1 kHz | 23.2% | 38.9% | 68.5% |
-| 48 kHz | 22.7% | 41.5% | 74.7% |
-| 88.2 kHz | 43.4% | 69.0% | **130.9%** |
-| 96 kHz | 47.1% | 75.3% | **143.3%** |
-| 176.4 kHz | 84.6% | **139.1%** | **264.3%** |
-| 192 kHz | 87.4% | **143.0%** | **275.8%** |
+| 44.1 kHz | 21.3% | 43.7% | 70.1% |
+| 48 kHz | 23.1% | 39.5% | 74.0% |
+| 88.2 kHz | 41.1% | 70.2% | **123.0%** |
+| 96 kHz | 45.7% | 83.7% | **139.9%** |
+| 176.4 kHz | 80.4% | **140.0%** | **242.4%** |
+| 192 kHz | 96.8% | **157.2%** | **283.7%** |
 
-Run-to-run spread on a shared vCPU is a few percentage points; a second full run
-agreed to within ±5% on every cell.
+Three full runs agreed to roughly ±10% per cell — this is a shared vCPU, so
+treat the ratios between cells as the result and the absolutes as an order of
+magnitude.
 
 Cost tracks the internal rate (base × factor) almost exactly: the amp costs
 roughly **2 µs per oversampled sample** on this core, which is what a
@@ -294,7 +314,7 @@ Worth recording, because these are the things that usually fail.
   down to 1 sample, a full parameter storm, mode churn, IR automation, and the
   concurrency run. The project's "no dynamic allocation in `processBlock`" rule
   holds in the shipped code, and is now measured rather than asserted.
-- **The host never received a bad sample.** Across 99 runs and 129 s of audio:
+- **The host never received a bad sample.** Across 102 runs and 138 s of audio:
   0 non-finite samples, 0 samples past ±1. With the effects on the peak is
   exactly 1.000 — the post-effects soft clip holds the bus.
 - **Hostile input is contained** at the output: full-scale noise, a 1.6 kHz
@@ -316,6 +336,19 @@ Worth recording, because these are the things that usually fail.
 - **Mode churn is clean.** Power, tuner mute, CAB, 7W, oversample, host bypass
   and `reset()` driven as fast as the block rate allows — no allocation, no
   non-finite sample, no overshoot.
+- **AddressSanitizer and UndefinedBehaviorSanitizer are clean.** A second build
+  (`-fsanitize=address,undefined`) ran every scenario — the load matrix, block
+  churn to 1 sample, the parameter storm with injected NaN, hostile input, mode
+  churn, IR automation, the concurrency run, the mono bus, denormals and the
+  stability soak: **0 AddressSanitizer errors and 0 UndefinedBehaviorSanitizer
+  runtime errors**, over 45 s of audio. No out-of-bounds access, no
+  use-after-free, no signed overflow, no bad shift, no invalid cast anywhere in
+  normal operation. (The one overflow this project does have needs the host to
+  break its contract — RT-5.)
+- **A mono bus is as healthy as a stereo one.** 1 in / 1 out, with effects, with
+  an IR and under `IR_INDEX` churn, and under full-scale Nyquist input: output
+  bounded, no allocation, recovery clean. Nothing in the suite had covered the
+  single-channel paths before.
 - **ThreadSanitizer found one race** (RT-4) and nothing else — not in the IR
   hand-off, the cab-mode switcher, state save/restore during playback, the
   meters or the readout snapshots. The `threads` scenario ran ~1200
@@ -336,6 +369,27 @@ cmake --build build-verify --target SilentRiotRTStress
 ./build-verify/tests/SilentRiotRTStress --only=overblock --overblock   # RT-5 (crashes)
 ./build-verify/tests/SilentRiotRTStress --md=rt-report.md    # machine-readable table
 ```
+
+AddressSanitizer + UndefinedBehaviorSanitizer:
+
+```bash
+cmake -B build-asan -G Ninja -DCMAKE_BUILD_TYPE=Debug -DSR_BUILD_TESTS=ON \
+      -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer -O1 -g -DNDEBUG" \
+      -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address,undefined"
+cmake --build build-asan --target SilentRiotRTStress
+ASAN_OPTIONS=detect_leaks=0 UBSAN_OPTIONS=print_stacktrace=1 \
+  ./build-asan/tests/SilentRiotRTStress --quick
+```
+
+A sanitizer build is a CMake `Debug` config, so JUCE's assertions are on
+(`juce_add_plugin` defines `DEBUG=1` there, which beats `-DNDEBUG`). The
+`params` scenario therefore prints a run of
+`JUCE Assertion failure in juce_NormalisableRange.h:253` — that is
+`clampTo0To1` seeing the NaN the harness injected straight into the raw
+parameter atomic, read back by APVTS's own value-tree flush. It is expected,
+it is what a host-supplied NaN would do too, and it is compiled out of
+Release; the audio path's own sanitisation (review S1) is what keeps it
+harmless.
 
 ThreadSanitizer (RT-4) — the harness compiles its own interposers out under a
 sanitizer, so the sanitizer stays the instrument:

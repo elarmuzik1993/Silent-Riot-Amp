@@ -109,6 +109,7 @@ cmake --build build-verify --target SilentRiotRTStress
 | `threads` | State save/restore, presets and IR loads on the message thread during playback |
 | `recover` | Whether one non-finite input sample permanently silences the amp |
 | `overhead` | Fixed cost per block before any DSP runs |
+| `mono` | The 1-in/1-out bus: widener skipped, IR channel 0 only, single-channel loops |
 | `denormals` | Block time while a tail decays into denormal range |
 | `stability` | Every knob maxed, long run, then silence |
 
