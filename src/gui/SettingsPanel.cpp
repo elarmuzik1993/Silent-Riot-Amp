@@ -161,7 +161,7 @@ void SettingsPanel::paint(juce::Graphics& g)
     g.fillEllipse(px + 10.0f, y + 10.0f, 8.0f, 8.0f);
     g.setFont(Fonts::spaceMono(Fonts::Sizes::small));
     g.setColour(Colours::text);
-    g.drawText("Free & open source — GPLv3", juce::Rectangle<float>(px + 24.0f, y, w - 24.0f, 28.0f),
+    g.drawText(juce::CharPointer_UTF8("Free & open source \xe2\x80\x94 GPLv3"), juce::Rectangle<float>(px + 24.0f, y, w - 24.0f, 28.0f),
                juce::Justification::centredLeft, false);
 }
 

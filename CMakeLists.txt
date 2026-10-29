@@ -131,6 +131,7 @@ target_sources(SilentRiot
         src/gui/SectionBar.cpp
         src/gui/AdvancedPanel.h
         src/gui/AdvancedPanel.cpp
+        src/gui/AmpFaceplate.cpp
         src/gui/PresetSelector.h
         src/gui/PresetSelector.cpp
         src/gui/SegmentedSelector.h

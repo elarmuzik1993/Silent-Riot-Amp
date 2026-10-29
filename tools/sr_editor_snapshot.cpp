@@ -4,10 +4,11 @@
 // Renders the full plugin editor to a PNG for the user manual
 // (docs/manual/, resources/images/). Built only when -DSR_BUILD_TOOLS=ON.
 //
-//   sr_editor_snapshot <out.png> [fx] [ir] [adv] [scale=<0..n>]
+//   sr_editor_snapshot <out.png> [fx] [ir] [adv] [off] [scale=<0..n>] [theme=<n>]
 //
 // The flags open the matching panels (EFFECTS, IR LOADER, ADVANCED). With
-// the CAB toggle on (the default) the editor opens the IR LOADER itself. Panel states go through the same apvts.state
+// the CAB toggle on (the default) the editor opens the IR LOADER itself. `off`
+// switches PWR off; `theme=` picks a SettingsPanel theme index. Panel states go through the same apvts.state
 // properties the editor restores from, so the panels snap open with no
 // animation. Paints offscreen via paintEntireComponent; on Linux the editor
 // still opens an X11 connection, so run it under Xvfb (xvfb-run) when
@@ -50,6 +51,10 @@ int main(int argc, char** argv)
         if (arg == "fx")  state.setProperty("fxPanelOpen",  true, nullptr);
         if (arg == "ir")  state.setProperty("irPanelOpen",  true, nullptr);
         if (arg == "adv") state.setProperty("advPanelOpen", true, nullptr);
+        if (arg == "off")
+            proc->apvts.getParameter(sr::Params::IDs::POWER)->setValueNotifyingHost(0.0f);
+        if (arg.startsWith("theme="))
+            state.setProperty("theme", arg.fromFirstOccurrenceOf("=", false, false).getIntValue(), nullptr);
         if (arg.startsWith("scale="))
             state.setProperty("uiScale", arg.fromFirstOccurrenceOf("=", false, false).getIntValue(), nullptr);
     }

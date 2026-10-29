@@ -2,15 +2,16 @@
 // Copyright (C) 2026 Boris Miscenco
 #pragma once
 #include <juce_gui_basics/juce_gui_basics.h>
+#include "../utils/Constants.h"
 
 namespace sr {
 
 // Data struct for processor readout
 struct DSPReadout {
-    float vBPlus = 300.0f;   // volts (real)
-    float vScreen = 282.0f;
-    float vPi = 260.0f;
-    float vPreamp = 198.0f;
+    float vBPlus  = VS::toVolts(V_POWER_NOMINAL_N);   // volts (real)
+    float vScreen = VS::toVolts(V_SCREEN_NOMINAL_N);
+    float vPi     = VS::toVolts(V_PI_NOMINAL_N);
+    float vPreamp = VS::toVolts(V_PREAMP_NOMINAL_N);
     float sagPercent = 0.0f;
     float biasV = -13.2f;
     float gridCurrentMA = 0.0f;
@@ -34,7 +35,8 @@ private:
     juce::Random rng;
 
     // Jittered display voltages
-    float dispBPlus = 315.0f, dispScreen = 282.0f, dispPi = 260.0f, dispPreamp = 198.0f;
+    float dispBPlus  = VS::toVolts(V_POWER_NOMINAL_N),  dispScreen = VS::toVolts(V_SCREEN_NOMINAL_N);
+    float dispPi     = VS::toVolts(V_PI_NOMINAL_N),     dispPreamp = VS::toVolts(V_PREAMP_NOMINAL_N);
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(AdvancedPanel)
 };

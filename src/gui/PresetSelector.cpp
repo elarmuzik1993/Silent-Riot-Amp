@@ -55,6 +55,18 @@ std::unique_ptr<juce::AccessibilityHandler> PresetSelector::createAccessibilityH
             .addAction(juce::AccessibilityActionType::showMenu, [this] { step(+1); }));
 }
 
+// The arrows are drawn, not typed: the embedded fonts have no \u25C2 / \u25B8
+// glyph, and JUCE does not fall back to a system font for an embedded typeface.
+static void fillArrow(juce::Graphics& g, juce::Rectangle<float> cell, int direction)
+{
+    const float halfH = 4.0f, w = 4.5f;
+    const float cx = cell.getCentreX(), cy = cell.getCentreY();
+    const float tip = cx + direction * w * 0.5f, base = cx - direction * w * 0.5f;
+    juce::Path p;
+    p.addTriangle(base, cy - halfH, base, cy + halfH, tip, cy);
+    g.fillPath(p);
+}
+
 void PresetSelector::paint(juce::Graphics& g)
 {
     auto bounds = getLocalBounds().toFloat();
@@ -69,20 +81,15 @@ void PresetSelector::paint(juce::Graphics& g)
     // Left arrow cell
     g.setColour(Colours::border);
     g.fillRect(arrowW, 0.0f, 1.0f, h);
-    g.setFont(Fonts::spaceMono(Fonts::Sizes::value));
     g.setColour(Colours::label);
-    g.drawText(juce::CharPointer_UTF8("\xe2\x97\x82"),
-               juce::Rectangle<float>(0.0f, 0.0f, arrowW, h),
-               juce::Justification::centred, false);
+    fillArrow(g, juce::Rectangle<float>(0.0f, 0.0f, arrowW, h), -1);
 
     // Right arrow cell
     float rightX = bounds.getWidth() - arrowW;
     g.setColour(Colours::border);
     g.fillRect(rightX, 0.0f, 1.0f, h);
     g.setColour(Colours::label);
-    g.drawText(juce::CharPointer_UTF8("\xe2\x96\xb8"),
-               juce::Rectangle<float>(rightX, 0.0f, arrowW, h),
-               juce::Justification::centred, false);
+    fillArrow(g, juce::Rectangle<float>(rightX, 0.0f, arrowW, h), +1);
 
     // Center: preset name
     float centerW = bounds.getWidth() - arrowW * 2.0f;

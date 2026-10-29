@@ -20,7 +20,8 @@ public:
     void toggle();  // flip state with notification
 
     // How the state is drawn under the label.
-    //   Switch — iOS-style pill track + sliding thumb. The amp row uses this.
+    //   Switch — a chrome bat toggle through a hex nut on a glass ring that
+    //            lights in activeColor; lever up is on. The amp row uses this.
     //   Led    — a flat bar, lit in activeColor. Used in the effects cards,
     //            where a pill per card reads as heavy chrome next to
     //            half-scale knobs.
@@ -37,7 +38,7 @@ public:
     static constexpr int minHeight(Style s)
     {
         return static_cast<int>(kLabelH + kLabelGap
-                                + (s == Style::Led ? kLedH + kLedGlow : trackH));
+                                + (s == Style::Led ? kLedH + kLedGlow : kBatH));
     }
 
 private:
@@ -55,9 +56,11 @@ private:
 
     static constexpr float kLabelH   = 14.0f;
     static constexpr float kLabelGap =  4.0f;
-    static constexpr float trackW    = 34.0f;
-    static constexpr float trackH    = 16.0f;
-    static constexpr float thumbD    = 12.0f;
+    // Bat toggle: drawn at kBatScale around a nut centred kBatPivot below the
+    // label gap; the lever tip, its ball and their shadows need kBatH in all.
+    static constexpr float kBatScale = 1.15f;
+    static constexpr float kBatH     = 30.0f;
+    static constexpr float kBatPivot = 14.0f;
     // A hairline, not a pill. kLedH + kLedGlow is deliberately chosen to make
     // minHeight() land on a whole number — it truncates, so a fractional sum
     // would leave the bar half a pixel short of its own reserved space.

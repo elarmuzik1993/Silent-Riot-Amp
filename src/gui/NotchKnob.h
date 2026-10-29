@@ -43,6 +43,16 @@ public:
     // so each metric below carries a floor.
     void setScale(float s);
 
+    // Draw the parameter name above the knob instead of below the readout. The
+    // strip is the same height either way, so preferredHeight still holds.
+    void setLabelOnTop(bool onTop);
+
+    // Draw the value as plain text printed on the panel instead of a boxed
+    // readout. Its row is kEngravedSaving shorter, so the knob needs that much
+    // less height.
+    void setEngravedReadout(bool engraved);
+    static constexpr int kEngravedSaving = 4;
+
     // Vertical room a knob needs to render in full *at scale 1.0*: the square
     // knob plus the readout + label strip. Lay one out shorter and the name is
     // drawn past the bottom edge and silently clipped — which is exactly what
@@ -75,7 +85,8 @@ private:
         }
     };
 
-    float stripH() const { return readoutH + readoutGap + labelH; }
+    float readoutRowH() const { return engravedReadout ? readoutH - kEngravedSaving : readoutH; }
+    float stripH() const { return readoutRowH() + readoutGap + labelH; }
 
     KnobSlider slider;
     juce::String label;
@@ -95,6 +106,8 @@ private:
     float readoutGap  = kReadoutGapBase;
     float labelH      = kLabelHBase;
     float readoutMinW = kReadoutMinWBase;
+    bool labelOnTop   = false;
+    bool engravedReadout = false;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(NotchKnob)
 };

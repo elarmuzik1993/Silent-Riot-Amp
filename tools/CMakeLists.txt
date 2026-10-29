@@ -42,6 +42,7 @@ target_sources(sr_render PRIVATE
     ${CMAKE_SOURCE_DIR}/src/gui/FooterBar.cpp
     ${CMAKE_SOURCE_DIR}/src/gui/SectionBar.cpp
     ${CMAKE_SOURCE_DIR}/src/gui/AdvancedPanel.cpp
+    ${CMAKE_SOURCE_DIR}/src/gui/AmpFaceplate.cpp
     ${CMAKE_SOURCE_DIR}/src/gui/PresetSelector.cpp
     ${CMAKE_SOURCE_DIR}/src/gui/SegmentedSelector.cpp
     ${CMAKE_SOURCE_DIR}/src/gui/SettingsPanel.cpp
@@ -150,6 +151,7 @@ target_sources(sr_editor_snapshot PRIVATE
     ${CMAKE_SOURCE_DIR}/src/gui/FooterBar.cpp
     ${CMAKE_SOURCE_DIR}/src/gui/SectionBar.cpp
     ${CMAKE_SOURCE_DIR}/src/gui/AdvancedPanel.cpp
+    ${CMAKE_SOURCE_DIR}/src/gui/AmpFaceplate.cpp
     ${CMAKE_SOURCE_DIR}/src/gui/PresetSelector.cpp
     ${CMAKE_SOURCE_DIR}/src/gui/SegmentedSelector.cpp
     ${CMAKE_SOURCE_DIR}/src/gui/SettingsPanel.cpp

@@ -44,13 +44,35 @@ void NotchKnob::setScale(float s)
     repaint();
 }
 
+void NotchKnob::setLabelOnTop(bool onTop)
+{
+    labelOnTop = onTop;
+    resized();
+    repaint();
+}
+
+void NotchKnob::setEngravedReadout(bool engraved)
+{
+    engravedReadout = engraved;
+    resized();
+    repaint();
+}
+
 void NotchKnob::resized()
 {
     // Reserve the readout + label strip, then centre a square knob in what's
     // left — drawRotarySlider takes jmin(w,h), so a non-square slider would
     // just pad one axis.
     auto area = getLocalBounds();
-    area.removeFromBottom(juce::roundToInt(stripH()));
+    if (labelOnTop)
+    {
+        area.removeFromTop(juce::roundToInt(labelH + readoutGap));
+        area.removeFromBottom(juce::roundToInt(readoutRowH()));
+    }
+    else
+    {
+        area.removeFromBottom(juce::roundToInt(stripH()));
+    }
     const int side = juce::jmin(area.getWidth(), area.getHeight());
     slider.setBounds(area.withSizeKeepingCentre(side, side));
 }
@@ -58,9 +80,10 @@ void NotchKnob::resized()
 void NotchKnob::paint(juce::Graphics& g)
 {
     auto bounds     = getLocalBounds().toFloat();
-    auto labelBox   = bounds.removeFromBottom(labelH);
-    bounds.removeFromBottom(readoutGap);
-    auto readoutRow = bounds.removeFromBottom(readoutH);
+    auto labelBox   = labelOnTop ? bounds.removeFromTop(labelH) : bounds.removeFromBottom(labelH);
+    if (! labelOnTop)
+        bounds.removeFromBottom(readoutGap);
+    auto readoutRow = bounds.removeFromBottom(readoutRowH());
 
     // Value readout — knobs are 0..1 internally, displayed ×10 unless the owner
     // supplied a formatter (DELAY TIME's ms, the % knobs).
@@ -71,16 +94,27 @@ void NotchKnob::paint(juce::Graphics& g)
                                                Fonts::Sizes::value * scale));
     g.setFont(valFont);
 
-    const float valW = juce::jmax(readoutMinW,
-                                  valFont.getStringWidthFloat(valText) + 20.0f * scale);
-    auto valBox = readoutRow.withSizeKeepingCentre(valW, readoutRow.getHeight());
+    if (engravedReadout)
+    {
+        // Printed on the panel: a dark copy a pixel down sets it into the surface
+        g.setColour(juce::Colours::black.withAlpha(0.6f));
+        g.drawText(valText, readoutRow.translated(0.0f, 1.0f), juce::Justification::centred, false);
+        g.setColour(Colours::text);
+        g.drawText(valText, readoutRow, juce::Justification::centred, false);
+    }
+    else
+    {
+        const float valW = juce::jmax(readoutMinW,
+                                      valFont.getStringWidthFloat(valText) + 20.0f * scale);
+        auto valBox = readoutRow.withSizeKeepingCentre(valW, readoutRow.getHeight());
 
-    g.setColour(Colours::surface);
-    g.fillRoundedRectangle(valBox, 3.0f);
-    g.setColour(Colours::border);
-    g.drawRoundedRectangle(valBox, 3.0f, 1.0f);
-    g.setColour(Colours::bright);
-    g.drawText(valText, valBox, juce::Justification::centred, false);
+        g.setColour(Colours::surface);
+        g.fillRoundedRectangle(valBox, 3.0f);
+        g.setColour(Colours::border);
+        g.drawRoundedRectangle(valBox, 3.0f, 1.0f);
+        g.setColour(Colours::bright);
+        g.drawText(valText, valBox, juce::Justification::centred, false);
+    }
 
     // Parameter name
     g.setFont(Fonts::spaceMono(juce::jmax(Fonts::Sizes::micro,

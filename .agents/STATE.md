@@ -1,6 +1,6 @@
 # State
 
-_Updated 2026-10-28_
+_Updated 2026-10-29_
 
 ## Now
 - Silent Riot v0.3.4 (JUCE 7 VST3/Standalone), GPL-3.0-or-later, free + optional donations. No tagged
@@ -8,7 +8,8 @@ _Updated 2026-10-28_
 - Docs are open-source ready: README, `docs/manual/`, `docs/dev/`, CONTRIBUTING/CoC/SECURITY, issue
   forms, CHANGELOG (feeds release notes). `docs/README.md` indexes every doc; `dev/` + `manual/` track
   the code, `design/` + `records/` are frozen. `verify.sh --quick` (also in CI) checks SPDX headers,
-  repo links (`scripts/check_links.py` + `linkcheck-allow.txt`) and the tools' source lists.
+  repo links (`scripts/check_links.py` + `linkcheck-allow.txt`), the tools' source lists, and that
+  UI text can render (`scripts/check_text.py`: UTF-8 spelling, embedded-font glyph coverage).
 - Contributor issues #37–#48 are open (GUI bugs, IR loader, installers, README screenshot).
 - Commit as `Boris Miscenco <219343213+elarmuzik1993@users.noreply.github.com>`: export
   `GIT_AUTHOR_EMAIL`/`GIT_COMMITTER_EMAIL`; the cloud env's values beat `git -c`.
@@ -26,6 +27,10 @@ _Updated 2026-10-28_
    power Tasks 3–5 (`docs/plans/2026-10-23-power-section-fixes.md`).
 5. E3 last: repoint the gate to `tests/fixtures/ir/bright.wav`, then fix the engine aliasing.
 6. GitHub Actions has failed every run since 2026-10-09; recheck once public (free runners).
+7. Amp faceplate is on `main` (`src/gui/AmpFaceplate.*`): deep-ruby glass pilot lamp, satin pointer
+   knobs with engraved values, chrome bat toggles on orange glass rings. Owner still open: lamp
+   colour, weave strength, keep the "POWER" label? Next GUI pass: bring the EFFECTS panel (flat
+   knobs, faint LED toggles, small text) into the same hardware style.
 
 ## Decisions
 - Never gate features, nag, or add a trial (open source + donations).
@@ -42,5 +47,8 @@ _Updated 2026-10-28_
 - **Projects that use an IR play louder** (+5.4…+13.1 dB) since the IR level match; in CHANGELOG.
 - IR path: cab-mode switches dip (~6–95 ms by block size); bright IRs sit 1.2–1.5 dB under the
   built-in cab; long IRs lose their ring at the 8192 cap. GUI bugs are tracked in #37–#45.
+- GUI review 2026-10-28, still open: small low-contrast text (section titles, footer, effects
+  labels), faint LED on/off toggles in EFFECTS, REVERB knob row ~30 px above DELAY's, small
+  effects knobs, window can outgrow the screen with EFFECTS + IR LOADER open.
 - 13 commits on `main` and the docs plan's first commit carry the env email, not the noreply one;
   pre-rewrite commits stay reachable via closed PRs' `refs/pull/*` (only GitHub Support can purge).

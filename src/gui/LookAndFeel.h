@@ -17,6 +17,10 @@ struct SilentRiotLookAndFeel : public juce::LookAndFeel_V4 {
     SilentRiotLookAndFeel();
     void drawRotarySlider(juce::Graphics&, int x, int y, int w, int h,
                           float pos, float start, float end, juce::Slider&) override;
+
+    // Slider property that swaps the flat dial for a satin pointer knob (the amp
+    // row's GAIN / SHAPE / VOLUME). Ticks and value arc are shared.
+    static constexpr const char* kPointerKnobProperty = "srPointerKnob";
     void drawToggleButton(juce::Graphics&, juce::ToggleButton&,
                           bool highlighted, bool down) override;
 };

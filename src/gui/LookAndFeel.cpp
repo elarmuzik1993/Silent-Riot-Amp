@@ -3,6 +3,11 @@
 #include "LookAndFeel.h"
 #include "ColourPalette.h"
 #include "FontData.h"
+#include <cmath>
+#include <initializer_list>
+#include <iterator>
+#include <utility>
+#include <vector>
 
 namespace sr {
 
@@ -38,9 +43,142 @@ SilentRiotLookAndFeel::SilentRiotLookAndFeel()
     setColour(juce::ScrollBar::thumbColourId, Colours::dim);
 }
 
+namespace {
+
+// Satin pointer knob: a black skirt with a chamfered bar across the top and a
+// cream line along the bar. Drawn in a 76 px design square scaled to d; the
+// bar is rotated point by point so the light (upper left) stays fixed, and
+// each chamfer facet is shaded by how its outward normal faces that light.
+void drawPointerKnob(juce::Graphics& g, juce::Point<float> c, float d, float angle)
+{
+    using juce::Colours::black;
+    using juce::Colours::white;
+    using Stops = std::initializer_list<std::pair<float, juce::Colour>>;
+    const float k = d / 76.0f;
+    const float sn = std::sin(angle), cs = std::cos(angle);
+    const auto rgb = [](juce::uint32 argb) { return juce::Colour(argb); };
+    // design units (knob centred on 0,0) -> screen, unrotated and rotated
+    const auto at = [&](float x, float y) { return juce::Point<float>(c.x + x * k, c.y + y * k); };
+    const auto turned = [&](float x, float y, float dx = 0.0f, float dy = 0.0f) {
+        return at(x * cs - y * sn + dx, x * sn + y * cs + dy);
+    };
+    const auto circle = [&](float x, float y, float r) {
+        return juce::Rectangle<float>(r * 2.0f * k, r * 2.0f * k).withCentre(at(x, y));
+    };
+    const auto withStops = [](juce::ColourGradient grad, Stops stops) {
+        for (const auto& [p, col] : stops)
+            if (p > 0.0f && p < 1.0f)
+                grad.addColour(p, col);
+        return grad;
+    };
+    const auto radial = [&](float x, float y, float r, Stops stops) {
+        return withStops(juce::ColourGradient(stops.begin()->second, at(x, y),
+                                              std::prev(stops.end())->second, at(x + r, y), true), stops);
+    };
+    const auto linear = [&](float x1, float y1, float x2, float y2, Stops stops) {
+        return withStops(juce::ColourGradient(stops.begin()->second, at(x1, y1),
+                                              std::prev(stops.end())->second, at(x2, y2), false), stops);
+    };
+
+    // Skirt: shadow on the panel, chamfered edge, satin top, a faint rim light
+    const float skirtR = 18.5f;
+    g.setGradientFill(radial(1.2f, 2.4f, skirtR + 2.8f, { { 0.0f, black.withAlpha(0.65f) },
+                                                         { skirtR / (skirtR + 2.8f), black.withAlpha(0.45f) },
+                                                         { 1.0f, black.withAlpha(0.0f) } }));
+    g.fillEllipse(circle(1.2f, 2.4f, skirtR + 2.8f));
+    g.setGradientFill(linear(-skirtR, -skirtR, skirtR, skirtR, { { 0.0f, rgb(0xFF4C4E55) }, { 0.3f, rgb(0xFF1E1F24) },
+                                                                 { 0.55f, rgb(0xFF08080A) }, { 1.0f, black } }));
+    g.fillEllipse(circle(0.0f, 0.0f, skirtR));
+    g.setGradientFill(radial(-5.0f, -6.0f, 26.0f, { { 0.0f, rgb(0xFF16171B) }, { 0.5f, rgb(0xFF08080A) },
+                                                    { 1.0f, rgb(0xFF030304) } }));
+    g.fillEllipse(circle(0.0f, 0.0f, skirtR - 1.6f));
+    {
+        juce::Path rim;
+        rim.addCentredArc(c.x, c.y, (skirtR - 0.8f) * k, (skirtR - 0.8f) * k, 0.0f,
+                          juce::degreesToRadians(290.0f), juce::degreesToRadians(340.0f), true);
+        g.setColour(white.withAlpha(0.16f));
+        g.strokePath(rim, juce::PathStrokeType(0.55f * k, juce::PathStrokeType::curved,
+                                               juce::PathStrokeType::rounded));
+    }
+
+    // Bar outline in design units, pointing to -y: a square front and a
+    // semicircular back. The top face is the same shape inset by the chamfer.
+    const auto outline = [](float halfW, float front, float backY) {
+        std::vector<juce::Point<float>> pts { { -halfW, front }, { halfW, front }, { halfW, backY } };
+        for (int i = 1; i < 12; ++i)
+        {
+            const float a = juce::degreesToRadians(15.0f * static_cast<float>(i));
+            pts.push_back({ halfW * std::cos(a), backY + halfW * std::sin(a) });
+        }
+        pts.push_back({ -halfW, backY });
+        return pts;
+    };
+    const auto outer = outline(7.0f, -18.0f, 6.8f), inner = outline(5.3f, -16.4f, 6.8f);
+    const auto polygon = [&](const std::vector<juce::Point<float>>& pts, float dx, float dy) {
+        juce::Path p;
+        for (size_t i = 0; i < pts.size(); ++i)
+        {
+            const auto v = turned(pts[i].x, pts[i].y, dx, dy);
+            if (i == 0) p.startNewSubPath(v); else p.lineTo(v);
+        }
+        p.closeSubPath();
+        return p;
+    };
+
+    // Cast shadow of the bar on the skirt, soft then core
+    g.setColour(black.withAlpha(0.2f));
+    g.fillPath(polygon(outer, 3.2f, 4.4f));
+    g.setColour(black.withAlpha(0.7f));
+    g.fillPath(polygon(outer, 1.7f, 2.5f));
+
+    // Chamfer facets. Satin: highlights at 45% of gloss strength.
+    const float gloss = 0.45f, lightA = juce::degreesToRadians(315.0f);
+    const juce::Colour facetBase = rgb(0xFF1E1F25), facetSpec = rgb(0xFFD2D4DC);
+    for (size_t i = 0; i < outer.size(); ++i)
+    {
+        const size_t j = (i + 1) % outer.size();
+        const float normal = std::atan2(outer[j].x - outer[i].x, -(outer[j].y - outer[i].y));
+        const float facing = std::cos(normal + angle - lightA);
+        const juce::Colour col = facing >= 0.0f
+            ? facetBase.interpolatedWith(facetSpec, facing * facing * gloss)
+            : facetBase.interpolatedWith(black, -facing * 0.85f);
+        juce::Path facet;
+        facet.startNewSubPath(turned(outer[i].x, outer[i].y));
+        facet.lineTo(turned(outer[j].x, outer[j].y));
+        facet.lineTo(turned(inner[j].x, inner[j].y));
+        facet.lineTo(turned(inner[i].x, inner[i].y));
+        facet.closeSubPath();
+        g.setColour(col);
+        g.fillPath(facet);
+        g.strokePath(facet, juce::PathStrokeType(0.15f * k));  // closes hairline seams between facets
+    }
+
+    // Top face, lit from the upper left, and a hairline round the whole bar
+    g.setGradientFill(linear(-12.0f, -14.0f, 12.0f, 14.0f, { { 0.0f, rgb(0xFF32333A) }, { 0.45f, rgb(0xFF18191D) },
+                                                             { 1.0f, rgb(0xFF0A0A0C) } }));
+    g.fillPath(polygon(inner, 0.0f, 0.0f));
+    g.setColour(black.withAlpha(0.6f));
+    g.strokePath(polygon(outer, 0.0f, 0.0f), juce::PathStrokeType(0.3f * k, juce::PathStrokeType::curved));
+
+    // Pointer line: down the front chamfer, then along the top
+    const juce::Colour lineCol = rgb(0xFFF2F1EC);
+    const juce::PathStrokeType lineStroke(1.35f * k, juce::PathStrokeType::curved, juce::PathStrokeType::butt);
+    juce::Path front, top;
+    front.startNewSubPath(turned(0.0f, -18.0f));
+    front.lineTo(turned(0.0f, -16.6f));
+    top.startNewSubPath(turned(0.0f, -16.6f));
+    top.lineTo(turned(0.0f, -5.5f));
+    g.setColour(lineCol.interpolatedWith(black, 0.35f));
+    g.strokePath(front, lineStroke);
+    g.setColour(lineCol);
+    g.strokePath(top, lineStroke);
+}
+
+} // namespace
+
 void SilentRiotLookAndFeel::drawRotarySlider(juce::Graphics& g, int x, int y, int w, int h,
                                               float pos, float startAngle, float endAngle,
-                                              juce::Slider&)
+                                              juce::Slider& slider)
 {
     const auto bounds = juce::Rectangle<int>(x, y, w, h).toFloat();
     const auto centre = bounds.getCentre();
@@ -91,6 +229,12 @@ void SilentRiotLookAndFeel::drawRotarySlider(juce::Graphics& g, int x, int y, in
         fill.addCentredArc(centre.x, centre.y, arcR, arcR, 0.0f, startAngle, angle, true);
         g.strokePath(fill, juce::PathStrokeType(arcW, juce::PathStrokeType::curved,
                                                       juce::PathStrokeType::rounded));
+    }
+
+    if (slider.getProperties()[kPointerKnobProperty])
+    {
+        drawPointerKnob(g, centre, d, angle);
+        return;
     }
 
     // 3 — body

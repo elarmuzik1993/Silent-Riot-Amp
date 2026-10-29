@@ -47,11 +47,18 @@ SilentRiotEditor::SilentRiotEditor(SilentRiotProcessor& p)
     tuner.readSamples = [this](float* dest, int maxN) {
         return proc.readLatestTunerSamples(dest, maxN);
     };
+    contentArea.addAndMakeVisible(faceplate);
     contentArea.addAndMakeVisible(vuIn);
     contentArea.addAndMakeVisible(vuOut);
     contentArea.addAndMakeVisible(gainKnob);
     contentArea.addAndMakeVisible(toneKnob);
     contentArea.addAndMakeVisible(volumeKnob);
+    for (auto* k : { &gainKnob, &toneKnob, &volumeKnob })
+    {
+        k->setLabelOnTop(true);
+        k->setEngravedReadout(true);
+        k->getSlider().getProperties().set(sr::SilentRiotLookAndFeel::kPointerKnobProperty, true);
+    }
     contentArea.addAndMakeVisible(halfPowerToggle);
     contentArea.addAndMakeVisible(cabSimToggle);
     contentArea.addAndMakeVisible(powerToggle);
@@ -218,9 +225,9 @@ SilentRiotEditor::SilentRiotEditor(SilentRiotProcessor& p)
     powerToggle.setDescription("Amp power");
 
     // Tooltips (shown only while a TooltipWindow exists — see applySettings)
-    gs.setTooltip("Gain — preamp drive");
-    ts.setTooltip("Shape — mid scoop (CW) to mid boost (CCW)");
-    vs.setTooltip("Volume — master / power-amp drive");
+    gs.setTooltip(juce::CharPointer_UTF8("Gain \xe2\x80\x94 preamp drive"));
+    ts.setTooltip(juce::CharPointer_UTF8("Shape \xe2\x80\x94 mid scoop (CW) to mid boost (CCW)"));
+    vs.setTooltip(juce::CharPointer_UTF8("Volume \xe2\x80\x94 master / power-amp drive"));
     halfPowerToggle.setTooltip("7W half-power mode");
     cabSimToggle.setTooltip("Cabinet simulation on/off");
     powerToggle.setTooltip("Amp power on/off");
@@ -518,6 +525,7 @@ void SilentRiotEditor::timerCallback()
 
     // Live VU meters
     bool powerOn = proc.apvts.getRawParameterValue(sr::Params::IDs::POWER)->load() > 0.5f;
+    faceplate.setPowered(powerOn);
     if (powerOn)
     {
         vuIn.setLevel(proc.inputLevelForGUI.load(std::memory_order_relaxed));
@@ -610,31 +618,45 @@ void SilentRiotEditor::layoutContent()
 
     vuIn.setBounds(body.removeFromLeft(vuW).reduced(8, 20));
     vuOut.setBounds(body.removeFromRight(vuW).reduced(8, 20));
+    const auto plate = body.reduced(8, 8);
+    faceplate.setBounds(plate);
 
-    int cx = body.getCentreX();
+    // SHAPE sits dead centre on the faceplate with GAIN and VOLUME a fixed pitch
+    // either side. The toggles stay a tight group under SHAPE, so they read as
+    // secondary to the knobs.
+    constexpr int dialW = 80, knobPitch = 155;
+    const float plateCentreX = static_cast<float>(plate.getX()) + plate.getWidth() * 0.5f;
+    const auto columnX = [&](int i) {
+        return plateCentreX + static_cast<float>(knobPitch * (i - 1));
+    };
 
-    // knobH only reserves paint space: NotchKnob draws the dial (80px) plus the
-    // value readout and label, bottoming out at 108px. The slider hit area is
-    // the top 80px, so the extra rows below were pure dead space.
-    int knobW = 100, knobH = 110, knobGap = 36;
-    int totalKnobW = knobW * 3 + knobGap * 2;
-    int knobStartX = cx - totalKnobW / 2;
-    int knobY = body.getY() + 16;
+    // knobH only reserves paint space: NotchKnob draws the label, the dial
+    // (76px) and the engraved value, which is kEngravedSaving shorter than a
+    // boxed readout. The knob + toggle stack is centred top to bottom.
+    int knobW = 100, knobH = 110 - sr::NotchKnob::kEngravedSaving;
+    int toggleW = 50, toggleH = sr::ToggleSwitch::minHeight(sr::ToggleSwitch::Style::Switch), toggleGap = 32;
+    // 10px below the knob's paint extent — ToggleSwitch draws its own label in
+    // the top 14px, so the visible gap between knob readout and toggle label ~12px.
+    const int stackH = knobH + 10 + toggleH;
+    int knobY = plate.getY() + (plate.getHeight() - stackH) / 2;
+    int toggleY = knobY + knobH + 10;
 
-    gainKnob.setBounds(knobStartX, knobY, knobW, knobH);
-    toneKnob.setBounds(knobStartX + knobW + knobGap, knobY, knobW, knobH);
-    volumeKnob.setBounds(knobStartX + (knobW + knobGap) * 2, knobY, knobW, knobH);
+    sr::NotchKnob* knobs[] = { &gainKnob, &toneKnob, &volumeKnob };
+    sr::ToggleSwitch* toggles[] = { &halfPowerToggle, &cabSimToggle, &powerToggle };
+    for (int i = 0; i < 3; ++i)
+    {
+        const int x = juce::roundToInt(columnX(i));
+        knobs[i]->setBounds(x - knobW / 2, knobY, knobW, knobH);
+        const int tx = juce::roundToInt(plateCentreX) + (toggleW + toggleGap) * (i - 1);
+        toggles[i]->setBounds(tx - toggleW / 2, toggleY, toggleW, toggleH);
+    }
 
-    int toggleW = 50, toggleH = 36, toggleGap = 32;
-    int totalToggleW = toggleW * 3 + toggleGap * 2;
-    int toggleStartX = cx - totalToggleW / 2;
-    // 16px below the knob's paint extent — ToggleSwitch draws its own label in
-    // the top 14px, so the visible gap between knob label and toggle label ~24px.
-    int toggleY = knobY + knobH + 16;
-
-    halfPowerToggle.setBounds(toggleStartX, toggleY, toggleW, toggleH);
-    cabSimToggle.setBounds(toggleStartX + toggleW + toggleGap, toggleY, toggleW, toggleH);
-    powerToggle.setBounds(toggleStartX + (toggleW + toggleGap) * 2, toggleY, toggleW, toggleH);
+    // The lamp sits midway between VOLUME's dial and the faceplate's right
+    // edge, centred top to bottom.
+    const float volumeDialRight = columnX(2) + dialW * 0.5f;
+    faceplate.setLampCentre({ (volumeDialRight + static_cast<float>(plate.getRight())) * 0.5f
+                                  - static_cast<float>(plate.getX()),
+                              plate.getHeight() * 0.5f });
 
     fxSectionBar.setBounds(area.removeFromTop(kSectionH));
     int fxH = static_cast<int>(fxPanelAnimH);

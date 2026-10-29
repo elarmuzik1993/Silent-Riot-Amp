@@ -75,6 +75,15 @@ if command -v python3 >/dev/null; then
     done < <(python3 scripts/check_links.py)
 fi
 
+# 7. Every non-ASCII character in a src/ string literal can render: spelled as
+#    UTF-8 inside juce::CharPointer_UTF8 (a raw literal turns to mojibake) and
+#    present in the embedded fonts (a missing glyph draws as an empty box).
+if command -v python3 >/dev/null; then
+    while IFS= read -r line; do
+        bad "$line"
+    done < <(python3 scripts/check_text.py)
+fi
+
 say "static checks: $([ $fail -eq 0 ] && echo pass || echo FAIL)"
 [ "$QUICK" -eq 1 ] && exit $fail
 

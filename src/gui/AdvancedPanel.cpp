@@ -44,13 +44,15 @@ void AdvancedPanel::paint(juce::Graphics& g)
                juce::Justification::centredLeft, false);
     ly += 22.0f;
 
-    // Rail bars
+    // Rail bars, each scaled to its node's nominal in the supply model. The
+    // old hand-typed scales sat below the PI and PRE idle voltages, so those
+    // two bars read full at idle and could not show droop.
     struct Rail { const char* name; float voltage; float nominal; };
     Rail rails[] = {
-        { "B+",  dispBPlus,  315.0f },
-        { "SCR", dispScreen, 282.0f },
-        { "PI",  dispPi,     260.0f },
-        { "PRE", dispPreamp, 198.0f },
+        { "B+",  dispBPlus,  VS::toVolts(V_POWER_NOMINAL_N)  },
+        { "SCR", dispScreen, VS::toVolts(V_SCREEN_NOMINAL_N) },
+        { "PI",  dispPi,     VS::toVolts(V_PI_NOMINAL_N)     },
+        { "PRE", dispPreamp, VS::toVolts(V_PREAMP_NOMINAL_N) },
     };
 
     float barMaxW = midX - lx - 80.0f;

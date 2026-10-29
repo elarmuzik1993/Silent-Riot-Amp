@@ -5,6 +5,7 @@
 #include "gui/LookAndFeel.h"
 #include "gui/NotchKnob.h"
 #include "gui/VUMeter.h"
+#include "gui/AmpFaceplate.h"
 #include "gui/ToggleSwitch.h"
 #include "gui/HeaderBar.h"
 #include "gui/TunerBar.h"
@@ -58,6 +59,7 @@ private:
     sr::HeaderBar header;
     sr::TunerBar  tuner;
     sr::FooterBar footer;
+    sr::AmpFaceplate faceplate;   // behind the amp row; added first so it paints under it
     sr::VUMeter vuIn{"IN"}, vuOut{"OUT"};
 
     // Knobs
@@ -68,7 +70,7 @@ private:
     // Toggles
     sr::ToggleSwitch halfPowerToggle{"7W"};
     sr::ToggleSwitch cabSimToggle{"CAB"};
-    sr::ToggleSwitch powerToggle{"PWR", juce::Colour(0xFF2DD4A0)};
+    sr::ToggleSwitch powerToggle{"PWR"};  // same orange as CAB and 7W: one accent colour on the faceplate
 
     // Collapsible sections
     sr::SectionBar irSectionBar{"IR LOADER"};
