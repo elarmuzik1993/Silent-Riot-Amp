@@ -1,6 +1,6 @@
 # State
 
-_Updated 2026-10-28_
+_Updated 2026-10-29_
 
 ## Now
 - Silent Riot v0.3.4 (JUCE 7 VST3/Standalone), GPL-3.0-or-later, free + optional donations. No tagged
@@ -28,7 +28,9 @@ _Updated 2026-10-28_
 5. E3 last: repoint the gate to `tests/fixtures/ir/bright.wav`, then fix the engine aliasing.
 6. GitHub Actions has failed every run since 2026-10-09; recheck once public (free runners).
 7. Owner: amp faceplate (`feat/amp-faceplate`, `src/gui/AmpFaceplate.*`) approved, wordmark removed.
-   Still open: lamp colour, weave strength, keep the "POWER" label? Then refresh `resources/images/`.
+   Pilot lamp is a deep-ruby glass dome (9.5 px lens); amp knob labels sit on top; knobs + lamp share
+   one evenly spaced row, toggles under their knobs. Main screenshot refreshed. Still open: lamp
+   colour, weave strength, keep the "POWER" label?
 
 ## Decisions
 - Never gate features, nag, or add a trial (open source + donations).
