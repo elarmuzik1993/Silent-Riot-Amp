@@ -70,7 +70,7 @@ private:
     // Toggles
     sr::ToggleSwitch halfPowerToggle{"7W"};
     sr::ToggleSwitch cabSimToggle{"CAB"};
-    sr::ToggleSwitch powerToggle{"PWR", juce::Colour(0xFF2DD4A0)};
+    sr::ToggleSwitch powerToggle{"PWR"};  // same orange as CAB and 7W: one accent colour on the faceplate
 
     // Collapsible sections
     sr::SectionBar irSectionBar{"IR LOADER"};
