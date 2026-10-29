@@ -185,11 +185,11 @@ void ToggleSwitch::paintSwitch(juce::Graphics& g, juce::Rectangle<float> bounds)
         g.fillEllipse(circle(cx, cy, 11.0f));
     }
 
-    // Narrow glass ring under the nut: a chrome lip, dark tinted glass, and
+    // Narrow glass ring under the nut: a dark lip, dark tinted glass, and
     // the lit glass crossfaded over it on the toggle animation. Only the band
     // outside the nut shows, so the light stays a thin, quiet rim.
     g.setGradientFill(linear(cx - 8.5f, cy - 8.5f, cx + 8.5f, cy + 8.5f,
-                             { { 0.0f, rgb(0xFFD8DAE2) }, { 1.0f, rgb(0xFF2A2D38) } }));
+                             { { 0.0f, rgb(0xFF55575F) }, { 1.0f, rgb(0xFF08080A) } }));
     g.fillEllipse(circle(cx, cy, 8.5f));
     const juce::Colour off = darken(activeColor, 0.8f);
     g.setGradientFill(radial(cx, cy + 1.0f, 7.8f, { { 0.0f, darken(off, 0.4f) }, { 0.7f, off },
@@ -230,17 +230,17 @@ void ToggleSwitch::paintSwitch(juce::Graphics& g, juce::Rectangle<float> bounds)
         facet.lineTo(vertex(i, 5.5f));
         facet.closeSubPath();
         const float facing = std::cos(juce::degreesToRadians(60.0f * static_cast<float>(i) + 60.0f - 225.0f));
-        g.setColour(rgb(0xFF3C3F4A).interpolatedWith(rgb(0xFFF4F5F8), (facing + 1.0f) * 0.5f));
+        g.setColour(rgb(0xFF050506).interpolatedWith(rgb(0xFF6A6C76), (facing + 1.0f) * 0.5f));
         g.fillPath(facet);
     }
     g.setGradientFill(linear(cx - 5.5f, cy - 5.5f, cx + 5.5f, cy + 5.5f,
-                             { { 0.0f, rgb(0xFFD9DBE3) }, { 0.55f, rgb(0xFFA3A6B3) }, { 1.0f, rgb(0xFF6E7180) } }));
+                             { { 0.0f, rgb(0xFF34353C) }, { 0.55f, rgb(0xFF17181C) }, { 1.0f, rgb(0xFF08080A) } }));
     g.fillPath(hexagon(cx, cy, 5.5f));
     g.setColour(black.withAlpha(0.4f));
     g.strokePath(hexagon(cx, cy, 6.7f), juce::PathStrokeType(0.35f, juce::PathStrokeType::curved));
 
     // Threaded bushing seen end on, and the hole the lever leaves through
-    g.setGradientFill(linear(cx, cy - 4.2f, cx, cy + 4.2f, { { 0.0f, rgb(0xFF3A3D48) }, { 1.0f, rgb(0xFFD4D6DE) } }));
+    g.setGradientFill(linear(cx, cy - 4.2f, cx, cy + 4.2f, { { 0.0f, rgb(0xFF08080A) }, { 1.0f, rgb(0xFF44464E) } }));
     g.fillEllipse(circle(cx, cy, 4.2f));
     for (const float r : { 3.85f, 3.45f })
     {
@@ -278,13 +278,13 @@ void ToggleSwitch::paintSwitch(juce::Graphics& g, juce::Rectangle<float> bounds)
     g.setColour(black.withAlpha(0.32f));
     g.fillEllipse(circle(cx + 1.4f, tipY + 1.7f, ballR));
 
-    g.setGradientFill(radial(cx - 0.7f, cy - 0.8f, 2.8f, { { 0.0f, white }, { 0.5f, rgb(0xFFB8BAC6) }, { 1.0f, rgb(0xFF4E515C) } }));
+    g.setGradientFill(radial(cx - 0.7f, cy - 0.8f, 2.8f, { { 0.0f, rgb(0xFF70727C) }, { 0.5f, rgb(0xFF24252B) }, { 1.0f, rgb(0xFF050506) } }));
     g.fillEllipse(circle(cx, cy, 2.3f));  // collar
     if (hasShaft)
     {
         g.setGradientFill(linear(cx - w0, cy, cx + w0, cy,
-                                 { { 0.0f, rgb(0xFF3A3D48) }, { 0.28f, rgb(0xFFC8CAD4) }, { 0.4f, white },
-                                   { 0.55f, rgb(0xFFA9ACB8) }, { 0.8f, rgb(0xFF5C5F6B) }, { 1.0f, rgb(0xFF2E3039) } }));
+                                 { { 0.0f, rgb(0xFF050506) }, { 0.28f, rgb(0xFF2C2D33) }, { 0.4f, rgb(0xFF70727C) },
+                                   { 0.55f, rgb(0xFF24252B) }, { 0.8f, rgb(0xFF0C0C0F) }, { 1.0f, rgb(0xFF050506) } }));
         g.fillPath(shaft(0.0f, 0.0f, 0.0f));
         // the shaft darkens toward the tip, where it reflects the panel
         g.setGradientFill(linear(cx, cy, cx, tipY, { { 0.0f, black.withAlpha(0.0f) }, { 0.75f, black.withAlpha(0.0f) },

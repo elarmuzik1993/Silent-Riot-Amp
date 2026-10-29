@@ -28,7 +28,7 @@ _Updated 2026-10-29_
 5. E3 last: repoint the gate to `tests/fixtures/ir/bright.wav`, then fix the engine aliasing.
 6. GitHub Actions has failed every run since 2026-10-09; recheck once public (free runners).
 7. Amp faceplate is on `main` (`src/gui/AmpFaceplate.*`): deep-ruby glass pilot lamp, satin pointer
-   knobs with engraved values, chrome bat toggles on orange glass rings. The EFFECTS panel now uses
+   knobs with engraved values, satin-black bat toggles on orange glass rings. The EFFECTS panel now uses
    the same hardware style (faceplate cards, 0.7× pointer knobs, orange glass jewel ON/PP toggles).
    Owner still open: lamp colour, weave strength, keep the "POWER" label? Jewel size/colour OK?
 
