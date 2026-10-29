@@ -141,18 +141,15 @@ static void paintSpeaker(juce::Graphics& g, juce::Point<float> c, float r)
     g.fillEllipse(c.x - cap * 0.6f, c.y - cap * 0.62f, cap * 0.55f, cap * 0.32f);
 }
 
+// A moulded black plastic corner cap. Black in both themes, like the real part.
 static void paintCorner(juce::Graphics& g, juce::Rectangle<float> r)
 {
-    using juce::Colours::black;
     const float cs = r.getWidth() * 0.32f;
-    g.setGradientFill(juce::ColourGradient(Colours::bright, r.getX(), r.getY(),
-                                           Colours::knobBody, r.getRight(), r.getBottom(), false));
+    g.setGradientFill(juce::ColourGradient(juce::Colour(0xFF2A2D36), r.getX(), r.getY(),
+                                           juce::Colour(0xFF050507), r.getRight(), r.getBottom(), false));
     g.fillRoundedRectangle(r, cs);
-    g.setColour(black.withAlpha(0.45f));
-    g.drawRoundedRectangle(r, cs, 0.8f);
-    const float sr = r.getWidth() * 0.11f;
-    g.setColour(Colours::bg);
-    g.fillEllipse(r.getCentreX() - sr, r.getCentreY() - sr, sr * 2.0f, sr * 2.0f);
+    g.setColour(juce::Colours::white.withAlpha(0.12f));
+    g.drawRoundedRectangle(r.reduced(0.5f), cs, 0.8f);
 }
 
 void CabinetView::paintCabinet(juce::Graphics& g, juce::Rectangle<float> b)
@@ -197,34 +194,38 @@ void CabinetView::paintCabinet(juce::Graphics& g, juce::Rectangle<float> b)
     for (float dir : { -1.0f, 1.0f })
         paintSpeaker(g, { grille.getCentreX() + dir * spkR * 1.12f, grille.getCentreY() }, spkR);
 
-    // Grille cloth over them: thin enough for the speakers to show through
+    // Perforated steel grille over them: a plate punched with a hex grid of
+    // holes (even-odd fill), so the speakers show through every hole
     {
         juce::Graphics::ScopedSaveState save(g);
         juce::Path clip;
         clip.addRoundedRectangle(grille, gr);
         g.reduceClipRegion(clip);
-        g.setColour(Colours::panelLight.withAlpha(0.62f));
-        g.fillRect(grille);
-        g.setColour(Colours::borderHi.withAlpha(0.8f));
-        const float step = 3.0f, h = grille.getHeight();
-        for (float x = grille.getX() - h; x < grille.getRight(); x += step)
-        {
-            g.drawLine(x, grille.getBottom(), x + h, grille.getY(), 0.6f);
-            g.drawLine(x, grille.getY(), x + h, grille.getBottom(), 0.6f);
-        }
+        juce::Path plate;
+        plate.setUsingNonZeroWinding(false);
+        plate.addRectangle(grille);
+        const float pitch = 4.2f, hole = 1.35f;
+        int row = 0;
+        for (float y = grille.getY() + pitch * 0.5f; y < grille.getBottom(); y += pitch * 0.866f, ++row)
+            for (float x = grille.getX() + ((row & 1) != 0 ? pitch : pitch * 0.5f); x < grille.getRight(); x += pitch)
+                plate.addEllipse(x - hole, y - hole, hole * 2.0f, hole * 2.0f);
+        g.setGradientFill(juce::ColourGradient(Colours::knobBodyEdge.brighter(0.25f), grille.getX(), grille.getY(),
+                                               Colours::knobBody, grille.getRight(), grille.getBottom(), false));
+        g.fillPath(plate);
         // The frame's shadow falls across the top of the cloth
         g.setGradientFill(juce::ColourGradient(black.withAlpha(0.4f), 0.0f, grille.getY(),
                                                black.withAlpha(0.0f), 0.0f, grille.getY() + 10.0f, false));
         g.fillRect(grille.withHeight(10.0f));
     }
 
-    // Piping: a light bead around the cloth with a dark seam outside it
+    // Piping: an orange bead around the grille, the faceplate's one accent
+    // colour, with a dark seam outside it
     g.setColour(Colours::bg.withAlpha(0.8f));
     g.drawRoundedRectangle(grille.expanded(3.0f), gr + 3.0f, 1.0f);
-    g.setColour(Colours::label.withAlpha(0.6f));
-    g.drawRoundedRectangle(grille.expanded(1.2f), gr + 1.2f, 1.4f);
+    g.setColour(Colours::accent.withAlpha(0.9f));
+    g.drawRoundedRectangle(grille.expanded(1.2f), gr + 1.2f, 1.5f);
 
-    // Chrome corner protectors
+    // Corner protectors
     const float s = side * 0.11f;
     paintCorner(g, { b.getX() - 1.0f, b.getY() - 1.0f, s, s });
     paintCorner(g, { b.getRight() - s + 1.0f, b.getY() - 1.0f, s, s });
