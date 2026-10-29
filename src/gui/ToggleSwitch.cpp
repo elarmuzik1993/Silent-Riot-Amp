@@ -250,7 +250,7 @@ void ToggleSwitch::paintSwitch(juce::Graphics& g, juce::Rectangle<float> bounds)
 
     // The bat, foreshortened: the tip sits below the pivot when off, above it
     // when on, and passes through the pivot mid-flip
-    const float k = 1.0f - 2.0f * pos, tipY = cy + 11.0f * k;
+    const float k = 1.0f - 2.0f * pos, tipY = cy + 8.5f * k;
     const float ballR = 2.5f + 0.45f * std::abs(k), w0 = 1.75f, w1 = 1.25f;
     const bool hasShaft = std::abs(tipY - cy) > 0.4f;
     const auto shaft = [&](float dx, float dy, float grow) {
@@ -288,13 +288,19 @@ void ToggleSwitch::paintSwitch(juce::Graphics& g, juce::Rectangle<float> bounds)
         g.fillPath(shaft(0.0f, 0.0f, 0.0f));
     }
 
-    // Mirror-chrome ball tip
-    g.setGradientFill(radial(cx - ballR * 0.35f, tipY - ballR * 0.4f, ballR * 1.4f,
-                             { { 0.0f, white }, { 0.22f, rgb(0xFFEDEEF3) }, { 0.55f, rgb(0xFF8E919E) },
-                               { 0.78f, rgb(0xFF33363F) }, { 0.92f, rgb(0xFF7E8190) }, { 1.0f, rgb(0xFFB4B7C3) } }));
+    // Black phenolic ball tip with a soft highlight
+    g.setGradientFill(radial(cx - ballR * 0.35f, tipY - ballR * 0.4f, ballR * 1.35f,
+                             { { 0.0f, rgb(0xFF5E616C) }, { 0.35f, rgb(0xFF1E1F26) },
+                               { 0.85f, rgb(0xFF060608) }, { 1.0f, rgb(0xFF2A2C33) } }));
     g.fillEllipse(circle(cx, tipY, ballR));
-    g.setColour(white.withAlpha(0.95f));
-    g.fillEllipse(circle(cx - ballR * 0.38f, tipY - ballR * 0.42f, ballR * 0.22f));
+    {
+        const float hx = cx - ballR * 0.35f, hy = tipY - ballR * 0.42f;
+        juce::Path spec;
+        spec.addEllipse(hx - ballR * 0.32f, hy - ballR * 0.18f, ballR * 0.64f, ballR * 0.36f);
+        spec.applyTransform(juce::AffineTransform::rotation(juce::degreesToRadians(-30.0f), hx, hy));
+        g.setColour(white.withAlpha(0.7f));
+        g.fillPath(spec);
+    }
     g.setColour(black.withAlpha(0.35f));
     g.drawEllipse(circle(cx, tipY, ballR), 0.3f);
 
