@@ -93,7 +93,7 @@ target_sources(sr_snapshot PRIVATE
     ${CMAKE_SOURCE_DIR}/src/gui/FontData.cpp
     ${CMAKE_SOURCE_DIR}/src/gui/NotchKnob.cpp
     ${CMAKE_SOURCE_DIR}/src/gui/ToggleSwitch.cpp
-    ${CMAKE_SOURCE_DIR}/src/gui/SegmentedSelector.cpp
+    ${CMAKE_SOURCE_DIR}/src/gui/AmpFaceplate.cpp
     ${CMAKE_SOURCE_DIR}/src/gui/EffectsPanel.cpp
 )
 

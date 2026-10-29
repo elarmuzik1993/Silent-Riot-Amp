@@ -113,6 +113,7 @@ catch_discover_tests(SilentRiotJuceTests)
 # hand-copied source list to drift. A new test file goes in this list; drive
 # the processor through tests/processor_harness.h.
 add_executable(SilentRiotProcessorTests
+    processor_delay_time_tests.cpp
     processor_effects_tests.cpp
     processor_ir_tests.cpp
     processor_meter_tests.cpp

@@ -71,8 +71,8 @@ A tape-flavoured echo after the cabinet. Switch it with **ON**.
 
 | Control | What it does |
 |---|---|
-| Sync row | **MANUAL** uses the TIME knob. 1/16, 1/8T, 1/8, 1/8D, 1/4, 1/4D or 1/2 lock the delay to the host tempo (120 BPM when the host reports none, e.g. the standalone app) |
-| TIME | 20–1000 ms in MANUAL (ignored when synced). Synced times can reach 2000 ms (a 1/2 note at 60 BPM) |
+| SYNC | Off: TIME sets the delay in milliseconds. On: TIME picks a note division instead, and the delay follows the host tempo (120 BPM when the host reports none, e.g. the standalone app). Switching SYNC off brings back your millisecond time; switching it on again brings back the last division |
+| TIME | SYNC off: 20–1000 ms. SYNC on: clicks through 1/16, 1/8T, 1/8, 1/8D, 1/4, 1/4D and 1/2 (the readout shows the division). Synced times can reach 2000 ms (a 1/2 note at 60 BPM) |
 | FBK | How many repeats. Shown in %; the delay is built **never to self-oscillate**, and settings above 95% behave like 95% |
 | MIX | Echo level, 0–100% |
 | TONE | Darkness of the repeats: each echo passes through the filter again, so low TONE gives dark, tape-like repeats that fade into the background; high TONE keeps them bright |

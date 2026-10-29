@@ -15,18 +15,44 @@
 #include "gui/SettingsPanel.h"
 #include "gui/IRLoaderPanel.h"
 #include "gui/EffectsPanel.h"
+#include "dsp/effects/TempoSync.h"
 
-// Wires an index-based SegmentedSelector to an AudioParameterChoice — there's
-// no built-in APVTS attachment type for this custom widget (mirrors how
-// juce::ComboBoxParameterAttachment wires a juce::ComboBox).
-class ChoiceSelectorAttachment {
+// Wires the DELAY TIME knob and SYNC jewel to two parameters. SYNC off: the
+// knob is DELAY_TIME (20–1000 ms). SYNC on: the same knob steps through the
+// tempo divisions of DELAY_SYNC_DIV, one detent each (TempoSync.h); index 0,
+// MANUAL, *is* SYNC off. A SliderAttachment binds one parameter for life, so
+// this swaps which one the knob drives — the parameters themselves are
+// unchanged, and saved sessions and automation keep working.
+class DelayTimeAttachment {
 public:
-    ChoiceSelectorAttachment(juce::AudioProcessorValueTreeState& state,
-                              const juce::String& paramID, sr::SegmentedSelector& selectorIn);
+    DelayTimeAttachment(juce::AudioProcessorValueTreeState& state,
+                        sr::NotchKnob& timeKnob, sr::ToggleSwitch& syncToggle);
+    ~DelayTimeAttachment();
+
+    // apvts.state property holding the division SYNC returns to when switched
+    // back on, so a round trip through manual keeps the player's division.
+    static constexpr const char* kLastDivisionProperty = "delayLastSyncDiv";
 
 private:
-    sr::SegmentedSelector& selector;
-    juce::ParameterAttachment attachment;
+    bool synced() const { return division > 0; }
+    void refresh();          // parameters → knob + toggle
+    void sliderChanged();    // knob → the active parameter
+    juce::ParameterAttachment& active() { return synced() ? divisionAttachment : timeAttachment; }
+
+    juce::AudioProcessorValueTreeState& state;
+    sr::NotchKnob& knob;
+    juce::Slider& slider;
+    juce::Button& syncButton;
+    const double manualDefault;   // the knob's own double-click value (ms mode)
+
+    float time = 0.0f;
+    int division = 0;
+    int lastDivision = sr::kDefaultSyncDivision;
+    bool updating = false;                          // re-entrancy guard for refresh()
+    juce::ParameterAttachment* gesture = nullptr;   // the attachment a drag began on
+
+    juce::ParameterAttachment timeAttachment;
+    juce::ParameterAttachment divisionAttachment;
 };
 
 class SilentRiotEditor : public juce::AudioProcessorEditor,
@@ -103,10 +129,10 @@ private:
     // Effects module attachments
     std::unique_ptr<ButtonA> boostOnA, delayOnA, reverbOnA, delayPingPongA;
     std::unique_ptr<SliderA> gateThreshA, boostLevelA, boostTightA, boostBrightA,
-                             delayTimeA, delayFbA, delayMixA, delayToneA,
+                             delayFbA, delayMixA, delayToneA,
                              reverbMixA, reverbSizeA, reverbToneA, widthA;
     std::unique_ptr<SliderA> inputLevelA, outputLevelA;
-    std::unique_ptr<ChoiceSelectorAttachment> delaySyncA;
+    std::unique_ptr<DelayTimeAttachment> delayTimeA;
 
     static constexpr int kWindowW = 700;
     static constexpr int kHeaderH   = 38;

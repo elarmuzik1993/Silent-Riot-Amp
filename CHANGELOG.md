@@ -15,6 +15,10 @@ tagged release will collect everything below.
 
 ### Changed
 
+- DELAY: the row of sync-division buttons is gone. A **SYNC** bat toggle, stacked over PP
+  on the card's left like the amp's 7W/CAB/PWR switches, turns the TIME knob into the
+  division selector (1/16 to 1/2, one click per division); with SYNC off it sets
+  milliseconds as before. Saved sessions and automation are unaffected.
 - **Projects that use a cabinet IR play louder: +5.4 to +13.1 dB, depending on the IR and
   sample rate.** Every IR is now level-matched to the built-in cabinet; before, IRs played
   about 11 dB quieter, and 3 dB louder at 96 kHz than at 48 kHz. Turn OUTPUT down, or the

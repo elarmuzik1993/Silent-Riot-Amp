@@ -20,7 +20,7 @@ public:
     void toggle();  // flip state with notification
 
     // How the state is drawn under the label.
-    //   Switch — a chrome bat toggle through a hex nut on a glass ring that
+    //   Switch — a satin-black bat toggle through a hex nut on a glass ring that
     //            lights in activeColor; lever up is on. The amp row uses this.
     //   Jewel  — a small glass jewel in a chrome bezel (the pilot lamp's glass,
     //            AmpFaceplate::paintLamp), lit in activeColor, with the label

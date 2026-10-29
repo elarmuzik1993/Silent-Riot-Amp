@@ -10,19 +10,17 @@
 namespace sr {
 
 // Card geometry — kept in sync between paint() and resized(). Cards are a
-// fixed size (sized to hug the knobs + the delay sync row) and the 2×2 grid is
+// fixed size (sized to hug the title row + one knob row) and the 2×2 grid is
 // centred in the panel, rather than stretched to fill it — otherwise the knobs
 // float in oversized boxes.
 namespace {
     constexpr int kCardGap = 12;
     constexpr int kCardW   = 328;  // two fit the 680 px inside the panel margin
-    constexpr int kCardH   = 140;  // title row + (optional sync row) + one knob row
+    constexpr int kCardH   = 136;  // title row + one knob row (or DELAY's switch stack)
 
-    // Card chrome metrics, shared by paint() and resized(). Kept tight so the
-    // DELAY card can fit its sync row *and* a knob row inside kCardH.
+    // Card chrome metrics, shared by paint() and resized().
     constexpr int kCardPadY = 6;
     constexpr int kRowGap   = 3;
-    constexpr int kSyncH    = 17;
 
     // The effect knobs are the amp row's satin pointer knobs (name on top, value
     // engraved below) drawn smaller. kKnobH must hold the text strip *and* a
@@ -44,11 +42,22 @@ namespace {
     constexpr auto kCardToggleStyle = ToggleSwitch::Style::Jewel;
     constexpr int  kToggleH = ToggleSwitch::minHeight(kCardToggleStyle);
     constexpr int  kToggleW = 40;  // a two-letter label + the jewel and its glow
+
+    // DELAY's SYNC and PP are the amp row's bat toggles, stacked SYNC over PP
+    // on the card's left, before TIME. The stack is the tallest thing in any
+    // card, so it sets kCardH; every card shares that height, so all four
+    // knob rows stay on the same baseline.
+    constexpr auto kStackStyle = ToggleSwitch::Style::Switch;
+    constexpr int  kStackW = 50;   // the amp row's toggle width
+    constexpr int  kStackH = 2 * ToggleSwitch::minHeight(kStackStyle);
+    static_assert(kCardH >= 2 * kCardPadY + kToggleH + kRowGap + kStackH,
+                  "kCardH leaves the DELAY card too little for its SYNC/PP stack: "
+                  "the bat toggles get clipped and look dead");
     static_assert(kToggleH >= ToggleSwitch::minHeight(kCardToggleStyle),
                   "card toggle row is shorter than a ToggleSwitch can paint into: "
                   "the jewel gets clipped and the toggle looks dead");
-    static_assert(kCardH >= 2 * kCardPadY + kToggleH + kRowGap + kSyncH + kRowGap + kKnobH,
-                  "kCardH leaves the DELAY card too little for a full knob row");
+    static_assert(kCardH >= 2 * kCardPadY + kToggleH + kRowGap + kKnobH,
+                  "kCardH leaves the cards too little for a full knob row");
     static_assert(EffectsPanel::panelHeight >= 2 * kCardH + kCardGap + 2 * 10,
                   "panelHeight is shorter than the card grid it holds");
 }
@@ -59,13 +68,14 @@ EffectsPanel::EffectsPanel()
     addAndMakeVisible(delayTgl);
     addAndMakeVisible(reverbTgl);
     addAndMakeVisible(delayPP);
-    addAndMakeVisible(delaySync);
-    delaySync.setTitleText("Delay sync");
+    addAndMakeVisible(delaySyncTgl);
 
     // Jewels: small lit lamps beside the card title, the same glass as the
     // faceplate's pilot lamp — see kCardToggleStyle, which the layout sizes against.
-    for (auto* t : { &boostTgl, &delayTgl, &reverbTgl, &delayPP })
+    for (auto* t : { &boostTgl, &delayTgl, &reverbTgl })
         t->setStyle(kCardToggleStyle);
+    for (auto* t : { &delaySyncTgl, &delayPP })
+        t->setStyle(kStackStyle);
 
     for (auto* k : { &gateThresh, &width, &inputLevel, &outputLevel,
                      &boostLevel, &boostTight, &boostBright,
@@ -81,16 +91,9 @@ EffectsPanel::EffectsPanel()
         addAndMakeVisible(*k);
     }
 
-    // Readouts in real units where the parameter has one. TIME mirrors the
-    // 0–1 → ms mapping the processor applies (see PluginProcessor::processBlock),
-    // so the display cannot drift from what the delay line actually does.
-    // Note: with DELAY SYNC set to anything but MANUAL the host tempo drives
-    // delay time and this knob is inactive — the readout still shows its own value.
-    delayTime.setValueFormatter([](float v) {
-        float ms = DELAY_TIME_MIN_MS + v * (DELAY_TIME_KNOB_MAX_MS - DELAY_TIME_MIN_MS);
-        return juce::String(juce::roundToInt(ms)) + "ms";
-    });
-
+    // Readouts in real units where the parameter has one. TIME's readout (ms,
+    // or the division while SYNC is on) is set by DelayTimeAttachment, which
+    // knows which of its two parameters the knob is showing.
     auto percent = [](float v) { return juce::String(juce::roundToInt(v * 100.0f)) + "%"; };
     delayFb.setValueFormatter(percent);
     delayMix.setValueFormatter(percent);
@@ -180,20 +183,20 @@ void EffectsPanel::resized()
     layoutCard(cardBounds(area, 1, 0), boostTgl,  { &boostLevel, &boostTight, &boostBright });
     layoutCard(cardBounds(area, 1, 1), reverbTgl, { &reverbMix, &reverbSize, &reverbTone });
 
-    // DELAY card is bespoke: a second toggle (PING-PONG) shares the title row
-    // with ON, and a sync-division row sits above the knobs. That extra row is
-    // why panelHeight is sized off this card.
+    // DELAY card: ON in the title row like the others; SYNC over PP as bat
+    // toggles down the left, just before TIME (SYNC turns TIME into the
+    // division selector). The four knobs share what is left of the row.
     auto delayCard  = cardBounds(area, 0, 1);
     auto delayInner = delayCard.reduced(10, kCardPadY);
     auto titleRow   = delayInner.removeFromTop(kToggleH);
     delayTgl.setBounds(titleRow.removeFromRight(kToggleW));
-    titleRow.removeFromRight(6);
-    delayPP.setBounds(titleRow.removeFromRight(kToggleW));
 
     delayInner.removeFromTop(kRowGap);
-    delaySync.setBounds(delayInner.removeFromTop(kSyncH));
-
-    delayInner.removeFromTop(kRowGap);
+    auto stack = delayInner.removeFromLeft(kStackW)
+                           .withSizeKeepingCentre(kStackW, kStackH);
+    delaySyncTgl.setBounds(stack.removeFromTop(kStackH / 2));
+    delayPP.setBounds(stack);
+    delayInner.removeFromLeft(4);
     layoutKnobRow(delayInner, { &delayTime, &delayFb, &delayMix, &delayTone });
 }
 
