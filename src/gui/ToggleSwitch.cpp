@@ -170,42 +170,44 @@ void ToggleSwitch::paintSwitch(juce::Graphics& g, juce::Rectangle<float> bounds)
         return p;
     };
 
-    // Soft contact shadow on the panel, then the glow the lit ring throws
-    g.setGradientFill(radial(cx + 0.8f, cy + 1.6f, 10.5f, { { 0.0f, black.withAlpha(0.55f) },
-                                                             { 0.75f, black.withAlpha(0.35f) },
-                                                             { 1.0f, black.withAlpha(0.0f) } }));
-    g.fillEllipse(circle(cx + 0.8f, cy + 1.6f, 10.5f));
+    // Soft contact shadow on the panel, then a faint glow from the lit ring
+    g.setGradientFill(radial(cx + 0.8f, cy + 1.6f, 9.6f, { { 0.0f, black.withAlpha(0.55f) },
+                                                            { 0.75f, black.withAlpha(0.35f) },
+                                                            { 1.0f, black.withAlpha(0.0f) } }));
+    g.fillEllipse(circle(cx + 0.8f, cy + 1.6f, 9.6f));
     if (pos > 0.0f)
     {
-        g.setGradientFill(radial(cx, cy, 15.0f, { { 0.0f, activeColor.withAlpha(0.4f * pos) },
-                                                  { 0.6f, activeColor.withAlpha(0.18f * pos) },
+        g.setGradientFill(radial(cx, cy, 11.0f, { { 0.0f, activeColor.withAlpha(0.2f * pos) },
+                                                  { 0.65f, activeColor.withAlpha(0.08f * pos) },
                                                   { 1.0f, activeColor.withAlpha(0.0f) } }));
-        g.fillEllipse(circle(cx, cy, 15.0f));
+        g.fillEllipse(circle(cx, cy, 11.0f));
     }
 
-    // Glass ring under the nut: a chrome lip, dark tinted glass, and the lit
-    // glass crossfaded over it on the toggle animation
-    g.setGradientFill(linear(cx - 9.0f, cy - 9.0f, cx + 9.0f, cy + 9.0f,
+    // Narrow glass ring under the nut: a chrome lip, dark tinted glass, and
+    // the lit glass crossfaded over it on the toggle animation. Only the band
+    // outside the nut shows, so the light stays a thin, quiet rim.
+    g.setGradientFill(linear(cx - 8.5f, cy - 8.5f, cx + 8.5f, cy + 8.5f,
                              { { 0.0f, rgb(0xFFD8DAE2) }, { 1.0f, rgb(0xFF2A2D38) } }));
-    g.fillEllipse(circle(cx, cy, 9.4f));
-    const juce::Colour off = darken(activeColor, 0.72f);
-    g.setGradientFill(radial(cx, cy + 1.0f, 8.6f, { { 0.0f, darken(off, 0.4f) }, { 0.7f, off },
-                                                    { 1.0f, lighten(off, 0.12f) } }));
-    g.fillEllipse(circle(cx, cy, 8.6f));
+    g.fillEllipse(circle(cx, cy, 8.5f));
+    const juce::Colour off = darken(activeColor, 0.8f);
+    g.setGradientFill(radial(cx, cy + 1.0f, 7.8f, { { 0.0f, darken(off, 0.4f) }, { 0.7f, off },
+                                                    { 1.0f, lighten(off, 0.08f) } }));
+    g.fillEllipse(circle(cx, cy, 7.8f));
     if (pos > 0.0f)
     {
-        g.setGradientFill(radial(cx, cy + 1.0f, 8.6f, { { 0.0f, darken(activeColor, 0.2f).withAlpha(pos) },
-                                                        { 0.72f, activeColor.withAlpha(pos) },
-                                                        { 0.9f, lighten(activeColor, 0.45f).withAlpha(pos) },
-                                                        { 1.0f, lighten(activeColor, 0.2f).withAlpha(pos) } }));
-        g.fillEllipse(circle(cx, cy, 8.6f));
+        const float a = 0.85f * pos;
+        g.setGradientFill(radial(cx, cy + 1.0f, 7.8f, { { 0.0f, darken(activeColor, 0.3f).withAlpha(a) },
+                                                        { 0.8f, darken(activeColor, 0.15f).withAlpha(a) },
+                                                        { 0.92f, activeColor.withAlpha(a) },
+                                                        { 1.0f, lighten(activeColor, 0.15f).withAlpha(a) } }));
+        g.fillEllipse(circle(cx, cy, 7.8f));
     }
     {
         juce::Path edge;  // catch-light on the ring's upper-left edge
-        edge.addCentredArc(cx, cy, 8.0f, 8.0f, 0.0f,
+        edge.addCentredArc(cx, cy, 7.3f, 7.3f, 0.0f,
                            juce::degreesToRadians(288.2f), juce::degreesToRadians(341.8f), true);
-        g.setColour(white.withAlpha(0.55f));
-        g.strokePath(edge, juce::PathStrokeType(0.55f, juce::PathStrokeType::curved,
+        g.setColour(white.withAlpha(0.35f));
+        g.strokePath(edge, juce::PathStrokeType(0.45f, juce::PathStrokeType::curved,
                                                 juce::PathStrokeType::rounded));
     }
 
@@ -308,7 +310,7 @@ void ToggleSwitch::paintSwitch(juce::Graphics& g, juce::Rectangle<float> bounds)
     if (hasKeyboardFocus(false))
     {
         g.setColour(Colours::accent.withAlpha(0.7f));
-        g.drawEllipse(circle(cx, cy, 11.5f), 1.5f);
+        g.drawEllipse(circle(cx, cy, 10.5f), 1.5f);
     }
 }
 
