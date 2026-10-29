@@ -13,7 +13,8 @@ _Updated 2026-10-29 (IR loader cab view)_
   toggles stacked left of TIME, and SYNC turns TIME into the division knob (`DelayTimeAttachment`).
 - IR LOADER opens on a drawn 2x12 cab (`src/gui/CabinetView.*`: 2:1, plain black caps, orange
   piping, black expanded-metal grille) with arrows that cycle the built-in cab + every IR; a
-  CAB | LIBRARY switch brings back the list (`irView` UI property).
+  CAB | LIBRARY switch brings back the list (`irView` UI property). The IR LOADER sits directly under
+  the amp, above EFFECTS (section order IR LOADER, EFFECTS, ADVANCED).
 - Contributor issues #37–#48 are open (GUI bugs, IR loader, installers, README screenshot).
 - Commit as `Boris Miscenco <219343213+elarmuzik1993@users.noreply.github.com>`: export
   `GIT_AUTHOR_EMAIL`/`GIT_COMMITTER_EMAIL`; the cloud env's values beat `git -c`.

@@ -321,10 +321,12 @@ SilentRiotEditor::SilentRiotEditor(SilentRiotProcessor& p)
     halfPowerToggle.setExplicitFocusOrder(5);
     cabSimToggle.setExplicitFocusOrder(6);
     powerToggle.setExplicitFocusOrder(7);
-    // EFFECTS section + its controls come after the amp controls
-    fxSectionBar.setExplicitFocusOrder(8);
+    // The IR LOADER sits directly under the amp, so its bar comes next; then
+    // the EFFECTS section and its controls
+    irSectionBar.setExplicitFocusOrder(8);
+    fxSectionBar.setExplicitFocusOrder(9);
     {
-        int order = 9;
+        int order = 10;
         // Titles are qualified by effect — several cards share a knob name
         // (MIX, TONE), and the visible label is a sibling of the slider, so a
         // screen reader has nothing else to disambiguate them with.
@@ -359,11 +361,10 @@ SilentRiotEditor::SilentRiotEditor(SilentRiotProcessor& p)
         effectsPanel.delaySyncToggle().setDescription("Delay tempo sync");
     }
 
-    // These two literals are NOT derived from the `order` variable above (which
-    // goes out of scope at the closing brace of that block) — they are hand-set
-    // to continue the sequence it produces. Adding INPUT/OUTPUT to the knob list
-    // shifted every order value after them by +2, so these must shift too.
-    irSectionBar.setExplicitFocusOrder(28);
+    // This literal is NOT derived from the `order` variable above (which goes
+    // out of scope at the closing brace of that block) — it is hand-set to
+    // continue the sequence it produces (10 + 14 knobs + 5 toggles = 29).
+    // Adding a control to the list above shifts it, so it must shift too.
     advSectionBar.setExplicitFocusOrder(29);
 
     // Restore UI state
@@ -745,15 +746,15 @@ void SilentRiotEditor::layoutContent()
                                   - static_cast<float>(plate.getX()),
                               plate.getHeight() * 0.5f });
 
-    fxSectionBar.setBounds(area.removeFromTop(kSectionH));
-    int fxH = static_cast<int>(fxPanelAnimH);
-    if (fxH > 0)
-        effectsPanel.setBounds(area.removeFromTop(fxH));
-
     irSectionBar.setBounds(area.removeFromTop(kSectionH));
     int irH = static_cast<int>(irPanelAnimH);
     if (irH > 0)
         irLoaderPanel.setBounds(area.removeFromTop(irH));
+
+    fxSectionBar.setBounds(area.removeFromTop(kSectionH));
+    int fxH = static_cast<int>(fxPanelAnimH);
+    if (fxH > 0)
+        effectsPanel.setBounds(area.removeFromTop(fxH));
 
     advSectionBar.setBounds(area.removeFromTop(kSectionH));
     int advH = static_cast<int>(advPanelAnimH);

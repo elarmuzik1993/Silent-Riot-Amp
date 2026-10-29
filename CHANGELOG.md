@@ -15,6 +15,8 @@ tagged release will collect everything below.
 
 ### Changed
 
+- The IR LOADER now sits directly under the amp, above EFFECTS, so the head and its cab read
+  as one rig; Tab reaches the IR LOADER bar before the EFFECTS controls.
 - DELAY: the row of sync-division buttons is gone. A **SYNC** bat toggle, stacked over PP
   on the card's left like the amp's 7W/CAB/PWR switches, turns the TIME knob into the
   division selector (1/16 to 1/2, one click per division); with SYNC off it sets

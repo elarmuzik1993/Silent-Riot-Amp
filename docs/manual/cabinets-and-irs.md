@@ -21,7 +21,7 @@ speaker IRs yet — for the most realistic cab sound, load your own.
 
 ## Loading an impulse response
 
-The IR LOADER is the lower panel in the [main window screenshot](../../resources/images/silent-riot-main.png).
+The IR LOADER is the panel directly under the amp in the [main window screenshot](../../resources/images/silent-riot-main.png).
 
 The panel has two views, picked with the **CAB | LIBRARY** switch at its top
 right (the choice is saved with the project):
