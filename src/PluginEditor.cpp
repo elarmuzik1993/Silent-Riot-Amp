@@ -10,16 +10,94 @@
 #include <X11/Xatom.h>
 #endif
 
-ChoiceSelectorAttachment::ChoiceSelectorAttachment(juce::AudioProcessorValueTreeState& state,
-                                                    const juce::String& paramID,
-                                                    sr::SegmentedSelector& selectorIn)
-    : selector(selectorIn),
-      attachment(*state.getParameter(paramID),
-                 [this](float v) { selector.setSelectedIndex(static_cast<int>(v)); },
-                 state.undoManager)
+DelayTimeAttachment::DelayTimeAttachment(juce::AudioProcessorValueTreeState& stateIn,
+                                         sr::NotchKnob& timeKnob, sr::ToggleSwitch& syncToggle)
+    : state(stateIn),
+      knob(timeKnob),
+      slider(timeKnob.getSlider()),
+      syncButton(syncToggle.getButton()),
+      manualDefault(timeKnob.getSlider().getDoubleClickReturnValue()),
+      timeAttachment(*stateIn.getParameter(sr::Params::IDs::DELAY_TIME),
+                     [this](float v) { time = v; refresh(); }, stateIn.undoManager),
+      divisionAttachment(*stateIn.getParameter(sr::Params::IDs::DELAY_SYNC_DIV),
+                         [this](float v) {
+                             division = juce::jlimit(0, sr::kNumSyncDivisions - 1, juce::roundToInt(v));
+                             if (synced())
+                             {
+                                 lastDivision = division;
+                                 state.state.setProperty(kLastDivisionProperty, division, nullptr);
+                             }
+                             refresh();
+                         },
+                         stateIn.undoManager)
 {
-    selector.onChange = [this](int idx) { attachment.setValueAsCompleteGesture(static_cast<float>(idx)); };
-    attachment.sendInitialUpdate();
+    const int saved = state.state.getProperty(kLastDivisionProperty, sr::kDefaultSyncDivision);
+    lastDivision = juce::jlimit(1, sr::kNumSyncDivisions - 1, saved);
+
+    // The readout follows the mode: the note division while synced, otherwise
+    // the 0–1 → ms mapping the processor applies (PluginProcessor::processBlock),
+    // so the display cannot drift from what the delay line actually does.
+    knob.setValueFormatter([this](float v) {
+        if (synced())
+            return juce::String(sr::kSyncDivisions[sr::syncDivisionFromKnob(v)].name);
+        const float ms = sr::DELAY_TIME_MIN_MS + v * (sr::DELAY_TIME_KNOB_MAX_MS - sr::DELAY_TIME_MIN_MS);
+        return juce::String(juce::roundToInt(ms)) + "ms";
+    });
+
+    slider.onValueChange = [this] { knob.repaint(); if (! updating) sliderChanged(); };
+    slider.onDragStart = [this] { gesture = &active(); gesture->beginGesture(); };
+    slider.onDragEnd   = [this] { if (gesture != nullptr) gesture->endGesture(); gesture = nullptr; };
+
+    // ToggleSwitch drives its lever animation from onStateChange — onClick is ours.
+    syncButton.onClick = [this] {
+        if (updating) return;
+        divisionAttachment.setValueAsCompleteGesture(
+            static_cast<float>(syncButton.getToggleState() ? lastDivision : 0));
+    };
+
+    timeAttachment.sendInitialUpdate();
+    divisionAttachment.sendInitialUpdate();
+}
+
+DelayTimeAttachment::~DelayTimeAttachment()
+{
+    if (gesture != nullptr) gesture->endGesture();
+    slider.onValueChange = [k = &knob] { k->repaint(); };
+    slider.onDragStart = nullptr;
+    slider.onDragEnd = nullptr;
+    syncButton.onClick = nullptr;
+    knob.setValueFormatter(nullptr);
+}
+
+void DelayTimeAttachment::refresh()
+{
+    const juce::ScopedValueSetter<bool> svs(updating, true);
+    syncButton.setToggleState(synced(), juce::sendNotificationSync);   // animates the jewel; onClick ignores it (updating)
+
+    // Synced, the knob has one detent per division, so it snaps as it turns
+    // and the arrow keys step a whole division (NotchKnob::KnobSlider).
+    if (synced())
+    {
+        slider.setRange(0.0, 1.0, sr::knobFromSyncDivision(2));
+        slider.setDoubleClickReturnValue(true, sr::knobFromSyncDivision(sr::kDefaultSyncDivision));
+        slider.setValue(sr::knobFromSyncDivision(division), juce::dontSendNotification);
+    }
+    else
+    {
+        slider.setRange(0.0, 1.0, 0.001);
+        slider.setDoubleClickReturnValue(true, manualDefault);
+        slider.setValue(time, juce::dontSendNotification);
+    }
+    knob.repaint();
+}
+
+void DelayTimeAttachment::sliderChanged()
+{
+    const auto v = static_cast<float>(slider.getValue());
+    if (synced())
+        divisionAttachment.setValueAsPartOfGesture(static_cast<float>(sr::syncDivisionFromKnob(v)));
+    else
+        timeAttachment.setValueAsPartOfGesture(v);
 }
 
 SilentRiotEditor::SilentRiotEditor(SilentRiotProcessor& p)
@@ -194,12 +272,12 @@ SilentRiotEditor::SilentRiotEditor(SilentRiotProcessor& p)
     boostTightA  = std::make_unique<SliderA>(proc.apvts, IDs::BOOST_TIGHT,    effectsPanel.boostTightKnob().getSlider());
     boostBrightA = std::make_unique<SliderA>(proc.apvts, IDs::BOOST_BRIGHT,   effectsPanel.boostBrightKnob().getSlider());
     delayOnA     = std::make_unique<ButtonA>(proc.apvts, IDs::DELAY_ON,       effectsPanel.delayToggle().getButton());
-    delayTimeA   = std::make_unique<SliderA>(proc.apvts, IDs::DELAY_TIME,     effectsPanel.delayTimeKnob().getSlider());
+    delayTimeA   = std::make_unique<DelayTimeAttachment>(proc.apvts, effectsPanel.delayTimeKnob(),
+                                                         effectsPanel.delaySyncToggle());
     delayFbA     = std::make_unique<SliderA>(proc.apvts, IDs::DELAY_FEEDBACK, effectsPanel.delayFbKnob().getSlider());
     delayMixA    = std::make_unique<SliderA>(proc.apvts, IDs::DELAY_MIX,      effectsPanel.delayMixKnob().getSlider());
     delayToneA   = std::make_unique<SliderA>(proc.apvts, IDs::DELAY_TONE,     effectsPanel.delayToneKnob().getSlider());
     delayPingPongA = std::make_unique<ButtonA>(proc.apvts, IDs::DELAY_PINGPONG, effectsPanel.delayPingPongToggle().getButton());
-    delaySyncA   = std::make_unique<ChoiceSelectorAttachment>(proc.apvts, IDs::DELAY_SYNC_DIV, effectsPanel.delaySyncSelector());
     reverbOnA    = std::make_unique<ButtonA>(proc.apvts, IDs::REVERB_ON,      effectsPanel.reverbToggle().getButton());
     reverbMixA   = std::make_unique<SliderA>(proc.apvts, IDs::REVERB_MIX,     effectsPanel.reverbMixKnob().getSlider());
     reverbSizeA  = std::make_unique<SliderA>(proc.apvts, IDs::REVERB_SIZE,    effectsPanel.reverbSizeKnob().getSlider());
@@ -256,7 +334,7 @@ SilentRiotEditor::SilentRiotEditor(SilentRiotProcessor& p)
                  FxKnob{ &effectsPanel.boostLevelKnob(),  "Boost level",     "Boost level, 0 to 10" },
                  FxKnob{ &effectsPanel.boostTightKnob(),  "Boost tight",     "Boost low cut, 0 to 10" },
                  FxKnob{ &effectsPanel.boostBrightKnob(), "Boost bright",    "Boost high boost, 0 to 10" },
-                 FxKnob{ &effectsPanel.delayTimeKnob(),   "Delay time",      "Delay time, 0 to 10" },
+                 FxKnob{ &effectsPanel.delayTimeKnob(),   "Delay time",      "Delay time, 20 to 1000 ms; a note division when sync is on" },
                  FxKnob{ &effectsPanel.delayFbKnob(),     "Delay feedback",  "Delay feedback, 0 to 10" },
                  FxKnob{ &effectsPanel.delayMixKnob(),    "Delay mix",       "Delay mix, 0 dry to 10 wet" },
                  FxKnob{ &effectsPanel.delayToneKnob(),   "Delay tone",      "Delay tone, 0 dark to 10 bright" },
@@ -274,7 +352,8 @@ SilentRiotEditor::SilentRiotEditor(SilentRiotProcessor& p)
         effectsPanel.delayToggle().setExplicitFocusOrder(order++);
         effectsPanel.reverbToggle().setExplicitFocusOrder(order++);
         effectsPanel.delayPingPongToggle().setExplicitFocusOrder(order++);
-        effectsPanel.delaySyncSelector().setExplicitFocusOrder(order++);
+        effectsPanel.delaySyncToggle().setExplicitFocusOrder(order++);
+        effectsPanel.delaySyncToggle().setDescription("Delay tempo sync");
     }
 
     // These two literals are NOT derived from the `order` variable above (which

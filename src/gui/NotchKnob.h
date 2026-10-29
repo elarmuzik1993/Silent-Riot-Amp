@@ -73,6 +73,9 @@ private:
     // Custom slider with keyboard step overrides.
     // Arrow: ±0.01 internal (±0.1 on 0-10 display)
     // PageUp/Down: ±0.1 internal (±1.0 on display)
+    // A slider whose interval is coarser than a step (DELAY TIME's detents
+    // while synced) steps one interval instead — a smaller step would snap
+    // straight back to the value it started from.
     //
     // Deliberately paints no focus indicator: the knobs are still in the tab
     // order and keyPressed still moves them, but focus is not shown. Don't add
@@ -82,14 +85,16 @@ private:
         using Slider::Slider;
         bool keyPressed(const juce::KeyPress& key) override
         {
+            const double fine   = juce::jmax(0.01, getInterval());
+            const double coarse = juce::jmax(0.1,  getInterval());
             if (key == juce::KeyPress::upKey || key == juce::KeyPress::rightKey)
-            { setValue(getValue() + 0.01, juce::sendNotificationSync); return true; }
+            { setValue(getValue() + fine, juce::sendNotificationSync); return true; }
             if (key == juce::KeyPress::downKey || key == juce::KeyPress::leftKey)
-            { setValue(getValue() - 0.01, juce::sendNotificationSync); return true; }
+            { setValue(getValue() - fine, juce::sendNotificationSync); return true; }
             if (key == juce::KeyPress::pageUpKey)
-            { setValue(getValue() + 0.1, juce::sendNotificationSync); return true; }
+            { setValue(getValue() + coarse, juce::sendNotificationSync); return true; }
             if (key == juce::KeyPress::pageDownKey)
-            { setValue(getValue() - 0.1, juce::sendNotificationSync); return true; }
+            { setValue(getValue() - coarse, juce::sendNotificationSync); return true; }
             return Slider::keyPressed(key);
         }
     };

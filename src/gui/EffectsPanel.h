@@ -4,7 +4,6 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "NotchKnob.h"
 #include "ToggleSwitch.h"
-#include "SegmentedSelector.h"
 
 namespace sr {
 
@@ -19,20 +18,22 @@ public:
     void resized() override;
 
     // Two card rows sized to the scaled pointer knobs (name + dial + engraved
-    // value, see kKnobH) plus each card's jewel-toggle title row (and the delay
-    // card's sync row): 2 × kCardH + kCardGap + the 10 px margin either side.
-    // Kept in sync with the card metrics in EffectsPanel.cpp, which
-    // static_assert it. The DELAY card is the binding constraint — it carries
-    // the sync-division row *and* a knob row, so it is the first place a
+    // value, see kKnobH) plus each card's jewel-toggle title row:
+    // 2 × kCardH + kCardGap + the 10 px margin either side. Kept in sync with
+    // the card metrics in EffectsPanel.cpp, which static_assert it — a
     // too-short panel shows up as knob values drawn past the bottom edge and
     // silently clipped.
-    static constexpr int panelHeight = 312;
+    static constexpr int panelHeight = 272;
 
     // Toggles (the UTILITY card's gate/width knobs self-gate — no toggle)
     ToggleSwitch& boostToggle()  { return boostTgl; }
     ToggleSwitch& delayToggle()  { return delayTgl; }
     ToggleSwitch& reverbToggle() { return reverbTgl; }
     ToggleSwitch& delayPingPongToggle() { return delayPP; }
+    // SYNC: off = TIME sets the delay in ms; on = TIME steps through the tempo
+    // divisions. One knob, two parameters — wired by DelayTimeAttachment in
+    // the editor, not by a plain APVTS attachment.
+    ToggleSwitch& delaySyncToggle() { return delaySyncTgl; }
 
     // Knobs
     NotchKnob& gateThreshKnob()  { return gateThresh; }
@@ -50,11 +51,6 @@ public:
     NotchKnob& reverbSizeKnob()  { return reverbSize; }
     NotchKnob& reverbToneKnob()  { return reverbTone; }
 
-    // Sync division selector — index 0 ("MANUAL") means the TIME knob drives
-    // delay time; any other index syncs to host tempo (see TempoSync.h, whose
-    // kSyncDivisions order this list must match).
-    SegmentedSelector& delaySyncSelector() { return delaySync; }
-
 private:
     // Lay out N knobs centred in a horizontal row inside `row`.
     void layoutKnobRow(juce::Rectangle<int> row, std::initializer_list<NotchKnob*> knobs);
@@ -66,6 +62,7 @@ private:
     ToggleSwitch delayTgl  { "ON" };
     ToggleSwitch reverbTgl { "ON" };
     ToggleSwitch delayPP   { "PP" };
+    ToggleSwitch delaySyncTgl { "SYNC" };
 
     NotchKnob gateThresh { "THRESH", 0.0f };
     NotchKnob width      { "WIDTH",  0.0f };   // 0=off (dry/mono), 10=wide
@@ -81,8 +78,6 @@ private:
     NotchKnob reverbMix  { "MIX",    0.25f };
     NotchKnob reverbSize { "SIZE",   0.5f };
     NotchKnob reverbTone { "TONE",   0.5f };
-
-    SegmentedSelector delaySync { { "MANUAL", "1/16", "1/8T", "1/8", "1/8D", "1/4", "1/4D", "1/2" }, 0 };
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(EffectsPanel)
 };

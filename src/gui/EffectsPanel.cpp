@@ -10,19 +10,17 @@
 namespace sr {
 
 // Card geometry — kept in sync between paint() and resized(). Cards are a
-// fixed size (sized to hug the knobs + the delay sync row) and the 2×2 grid is
+// fixed size (sized to hug the title row + one knob row) and the 2×2 grid is
 // centred in the panel, rather than stretched to fill it — otherwise the knobs
 // float in oversized boxes.
 namespace {
     constexpr int kCardGap = 12;
     constexpr int kCardW   = 328;  // two fit the 680 px inside the panel margin
-    constexpr int kCardH   = 140;  // title row + (optional sync row) + one knob row
+    constexpr int kCardH   = 120;  // title row + one knob row
 
-    // Card chrome metrics, shared by paint() and resized(). Kept tight so the
-    // DELAY card can fit its sync row *and* a knob row inside kCardH.
+    // Card chrome metrics, shared by paint() and resized().
     constexpr int kCardPadY = 6;
     constexpr int kRowGap   = 3;
-    constexpr int kSyncH    = 17;
 
     // The effect knobs are the amp row's satin pointer knobs (name on top, value
     // engraved below) drawn smaller. kKnobH must hold the text strip *and* a
@@ -44,11 +42,12 @@ namespace {
     constexpr auto kCardToggleStyle = ToggleSwitch::Style::Jewel;
     constexpr int  kToggleH = ToggleSwitch::minHeight(kCardToggleStyle);
     constexpr int  kToggleW = 40;  // a two-letter label + the jewel and its glow
+    constexpr int  kSyncToggleW = 56;  // "SYNC": two more letters
     static_assert(kToggleH >= ToggleSwitch::minHeight(kCardToggleStyle),
                   "card toggle row is shorter than a ToggleSwitch can paint into: "
                   "the jewel gets clipped and the toggle looks dead");
-    static_assert(kCardH >= 2 * kCardPadY + kToggleH + kRowGap + kSyncH + kRowGap + kKnobH,
-                  "kCardH leaves the DELAY card too little for a full knob row");
+    static_assert(kCardH >= 2 * kCardPadY + kToggleH + kRowGap + kKnobH,
+                  "kCardH leaves the cards too little for a full knob row");
     static_assert(EffectsPanel::panelHeight >= 2 * kCardH + kCardGap + 2 * 10,
                   "panelHeight is shorter than the card grid it holds");
 }
@@ -59,12 +58,11 @@ EffectsPanel::EffectsPanel()
     addAndMakeVisible(delayTgl);
     addAndMakeVisible(reverbTgl);
     addAndMakeVisible(delayPP);
-    addAndMakeVisible(delaySync);
-    delaySync.setTitleText("Delay sync");
+    addAndMakeVisible(delaySyncTgl);
 
     // Jewels: small lit lamps beside the card title, the same glass as the
     // faceplate's pilot lamp — see kCardToggleStyle, which the layout sizes against.
-    for (auto* t : { &boostTgl, &delayTgl, &reverbTgl, &delayPP })
+    for (auto* t : { &boostTgl, &delayTgl, &reverbTgl, &delayPP, &delaySyncTgl })
         t->setStyle(kCardToggleStyle);
 
     for (auto* k : { &gateThresh, &width, &inputLevel, &outputLevel,
@@ -81,16 +79,9 @@ EffectsPanel::EffectsPanel()
         addAndMakeVisible(*k);
     }
 
-    // Readouts in real units where the parameter has one. TIME mirrors the
-    // 0–1 → ms mapping the processor applies (see PluginProcessor::processBlock),
-    // so the display cannot drift from what the delay line actually does.
-    // Note: with DELAY SYNC set to anything but MANUAL the host tempo drives
-    // delay time and this knob is inactive — the readout still shows its own value.
-    delayTime.setValueFormatter([](float v) {
-        float ms = DELAY_TIME_MIN_MS + v * (DELAY_TIME_KNOB_MAX_MS - DELAY_TIME_MIN_MS);
-        return juce::String(juce::roundToInt(ms)) + "ms";
-    });
-
+    // Readouts in real units where the parameter has one. TIME's readout (ms,
+    // or the division while SYNC is on) is set by DelayTimeAttachment, which
+    // knows which of its two parameters the knob is showing.
     auto percent = [](float v) { return juce::String(juce::roundToInt(v * 100.0f)) + "%"; };
     delayFb.setValueFormatter(percent);
     delayMix.setValueFormatter(percent);
@@ -180,18 +171,17 @@ void EffectsPanel::resized()
     layoutCard(cardBounds(area, 1, 0), boostTgl,  { &boostLevel, &boostTight, &boostBright });
     layoutCard(cardBounds(area, 1, 1), reverbTgl, { &reverbMix, &reverbSize, &reverbTone });
 
-    // DELAY card is bespoke: a second toggle (PING-PONG) shares the title row
-    // with ON, and a sync-division row sits above the knobs. That extra row is
-    // why panelHeight is sized off this card.
+    // DELAY card: PING-PONG and SYNC share the title row with ON. SYNC turns
+    // the TIME knob into the division selector, so the card needs no row of
+    // its own for the divisions and its knobs line up with the other cards'.
     auto delayCard  = cardBounds(area, 0, 1);
     auto delayInner = delayCard.reduced(10, kCardPadY);
     auto titleRow   = delayInner.removeFromTop(kToggleH);
     delayTgl.setBounds(titleRow.removeFromRight(kToggleW));
     titleRow.removeFromRight(6);
     delayPP.setBounds(titleRow.removeFromRight(kToggleW));
-
-    delayInner.removeFromTop(kRowGap);
-    delaySync.setBounds(delayInner.removeFromTop(kSyncH));
+    titleRow.removeFromRight(6);
+    delaySyncTgl.setBounds(titleRow.removeFromRight(kSyncToggleW));
 
     delayInner.removeFromTop(kRowGap);
     layoutKnobRow(delayInner, { &delayTime, &delayFb, &delayMix, &delayTone });

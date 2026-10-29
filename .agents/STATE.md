@@ -4,7 +4,7 @@ _Updated 2026-10-29_
 
 ## Now
 - Silent Riot v0.3.4 (JUCE 7 VST3/Standalone), GPL-3.0-or-later, free + optional donations. No tagged
-  release yet. `bash scripts/verify.sh` passes: 408/408 ctest (308 pure C++ / 81 JUCE / 19 processor).
+  release yet. `bash scripts/verify.sh` passes: 416/416 ctest (312 pure C++ / 81 JUCE / 23 processor).
 - Docs are open-source ready: README, `docs/manual/`, `docs/dev/`, CONTRIBUTING/CoC/SECURITY, issue
   forms, CHANGELOG (feeds release notes). `docs/README.md` indexes every doc; `dev/` + `manual/` track
   the code, `design/` + `records/` are frozen. `verify.sh --quick` (also in CI) checks SPDX headers,
@@ -30,13 +30,15 @@ _Updated 2026-10-29_
 7. Amp faceplate is on `main` (`src/gui/AmpFaceplate.*`): deep-ruby glass pilot lamp, satin pointer
    knobs with engraved values, chrome bat toggles on orange glass rings. The EFFECTS panel now uses
    the same hardware style (faceplate cards, 0.7× pointer knobs, orange glass jewel ON/PP toggles).
+   DELAY's sync-division row is now a SYNC jewel that turns TIME into the division knob.
    Owner still open: lamp colour, weave strength, keep the "POWER" label? Jewel size/colour OK?
 
 ## Decisions
 - Never gate features, nag, or add a trial (open source + donations).
 - Code, CLAUDE.md and handoffs beat the DSP spec v2.13; `ROADMAP.md` is the live plan.
 - Tone-neutral fixes first; tone-changing ones together, so the amp is re-calibrated once.
-- Delay never self-oscillates; sync ceiling 2000 ms, TIME knob 20–1000 ms.
+- Delay never self-oscillates; sync ceiling 2000 ms, TIME knob 20–1000 ms. SYNC reuses the TIME
+  knob for divisions; the GUI swaps parameters, the parameter layout stays as it was.
 - IRs match the built-in cab's level; 8192-sample cap stays; state keeps raw IRs; restore is laxer
   than load (refusing a silent IR would drop every later slot).
 - Latency is an exact integer, constant across cab modes.
@@ -47,8 +49,8 @@ _Updated 2026-10-29_
 - **Projects that use an IR play louder** (+5.4…+13.1 dB) since the IR level match; in CHANGELOG.
 - IR path: cab-mode switches dip (~6–95 ms by block size); bright IRs sit 1.2–1.5 dB under the
   built-in cab; long IRs lose their ring at the 8192 cap. GUI bugs are tracked in #37–#45.
-- GUI review 2026-10-28, still open: small low-contrast text (section titles, footer), REVERB
-  knob row ~30 px above DELAY's, window can outgrow the screen with EFFECTS + IR LOADER open
-  (EFFECTS grew 28 px with the hardware restyle).
+- GUI review 2026-10-28, still open: small low-contrast text (section titles, footer), window
+  can outgrow the screen with EFFECTS + IR LOADER open (EFFECTS is now 272 px, 12 px under its
+  pre-restyle height). The REVERB/DELAY knob-row offset is gone with the sync row.
 - 13 commits on `main` and the docs plan's first commit carry the env email, not the noreply one;
   pre-rewrite commits stay reachable via closed PRs' `refs/pull/*` (only GitHub Support can purge).

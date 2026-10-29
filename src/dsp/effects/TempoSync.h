@@ -33,6 +33,26 @@ inline constexpr SyncDivision kSyncDivisions[] = {
 };
 inline constexpr int kNumSyncDivisions = static_cast<int>(sizeof(kSyncDivisions) / sizeof(kSyncDivisions[0]));
 
+// The DELAY TIME knob doubles as the division selector while SYNC is on: its
+// 0..1 travel is cut into one equal detent per division (MANUAL excluded),
+// slowest division at the top. These two are each other's inverse on the
+// detents, so a division round-trips through the knob unchanged.
+inline constexpr int kNumSyncSteps = kNumSyncDivisions - 1;
+inline constexpr int kDefaultSyncDivision = 5;   // "1/4" — what SYNC selects first
+
+inline int syncDivisionFromKnob(float knob)
+{
+    if (!(knob > 0.0f)) return 1;                       // also catches NaN
+    const float step = std::round(std::min(knob, 1.0f) * static_cast<float>(kNumSyncSteps - 1));
+    return 1 + static_cast<int>(step);
+}
+
+inline float knobFromSyncDivision(int divisionIndex)
+{
+    const int idx = std::clamp(divisionIndex, 1, kNumSyncDivisions - 1);
+    return static_cast<float>(idx - 1) / static_cast<float>(kNumSyncSteps - 1);
+}
+
 // Delay time in ms for a given division index (1..kNumSyncDivisions-1) at bpm,
 // clamped to DELAY_TIME_MIN_MS..DELAY_SYNC_MAX_MS — further than the TIME knob
 // reaches (DELAY_TIME_KNOB_MAX_MS), so slow divisions keep their length. divisionIndex==0 (MANUAL) returns
