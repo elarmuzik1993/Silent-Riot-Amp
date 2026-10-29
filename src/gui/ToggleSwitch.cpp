@@ -3,6 +3,10 @@
 #include "ToggleSwitch.h"
 #include "ColourPalette.h"
 #include "FontData.h"
+#include <cmath>
+#include <initializer_list>
+#include <iterator>
+#include <utility>
 
 namespace sr {
 
@@ -131,39 +135,174 @@ void ToggleSwitch::paintLed(juce::Graphics& g, juce::Rectangle<float> bounds)
 
 void ToggleSwitch::paintSwitch(juce::Graphics& g, juce::Rectangle<float> bounds)
 {
-    // Track
-    float trackX = (bounds.getWidth() - trackW) * 0.5f;
-    float trackY = kLabelH + kLabelGap;
-    float trackRadius = trackH * 0.5f;
+    using juce::Colours::black;
+    using juce::Colours::white;
+    using Stops = std::initializer_list<std::pair<float, juce::Colour>>;
+    const float pos = juce::jlimit(0.0f, 1.0f, thumbPos);
+    const float cx = bounds.getWidth() * 0.5f, cy = kLabelH + kLabelGap + kBatPivot;
+    const auto rgb = [](juce::uint32 argb) { return juce::Colour(argb); };
+    const auto lighten = [](juce::Colour c, float t) { return c.interpolatedWith(juce::Colours::white, t); };
+    const auto darken = [](juce::Colour c, float t) { return c.interpolatedWith(juce::Colours::black, t); };
+    const auto circle = [](float x, float y, float r) { return juce::Rectangle<float>(x - r, y - r, r * 2.0f, r * 2.0f); };
+    const auto withStops = [](juce::ColourGradient grad, Stops stops) {
+        for (const auto& [p, col] : stops)
+            if (p > 0.0f && p < 1.0f)
+                grad.addColour(p, col);
+        return grad;
+    };
+    const auto radial = [&](float x, float y, float r, Stops stops) {
+        return withStops(juce::ColourGradient(stops.begin()->second, x, y,
+                                              std::prev(stops.end())->second, x + r, y, true), stops);
+    };
+    const auto linear = [&](float x1, float y1, float x2, float y2, Stops stops) {
+        return withStops(juce::ColourGradient(stops.begin()->second, x1, y1,
+                                              std::prev(stops.end())->second, x2, y2, false), stops);
+    };
+    const auto hexagon = [](float x, float y, float r) {
+        juce::Path p;
+        for (int i = 0; i < 6; ++i)
+        {
+            const float a = juce::degreesToRadians(30.0f + 60.0f * static_cast<float>(i));
+            const juce::Point<float> v(x + r * std::cos(a), y + r * std::sin(a));
+            if (i == 0) p.startNewSubPath(v); else p.lineTo(v);
+        }
+        p.closeSubPath();
+        return p;
+    };
 
-    juce::Colour trackColour = button.getToggleState()
-        ? activeColor
-        : Colours::track;
-    g.setColour(trackColour);
-    g.fillRoundedRectangle(trackX, trackY, trackW, trackH, trackRadius);
-
-    // Thumb
-    float thumbTravel = trackW - thumbD - 4.0f;
-    float thumbX = trackX + 2.0f + thumbPos * thumbTravel;
-    float thumbY = trackY + (trackH - thumbD) * 0.5f;
-
-    if (button.getToggleState())
+    // Soft contact shadow on the panel, then the glow the lit ring throws
+    g.setGradientFill(radial(cx + 0.8f, cy + 1.6f, 10.5f, { { 0.0f, black.withAlpha(0.55f) },
+                                                             { 0.75f, black.withAlpha(0.35f) },
+                                                             { 1.0f, black.withAlpha(0.0f) } }));
+    g.fillEllipse(circle(cx + 0.8f, cy + 1.6f, 10.5f));
+    if (pos > 0.0f)
     {
-        // Glow
-        g.setColour(activeColor.withAlpha(0.25f));
-        g.fillEllipse(thumbX - 5.0f, thumbY - 5.0f, thumbD + 10.0f, thumbD + 10.0f);
+        g.setGradientFill(radial(cx, cy, 15.0f, { { 0.0f, activeColor.withAlpha(0.4f * pos) },
+                                                  { 0.6f, activeColor.withAlpha(0.18f * pos) },
+                                                  { 1.0f, activeColor.withAlpha(0.0f) } }));
+        g.fillEllipse(circle(cx, cy, 15.0f));
     }
 
-    juce::Colour thumbCol = button.getToggleState() ? Colours::white : Colours::dim;
-    g.setColour(thumbCol);
-    g.fillEllipse(thumbX, thumbY, thumbD, thumbD);
+    // Glass ring under the nut: a chrome lip, dark tinted glass, and the lit
+    // glass crossfaded over it on the toggle animation
+    g.setGradientFill(linear(cx - 9.0f, cy - 9.0f, cx + 9.0f, cy + 9.0f,
+                             { { 0.0f, rgb(0xFFD8DAE2) }, { 1.0f, rgb(0xFF2A2D38) } }));
+    g.fillEllipse(circle(cx, cy, 9.4f));
+    const juce::Colour off = darken(activeColor, 0.72f);
+    g.setGradientFill(radial(cx, cy + 1.0f, 8.6f, { { 0.0f, darken(off, 0.4f) }, { 0.7f, off },
+                                                    { 1.0f, lighten(off, 0.12f) } }));
+    g.fillEllipse(circle(cx, cy, 8.6f));
+    if (pos > 0.0f)
+    {
+        g.setGradientFill(radial(cx, cy + 1.0f, 8.6f, { { 0.0f, darken(activeColor, 0.2f).withAlpha(pos) },
+                                                        { 0.72f, activeColor.withAlpha(pos) },
+                                                        { 0.9f, lighten(activeColor, 0.45f).withAlpha(pos) },
+                                                        { 1.0f, lighten(activeColor, 0.2f).withAlpha(pos) } }));
+        g.fillEllipse(circle(cx, cy, 8.6f));
+    }
+    {
+        juce::Path edge;  // catch-light on the ring's upper-left edge
+        edge.addCentredArc(cx, cy, 8.0f, 8.0f, 0.0f,
+                           juce::degreesToRadians(288.2f), juce::degreesToRadians(341.8f), true);
+        g.setColour(white.withAlpha(0.55f));
+        g.strokePath(edge, juce::PathStrokeType(0.55f, juce::PathStrokeType::curved,
+                                                juce::PathStrokeType::rounded));
+    }
 
-    // Keyboard focus ring around the track
+    // Hex nut: chamfered edge facets shaded by how they face a light from the
+    // upper left, a flat top, and a hairline outline
+    g.setColour(black.withAlpha(0.45f));
+    g.fillPath(hexagon(cx + 0.7f, cy + 1.0f, 6.7f));
+    for (int i = 0; i < 6; ++i)
+    {
+        const auto vertex = [&](int k, float r) {
+            const float a = juce::degreesToRadians(30.0f + 60.0f * static_cast<float>(k % 6));
+            return juce::Point<float>(cx + r * std::cos(a), cy + r * std::sin(a));
+        };
+        juce::Path facet;
+        facet.startNewSubPath(vertex(i, 6.7f));
+        facet.lineTo(vertex(i + 1, 6.7f));
+        facet.lineTo(vertex(i + 1, 5.5f));
+        facet.lineTo(vertex(i, 5.5f));
+        facet.closeSubPath();
+        const float facing = std::cos(juce::degreesToRadians(60.0f * static_cast<float>(i) + 60.0f - 225.0f));
+        g.setColour(rgb(0xFF3C3F4A).interpolatedWith(rgb(0xFFF4F5F8), (facing + 1.0f) * 0.5f));
+        g.fillPath(facet);
+    }
+    g.setGradientFill(linear(cx - 5.5f, cy - 5.5f, cx + 5.5f, cy + 5.5f,
+                             { { 0.0f, rgb(0xFFD9DBE3) }, { 0.55f, rgb(0xFFA3A6B3) }, { 1.0f, rgb(0xFF6E7180) } }));
+    g.fillPath(hexagon(cx, cy, 5.5f));
+    g.setColour(black.withAlpha(0.4f));
+    g.strokePath(hexagon(cx, cy, 6.7f), juce::PathStrokeType(0.35f, juce::PathStrokeType::curved));
+
+    // Threaded bushing seen end on, and the hole the lever leaves through
+    g.setGradientFill(linear(cx, cy - 4.2f, cx, cy + 4.2f, { { 0.0f, rgb(0xFF3A3D48) }, { 1.0f, rgb(0xFFD4D6DE) } }));
+    g.fillEllipse(circle(cx, cy, 4.2f));
+    for (const float r : { 3.85f, 3.45f })
+    {
+        g.setColour(black.withAlpha(0.45f));
+        g.drawEllipse(circle(cx, cy, r), 0.28f);
+        g.setColour(white.withAlpha(0.2f));
+        g.drawEllipse(circle(cx, cy + 0.25f, r), 0.22f);
+    }
+    g.setGradientFill(radial(cx, cy - 0.6f, 3.0f, { { 0.0f, black }, { 0.8f, rgb(0xFF0A0A0E) }, { 1.0f, rgb(0xFF2A2C34) } }));
+    g.fillEllipse(circle(cx, cy, 3.0f));
+
+    // The bat, foreshortened: the tip sits below the pivot when off, above it
+    // when on, and passes through the pivot mid-flip
+    const float k = 1.0f - 2.0f * pos, tipY = cy + 11.0f * k;
+    const float ballR = 2.5f + 0.45f * std::abs(k), w0 = 1.75f, w1 = 1.25f;
+    const bool hasShaft = std::abs(tipY - cy) > 0.4f;
+    const auto shaft = [&](float dx, float dy, float grow) {
+        juce::Path p;
+        p.startNewSubPath(cx - w0 - grow + dx, cy + dy);
+        p.lineTo(cx - w1 - grow + dx, tipY + dy);
+        p.lineTo(cx + w1 + grow + dx, tipY + dy);
+        p.lineTo(cx + w0 + grow + dx, cy + dy);
+        p.closeSubPath();
+        return p;
+    };
+    if (hasShaft)
+    {
+        g.setColour(black.withAlpha(0.14f));
+        g.fillPath(shaft(2.6f, 3.0f, 0.9f));
+        g.setColour(black.withAlpha(0.3f));
+        g.fillPath(shaft(1.5f, 1.8f, 0.2f));
+    }
+    g.setColour(black.withAlpha(0.14f));
+    g.fillEllipse(circle(cx + 2.4f, tipY + 2.8f, ballR + 0.9f));
+    g.setColour(black.withAlpha(0.32f));
+    g.fillEllipse(circle(cx + 1.4f, tipY + 1.7f, ballR));
+
+    g.setGradientFill(radial(cx - 0.7f, cy - 0.8f, 2.8f, { { 0.0f, white }, { 0.5f, rgb(0xFFB8BAC6) }, { 1.0f, rgb(0xFF4E515C) } }));
+    g.fillEllipse(circle(cx, cy, 2.3f));  // collar
+    if (hasShaft)
+    {
+        g.setGradientFill(linear(cx - w0, cy, cx + w0, cy,
+                                 { { 0.0f, rgb(0xFF3A3D48) }, { 0.28f, rgb(0xFFC8CAD4) }, { 0.4f, white },
+                                   { 0.55f, rgb(0xFFA9ACB8) }, { 0.8f, rgb(0xFF5C5F6B) }, { 1.0f, rgb(0xFF2E3039) } }));
+        g.fillPath(shaft(0.0f, 0.0f, 0.0f));
+        // the shaft darkens toward the tip, where it reflects the panel
+        g.setGradientFill(linear(cx, cy, cx, tipY, { { 0.0f, black.withAlpha(0.0f) }, { 0.75f, black.withAlpha(0.0f) },
+                                                     { 1.0f, black.withAlpha(0.25f) } }));
+        g.fillPath(shaft(0.0f, 0.0f, 0.0f));
+    }
+
+    // Mirror-chrome ball tip
+    g.setGradientFill(radial(cx - ballR * 0.35f, tipY - ballR * 0.4f, ballR * 1.4f,
+                             { { 0.0f, white }, { 0.22f, rgb(0xFFEDEEF3) }, { 0.55f, rgb(0xFF8E919E) },
+                               { 0.78f, rgb(0xFF33363F) }, { 0.92f, rgb(0xFF7E8190) }, { 1.0f, rgb(0xFFB4B7C3) } }));
+    g.fillEllipse(circle(cx, tipY, ballR));
+    g.setColour(white.withAlpha(0.95f));
+    g.fillEllipse(circle(cx - ballR * 0.38f, tipY - ballR * 0.42f, ballR * 0.22f));
+    g.setColour(black.withAlpha(0.35f));
+    g.drawEllipse(circle(cx, tipY, ballR), 0.3f);
+
+    // Keyboard focus ring around the glass ring
     if (hasKeyboardFocus(false))
     {
         g.setColour(Colours::accent.withAlpha(0.7f));
-        g.drawRoundedRectangle(trackX - 3.0f, trackY - 3.0f,
-                               trackW + 6.0f, trackH + 6.0f, trackRadius + 3.0f, 1.5f);
+        g.drawEllipse(circle(cx, cy, 11.5f), 1.5f);
     }
 }
 

@@ -630,12 +630,12 @@ void SilentRiotEditor::layoutContent()
     // (80px) and the value readout, 108px in all. The knob + toggle stack is
     // centred top to bottom.
     int knobW = 100, knobH = 110;
-    int toggleW = 50, toggleH = 36, toggleGap = 32;
-    // 16px below the knob's paint extent — ToggleSwitch draws its own label in
-    // the top 14px, so the visible gap between knob label and toggle label ~24px.
-    const int stackH = knobH + 16 + toggleH;
+    int toggleW = 50, toggleH = sr::ToggleSwitch::minHeight(sr::ToggleSwitch::Style::Switch), toggleGap = 32;
+    // 10px below the knob's paint extent — ToggleSwitch draws its own label in
+    // the top 14px, so the visible gap between knob readout and toggle label ~12px.
+    const int stackH = knobH + 10 + toggleH;
     int knobY = plate.getY() + (plate.getHeight() - stackH) / 2;
-    int toggleY = knobY + knobH + 16;
+    int toggleY = knobY + knobH + 10;
 
     sr::NotchKnob* knobs[] = { &gainKnob, &toneKnob, &volumeKnob };
     sr::ToggleSwitch* toggles[] = { &halfPowerToggle, &cabSimToggle, &powerToggle };
