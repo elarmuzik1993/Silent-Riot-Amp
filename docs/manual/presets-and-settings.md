@@ -45,7 +45,7 @@ Your host saves the plugin state with the project. It contains:
 
 - every parameter (all knobs, switches and effect settings),
 - the IRs you loaded, stored in full ([Cabinets and IRs](cabinets-and-irs.md#saved-with-your-project)),
-- the display settings above, and which panels (EFFECTS, IR LOADER, ADVANCED)
+- the display settings above, and which panels (IR LOADER, EFFECTS, ADVANCED)
   were open.
 
 Tuner **MUTE** is the exception: it is always off when a project loads, so a
