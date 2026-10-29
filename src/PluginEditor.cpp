@@ -618,7 +618,8 @@ void SilentRiotEditor::layoutContent()
     faceplate.setBounds(plate);
 
     // SHAPE sits dead centre on the faceplate with GAIN and VOLUME a fixed pitch
-    // either side. Each toggle sits under its knob's column.
+    // either side. The toggles stay a tight group under SHAPE, so they read as
+    // secondary to the knobs.
     constexpr int dialW = 80, knobPitch = 145;
     const float plateCentreX = static_cast<float>(plate.getX()) + plate.getWidth() * 0.5f;
     const auto columnX = [&](int i) {
@@ -629,7 +630,7 @@ void SilentRiotEditor::layoutContent()
     // (80px) and the value readout, 108px in all. The knob + toggle stack is
     // centred top to bottom.
     int knobW = 100, knobH = 110;
-    int toggleW = 50, toggleH = 36;
+    int toggleW = 50, toggleH = 36, toggleGap = 32;
     // 16px below the knob's paint extent — ToggleSwitch draws its own label in
     // the top 14px, so the visible gap between knob label and toggle label ~24px.
     const int stackH = knobH + 16 + toggleH;
@@ -642,7 +643,8 @@ void SilentRiotEditor::layoutContent()
     {
         const int x = juce::roundToInt(columnX(i));
         knobs[i]->setBounds(x - knobW / 2, knobY, knobW, knobH);
-        toggles[i]->setBounds(x - toggleW / 2, toggleY, toggleW, toggleH);
+        const int tx = juce::roundToInt(plateCentreX) + (toggleW + toggleGap) * (i - 1);
+        toggles[i]->setBounds(tx - toggleW / 2, toggleY, toggleW, toggleH);
     }
 
     // The lamp sits midway between VOLUME's dial and the faceplate's right

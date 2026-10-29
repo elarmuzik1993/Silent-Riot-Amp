@@ -29,7 +29,7 @@ _Updated 2026-10-29_
 6. GitHub Actions has failed every run since 2026-10-09; recheck once public (free runners).
 7. Owner: amp faceplate (`feat/amp-faceplate`, `src/gui/AmpFaceplate.*`) approved, wordmark removed.
    Pilot lamp is a deep-ruby glass dome (8 px lens), vertically centred right of VOLUME; amp knob
-   labels on top; SHAPE dead centre, toggles under their knobs. Screenshot refreshed. Open: lamp
+   labels on top; SHAPE dead centre, toggles grouped under it. Screenshot refreshed. Open: lamp
    colour, weave strength, keep the "POWER" label?
 
 ## Decisions
