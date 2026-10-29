@@ -32,7 +32,8 @@ shows for automation, the range and the default.
    folder — `~/.vst3` on Linux, `C:\Program Files\Common Files\VST3` on
    Windows — and insert it on a mono or stereo guitar track. Or run the
    standalone app and pick your audio interface under **Options → Audio/MIDI
-   Settings**. To build it yourself, see [Building](../dev/building.md).
+   Settings**, then the input your guitar is in under the gear's **Input**
+   ([Settings](presets-and-settings.md#audio-input-standalone-only)). To build it yourself, see [Building](../dev/building.md).
 2. **Set your input level.** Play hard and watch the **IN** meter on the left.
    The amp responds to how hard you hit it, so a level that is too low makes
    every GAIN setting sound cleaner than it should. Aim for a DI peaking around

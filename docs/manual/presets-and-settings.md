@@ -39,6 +39,21 @@ Click the **gear** in the top-right corner to open the settings overlay.
 The **About** section shows the version and the licence (free and open source,
 GPLv3).
 
+### Audio input (standalone only)
+
+The standalone app adds an **AUDIO INPUT** section at the top of the overlay.
+Its **Input** list shows every input of your audio interface; pick the one your
+guitar is plugged into. The amp is mono and plays exactly that input, and the
+IN meter and the tuner follow it.
+
+You need it because the audio dialog (**Options → Audio/MIDI Settings**) only
+offers inputs in pairs ("Input 1 + 2"), and the amp hears the first input of a
+pair, so a guitar in Input 2 would be silent. The choice is saved with your
+audio device settings and comes back at the next launch; presets never change
+it. If you tick a pair in the audio dialog again, the list shows the first input
+of that pair, which is the one you hear. In a DAW the section is not shown:
+route the input you want to the track as usual.
+
 ## What is saved with a project
 
 Your host saves the plugin state with the project. It contains:

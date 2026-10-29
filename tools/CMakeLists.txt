@@ -18,6 +18,7 @@ target_sources(sr_render PRIVATE
 
     ${CMAKE_SOURCE_DIR}/src/PluginProcessor.cpp
     ${CMAKE_SOURCE_DIR}/src/PluginEditor.cpp
+    ${CMAKE_SOURCE_DIR}/src/StandaloneDevice.cpp
 
     ${CMAKE_SOURCE_DIR}/src/dsp/filters/FilterBank.cpp
     ${CMAKE_SOURCE_DIR}/src/dsp/tubes/TriodeWaveshaper.cpp
@@ -46,6 +47,7 @@ target_sources(sr_render PRIVATE
     ${CMAKE_SOURCE_DIR}/src/gui/PresetSelector.cpp
     ${CMAKE_SOURCE_DIR}/src/gui/SegmentedSelector.cpp
     ${CMAKE_SOURCE_DIR}/src/gui/SettingsPanel.cpp
+    ${CMAKE_SOURCE_DIR}/src/gui/InputSelector.cpp
     ${CMAKE_SOURCE_DIR}/src/gui/IRWaveformDisplay.cpp
     ${CMAKE_SOURCE_DIR}/src/gui/CabinetView.cpp
     ${CMAKE_SOURCE_DIR}/src/gui/IRLoaderPanel.cpp
@@ -128,6 +130,7 @@ target_sources(sr_editor_snapshot PRIVATE
 
     ${CMAKE_SOURCE_DIR}/src/PluginProcessor.cpp
     ${CMAKE_SOURCE_DIR}/src/PluginEditor.cpp
+    ${CMAKE_SOURCE_DIR}/src/StandaloneDevice.cpp
 
     ${CMAKE_SOURCE_DIR}/src/dsp/filters/FilterBank.cpp
     ${CMAKE_SOURCE_DIR}/src/dsp/tubes/TriodeWaveshaper.cpp
@@ -156,6 +159,7 @@ target_sources(sr_editor_snapshot PRIVATE
     ${CMAKE_SOURCE_DIR}/src/gui/PresetSelector.cpp
     ${CMAKE_SOURCE_DIR}/src/gui/SegmentedSelector.cpp
     ${CMAKE_SOURCE_DIR}/src/gui/SettingsPanel.cpp
+    ${CMAKE_SOURCE_DIR}/src/gui/InputSelector.cpp
     ${CMAKE_SOURCE_DIR}/src/gui/IRWaveformDisplay.cpp
     ${CMAKE_SOURCE_DIR}/src/gui/CabinetView.cpp
     ${CMAKE_SOURCE_DIR}/src/gui/IRLoaderPanel.cpp

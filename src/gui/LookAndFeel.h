@@ -23,6 +23,11 @@ struct SilentRiotLookAndFeel : public juce::LookAndFeel_V4 {
     static constexpr const char* kPointerKnobProperty = "srPointerKnob";
     void drawToggleButton(juce::Graphics&, juce::ToggleButton&,
                           bool highlighted, bool down) override;
+
+    // ComboBox and its popup (the standalone INPUT selector) take type from
+    // Fonts::Sizes like everything else, not JUCE's height-derived default.
+    juce::Font getComboBoxFont(juce::ComboBox&) override;
+    juce::Font getPopupMenuFont() override;
 };
 
 } // namespace sr

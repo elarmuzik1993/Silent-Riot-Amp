@@ -51,7 +51,7 @@ src/
 │   ├── tubes/       TriodeWaveshaper, PentodeWaveshaper, GridConduction
 │   ├── power/       PowerSupplyModel, SagEnvelope, LTPSolver
 │   └── cabinet/     SpeakerCoupling, CabinetSim, IRLibrary, OTSaturation
-├── gui/             19 custom components (see GUI Architecture below)
+├── gui/             20 custom components (see GUI Architecture below)
 ├── PluginProcessor  Full signal chain (§2.5 processBlock)
 └── PluginEditor     GUI shell (window sized to content height)
 ```
@@ -101,7 +101,7 @@ cmake -B build -DSR_BUILD_TESTS=ON # Build with tests
 - Tests use Catch2 v3 — one test file per DSP module, three test targets:
   - `SilentRiotTests` — 312 pure C++ test cases (no JUCE dependency)
   - `SilentRiotJuceTests` — 81 JUCE-dependent test cases (cabinet IR, convolution, IR level match, IR readiness, user IR loading and truncation fade, oversample switcher + latency, delay/reverb)
-  - `SilentRiotProcessorTests` — 28 test cases on the real `SilentRiotProcessor` (effect-tail wiring, host bypass, IR restore and first-block install, IR level, cab-mode fades, GUI meters, the DELAY TIME/SYNC knob binding, built-in cab selection) and on GUI components that need the plugin's code (`gui_ir_loader_tests.cpp`: the CAB view's IR cycle). Links the plugin's SharedCode target `SilentRiot`, so there is no source list to keep in step; drive it through `tests/processor_harness.h` (`ProcessorHarness`: prepared processor, `set()` params in natural units, `run()` / `silence()` in host blocks, `Mode::Bypassed`, `loadIR()`). Use it for anything that lives in `processBlock`'s wiring — a unit test of the DSP class it calls cannot see that. Each case takes seconds (4× oversampled amp), so keep runs short
+  - `SilentRiotProcessorTests` — 36 test cases on the real `SilentRiotProcessor` (effect-tail wiring, host bypass, IR restore and first-block install, IR level, cab-mode fades, GUI meters, the DELAY TIME/SYNC knob binding, built-in cab selection) and on GUI components that need the plugin's code (`gui_ir_loader_tests.cpp`: the CAB view's IR cycle; `gui_input_selector_tests.cpp`: the standalone INPUT selector against a mock 4-input device). Links the plugin's SharedCode target `SilentRiot`, so there is no source list to keep in step; drive it through `tests/processor_harness.h` (`ProcessorHarness`: prepared processor, `set()` params in natural units, `run()` / `silence()` in host blocks, `Mode::Bypassed`, `loadIR()`). Use it for anything that lives in `processBlock`'s wiring — a unit test of the DSP class it calls cannot see that. Each case takes seconds (4× oversampled amp), so keep runs short
 
 ## Cabinet IR Loader Architecture
 
@@ -119,7 +119,7 @@ cmake -B build -DSR_BUILD_TESTS=ON # Build with tests
 
 ## GUI Architecture
 
-19 custom components in `src/gui/`, all in `namespace sr`:
+20 custom components in `src/gui/`, all in `namespace sr`:
 
 - **ColourPalette.h** — 28 inline colour constants (dark theme), incl. the `knobBody`/`knobFace`/`knobTick` ramp. Text tiers hold ≥4.5:1 against `panel`; `muted` (3.5:1) is decoration only, never a glyph
 - **FontData.h/.cpp** — Embedded Space Mono + DM Sans fonts via BinaryData, plus the `Fonts::Sizes` type scale (micro 9 / small 10 / body 11 / value 12.5 / title 14 / hero 22). No bare numeric font sizes anywhere in `src/gui/` — tune type from that one block. Note these are JUCE font *heights* (ascent+descent), which render ~25% smaller than the same number in CSS px
@@ -134,7 +134,8 @@ cmake -B build -DSR_BUILD_TESTS=ON # Build with tests
 - **AdvancedPanel.h/.cpp** — PSU supply rails (teal gradient bars) + engine state readout
 - **PresetSelector.h/.cpp** — `[◂ | name | ▸]` cyclic preset browser
 - **SegmentedSelector.h/.cpp** — Row of mutually-exclusive buttons
-- **SettingsPanel.h/.cpp** — Overlay (340px) with UI preferences + About section
+- **SettingsPanel.h/.cpp** — Overlay (340px) with UI preferences + About section; in the standalone, an AUDIO INPUT section on top (`attachInputSelector()`, height `panelHeight()` — position the overlay with that, not `panelH`)
+- **InputSelector.h/.cpp** — standalone-only INPUT list. The amp reads bus channel 0 only and JUCE's standalone dialog offers inputs as stereo pairs, so the second input of a pair was never heard. Picking an input reopens the device with **only that input active** (`selectSingleInput()`); JUCE packs active inputs, so it arrives on channel 0 — no processor change. The choice lives in the device setup, which `StandalonePluginHolder` saves (`audioSetup`) and restores; it is not a parameter. `src/StandaloneDevice.*` (`standaloneDeviceManager()`) is the one place that includes JUCE's standalone window header: `nullptr` in VST3, the tools and the tests, so the section never shows there
 - **IRLoaderPanel.h/.cpp** — Two views behind a `CAB | LIBRARY` `SegmentedSelector` (top right; the editor persists it as the `irView` property, default CAB). **CAB**: a `CabinetView` plus a LOAD IR chip; its arrows call `stepIR()`, which cycles IR_INDEX 0 (built-in cab) → each loaded IR → wrap, and reports through `onIRSelected` — the editor maps 0 to `selectBuiltInCab()` (sets IR_INDEX 0 and applies it at once, like `selectUserIR`). **LIBRARY**: scrollable IR list, waveform display, drop zone. Drag-and-drop works in both (category tabs per UI spec §5.7 not yet implemented — user-IR-only today). The section sits directly under the amp: `layoutContent()` stacks IR LOADER → EFFECTS → ADVANCED, and the hand-set Tab order (`irSectionBar` 8, `fxSectionBar` 9, effects controls 10–28, `advSectionBar` 29) follows it
 - **CabinetView.h/.cpp** — the CAB view: a 2x12 cab front painted in code (`paintCabinet()`: tolex with pebble grain, plain black corner caps (owner prefers them simple), orange accent piping, a black expanded-metal grille — staggered diamond openings filled even-odd — over two speakers that show through. Grille, baffle, speakers and caps are fixed black in both themes, like the real parts; only the tolex and piping follow the theme), at `kCabAspect` 2:1 (a little wider than a real 2x12's 3:2; trim scales with the cab's *height*, and the two speakers sit side by side in the middle, so a wider box still reads as a 2x12), round drawn arrow buttons either side of it, the playing name + detail line under it. Display only — `onStep(±1)` goes to the panel
 - **IRWaveformDisplay.h/.cpp** — Waveform plot with envelope fill

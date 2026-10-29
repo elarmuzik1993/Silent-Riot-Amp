@@ -48,6 +48,7 @@ target_sources(SilentRiot
         src/PluginProcessor.cpp
         src/PluginProcessor.h
         src/PluginEditor.cpp
+        src/StandaloneDevice.cpp
         src/PluginEditor.h
 
         # Utils — VoltageScale, constants, params
@@ -138,6 +139,7 @@ target_sources(SilentRiot
         src/gui/SegmentedSelector.cpp
         src/gui/SettingsPanel.h
         src/gui/SettingsPanel.cpp
+        src/gui/InputSelector.cpp
         src/gui/IRWaveformDisplay.h
         src/gui/IRWaveformDisplay.cpp
         src/gui/CabinetView.h
