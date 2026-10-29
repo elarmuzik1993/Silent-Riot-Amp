@@ -69,6 +69,7 @@ Dated defect investigations and reviews. Each one is a measurement you can re-ru
 | [`plans/2026-10-23-power-section-fixes.md`](plans/2026-10-23-power-section-fixes.md) | in progress (Tasks 0–1 done) |
 | [`plans/2026-10-26-ir-path-sound-fixes.md`](plans/2026-10-26-ir-path-sound-fixes.md) | done |
 | [`plans/2026-10-28-open-source-docs-prep.md`](plans/2026-10-28-open-source-docs-prep.md) | in progress |
+| [`plans/2026-10-29-reactive-panel-glow.md`](plans/2026-10-29-reactive-panel-glow.md) | planned |
 
 Current project status and the next steps are in [`../.agents/STATE.md`](../.agents/STATE.md);
 the product roadmap is [`../ROADMAP.md`](../ROADMAP.md).
