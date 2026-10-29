@@ -32,7 +32,7 @@ void CabinetView::setDragOver(bool over)
 }
 
 // The cab fills the component edge to edge, above the name strip: wider
-// than a real 2x12's 3:2 front, so the speakers spread apart.
+// than a real 2x12's 3:2 front.
 juce::Rectangle<float> CabinetView::cabBounds() const
 {
     return { kMargin, 4.0f, static_cast<float>(getWidth()) - 2.0f * kMargin,
@@ -191,8 +191,9 @@ void CabinetView::paintCabinet(juce::Graphics& g, juce::Rectangle<float> b)
     g.setColour(Colours::bg);
     g.fillRoundedRectangle(grille, gr);
     const float spkR = juce::jmin(grille.getWidth() * 0.235f, grille.getHeight() * 0.45f);
-    for (float fx : { 0.28f, 0.72f })
-        paintSpeaker(g, { grille.getX() + grille.getWidth() * fx, grille.getCentreY() }, spkR);
+    // Side by side in the middle, as in a real 2x12, however wide the box
+    for (float dir : { -1.0f, 1.0f })
+        paintSpeaker(g, { grille.getCentreX() + dir * spkR * 1.12f, grille.getCentreY() }, spkR);
 
     // Grille cloth over them: thin enough for the speakers to show through
     {
