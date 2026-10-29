@@ -26,8 +26,8 @@ The IR LOADER is the lower panel in the [main window screenshot](../../resources
 The panel has two views, picked with the **CAB | LIBRARY** switch at its top
 right (the choice is saved with the project):
 
-- **CAB** (the default) shows a 2x12 cabinet with the name of what is playing
-  under it. The arrow buttons either side step through the **built-in cab**
+- **CAB** (the default) shows a 2x12 cabinet across the panel with the name of
+  what is playing under it. The arrow buttons either side of the name step through the **built-in cab**
   and every IR you have loaded, wrapping around at either end. Click
   **LOAD IR** to add a file.
 - **LIBRARY** shows the full list on the left and the selected IR's waveform

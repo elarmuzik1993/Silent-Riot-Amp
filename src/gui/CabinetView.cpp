@@ -31,21 +31,20 @@ void CabinetView::setDragOver(bool over)
     repaint();
 }
 
-// The cab takes all the height above the name strip at a 2x12's 3:2 front,
-// narrowed if the arrows either side would not fit.
+// The cab fills the component edge to edge, above the name strip: wider
+// than a real 2x12's 3:2 front, so the speakers spread apart.
 juce::Rectangle<float> CabinetView::cabBounds() const
 {
-    const float h = static_cast<float>(getHeight()) - kNameH - 6.0f;
-    const float maxW = static_cast<float>(getWidth()) - 4.0f * (kArrowR * 2.0f + 16.0f);
-    const float w = juce::jmin(h * 1.5f, maxW);
-    return { (static_cast<float>(getWidth()) - w) * 0.5f, 4.0f, w, w / 1.5f };
+    return { kMargin, 4.0f, static_cast<float>(getWidth()) - 2.0f * kMargin,
+             static_cast<float>(getHeight()) - kNameH - 6.0f };
 }
 
+// Either side of the name, centred on the strip under the cab
 juce::Point<float> CabinetView::arrowCentre(int direction) const
 {
     const auto cab = cabBounds();
-    return { cab.getCentreX() + static_cast<float>(direction) * (cab.getWidth() * 0.5f + 44.0f),
-             cab.getCentreY() };
+    return { cab.getCentreX() + static_cast<float>(direction) * kArrowOffset,
+             cab.getBottom() + 4.0f + kNameH * 0.5f };
 }
 
 int CabinetView::arrowAt(juce::Point<float> p) const
@@ -158,7 +157,9 @@ void CabinetView::paintCabinet(juce::Graphics& g, juce::Rectangle<float> b)
 {
     using juce::Colours::black;
     using juce::Colours::white;
-    const float rad = juce::jmin(b.getWidth(), b.getHeight()) * 0.035f;
+    // Trim scales with the cab's height, so a wide cab keeps a 2x12's frame
+    const float side = juce::jmin(b.getWidth(), b.getHeight());
+    const float rad = side * 0.035f;
 
     // Drop shadow, then the tolex-covered box
     g.setColour(black.withAlpha(0.45f));
@@ -185,12 +186,12 @@ void CabinetView::paintCabinet(juce::Graphics& g, juce::Rectangle<float> b)
     g.drawRoundedRectangle(b, rad, 1.0f);
 
     // Baffle, and the two speakers on it
-    const auto grille = b.reduced(b.getWidth() * 0.065f);
+    const auto grille = b.reduced(side * 0.095f);
     const float gr = rad * 0.5f;
     g.setColour(Colours::bg);
     g.fillRoundedRectangle(grille, gr);
     const float spkR = juce::jmin(grille.getWidth() * 0.235f, grille.getHeight() * 0.45f);
-    for (float fx : { 0.265f, 0.735f })
+    for (float fx : { 0.28f, 0.72f })
         paintSpeaker(g, { grille.getX() + grille.getWidth() * fx, grille.getCentreY() }, spkR);
 
     // Grille cloth over them: thin enough for the speakers to show through
@@ -221,7 +222,7 @@ void CabinetView::paintCabinet(juce::Graphics& g, juce::Rectangle<float> b)
     g.drawRoundedRectangle(grille.expanded(1.2f), gr + 1.2f, 1.4f);
 
     // Chrome corner protectors
-    const float s = b.getWidth() * 0.075f;
+    const float s = side * 0.11f;
     paintCorner(g, { b.getX() - 1.0f, b.getY() - 1.0f, s, s });
     paintCorner(g, { b.getRight() - s + 1.0f, b.getY() - 1.0f, s, s });
     paintCorner(g, { b.getX() - 1.0f, b.getBottom() - s + 1.0f, s, s });
@@ -268,14 +269,16 @@ void CabinetView::paint(juce::Graphics& g)
     for (int dir : { -1, 1 })
         paintArrowButton(g, arrowCentre(dir), dir, canStep, hoverArrow == dir);
 
-    const float w = static_cast<float>(getWidth());
+    // Name and detail fill the gap between the arrows
+    const float textW = 2.0f * (kArrowOffset - kArrowR - 8.0f);
+    const float textX = cab.getCentreX() - textW * 0.5f;
     g.setFont(Fonts::spaceMono(Fonts::Sizes::value, true));
     g.setColour(Colours::bright);
-    g.drawText(name, juce::Rectangle<float>(16.0f, cab.getBottom() + 6.0f, w - 32.0f, 16.0f),
+    g.drawText(name, juce::Rectangle<float>(textX, cab.getBottom() + 6.0f, textW, 16.0f),
                juce::Justification::centred, true);
     g.setFont(Fonts::spaceMono(Fonts::Sizes::micro));
     g.setColour(Colours::dim);
-    g.drawText(detail, juce::Rectangle<float>(16.0f, cab.getBottom() + 23.0f, w - 32.0f, 12.0f),
+    g.drawText(detail, juce::Rectangle<float>(textX, cab.getBottom() + 23.0f, textW, 12.0f),
                juce::Justification::centred, true);
 }
 
