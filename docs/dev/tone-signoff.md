@@ -68,6 +68,11 @@ Once frozen, the **plugin's own rendered output** of D0–D5 at the canonical se
 becomes the golden reference for the regression test (Phase A's "golden-test lock"). Any
 later code change that shifts these renders beyond tolerance fails CI.
 
+> **Done, 2026-10-29.** The owner froze the sound by ear at `tone-v1` before the gates were
+> all passing (A1 and B1 accepted as they are; E3 open behind an A/B). The lock is
+> `tests/tone_lock_tests.cpp`, with fingerprints rather than raw renders; see
+> [`tone-lock.md`](tone-lock.md). Where this protocol and that page disagree, that page wins.
+
 ---
 
 ## 3. Test matrix (settings × signals)
