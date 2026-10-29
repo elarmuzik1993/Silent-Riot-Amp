@@ -47,8 +47,8 @@ Everything below serves those three. Anything that doesn't is deferred.
 
 > **Frozen at `tone-v1`, 2026-10-29.** The owner signed off the sound by ear at `059b209`;
 > `tests/tone_lock_tests.cpp` guards it (`docs/dev/tone-lock.md`). The constants below are
-> frozen as they are; the amp re-calibration is cancelled. Only the E3 aliasing fix stays
-> open, behind an owner A/B.
+> frozen as they are; the amp re-calibration is on hold (the owner may revisit it). Any
+> change, E3 first, goes through an owner A/B.
 
 The differentiation bet is "perfect one amp." Until the tone is frozen, nothing
 downstream (cabs, presets, marketing demos, the parked neural model) can be finalized —

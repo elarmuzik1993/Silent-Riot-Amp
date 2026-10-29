@@ -40,7 +40,7 @@ _Updated 2026-10-29 (tone frozen at tone-v1)_
 
 ## Decisions
 - Tone frozen at `tone-v1` (amp + cab + effects, steady state). Re-calibration (power Tasks 2–5,
-  `VOLUME_KNOB_HEADROOM`) cancelled; glitch/transition fixes allowed while the lock passes.
+  `VOLUME_KNOB_HEADROOM`) on hold, owner may revisit; glitch fixes allowed while the lock passes.
 - Never gate features, nag, or add a trial (open source + donations).
 - Code, CLAUDE.md and handoffs beat the DSP spec v2.13; `ROADMAP.md` is the live plan.
 - Tone-neutral fixes first; tone-changing ones together, so the amp is re-calibrated once.

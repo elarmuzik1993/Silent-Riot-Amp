@@ -5,6 +5,10 @@ Silent Riot's sound is **frozen at `tone-v1`**: the owner signed it off by ear o
 by accident. This page says what is locked, how the check works, and the only way the
 sound may change.
 
+The lock is a **reference, not a ban**. The owner can keep improving the sound: each
+approved change becomes the new reference, and every earlier one stays retrievable by its
+`tone-vN` tag, so there is always a known-good sound to compare with or go back to.
+
 ## What is locked
 
 The **steady-state** output of the amp, the cabinet and the effects:
@@ -68,7 +72,8 @@ tone lock means the change moves the sound: find out why.
 **Already approved in principle:** the E3 aliasing fix (whole-engine aliasing on the IIR
 path, `docs/dev/tone-signoff.md` gate E3). It still needs the owner's A/B before its new
 references land. The amp re-calibration that was planned before the freeze (raising
-`VOLUME_KNOB_HEADROOM`, D1/A1/B1 re-ratification, power-section Tasks 2–5) is cancelled.
+`VOLUME_KNOB_HEADROOM`, D1/A1/B1 re-ratification, power-section Tasks 2–5) is **on hold**:
+the owner may revisit it any time, through the same A/B and approval.
 
 ## The frozen voicing (tone-v1)
 
