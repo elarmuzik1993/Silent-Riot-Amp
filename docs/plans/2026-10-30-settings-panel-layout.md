@@ -86,7 +86,7 @@ and the standalone.
 2. Header + drawn close button (+ Escape, keyboard focus, accessibility title).
 3. `PluginEditor`: scale transform on the panel, height guard while open, outside-click
    close.
-4. Tests (`tests/gui_settings_panel_tests.cpp`, `SilentRiotProcessorTests`): every child's
+4. Tests (new file tests/gui_settings_panel_tests.cpp, in `SilentRiotProcessorTests`): every child's
    bounds lie inside the panel; each toggle's height ≥ `minHeight(Jewel)`; no two rows
    overlap; label column ≥ the widest label's text width; `panelHeight()` fits under the
    header at `kBaseH`; the editor at every UI scale contains the whole panel; existing
