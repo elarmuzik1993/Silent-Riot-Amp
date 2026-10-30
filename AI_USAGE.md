@@ -61,26 +61,25 @@ the way it is, and re-run the measurements.
 
 ## 3. Human Authored Content / Substantial Human Input
 
-The author, Boris Miscenco, is responsible for:
+The author, Boris Miscenco, art-directed the whole project. In practice that meant:
 
-- **The product.** What Silent Riot is: an original fictional amp in the cascaded-ECC83 /
-  EL84 push-pull family, its controls (GAIN, SHAPE, VOLUME, 15W/7W, CAB), the effects and what
-  the plugin does and does not do.
-- **The circuit and model design.** The signal chain, the normalized voltage domain, the
-  component values and gain staging, the dual-gang gain pot and the post-phase-inverter tone
-  control placement (see [`CREDITS.md`](CREDITS.md)).
-- **The sound.** Every voicing decision was made or approved by the author by ear, and the
-  shipped tone (`tone-v1`) is the author's sign-off.
-- **Direction and selection.** The tasks, priorities and plans; choosing between alternatives;
-  rejecting work that did not meet the bar.
-- **The visual design.** The faceplate, knobs, toggles, cab view and layout were specified,
-  iterated and approved by the author.
-- **Testing in use.** Playing the plugin, finding problems by ear and on real audio interfaces,
-  and reporting them.
-- **Review and acceptance** of every change merged into the project.
+- **The sound.** The author set out the sound Silent Riot should have and pursued it through
+  repeated listening rounds, judging every voicing change by ear. The shipped tone (`tone-v1`)
+  is the author's sign-off, and it changes only with the author's approval after an A/B.
+- **The architecture.** The author decided the product's architecture: an original fictional
+  amp in the cascaded-ECC83 / EL84 push-pull family, its signal chain and controls (GAIN,
+  SHAPE, VOLUME, 15W/7W, CAB), the effects, and what the plugin does and does not do. Where the
+  AI tools proposed designs or alternatives, the author chose between them.
+- **The look.** The faceplate, knobs, toggles, cab view and layout were directed, iterated and
+  approved by the author.
+- **Direction.** The tasks, priorities and plans; what was built, in what order, and what was
+  rejected for not meeting the bar.
+- **Testing in use.** Playing the plugin, finding problems by ear and on real audio
+  interfaces, and reporting them.
+- **Approval.** Every change merged into the project was reviewed and approved by the author.
 
-The AI tools are instruments the author used to carry out that design, in the way a developer
-uses a compiler, a code generator or a reference book. They are not authors of the project.
+The AI tools proposed, implemented and measured; the author directed, decided and approved.
+The AI tools are not authors of the project.
 
 ## 4. Intellectual Property (IP) Assignment / Transfer of Rights
 
