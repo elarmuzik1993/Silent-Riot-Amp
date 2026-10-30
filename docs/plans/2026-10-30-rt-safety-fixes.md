@@ -298,16 +298,16 @@ at 96 kHz and hears dropouts has no way to know why.
 
 **Steps**
 
-- [ ] Add a short paragraph to [`../manual/controls.md`](../manual/controls.md) under
+- [x] Add a short paragraph to [`../manual/controls.md`](../manual/controls.md) under
       oversampling: cost is proportional to sample rate × factor, 8× costs about four times
       what 2× does, and at high session rates the top settings may not keep up on a modest
       machine. Give the measured table as a guide and name the machine.
-- [ ] No UI change. Greying out settings by a guessed CPU budget would be wrong on hardware
+- [x] No UI change. Greying out settings by a guessed CPU budget would be wrong on hardware
       we have not measured.
 
 **Verification**
 
-- [ ] `bash scripts/verify.sh --quick` (the link and text checks cover the new doc text).
+- [x] `bash scripts/verify.sh --quick` (the link and text checks cover the new doc text).
 
 ---
 
