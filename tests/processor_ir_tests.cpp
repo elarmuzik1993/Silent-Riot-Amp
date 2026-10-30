@@ -22,7 +22,9 @@
 #include "dsp/cabinet/CabModeSwitcher.h"
 
 #include <algorithm>
+#include <atomic>
 #include <cstdint>
+#include <limits>
 #include <vector>
 
 using namespace sr::test;
@@ -524,22 +526,35 @@ TEST_CASE("Processor: automating IR_INDEX swaps the cab via the message-thread t
         h.silence(0.5);
     };
 
+    // getTailLengthSeconds() reads the cab state the timer writes, so read it
+    // on the message thread, between ticks, not on this audio thread.
+    auto tailLength = [&h] {
+        std::atomic<bool> done { false };
+        double v = std::numeric_limits<double>::quiet_NaN();   // NaN fails every check below
+        if (! juce::MessageManager::callAsync([&] { v = h.proc.getTailLengthSeconds(); done = true; }))
+            return v;
+        while (! done.load())
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        return v;
+    };
+
     float tailBuiltIn = 0.0f, tailIR1 = 0.0f, tailPast = 0.0f;
-    double lengthBuiltIn = -1.0, lengthIR1 = -1.0, lengthPast = -1.0;
+    const double kUnread = std::numeric_limits<double>::quiet_NaN();
+    double lengthBuiltIn = kUnread, lengthIR1 = kUnread, lengthPast = kUnread;
     h.withMessageLoop([&] {
         h.setFromAudioThread(IDs::IR_INDEX, 0.0f);   // the built-in cab
         settle();
-        lengthBuiltIn = h.proc.getTailLengthSeconds();
+        lengthBuiltIn = tailLength();
         tailBuiltIn = tailAfterNote(h);
 
         h.setFromAudioThread(IDs::IR_INDEX, 1.0f);   // the first IR
         settle();
-        lengthIR1 = h.proc.getTailLengthSeconds();
+        lengthIR1 = tailLength();
         tailIR1 = tailAfterNote(h);
 
         h.setFromAudioThread(IDs::IR_INDEX, 5.0f);   // past the list: convolution off
         settle();
-        lengthPast = h.proc.getTailLengthSeconds();
+        lengthPast = tailLength();
         tailPast = tailAfterNote(h);
     });
 

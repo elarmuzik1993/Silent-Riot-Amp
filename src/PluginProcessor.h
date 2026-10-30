@@ -244,10 +244,20 @@ private:
     double baseSampleRate = 44100.0;
     // The IR_INDEX cabSim was last synced to: timerCallback() applies the
     // parameter when it differs (RT-3). The audio thread never touches it;
-    // the timer, the GUI and state restore run on the message thread. Atomic
-    // only because a host may call prepareToPlay (which writes it) from
-    // another thread.
+    // every access is under irStateLock (below), so the atomic is only
+    // belt and braces.
     std::atomic<int> cachedIRIndex { 0 };
+    // Guards userIRs, cachedIRIndex and the cab's IR state against each other
+    // on the non-audio threads. The timer polls IR_INDEX all the time (the old
+    // AsyncUpdater only fired on a change), so a host that restores state or
+    // prepares off the message thread would otherwise race it: a tick could
+    // index a userIRs being reassigned, or queue a load beside
+    // installIRNow(). Held by the timer's IR branch, setStateInformation's
+    // restore, prepareToPlay and the GUI's loadUserIR/selectUserIR/
+    // selectBuiltInCab. NEVER on the audio thread (RT-3): processBlock only
+    // reads useIR and the try-lock bufferTransfer. Recursive, so the GUI
+    // paths may call applyIRIndexParam() under it.
+    juce::CriticalSection irStateLock;
 
     // ── Live tuner ring buffer (single-producer audio / single-consumer GUI) ──
     // Power-of-two size; the writer stores a monotonically increasing total

@@ -115,6 +115,7 @@ void SilentRiotProcessor::timerCallback()
     // possible allocation on the audio thread). CabModeSwitcher waits for
     // the real IR before entering IR mode, and JUCE builds that engine in
     // longer than a tick, so the extra delay is not heard.
+    const juce::ScopedLock irLock(irStateLock);
     const int irIdx = static_cast<int>(
         apvts.getRawParameterValue(sr::Params::IDs::IR_INDEX)->load());
     if (irIdx != cachedIRIndex.load())
@@ -372,6 +373,9 @@ void SilentRiotProcessor::recalcRateDependentCoeffs(LatencyPublish publish)
 
 void SilentRiotProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 {
+    // Prepares the cab (cabSim.prepare, installIRNow) and reads userIRs; a
+    // host may call this off the message thread, beside a timer tick.
+    const juce::ScopedLock irLock(irStateLock);
     baseSampleRate = sampleRate;
     preparedBlockSize = samplesPerBlock;
 
@@ -1311,6 +1315,12 @@ bool SilentRiotProcessor::loadUserIR(const juce::File& file)
     if (!sr::readUserIRFromFile(file, entry))
         return false;
 
+    // The file is read outside the lock; the list and the cab change inside
+    // it (irStateLock), so the cap is checked again there.
+    const juce::ScopedLock irLock(irStateLock);
+    if (static_cast<int>(userIRs.size()) >= sr::MAX_USER_IRS)
+        return false;
+
     // Load into convolution immediately
     juce::AudioBuffer<float> bufCopy(entry.audioData);
     cabSim.loadIRFromBuffer(std::move(bufCopy), entry.sampleRate);
@@ -1329,6 +1339,7 @@ bool SilentRiotProcessor::loadUserIR(const juce::File& file)
 void SilentRiotProcessor::selectUserIR(int userIndex)
 {
     // 0-based index into userIRs
+    const juce::ScopedLock irLock(irStateLock);
     if (userIndex < 0 || userIndex >= static_cast<int>(userIRs.size())) return;
 
     auto& ir = userIRs[static_cast<size_t>(userIndex)];
@@ -1347,6 +1358,7 @@ void SilentRiotProcessor::selectBuiltInCab()
     // selectUserIR: the convolution turns off now. The cache is set first, as
     // selectUserIR does, so no timer tick sees the new parameter value before
     // it is applied.
+    const juce::ScopedLock irLock(irStateLock);
     cachedIRIndex = 0;
     if (auto* param = apvts.getParameter(sr::Params::IDs::IR_INDEX))
         param->setValueNotifyingHost(param->convertTo0to1(0.0f));
@@ -1390,6 +1402,9 @@ void SilentRiotProcessor::setStateInformation(const void* data, int sizeInBytes)
     auto xml = getXmlFromBinary(data, sizeInBytes);
     if (xml && xml->hasTagName(apvts.state.getType()))
     {
+        // Hosts may restore off the message thread: keep a timer tick from
+        // applying IR_INDEX against a half-replaced userIRs (irStateLock).
+        const juce::ScopedLock irLock(irStateLock);
         apvts.replaceState(juce::ValueTree::fromXml(*xml));
         loadUserIRsFromState();
 

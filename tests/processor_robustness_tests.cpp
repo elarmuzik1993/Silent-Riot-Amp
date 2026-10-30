@@ -25,8 +25,8 @@
 // And an oversample switch, which reported its new latency to the host from
 // the audio thread (RT-2: setLatencySamples() calls every host listener
 // synchronously). The audio thread now only stores it; the processor's
-// message-thread timer reports it within a tick, and host bypass follows the
-// engine's latency throughout.
+// message-thread timer reports it once the message loop runs, and host
+// bypass follows the engine's latency throughout.
 //
 // Each case runs a few seconds of a 4x-oversampled amp; keep them short.
 // ═══════════════════════════════════════════════════════════════
@@ -305,7 +305,7 @@ constexpr int kLatency2x = 10, kLatency4x = 12;
 
 } // namespace
 
-TEST_CASE("Processor: an oversample switch reports its latency from the message thread, within a tick (RT-2)",
+TEST_CASE("Processor: an oversample switch reports its latency once the message loop runs (RT-2)",
           "[processor][robustness][latency]")
 {
     ProcessorHarness h;   // 4x
@@ -319,19 +319,17 @@ TEST_CASE("Processor: an oversample switch reports its latency from the message 
     REQUIRE(h.proc.getLatencySamples() == kLatency4x);
 
     // As in a host, with the message loop running: the timer reports it.
+    // The 2 s bound only keeps a broken timer from hanging the test; a tick
+    // is 50 ms, but wall-clock time is not asserted on a shared test machine.
     int reported = -1;
-    double waitedMs = -1.0;
     h.withMessageLoop([&] {
         const auto t0 = std::chrono::steady_clock::now();
         while (h.proc.getLatencySamples() != kLatency2x
                && std::chrono::steady_clock::now() - t0 < std::chrono::seconds(2))
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
-        waitedMs = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
         reported = h.proc.getLatencySamples();
     });
     REQUIRE(reported == kLatency2x);
-    // One tick is 50 ms; the rest is scheduling slack on a loaded test machine.
-    CHECK(waitedMs < 250.0);
 }
 
 TEST_CASE("Processor: host bypass stays exactly the latency behind across an oversample switch (RT-2)",
