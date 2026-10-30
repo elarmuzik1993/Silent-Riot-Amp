@@ -269,11 +269,11 @@ compiler, not the CPU.
 
 **Steps**
 
-- [ ] `std::array<std::atomic<float>, kTunerRingSize> tunerRing {}`.
-- [ ] `std::memory_order_relaxed` on both the store in `pushTunerSamples` and the load in
+- [x] `std::array<std::atomic<float>, kTunerRingSize> tunerRing {}`.
+- [x] `std::memory_order_relaxed` on both the store in `pushTunerSamples` and the load in
       `readLatestTunerSamples`. Leave the release/acquire pair on `tunerWritePos` exactly as
       it is — that is what orders the samples against the count.
-- [ ] Keep the comment about tolerating a stale window; it is still the design, it is just no
+- [x] Keep the comment about tolerating a stale window; it is still the design, it is just no
       longer undefined.
 
 **Cost.** None on x86-64 or AArch64: a relaxed atomic load/store of an aligned 32-bit value
@@ -281,11 +281,11 @@ compiles to the same plain instruction.
 
 **Test**
 
-- [ ] The existing tuner tests still pass unchanged.
+- [x] The existing tuner tests still pass unchanged.
 
 **Verification**
 
-- [ ] ThreadSanitizer over `threads,ir,modes,params,recover` reports **0 races**.
+- [x] ThreadSanitizer over `threads,ir,modes,params,recover` reports **0 races**.
 
 ---
 

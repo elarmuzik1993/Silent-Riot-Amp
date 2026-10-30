@@ -251,11 +251,17 @@ private:
 
     // ── Live tuner ring buffer (single-producer audio / single-consumer GUI) ──
     // Power-of-two size; the writer stores a monotonically increasing total
-    // sample count and the reader grabs the last N samples ending there. Torn
-    // reads are harmless — the next 30Hz frame recovers a clean window.
+    // sample count and the reader grabs the last N samples ending there. Each
+    // sample is a relaxed atomic (RT-4), so overlapping access is well defined;
+    // the release/acquire pair on tunerWritePos orders the samples against the
+    // count. A window the writer laps mid-copy can still mix old and new
+    // samples — that is tolerated by design: the next 30Hz frame recovers a
+    // clean window.
     static constexpr int kTunerRingSize = 8192;          // must be a power of two
     static constexpr int kTunerRingMask = kTunerRingSize - 1;
-    std::array<float, kTunerRingSize> tunerRing {};      // zero-initialised
+    static_assert(std::atomic<float>::is_always_lock_free,
+                  "the tuner ring must stay lock-free on the audio thread");
+    std::array<std::atomic<float>, kTunerRingSize> tunerRing {}; // value-initialised to 0
     std::atomic<uint64_t> tunerWritePos { 0 };
     void pushTunerSamples(const float* data, int n);     // audio thread only
 

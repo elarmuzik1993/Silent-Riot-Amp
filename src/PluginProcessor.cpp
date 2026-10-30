@@ -1226,7 +1226,8 @@ void SilentRiotProcessor::pushTunerSamples(const float* data, int n)
 
     uint64_t pos = tunerWritePos.load(std::memory_order_relaxed);
     for (int i = 0; i < n; ++i)
-        tunerRing[static_cast<size_t>((pos + static_cast<uint64_t>(i)) & kTunerRingMask)] = data[i];
+        tunerRing[static_cast<size_t>((pos + static_cast<uint64_t>(i)) & kTunerRingMask)]
+            .store(data[i], std::memory_order_relaxed);
 
     // Publish the advanced write position last (release) so a concurrent reader
     // that observes the new count also sees the samples written above.
@@ -1244,7 +1245,8 @@ int SilentRiotProcessor::readLatestTunerSamples(float* dest, int maxN) const
     // Copy the last `count` samples ending at the write position (oldest first).
     const uint64_t start = pos - static_cast<uint64_t>(count);
     for (int i = 0; i < count; ++i)
-        dest[i] = tunerRing[static_cast<size_t>((start + static_cast<uint64_t>(i)) & kTunerRingMask)];
+        dest[i] = tunerRing[static_cast<size_t>((start + static_cast<uint64_t>(i)) & kTunerRingMask)]
+                      .load(std::memory_order_relaxed);
     return count;
 }
 
