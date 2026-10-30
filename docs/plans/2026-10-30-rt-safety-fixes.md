@@ -25,42 +25,45 @@ on that baseline, not estimated.
 | RT-4 | Data race on the tuner ring buffer | LOW | 4 |
 | RT-6 | 8× does not fit in one core above 48 kHz | INFO | 5 (docs only) |
 
+**Status:** the three owner decisions below are settled (2026-10-30), so Task 1 can start.
+
 **Order:** 1 first — it is the only finding a player can hit by accident, and it is the
 smallest change. Then 2 (a crash, independent of everything). Then 3, the only task that
 moves code between threads. Then 4 and 5, both trivial. **One task per commit**, each with
 its own bit-identical check. Tasks 1, 2, 4 and 5 are independent of each other; 3 depends on
 nothing but is the one worth reviewing closely.
 
-## Owner decisions
+## Owner decisions (decided 2026-10-30)
 
-Three, and the first two are the only ones that change what gets built. The recommendation is
-given first; the reasoning is under each task.
+All three went with the recommendation. The rejected options are kept with their reasoning,
+so a later reader knows they were weighed rather than missed.
 
-- **D1 — how to get the latency report off the audio thread (Task 3).**
-  **Recommended: defer the report**, publishing it from a message-thread timer. The audio
-  signal stays bit-identical, so the tone lock cannot move; the host simply learns about a
-  latency change up to one timer period (50 ms) after it happens, during which its delay
-  compensation is 2 samples out.
-  *Alternative:* make the reported latency **constant across oversample factors** (always 12
-  samples, padding 2× by 2), so `setLatencySamples()` is only ever called from
-  `prepareToPlay` and the host never renegotiates at all. This matches the existing decision
-  that latency is constant across cab modes — but it shifts the 2× output by 2 samples, which
-  the tone lock's `oversample-2x` case may well see, so it needs an owner A/B and a new
-  reference. Not recommended while the tone is frozen; worth revisiting at `tone-v2`.
+- **D1 — how the latency report leaves the audio thread (Task 3): defer it**, publishing from
+  a message-thread timer. The audio signal stays bit-identical, so the tone lock cannot move;
+  the host learns about a latency change up to one timer period (50 ms) after it happens,
+  during which its delay compensation is 2 samples out. Nothing is audible in that window —
+  the oversample switch is already crossfading through silence.
+  *Rejected for now:* making the reported latency **constant across oversample factors**
+  (always 12 samples, padding 2× by 2), so `setLatencySamples()` is only ever called from
+  `prepareToPlay` and the host never renegotiates at all. It is the better architecture and it
+  matches the existing decision that latency is constant across cab modes — but it shifts the
+  2× output by 2 samples, which the tone lock's `oversample-2x` case may well see. That makes
+  it a tone change, and the tone is frozen. **Revisit at `tone-v2`**, alongside E3.
 
-- **D2 — `IR_INDEX` automation (Task 3).**
-  **Recommended: keep it automatable.** The review offered "make `IR_INDEX` non-automatable"
-  as one way out, but the timer in Task 3 removes the audio-thread work *and* keeps the
-  capability, so the trade is unnecessary. Only choose non-automatable if there is a separate
-  reason to hide cab switching from host automation.
+- **D2 — `IR_INDEX` automation (Task 3): keep it automatable.** The review offered "make
+  `IR_INDEX` non-automatable" as one way out of RT-3, but the timer in Task 3 removes the
+  audio-thread work *and* keeps the capability, so the trade buys nothing.
+  *Rejected:* `withAutomatable(false)`. Only worth revisiting if there is a separate reason to
+  hide cab switching from host automation.
 
-- **D3 — how far to go on RT-1 (Task 1 vs. Task 6).**
-  **Recommended: Task 1 only for now.** Scrubbing the input removes every path by which a
-  non-finite sample can get *in*. Task 6 (re-seed the amp if the output goes non-finite
-  anyway) additionally covers a NaN generated *inside* the engine, which has never been
-  observed — 102 runs, 138 s of audio, every hostile input the harness has, and a clean
-  AddressSanitizer/UndefinedBehaviorSanitizer pass. It is written up so it exists if a user
-  ever reports silence that Task 1 cannot explain.
+- **D3 — how far to go on RT-1: Task 1 only.** Scrubbing the input removes every path by which
+  a non-finite sample can get *in*, which is the only route ever observed.
+  *Deferred, not rejected:* Task 6, re-seeding the amp if the output goes non-finite anyway.
+  It would additionally cover a NaN generated *inside* the engine — which has never happened
+  in 102 runs, 138 s of audio, every hostile input the harness has, and a clean
+  AddressSanitizer/UndefinedBehaviorSanitizer pass — and it costs a real risk: a false trigger
+  would re-seed the amp mid-performance. Build it only if a user reports silence that Task 1
+  cannot explain.
 
 ## Global constraints
 
@@ -305,8 +308,8 @@ at 96 kHz and hears dropouts has no way to know why.
 
 ## Task 6 — Optional: recover from a non-finite state the input scrub cannot explain
 
-**Only if** a user reports the amp going silent after Task 1 is in. Written up now so the
-reasoning is not lost.
+**Deferred by D3.** Build it only if a user reports the amp going silent after Task 1 is in.
+Written up now so the reasoning is not lost.
 
 **Idea.** `processBlock` already scans its output for non-finite samples. Count the blocks in
 which it finds any; after a few consecutive ones, call `resetDSPState()` on the audio thread.
@@ -352,7 +355,8 @@ Per task, in this order:
   on this platform and so it shapes how these tasks are verified, but it is not an RT finding
   and its fix is an owner call about tolerances or per-toolchain references.
 - **Making latency constant across oversample factors.** The better architecture, but it moves
-  the 2× output by 2 samples — a `tone-v2` conversation, not a safety fix. See D1.
+  the 2× output by 2 samples — a `tone-v2` conversation, not a safety fix. Weighed and deferred
+  at D1; revisit alongside E3.
 - **The CPU cost itself.** Making the amp cheaper (a lighter solver, a cheaper Koren
   evaluation) is a tone-changing optimisation and belongs with the re-calibration that is on
   hold, not here.

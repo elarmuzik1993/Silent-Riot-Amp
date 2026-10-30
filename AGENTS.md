@@ -85,4 +85,8 @@ Tests use Catch2 v3:
 - `SilentRiotProcessorTests` for anything in `processBlock`'s wiring, on the real processor via
   `tests/processor_harness.h` (links the plugin's SharedCode target; no source list to maintain).
 
+`SilentRiotRTStress` (`tests/rt_stress.cpp`) is a fourth executable and **not** a ctest: it holds
+the audio thread to its real-time contracts — no allocation, no blocking lock, no missed deadline —
+and runs for minutes, so run it on demand and before a release. See `docs/dev/testing.md`.
+
 Verify DSP, parameter, and GUI behavior with focused tests whenever changing behavior.
