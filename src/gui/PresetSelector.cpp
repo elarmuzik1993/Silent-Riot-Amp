@@ -93,7 +93,7 @@ void PresetSelector::paint(juce::Graphics& g)
 
     // Center: preset name
     float centerW = bounds.getWidth() - arrowW * 2.0f;
-    g.setFont(Fonts::spaceMono(Fonts::Sizes::body));
+    g.setFont(Fonts::ui(Fonts::Sizes::body));
     g.setColour(Colours::bright);
     g.drawText(juce::String(presetName(currentIndex)),
                juce::Rectangle<float>(arrowW, 0.0f, centerW, h),

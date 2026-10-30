@@ -70,6 +70,12 @@ private:
     void loadUIState();
     void applySettings();   // apply theme/ballistics/knob-mode/peak-hold/tooltips
     int getContentHeight() const;
+    // Window height (unscaled): the content, or more while Settings is open and
+    // would not fit under the header — the window grows rather than clip it.
+    int getWindowHeight() const;
+    void setSettingsOpen(bool open);
+    // Contents' clicks (a nested mouse listener): one outside Settings closes it.
+    void mouseDown(const juce::MouseEvent&) override;
     void applyShapeMask();
     void setWindowBackground();
     void disableCompositorEffects();
@@ -114,7 +120,11 @@ private:
     bool advPanelOpen = false;
     float advPanelAnimH = 0.0f;
 
-    // Settings overlay
+    // Settings overlay, centred over a dimmed backdrop (a click on it closes Settings)
+    struct Scrim : juce::Component {
+        void paint(juce::Graphics& g) override { g.fillAll(juce::Colours::black.withAlpha(0.45f)); }
+    };
+    Scrim settingsScrim;
     sr::SettingsPanel settingsPanel;
 
     // Tooltips (created when enabled in settings; null = tooltips off)
@@ -142,6 +152,16 @@ private:
     static constexpr int kFooterH   = 30;
     // 3 section bars: EFFECTS, IR LOADER, ADVANCED
     static constexpr int kBaseH     = kHeaderH + kTunerH + kBodyH + kSectionH * 3 + kFooterH;
+    // Settings overlay: centred below the header, in content coordinates.
+    static constexpr int kSettingsInset  = 4;   // gap under the header
+    static constexpr int kSettingsMargin = 8;   // gap to the window's right and bottom edges
+    // The plugin's panel fits the smallest window (every section closed) at any
+    // UI scale, since the panel scales with the content; only the standalone's
+    // extra AUDIO INPUT section makes the window grow while it is open.
+    static_assert(kHeaderH + kSettingsInset + sr::SettingsPanel::panelH + kSettingsMargin <= kBaseH,
+                  "Settings no longer fits the collapsed window");
+    static_assert(sr::SettingsPanel::panelW + 2 * kSettingsMargin <= kWindowW,
+                  "Settings is wider than the window");
 
     float currentScale = 1.0f;
     bool compositorBypassed = false;

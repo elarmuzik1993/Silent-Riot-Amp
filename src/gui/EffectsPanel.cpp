@@ -125,7 +125,7 @@ void EffectsPanel::paint(juce::Graphics& g)
 
             // Centred on the toggle row, so the title and the jewels share a line
             g.setColour(Colours::accent);
-            g.setFont(Fonts::spaceMono(Fonts::Sizes::title, true));
+            g.setFont(Fonts::ui(Fonts::Sizes::title, true));
             g.drawText(titles[idx],
                        card.reduced(12, kCardPadY).removeFromTop(kToggleH),
                        juce::Justification::centredLeft, false);
