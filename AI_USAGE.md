@@ -63,6 +63,12 @@ Individual commits and pull requests do not carry AI attribution lines. That is 
 choice to keep the history clean and readable, not to hide anything: AI assistance is part of
 how the whole project is built, and this document discloses it once, for all of it.
 
+**The author's development system.** Silent Riot was built with a workflow the author
+designed for directing AI across machines and sessions, local and cloud. Project rules and
+decisions live in [`AGENTS.md`](AGENTS.md) and [`CLAUDE.md`](CLAUDE.md), a hand-off note
+([`.agents/STATE.md`](.agents/STATE.md)) lets every session resume from the repository alone,
+and the wider project context is kept in an Obsidian vault.
+
 ## 3. Human Authored Content / Substantial Human Input
 
 The author, Boris Miscenco, art-directed the whole project. In practice that meant:
