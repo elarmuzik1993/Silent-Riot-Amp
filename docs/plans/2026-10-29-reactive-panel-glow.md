@@ -101,11 +101,11 @@ Decides whether hue has a carrier. Nothing else starts until this is answered.
   any test target, so no `tests/CMakeLists.txt` entry.
 
 **Steps:**
-- [ ] Drive `ProcessorHarness` through a grid: gain {2, 5, 8, 10} × volume {3, 6, 10}, each with a
+- [x] Drive `ProcessorHarness` through a grid: gain {2, 5, 8, 10} × volume {3, 6, 10}, each with a
       nominal DI (−18 dBFS sine at 110 Hz) and a hot one (0.5 peak), 15W and 7W.
-- [ ] For each cell record min / mean / max of `sagOffsetForGUI` over a 2 s run, and the implied
+- [x] For each cell record min / mean / max of `sagOffsetForGUI` over a 2 s run, and the implied
       `sagPercent` (`biasOffset / 0.01`).
-- [ ] Report the **travel**: how much of the range between 0 and `SAG_BIAS_CLAMP_COLD_N` (−0.01,
+- [x] Report the **travel**: how much of the range between 0 and `SAG_BIAS_CLAMP_COLD_N` (−0.01,
       i.e. −3 V) sag actually uses, and whether it ever sits positive (the warm clamp).
 
 **Decision gate** — the question is not what fraction of the clamp sag uses, it is whether the
@@ -121,6 +121,98 @@ and ask:
   thing (the amp giving), and it needs no new DSP. Record the switch in this file.
 
 **Verification:** numbers written into this task, and the carrier named, before Task 2 begins.
+
+#### Result (2026-10-30)
+
+Probe: `docs/records/handoffs/handoff-sag-travel-probe.cpp` (real `processBlock` via
+`ProcessorHarness`, 44.1 kHz, 512-sample blocks, 4x, built-in cab, effects off; atomics read after
+every host block; statistics skip the first 0.5 s of each 2 s cell for parameter smoothing and
+onset). Re-run instructions are in its header. `sagPercent` below is `biasOffset / -0.01 * 100`,
+so **negative means warm** (positive offset).
+
+**Sag never leaves the warm side.** Idle sits at **+0.00258** (15W, +0.77 V, -25.8 %) and
+**+0.00342** (7W, +1.03 V, -34.2 %), independent of the knobs. Under play it only relaxes back
+toward 0; nothing in the grid, the sweep or the plucks ever reaches 0, let alone the cold clamp.
+
+| Grid cell (sag mean, 2 s sine) | 15W DI | 15W hot | 7W DI | 7W hot |
+|---|---|---|---|---|
+| gain 2, vol 3 | +0.002578 | +0.002571 | +0.003420 | +0.003416 |
+| gain 5, vol 6 | +0.002476 | +0.002480 | +0.003335 | +0.003327 |
+| gain 8, vol 6 | +0.002424 | +0.002259 | +0.003297 | +0.003151 |
+| gain 8, vol 10 | +0.002129 | +0.001641 | +0.003057 | +0.002673 |
+| gain 10, vol 10 | +0.001246 | +0.001359 | +0.002384 | +0.002508 |
+| **min seen in any cell** | **+0.001141** | | **+0.002280** | |
+
+| Soft vs hard (15W, 110 Hz sine) | -30 dBFS RMS | -6 dBFS RMS | sag travel | hue, rescaled to cranked span |
+|---|---|---|---|---|
+| gain 6, vol 5 (defaults) | -25.5 % | -24.8 % | 0.7 pt (2 mV) | ~1 deg |
+| gain 5, vol 6 | -25.6 % | -25.0 % | 0.6 pt | ~1 deg |
+| gain 8, vol 6 | -24.2 % | -22.2 % | 2.0 pt | ~3 deg |
+| gain 10, vol 10 | -20.3 % | -11.5 % | 8.8 pt | ~13 deg |
+| Pluck (tau 0.35 s), deepest point, -24 vs -6 dBFS peak: defaults | -25.4 % | -24.4 % | 1.0 pt | ~1.5 deg |
+| same, gain 10 / vol 10 | -18.8 % | -9.5 % | 9.3 pt | ~14 deg |
+
+- **Travel:** the largest excursion measured is **0.0016** (idle +0.00258 to +0.00099 on a hard
+  pluck at gain 10 / vol 10), **16 %** of the 0..cold-clamp distance, and all of it on the warm
+  side. The warm clamp (+0.005) is never reached either.
+- **Hue span:** under the plan's linear map (`-biasOffset / 0.01`, clamped at 0) every reading is
+  0, so **0 deg** everywhere. Rescaled so the cranked span fills the 24 deg ramp, soft vs hard at
+  normal settings moves **1-3 deg**, and the sweep is not even monotonic (at defaults -18 dBFS
+  sags deeper than -6). The 15W/7W idle offset (8.4 pt) is larger than any normal-setting playing
+  difference, so a rescaled hue would mostly show the 7W switch.
+
+**Carrier: compression** (the gate's fallback; the switch is recorded here as the gate requires).
+Sag is a dead carrier at normal settings: 2 mV of travel between a soft and a hard phrase, below
+the noise of the sweep's own non-monotonicity, and only usable at full crank. This is B2 (sag idles
+warm) seen from the GUI side; `VOLUME_KNOB_HEADROOM` keeps the EL84 grids out of conduction, so the
+average plate current, and with it sag, barely moves. Compression, by contrast, separates soft and
+hard playing by 11-21 dB at every setting measured, from the same two atomics the editor already
+reads (`inputLevelForGUI`, `outputLevelForGUI`; both block RMS of channel 0, post-trim; note the
+input meter sits **before** the gate/BOOST, so BOOST reads as extra gain, and delay/reverb tails add
+output). Hue therefore runs off `heat` from compression, not from `sagOffsetForGUI`.
+
+Compression in dB, `20*log10(cleanRatio / ratio)`, `ratio = outRms / inRms`, clean = the -36 dBFS
+reading:
+
+| out/in RMS, 15W | -36 | -30 | -24 | -18 | -12 | -6 dBFS RMS |
+|---|---|---|---|---|---|---|
+| gain 6, vol 5 | 0.569 | 0.575 | 0.583 | 0.515 | 0.159 | 0.144 |
+| compression dB | 0.0 | -0.1 | -0.2 | 0.9 | 11.1 | 11.9 |
+| gain 5, vol 6 | 0.455 | 0.460 | 0.467 | 0.477 | 0.388 | 0.127 |
+| compression dB | 0.0 | -0.1 | -0.2 | -0.4 | 1.4 | 11.1 |
+| gain 8, vol 6 | 3.551 | 3.068 | 0.970 | 0.902 | 0.737 | 0.461 |
+| compression dB | 0.0 | 1.3 | 11.3 | 11.9 | 13.7 | 17.7 |
+| gain 10, vol 10 | 14.39 | 12.41 | 8.70 | 5.22 | 2.53 | 1.24 |
+| compression dB | 0.0 | 1.3 | 4.4 | 8.8 | 15.1 | 21.3 |
+
+**Clean ratio** (out/in at -48 dBFS RMS, 15W; 7W is 5-8 % lower throughout). It spans five
+decades and is ~0 at gain 0 or volume 0, so it cannot be a constant:
+
+| gain \ vol | 2 | 4 | 6 | 8 | 10 |
+|---|---|---|---|---|---|
+| 2 | 0.0075 | 0.0299 | 0.0673 | 0.1197 | 0.1871 |
+| 4 | 0.0292 | 0.1169 | 0.2632 | 0.4688 | 0.7337 |
+| 6 | 0.0886 | 0.3549 | 0.8010 | 1.4291 | 2.2433 |
+| 8 | 0.3709 | 1.4926 | 3.3866 | 6.0953 | 9.6805 |
+| 10 | 1.8229 | 7.5650 | 17.75 | 32.93 | 54.07 |
+
+The full grid (min/mean/max sag and in/out RMS for all 48 cells, 7W included) is what the probe
+prints; the cells above are a subset.
+
+**Normalisation for Task 2** (the pure function's contract; constants to name there):
+`ref` is a running clean ratio, the peak-hold of `ratio` over frames with `inRms >= dB(-50)`,
+released at 0.5 dB/s and re-learnt (reset) whenever GAIN, VOLUME, 7W, OUTPUT trim, CAB mode or an
+effect's ON changes; it may be seeded from the table above (bilinear in dB) so a hard first phrase
+does not read clean. Then `compDb = 20*log10(ref / ratio)` and
+`heat = jlimit(0, 1, (compDb - 1 dB) / 11 dB)`: the 1 dB knee absorbs the +-1 dB wobble of clean
+play, and full heat at 12 dB is where a hard phrase lands at default knobs. Below the input gate,
+heat targets 0. Compression is lumpy (at defaults it jumps 10 dB between -18 and -12 dBFS), so
+`heat` goes through the glow's own slow envelope before it reaches the hue.
+
+Side observation, not in scope: at defaults the output RMS *falls* as the input rises from -18 to
+-12 dBFS (0.065 to 0.040), and at gain 8 / vol 6 the ratio drops 10 dB between -30 and -24 dBFS.
+Both look like the PI grid-charge rail (CLAUDE.md, `GRID_CHARGE_RATE`) engaging; worth a look when
+the tone lock is next opened, not here.
 
 ---
 

@@ -17,7 +17,6 @@ ROADMAP.md .github/FUNDING.yml
 docs/plans/2026-10-28-open-source-docs-prep.md .github/FUNDING.yml
 docs/plans/2026-10-28-open-source-docs-prep.md architecture.md
 docs/plans/2026-10-28-open-source-docs-prep.md building.md
-docs/plans/2026-10-29-reactive-panel-glow.md docs/records/handoffs/handoff-sag-travel-probe.cpp
 docs/plans/2026-10-29-reactive-panel-glow.md tests/glow_colour_tests.cpp
 docs/plans/2026-10-29-reactive-panel-glow.md tests/gui_faceplate_glow_tests.cpp
 
