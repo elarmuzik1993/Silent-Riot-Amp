@@ -308,20 +308,30 @@ plate-cache tests, one sampled pixel each, no reference image):
 
 **Files:**
 - Modify: `src/PluginEditor.cpp` (timer callback; `faceplate.setPowered` already lives there)
+- Modify (as built): `src/PluginEditor.h` (the follower member, `runTimerFrameForTest()`), and
+  `src/gui/AmpFaceplate.{h,cpp}` for `GlowDriveFollower`, the per-frame easing pulled out of the
+  editor so it is testable without a window. It lives beside `glowBeadColour()` rather than in a new
+  header, so the "no new file under `src/`" constraint holds.
 - Test: `tests/gui_faceplate_glow_tests.cpp`
 
 **Steps:**
-- [ ] In the 30 Hz timer, beside the existing `vuIn` / `vuOut` updates, read `outputPeakForGUI`
-      and the sag carrier chosen in Task 0.
-- [ ] Ease for display: jump straight to a rising peak (the audio-side decay already provides
+- [x] In the 30 Hz timer, beside the existing `vuIn` / `vuOut` updates, read `outputPeakForGUI`
+      and the hue carrier chosen in Task 0 — **compression**, not sag: `inputLevelForGUI` and
+      `outputLevelForGUI` through Task 0's `heat` formula, the reference re-learnt when
+      `glowParamsSignature()` (GAIN, VOLUME, OUTPUT trim, 7W, CAB, IR_INDEX, BOOST/DELAY/REVERB on,
+      gate/width engaged) changes. No seeding from the clean-ratio table: the first phrase after a
+      change reads clean.
+- [x] Ease for display: jump straight to a rising peak (the audio-side decay already provides
       release), and one-pole the hue so it drifts rather than flickers. Frame-rate independent,
-      since the timer is nominal 30 Hz and hosts do stall it.
-- [ ] Power off → `setDrive(0, 0)`, matching the branch that already zeroes the VU meters.
+      since the timer is nominal 30 Hz and hosts do stall it. *As built:* level is the peak mapped
+      −48…−6 dBFS with no display smoothing at all; heat eases 150 ms up / 600 ms down on the
+      measured frame length, clamped at 0.1 s.
+- [x] Power off → `setDrive(0, 0)`, matching the branch that already zeroes the VU meters.
 
 **Verification:**
-- [ ] Driving a `ProcessorHarness` with a loud block and ticking the editor timer raises the
+- [x] Driving a `ProcessorHarness` with a loud block and ticking the editor timer raises the
       faceplate's drive; silence lets it fall back.
-- [ ] Power off zeroes it on the first tick.
+- [x] Power off zeroes it on the first tick.
 
 ---
 

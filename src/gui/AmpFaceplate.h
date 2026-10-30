@@ -2,6 +2,7 @@
 // Copyright (C) 2026 Boris Miscenco
 #pragma once
 #include <juce_gui_basics/juce_gui_basics.h>
+#include <cstdint>
 
 namespace sr {
 
@@ -42,6 +43,62 @@ bool glowUsesHalo();
 // transparent at every heat) to kGlowAlphaMaxHalo or kGlowAlphaMaxBead,
 // depending on glowUsesHalo().
 juce::Colour glowBeadColour(float level, float heat);
+
+// ── Glow drive follower ──
+// Turns the processor's meter atomics into the faceplate's (level, heat), once
+// per editor timer frame. Kept out of the editor so the easing is testable
+// without a window (tests/gui_faceplate_glow_tests.cpp). Every time constant is
+// applied through the frame's real dt, so the result does not depend on the
+// timer's rate, and a stalled frame is clamped to kGlowMaxFrameSeconds.
+
+// Level: outputPeakForGUI in dBFS, mapped linearly onto 0..1 between these.
+// Silence and the idle noise floor sit under the floor; a nominal DI at the
+// default knobs peaks around -18 dBFS (~0.7) and a cranked amp (-14 LUFS)
+// near the ceiling. No display smoothing: the audio side's peak release
+// (METER_PEAK_RELEASE_MS) already gives the fall, so a rise shows at once.
+inline constexpr float kGlowLevelFloorDb = -48.0f;
+inline constexpr float kGlowLevelCeilDb  = -6.0f;
+
+// Heat is compression, not sag (plan Task 0's result: sag barely travels).
+// ratio = outRms / inRms, read only while the input is above this gate.
+inline constexpr float kGlowInputGateDb = -50.0f;
+// The clean reference: a peak-hold of ratio, released at this rate on gated
+// frames only (silence holds it), and re-learnt when the signature changes.
+inline constexpr float kGlowRefReleaseDbPerSec = 0.5f;
+// heat = (compDb - knee) / span, clamped: the knee absorbs clean play's
+// +-1 dB wobble; full heat at 12 dB is a hard phrase at the default knobs.
+inline constexpr float kGlowHeatKneeDb = 1.0f;
+inline constexpr float kGlowHeatSpanDb = 11.0f;
+// Heat's own envelope: compression jumps (10 dB between two input steps at
+// the default knobs), so the hue warms in ~150 ms and cools over ~600 ms.
+inline constexpr float kGlowHeatAttackSec  = 0.15f;
+inline constexpr float kGlowHeatReleaseSec = 0.6f;
+// A host that stalls the timer delivers one long frame; treat it as this.
+inline constexpr double kGlowMaxFrameSeconds = 0.1;
+
+class GlowDriveFollower {
+public:
+    struct Drive { float level, heat; };
+
+    // One frame. outPeak, inRms, outRms are the processor's linear meter
+    // values (non-finite or negative reads as 0). paramsSignature names the
+    // settings the clean ratio depends on (the editor hashes GAIN, VOLUME,
+    // 7W, OUTPUT trim, CAB, IR_INDEX and every effect's on/off); any change
+    // forgets the reference, so the next playing reads clean.
+    Drive update(float outPeak, float inRms, float outRms, double dtSeconds,
+                 uint32_t paramsSignature);
+
+    // Power off: dark, cool, and the reference forgotten.
+    void reset();
+
+    float getReference() const noexcept { return ref; }   // 0 = not learnt yet
+
+private:
+    float ref = 0.0f;
+    float heat = 0.0f;
+    uint32_t signature = 0;
+    bool haveSignature = false;
+};
 
 // The amp head's front panel, painted behind the GAIN/SHAPE/VOLUME row:
 // raised panel, grille-cloth weave, piping, corner screws and a jewel pilot

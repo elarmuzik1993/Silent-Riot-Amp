@@ -6,6 +6,9 @@
 #include "StandaloneDevice.h"
 #include "utils/Parameters.h"
 
+#include <cmath>
+#include <cstdint>
+
 #if JUCE_LINUX
 #include <X11/Xlib.h>
 #include <X11/Xatom.h>
@@ -563,6 +566,59 @@ void SilentRiotEditor::disableCompositorEffects()
 #endif
 }
 
+void SilentRiotEditor::runTimerFrameForTest(double dtSeconds)
+{
+    glowDtOverride = dtSeconds;
+    timerCallback();
+    glowDtOverride = -1.0;
+}
+
+uint32_t SilentRiotEditor::glowParamsSignature() const
+{
+    // FNV-1a over the settings the out/in ratio depends on, quantised so
+    // float noise on an untouched knob is not a change. Turning one of these
+    // re-learns the clean ratio on every frame of the turn, so the glow reads
+    // clean while a knob moves; it warms again once playing compresses.
+    namespace IDs = sr::Params::IDs;
+    const auto raw = [this](const juce::String& id) {
+        const float v = proc.apvts.getRawParameterValue(id)->load();
+        return std::isfinite(v) ? v : 0.0f;
+    };
+    const auto knob = [](float v) { return static_cast<int32_t>(std::lround(v * 200.0f)); };
+    const auto onOff = [](float v) { return static_cast<int32_t>(v > 0.5f); };
+    const auto engaged = [](float v) { return static_cast<int32_t>(v > 0.0f); };
+    const int32_t fields[] = {
+        knob(raw(IDs::GAIN)), knob(raw(IDs::VOLUME)), knob(raw(IDs::OUTPUT_LEVEL)),
+        onOff(raw(IDs::HALF_POWER)), onOff(raw(IDs::CAB_SIM)),
+        static_cast<int32_t>(std::lround(raw(IDs::IR_INDEX))),
+        onOff(raw(IDs::BOOST_ON)), onOff(raw(IDs::DELAY_ON)), onOff(raw(IDs::REVERB_ON)),
+        engaged(raw(IDs::GATE_THRESHOLD)), engaged(raw(IDs::WIDTH)),   // self-gating at 0
+    };
+    uint32_t h = 2166136261u;
+    for (int32_t f : fields)
+        for (int b = 0; b < 4; ++b)
+        {
+            h ^= (static_cast<uint32_t>(f) >> (8 * b)) & 0xffu;
+            h *= 16777619u;
+        }
+    return h;
+}
+
+void SilentRiotEditor::updateFaceplateGlow(bool powerOn, double dtSeconds)
+{
+    if (!powerOn)
+    {
+        glowFollower.reset();
+        faceplate.setDrive(0.0f, 0.0f);
+        return;
+    }
+    const auto drive = glowFollower.update(proc.outputPeakForGUI.load(std::memory_order_relaxed),
+                                           proc.inputLevelForGUI.load(std::memory_order_relaxed),
+                                           proc.outputLevelForGUI.load(std::memory_order_relaxed),
+                                           dtSeconds, glowParamsSignature());
+    faceplate.setDrive(drive.level, drive.heat);
+}
+
 void SilentRiotEditor::timerCallback()
 {
     if (!compositorBypassed)
@@ -629,6 +685,16 @@ void SilentRiotEditor::timerCallback()
     {
         vuIn.setLevel(0.0f);
         vuOut.setLevel(0.0f);
+    }
+
+    // Faceplate glow, on the frame's real length (hosts stall the timer)
+    {
+        const double nowMs = juce::Time::getMillisecondCounterHiRes();
+        double dt = (lastGlowFrameMs > 0.0) ? (nowMs - lastGlowFrameMs) * 0.001 : 1.0 / 30.0;
+        if (glowDtOverride >= 0.0)
+            dt = glowDtOverride;
+        lastGlowFrameMs = nowMs;
+        updateFaceplateGlow(powerOn, dt);
     }
 
     // Live tuner — detects from captured DI input (works even with PWR off).

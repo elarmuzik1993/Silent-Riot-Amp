@@ -120,6 +120,7 @@ add_executable(SilentRiotProcessorTests
     gui_ir_loader_tests.cpp
     gui_input_selector_tests.cpp
     glow_colour_tests.cpp
+    gui_faceplate_glow_tests.cpp
     tone_lock_core_tests.cpp
     tone_lock_tests.cpp
 )

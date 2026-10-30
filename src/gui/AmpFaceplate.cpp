@@ -35,6 +35,8 @@ juce::Rectangle<float> pipingStrokeRect(juce::Rectangle<float> plate, float widt
     return plate.reduced(juce::jmax(0.0f, width * 0.5f - 0.5f));
 }
 
+float dbToGain(float db) { return std::pow(10.0f, db / 20.0f); }
+
 } // namespace
 
 bool glowUsesHalo()
@@ -59,6 +61,57 @@ juce::Colour glowBeadColour(float level, float heat)
 
     const float ceiling = glowUsesHalo() ? kGlowAlphaMaxHalo : kGlowAlphaMaxBead;
     return juce::Colour::fromHSV(hue, sat, bri, ceiling * lv);
+}
+
+GlowDriveFollower::Drive GlowDriveFollower::update(float outPeak, float inRms, float outRms,
+                                                   double dtSeconds, uint32_t paramsSignature)
+{
+    const auto clean = [](float v) { return std::isfinite(v) && v > 0.0f ? v : 0.0f; };
+    outPeak = clean(outPeak);
+    inRms = clean(inRms);
+    outRms = clean(outRms);
+    const float dt = std::isfinite(dtSeconds)
+        ? static_cast<float>(juce::jlimit(0.0, kGlowMaxFrameSeconds, dtSeconds)) : 0.0f;
+
+    if (!haveSignature || paramsSignature != signature)
+    {
+        signature = paramsSignature;
+        haveSignature = true;
+        ref = 0.0f;
+    }
+
+    float level = 0.0f;
+    if (outPeak > 0.0f)
+        level = sanitiseUnit((20.0f * std::log10(outPeak) - kGlowLevelFloorDb)
+                             / (kGlowLevelCeilDb - kGlowLevelFloorDb));
+
+    float target = 0.0f;
+    if (inRms >= dbToGain(kGlowInputGateDb))
+    {
+        const float ratio = outRms / inRms;
+        ref *= dbToGain(-kGlowRefReleaseDbPerSec * dt);
+        if (ratio > ref)
+            ref = ratio;
+        // A silent output under a live input (tuner mute, OUTPUT trim at 0)
+        // is not compression: there is nothing to glow, so it stays cool.
+        if (ratio > 0.0f && ref > 0.0f)
+        {
+            const float compDb = 20.0f * std::log10(ref / ratio);
+            target = sanitiseUnit((compDb - kGlowHeatKneeDb) / kGlowHeatSpanDb);
+        }
+    }
+
+    const float tau = target > heat ? kGlowHeatAttackSec : kGlowHeatReleaseSec;
+    heat += (target - heat) * (1.0f - std::exp(-dt / tau));
+    heat = sanitiseUnit(heat);
+    return { level, heat };
+}
+
+void GlowDriveFollower::reset()
+{
+    ref = 0.0f;
+    heat = 0.0f;
+    haveSignature = false;
 }
 
 AmpFaceplate::AmpFaceplate()

@@ -1,11 +1,11 @@
 # State
 
-_Updated 2026-10-30 (panel glow planned; tone lock measured on Linux/GCC)_
+_Updated 2026-10-30 (panel glow Tasks 0–4 built; tone lock measured on Linux/GCC)_
 
 ## Now
 - **Tone frozen at `tone-v1`** (059b209): `tests/tone_lock_tests.cpp` guards it (`docs/dev/tone-lock.md`).
 - Silent Riot v0.3.4 (JUCE 7 VST3/Standalone), GPL-3.0-or-later, free + optional donations. No tagged
-  release. `bash scripts/verify.sh`: static checks pass, **453/458 ctest on Linux/GCC** — the 5
+  release. `bash scripts/verify.sh`: static checks pass, **470/475 ctest on Linux/GCC** — the 5
   tone-lock cases fail on float noise, not tone (Known issues). The references were written on MSVC.
 - Docs are open-source ready (README, `docs/manual/`, `docs/dev/`, CONTRIBUTING/CoC/SECURITY, issue
   forms, CHANGELOG); `docs/README.md` indexes them. `dev/` + `manual/` track the code; `design/` +
@@ -23,18 +23,18 @@ _Updated 2026-10-30 (panel glow planned; tone lock measured on Linux/GCC)_
   interface with one input active, so Input 2 of a pair plays (the amp reads channel 0 only). Saved
   with the device setup, not presets; hidden in VST3. Owner confirmed Input 2 plays on a KA6
   (`docs/plans/2026-10-29-standalone-input-select.md`).
-- **Panel glow is planned, not built** (`docs/plans/2026-10-29-reactive-panel-glow.md`): the faceplate
-  piping bead lights with playing and the pilot lamp's bloom breathes, costing no window height.
-  Brightness from an envelope on output level, hue from sag. GUI-only but for one read-only block
-  peak in `processBlock`; the plan sets out why no task in it can reach the sound.
+- **Panel glow built, Task 5 (record + hand-off) left** (`docs/plans/2026-10-29-reactive-panel-glow.md`):
+  the faceplate piping bead lights with playing and the pilot lamp's bloom breathes, costing no window
+  height. Level from the output block peak (`outputPeakForGUI`); hue from **compression**, not sag
+  (Task 0: sag barely travels) — `GlowDriveFollower` (`src/gui/AmpFaceplate.h`) on the editor timer.
+  GUI-only but for one read-only block peak in `processBlock`.
 - Contributor issues #37–#48 are open (GUI bugs, IR loader, installers, README screenshot).
 - Commit as `Boris Miscenco <219343213+elarmuzik1993@users.noreply.github.com>`: export
   `GIT_AUTHOR_EMAIL`/`GIT_COMMITTER_EMAIL`; the cloud env's values beat `git -c`. Public contact
   email (docs only, never commits): borismishchenkodev@gmail.com.
 
 ## Next
-1. Panel glow Task 0: measure sag travel and pick the hue carrier before any paint code. B2 may
-   leave hue dead; the plan names the fallback (hue from compression, using existing atomics).
+1. Panel glow Task 5: full `verify.sh`, plans index, CHANGELOG, final STATE rewrite.
 2. Owner: the tone lock's Linux/GCC divergence — a noise-floor gate (skip bands under ~−80 dB), or a
    looser per-band tolerance? It blocks CI going green once the repo is public.
 3. With owner OK: tag the tone-lock merge commit `tone-v1` and push the tag (`docs/dev/tone-lock.md`).
@@ -64,7 +64,7 @@ _Updated 2026-10-30 (panel glow planned; tone lock measured on Linux/GCC)_
 - Latency is an exact integer, constant across cab modes.
 
 ## Known issues
-- **Tone lock fails 5/458 on Linux/GCC** (cases 394–398): worst band deltas 0.48 dB
+- **Tone lock fails 5/475 on Linux/GCC** (cases 394–398): worst band deltas 0.48 dB
   (`preset-3-full-drive`, a band at −99 dB) and 1.01 dB (`preset-5-heavy-sag`, −96 dB) against a
   0.1 dB per-band tolerance, while RMS agrees to 3.8e−05 dB. Float noise in numerically silent bands,
   not a tone change — 43 of 45 assertions pass in that case.
