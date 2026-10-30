@@ -16,6 +16,7 @@ constexpr float kPlateRadius = 6.0f;      // the faceplate's corner radius (and 
 constexpr float kDriveEpsilon = 0.004f;   // ~1/255: smaller moves are not visible
 constexpr float kLampBloomBase = 3.2f;    // paintLamp's default bloom
 constexpr float kLampBloomGain = 0.35f;   // full drive widens the bloom by 35%
+constexpr float kLampRadius = 8.0f;       // the pilot lamp's lens radius
 
 float sanitiseUnit(float v)
 {
@@ -146,7 +147,27 @@ void AmpFaceplate::setDrive(float level, float heat)
     driveLevel = lv;
     driveHeat = ht;
     if (powered)
-        repaint();
+        repaintGlow();
+}
+
+void AmpFaceplate::repaintGlow()
+{
+    // Only the piping strip and the lamp's bloom change with drive. A whole-
+    // component repaint would also repaint the knobs and toggles laid over the
+    // plate on every 30 Hz frame; these regions stay clear of them.
+    float glowWidth = kGlowBeadWidth;
+    for (const auto& s : kGlowHaloStrokes)
+        glowWidth = juce::jmax(glowWidth, s.width);
+    const int strip = static_cast<int>(std::ceil(glowWidth)) + 2;   // + inset + antialiasing
+    const auto b = getLocalBounds();
+    repaint(b.withHeight(strip));
+    repaint(b.withTop(b.getBottom() - strip));
+    repaint(b.withWidth(strip));
+    repaint(b.withLeft(b.getRight() - strip));
+
+    const float bloomR = kLampRadius * kLampBloomBase * (1.0f + kLampBloomGain) + 2.0f;
+    repaint(juce::Rectangle<float>(lampCentre.x - bloomR, lampCentre.y - bloomR,
+                                   bloomR * 2.0f, bloomR * 2.0f).getSmallestIntegerContainer());
 }
 
 static void drawScrew(juce::Graphics& g, float cx, float cy)
@@ -262,7 +283,7 @@ void AmpFaceplate::paintLamp(juce::Graphics& g, juce::Point<float> c, float r,
     // Caustic: light leaving the lower right of the dome, with a brighter meniscus line
     const juce::Colour caustic = lighten(colour, 0.75f), meniscus = lighten(colour, 0.9f);
     fillLune(0.93f, -0.12f, -0.2f, 0.93f, linear(-0.2f, -0.2f, caustic.withAlpha(0.0f),
-                                                 0.65f, 0.65f, caustic.withAlpha(mixf(0.3f, 0.9f) * 1.15f)));
+                                                 0.65f, 0.65f, caustic.withAlpha(juce::jmin(1.0f, mixf(0.3f, 0.9f) * 1.15f))));
     fillLune(0.95f, -0.05f, -0.08f, 0.95f, linear(-0.2f, -0.2f, meniscus.withAlpha(0.0f),
                                                   0.65f, 0.65f, meniscus.withAlpha(mixf(0.22f, 0.7f) * 1.15f)));
 
@@ -388,7 +409,7 @@ void AmpFaceplate::paint(juce::Graphics& g)
 
     // ── Glass pilot lamp, placed by the editor in the knob row ──
     // Lit means powered, so brightness stays binary; playing only widens the bloom.
-    const float midY = lampCentre.y, lx = lampCentre.x, r = 8.0f;
+    const float midY = lampCentre.y, lx = lampCentre.x, r = kLampRadius;
     paintLamp(g, { lx, midY }, r, Colours::red, powered ? 1.0f : 0.0f,
               kLampBloomBase * (1.0f + kLampBloomGain * level));
 

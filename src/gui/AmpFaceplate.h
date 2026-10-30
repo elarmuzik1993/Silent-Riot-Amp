@@ -117,7 +117,9 @@ public:
 
     // Output level and compression heat, 0..1 each (sanitised). Repaints only
     // when either moves by more than a small step, or to/from exactly 0, so a
-    // silent amp stays idle. Ignored for painting while unpowered.
+    // silent amp stays idle, and then only the piping strip and the lamp's
+    // bloom, so the knobs over the plate are not repainted with it. Ignored
+    // for painting while unpowered.
     void setDrive(float level, float heat);
     float getDriveLevel() const noexcept { return driveLevel; }
     float getDriveHeat() const noexcept { return driveHeat; }
@@ -140,6 +142,7 @@ public:
 
 private:
     void renderPlateCache(float scale);
+    void repaintGlow();   // the regions setDrive() changes: piping strip + lamp bloom
 
     bool powered = true;
     juce::Point<float> lampCentre;
