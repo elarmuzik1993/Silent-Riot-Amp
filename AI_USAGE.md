@@ -125,5 +125,6 @@ The author has taken these steps to keep the project clean:
 - third-party libraries and fonts are listed in [`CREDITS.md`](CREDITS.md) with their licences.
 
 If you believe any part of Silent Riot copies material you hold rights in, open an issue or
-contact the author through the repository, with the file and the source it matches. It will
+email the author at [borismishchenkodev@gmail.com](mailto:borismishchenkodev@gmail.com),
+with the file and the source it matches. It will
 be looked at promptly and removed or rewritten if the claim holds.

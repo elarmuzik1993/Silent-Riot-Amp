@@ -10,7 +10,8 @@ Silent Riot is pre-1.0. Security fixes go into `main` and ship in the next relea
 Please **do not open a public issue** for a security problem.
 
 Report it privately through GitHub's private vulnerability reporting: open the repository's
-**Security** tab and choose **Report a vulnerability**. Include:
+**Security** tab and choose **Report a vulnerability**. If you can't use that, email
+[borismishchenkodev@gmail.com](mailto:borismishchenkodev@gmail.com). Include:
 
 - the plugin version (Settings → About) and your OS, host and plugin format;
 - what happens, and the file or steps that trigger it;
