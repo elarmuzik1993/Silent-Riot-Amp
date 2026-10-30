@@ -33,8 +33,8 @@ SettingsPanel::SettingsPanel()
         t->setShowLabel(false);
     }
 
-    peakHoldToggle.getButton().setToggleState(true, juce::dontSendNotification);
-    tooltipsToggle.getButton().setToggleState(true, juce::dontSendNotification);
+    peakHoldToggle.setOnSilently(true);
+    tooltipsToggle.setOnSilently(true);
 
     themeSelector.setTitleText("Theme");
     ballisticsSelector.setTitleText("Meter ballistics");
@@ -83,8 +83,8 @@ void SettingsPanel::syncControls()
     ballisticsSelector.setSelectedIndex(meterBallistics);
     knobModeSelector.setSelectedIndex(knobMode);
     scaleSelector.setSelectedIndex(uiScale);
-    peakHoldToggle.getButton().setToggleState(peakHold, juce::dontSendNotification);
-    tooltipsToggle.getButton().setToggleState(tooltipsEnabled, juce::dontSendNotification);
+    peakHoldToggle.setOnSilently(peakHold);
+    tooltipsToggle.setOnSilently(tooltipsEnabled);
 }
 
 bool SettingsPanel::keyPressed(const juce::KeyPress& key)

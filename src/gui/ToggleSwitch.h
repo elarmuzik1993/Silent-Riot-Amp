@@ -19,6 +19,11 @@ public:
 
     void toggle();  // flip state with notification
 
+    // Set the state without onClick (a restore, not a user edit) and still
+    // animate to it: a dontSendNotification setToggleState() on the button
+    // sends no state message either, so the lever/lamp would stay stale.
+    void setOnSilently(bool on);
+
     // How the state is drawn under the label.
     //   Switch — a satin-black bat toggle through a hex nut on a glass ring that
     //            lights in activeColor; lever up is on. The amp row uses this.

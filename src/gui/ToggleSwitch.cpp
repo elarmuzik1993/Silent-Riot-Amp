@@ -27,6 +27,12 @@ void ToggleSwitch::toggle()
     button.setToggleState(!button.getToggleState(), juce::sendNotification);
 }
 
+void ToggleSwitch::setOnSilently(bool on)
+{
+    button.setToggleState(on, juce::dontSendNotification);
+    startTimerHz(60);
+}
+
 void ToggleSwitch::mouseDown(const juce::MouseEvent&)
 {
     toggle();

@@ -136,3 +136,14 @@ TEST_CASE("SettingsPanel: close button and Escape both close it", "[settings]")
     CHECK_FALSE(panel.keyPressed(juce::KeyPress('a')));
     CHECK(closes == 2);
 }
+
+TEST_CASE("SettingsPanel: restoring state reports no change", "[settings]")
+{
+    sr::SettingsPanel panel;
+    int changes = 0;
+    panel.onSettingsChanged = [&] { ++changes; };
+    panel.peakHold = false;
+    panel.tooltipsEnabled = false;
+    panel.syncControls();
+    CHECK(changes == 0);   // a restore is not a user edit
+}
