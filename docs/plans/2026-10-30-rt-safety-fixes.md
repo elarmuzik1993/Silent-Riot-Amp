@@ -25,7 +25,10 @@ on that baseline, not estimated.
 | RT-4 | Data race on the tuner ring buffer | LOW | 4 |
 | RT-6 | 8× does not fit in one core above 48 kHz | INFO | 5 (docs only) |
 
-**Status:** the three owner decisions below are settled (2026-10-30), so Task 1 can start.
+**Status:** done (2026-10-30, PR #57). Tasks 1–5 are in, one commit each (Task 3 with a
+review follow-up for off-thread restore and prepare); RT-1…RT-5 are fixed and RT-6 is
+documented in the manual. Task 6 stays deferred by D3. The three owner decisions below were
+settled before Task 1 started.
 
 **Order:** 1 first — it is the only finding a player can hit by accident, and it is the
 smallest change. Then 2 (a crash, independent of everything). Then 3, the only task that

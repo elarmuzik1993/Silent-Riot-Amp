@@ -64,6 +64,13 @@ tagged release will collect everything below.
 
 ### Fixed
 
+- A single NaN or infinite input sample (from a misbehaving plugin upstream, say) no longer
+  silences the amp for the rest of the session; bad samples are replaced with silence on
+  the way in, in bypass too. [#57]
+- A host that sends a larger audio block than it announced no longer crashes the plugin. [#57]
+- Changing the oversampling factor or automating the cab IR no longer calls the host or
+  the message queue from the audio thread, which could cause dropouts. [#57]
+- The tuner no longer reads audio while it is being written. [#57]
 - Standalone: the second input of an interface (Input 2 on a Komplete Audio 6, for example)
   can now play through the amp. The audio dialog offers inputs only in pairs and the amp
   hears the first of the pair, so Input 2 was silent. Settings (gear) now has an **INPUT**

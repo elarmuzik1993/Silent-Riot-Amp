@@ -16,6 +16,9 @@ Plus, on every run: the host must only ever receive finite samples inside ±1.
 
 Frozen record. Re-run it with the commands at the end.
 
+**Fixed in PR #57:** RT-1…RT-5, and RT-6 is documented in the manual — see
+[`../../plans/2026-10-30-rt-safety-fixes.md`](../../plans/2026-10-30-rt-safety-fixes.md).
+
 | | |
 |---|---|
 | Base commit | `e56ab9f` (tone frozen at `tone-v1`) |
