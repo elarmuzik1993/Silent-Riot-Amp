@@ -32,6 +32,11 @@ public:
 
     std::function<void()> onGearClick;
 
+    // Keeps the gear's rotation in step when Settings closes some other way
+    // (its close button, Escape, a click outside). No callback.
+    void setGearActive(bool active);
+    const juce::Component& getGearButton() const { return gearButton; }
+
 private:
     void timerCallback() override;
     void paintGearIcon(juce::Graphics& g, juce::Rectangle<float> area) const;

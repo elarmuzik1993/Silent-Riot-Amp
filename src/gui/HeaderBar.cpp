@@ -50,6 +50,14 @@ void HeaderBar::activateGear()
     if (onGearClick) onGearClick();
 }
 
+void HeaderBar::setGearActive(bool active)
+{
+    if (gearActive == active)
+        return;
+    gearActive = active;
+    startTimerHz(60);
+}
+
 void HeaderBar::timerCallback()
 {
     float target = gearActive ? 60.0f : 0.0f;

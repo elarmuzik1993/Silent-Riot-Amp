@@ -1,6 +1,6 @@
 # Settings panel layout fix — plan
 
-_2026-10-30. Status: proposed, awaiting owner OK on the open decisions._
+_2026-10-30. Status: approved with every recommendation (A two columns, B scales, C window grows, D jewels, E compact ABOUT); built on `docs/settings-panel-plan`._
 
 Goal: the Settings overlay (gear icon) should read clearly — every control fully drawn,
 labels readable, even spacing, no dead space — at every UI scale and in both the plugin

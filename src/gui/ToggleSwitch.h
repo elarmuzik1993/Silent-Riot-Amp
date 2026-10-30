@@ -30,6 +30,10 @@ public:
     enum class Style { Switch, Jewel };
     void setStyle(Style s);
 
+    // Jewel only: hide the painted label when the owner draws the row's label
+    // itself (SettingsPanel). The label stays the accessible title.
+    void setShowLabel(bool show) { showLabel = show; repaint(); }
+
     // Vertical room paint() needs: the label, the gap under it, and the state
     // graphic. JUCE clips paint() to the component's own bounds, so a
     // ToggleSwitch laid out shorter than this loses its lever/lamp *silently* —
@@ -55,6 +59,7 @@ private:
     juce::String label;
     juce::Colour activeColor;
     Style style = Style::Switch;
+    bool showLabel = true;
     float thumbPos = 0.0f; // 0=off, 1=on (animated)
 
     static constexpr float kLabelH   = 14.0f;

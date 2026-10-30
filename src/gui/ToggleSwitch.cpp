@@ -116,11 +116,14 @@ void ToggleSwitch::paintJewel(juce::Graphics& g, juce::Rectangle<float> bounds)
     // jewel toggles right-aligns on their lamps whatever the label length.
     const juce::Point<float> c(bounds.getRight() - kJewelGlowR, bounds.getCentreY());
 
-    g.setFont(Fonts::spaceMono(Fonts::Sizes::small, true));
-    g.setColour(Colours::label.interpolatedWith(Colours::bright, thumbPos));
-    g.drawText(label.toUpperCase(),
-               bounds.withRight(c.x - kJewelBezelR - kJewelLabelGap),
-               juce::Justification::centredRight, false);
+    if (showLabel)
+    {
+        g.setFont(Fonts::spaceMono(Fonts::Sizes::small, true));
+        g.setColour(Colours::label.interpolatedWith(Colours::bright, thumbPos));
+        g.drawText(label.toUpperCase(),
+                   bounds.withRight(c.x - kJewelBezelR - kJewelLabelGap),
+                   juce::Justification::centredRight, false);
+    }
 
     AmpFaceplate::paintLamp(g, c, kJewelR, activeColor, thumbPos, kJewelGlowR / kJewelR);
 
