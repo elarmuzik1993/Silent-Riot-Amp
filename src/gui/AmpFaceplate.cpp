@@ -10,6 +10,57 @@
 
 namespace sr {
 
+namespace {
+
+constexpr float kPlateRadius = 6.0f;      // the faceplate's corner radius (and its piping's)
+constexpr float kDriveEpsilon = 0.004f;   // ~1/255: smaller moves are not visible
+constexpr float kLampBloomBase = 3.2f;    // paintLamp's default bloom
+constexpr float kLampBloomGain = 0.35f;   // full drive widens the bloom by 35%
+
+float sanitiseUnit(float v)
+{
+    return std::isfinite(v) ? juce::jlimit(0.0f, 1.0f, v) : 0.0f;
+}
+
+// The plate's outline in local coordinates; the piping is stroked on it.
+juce::Rectangle<float> plateBounds(const juce::Component& c)
+{
+    return c.getLocalBounds().toFloat().reduced(0.5f);
+}
+
+// The piping path inset so a stroke of `width` stays inside the component:
+// JUCE clips paint() to the bounds, so the glow spills inward onto the plate.
+juce::Rectangle<float> pipingStrokeRect(juce::Rectangle<float> plate, float width)
+{
+    return plate.reduced(juce::jmax(0.0f, width * 0.5f - 0.5f));
+}
+
+} // namespace
+
+bool glowUsesHalo()
+{
+    return Colours::panel.getPerceivedBrightness() <= 0.5f;
+}
+
+juce::Colour glowBeadColour(float level, float heat)
+{
+    const float lv = sanitiseUnit(level), ht = sanitiseUnit(heat);
+
+    // Hue along the shorter arc from accent to red, so the ramp never swings
+    // through green or blue whatever the palette holds.
+    const juce::Colour from = Colours::accent, to = Colours::red;
+    float dh = to.getHue() - from.getHue();
+    if (dh > 0.5f)  dh -= 1.0f;
+    if (dh < -0.5f) dh += 1.0f;
+    float hue = from.getHue() + dh * ht;
+    hue -= std::floor(hue);
+    const float sat = from.getSaturation() + (to.getSaturation() - from.getSaturation()) * ht;
+    const float bri = from.getBrightness() + (to.getBrightness() - from.getBrightness()) * ht;
+
+    const float ceiling = glowUsesHalo() ? kGlowAlphaMaxHalo : kGlowAlphaMaxBead;
+    return juce::Colour::fromHSV(hue, sat, bri, ceiling * lv);
+}
+
 AmpFaceplate::AmpFaceplate()
 {
     setInterceptsMouseClicks(false, false);
@@ -29,6 +80,20 @@ void AmpFaceplate::setPowered(bool on)
         return;
     powered = on;
     repaint();
+}
+
+void AmpFaceplate::setDrive(float level, float heat)
+{
+    const float lv = sanitiseUnit(level), ht = sanitiseUnit(heat);
+    const auto moved = [](float now, float was) {
+        return std::abs(now - was) > kDriveEpsilon || ((now == 0.0f) != (was == 0.0f));
+    };
+    if (!moved(lv, driveLevel) && !moved(ht, driveHeat))
+        return;
+    driveLevel = lv;
+    driveHeat = ht;
+    if (powered)
+        repaint();
 }
 
 static void drawScrew(juce::Graphics& g, float cx, float cy)
@@ -201,10 +266,19 @@ void AmpFaceplate::paintPlate(juce::Graphics& g, juce::Rectangle<float> b, float
     g.drawRoundedRectangle(b.reduced(2.0f), radius - 1.5f, 1.0f);
 }
 
-void AmpFaceplate::paint(juce::Graphics& g)
+void AmpFaceplate::renderPlateCache(float scale)
 {
-    const auto b = getLocalBounds().toFloat().reduced(0.5f);
-    paintPlate(g, b, 6.0f);
+    const int w = juce::jmax(1, juce::roundToInt(static_cast<float>(getWidth()) * scale));
+    const int h = juce::jmax(1, juce::roundToInt(static_cast<float>(getHeight()) * scale));
+    plateCache = juce::Image(juce::Image::ARGB, w, h, true);
+    plateCacheTheme = Colours::panel.getARGB();
+    plateCacheScale = scale;
+
+    juce::Graphics g(plateCache);
+    g.addTransform(juce::AffineTransform::scale(static_cast<float>(w) / static_cast<float>(getWidth()),
+                                                static_cast<float>(h) / static_cast<float>(getHeight())));
+    const auto b = plateBounds(*this);
+    paintPlate(g, b, kPlateRadius);
 
     // Corner screws
     const float inset = 10.0f;
@@ -212,10 +286,58 @@ void AmpFaceplate::paint(juce::Graphics& g)
     drawScrew(g, b.getRight() - inset, b.getY() + inset);
     drawScrew(g, b.getX() + inset, b.getBottom() - inset);
     drawScrew(g, b.getRight() - inset, b.getBottom() - inset);
+}
+
+void AmpFaceplate::paint(juce::Graphics& g)
+{
+    if (getWidth() <= 0 || getHeight() <= 0)
+        return;
+
+    // ── Static plate, from the cache ──
+    // There is no theme-change callback (applySettings() swaps the Colours
+    // globals and repaints from the top), so the key carries a theme token as
+    // well as the size. It is rendered at the physical pixel scale, so the UI
+    // scale's transform and HiDPI screens get a sharp plate, not an upscale.
+    const float scale = juce::jmax(0.01f, g.getInternalContext().getPhysicalPixelScaleFactor());
+    if (plateCache.isNull()
+        || plateCacheTheme != Colours::panel.getARGB()
+        || plateCacheScale != scale
+        || plateCache.getWidth() != juce::jmax(1, juce::roundToInt(static_cast<float>(getWidth()) * scale))
+        || plateCache.getHeight() != juce::jmax(1, juce::roundToInt(static_cast<float>(getHeight()) * scale)))
+        renderPlateCache(scale);
+    g.drawImage(plateCache, getLocalBounds().toFloat());
+
+    // ── Piping glow ──
+    const float level = powered ? driveLevel : 0.0f;
+    if (level > 0.0f)
+    {
+        const auto b = plateBounds(*this);
+        const juce::Colour bead = glowBeadColour(level, driveHeat);
+        if (glowUsesHalo())
+        {
+            // Widest and faintest first, so the bright core sits on top
+            for (int i = static_cast<int>(std::size(kGlowHaloStrokes)) - 1; i >= 0; --i)
+            {
+                const auto& s = kGlowHaloStrokes[i];
+                const auto r = pipingStrokeRect(b, s.width);
+                g.setColour(bead.withMultipliedAlpha(s.alphaScale));
+                g.drawRoundedRectangle(r, kPlateRadius - (r.getX() - b.getX()), s.width);
+            }
+        }
+        else
+        {
+            // Light panel: the bead itself colours up, no halo
+            const auto r = pipingStrokeRect(b, kGlowBeadWidth);
+            g.setColour(bead);
+            g.drawRoundedRectangle(r, kPlateRadius - (r.getX() - b.getX()), kGlowBeadWidth);
+        }
+    }
 
     // ── Glass pilot lamp, placed by the editor in the knob row ──
+    // Lit means powered, so brightness stays binary; playing only widens the bloom.
     const float midY = lampCentre.y, lx = lampCentre.x, r = 8.0f;
-    paintLamp(g, { lx, midY }, r, Colours::red, powered ? 1.0f : 0.0f);
+    paintLamp(g, { lx, midY }, r, Colours::red, powered ? 1.0f : 0.0f,
+              kLampBloomBase * (1.0f + kLampBloomGain * level));
 
     g.setColour(Colours::dim);
     g.setFont(Fonts::spaceMono(Fonts::Sizes::micro, true));

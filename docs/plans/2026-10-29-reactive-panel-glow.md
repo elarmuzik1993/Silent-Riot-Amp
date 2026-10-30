@@ -260,7 +260,7 @@ the tone lock is next opened, not here.
 
 **Files:**
 - Modify: `src/gui/AmpFaceplate.h`, `src/gui/AmpFaceplate.cpp`
-- Test: `tests/gui_faceplate_glow_tests.cpp` (new, in `SilentRiotProcessorTests`)
+- Test: `tests/glow_colour_tests.cpp` (new, in `SilentRiotProcessorTests`)
 
 **Interfaces:**
 - Produces: `juce::Colour sr::glowBeadColour(float level, float heat)` — **pure**, declared in
@@ -272,31 +272,34 @@ the tone lock is next opened, not here.
 - `paintPlate` and `paintLamp` keep their current signatures and behaviour.
 
 **Steps:**
-- [ ] Cache the static plate (gradient, weave, piping, screws) into a `juce::Image` blitted at the
+- [x] Cache the static plate (gradient, weave, piping, screws) into a `juce::Image` blitted at the
       top of `paint()`. Without this the weave's ~314 line draws run 30 times a second. Key the
       cache on **both** the component size and a theme token (`Colours::panel.getARGB()` is enough —
       every theme redefines it) and rebuild when either differs: there is no theme-change callback,
       only a blanket `repaint()`, so a size-only key serves a stale plate after a theme switch.
-- [ ] After the blit, draw the bead glow: three `drawRoundedRectangle` strokes on the piping's
+- [x] After the blit, draw the bead glow: three `drawRoundedRectangle` strokes on the piping's
       path at widths 1 / 2.5 / 5 px and alphas `a` / `0.4a` / `0.15a`, all **inside** the
       component bounds (JUCE clips `paint()`, and there is no cheap blur primitive). `a` scales
       with `level`; keep the ceiling low enough that the bead never outshines the value readouts.
-- [ ] Lamp: keep `brightness` at `powered ? 1.0f : 0.0f` so "lit = powered" stays unambiguous, and
+- [x] Lamp: keep `brightness` at `powered ? 1.0f : 0.0f` so "lit = powered" stays unambiguous, and
       modulate only `bloom` with `level`. The lamp's own colour stays `Colours::red`.
-- [ ] With `powered == false`, skip the glow entirely.
-- [ ] Update the class comment in `AmpFaceplate.h`: it opens "Pure decoration", which stops being
+- [x] With `powered == false`, skip the glow entirely.
+- [x] Update the class comment in `AmpFaceplate.h`: it opens "Pure decoration", which stops being
       true once the panel carries live signal state.
 
-**Verification** (`tests/glow_colour_tests.cpp`, added to `SilentRiotTests` in
-`tests/CMakeLists.txt` — pure C++, no GUI):
-- [ ] `glowBeadColour(0, h)` is fully transparent for every `h`: a silent amp adds nothing.
-- [ ] Rising `level` raises alpha monotonically and never past the agreed ceiling.
-- [ ] `glowBeadColour(1, 0)` and `glowBeadColour(1, 1)` differ **in hue**, not only in alpha, and
+**Verification** (`tests/glow_colour_tests.cpp`, added to `SilentRiotProcessorTests` in
+`tests/CMakeLists.txt`. Corrected from `SilentRiotTests` during implementation: that target has no
+JUCE, and `glowBeadColour()` returns a `juce::Colour`. The function itself is still pure; it
+needs no GUI, only the JUCE headers. The same file also holds the faceplate's drive-state and
+plate-cache tests, one sampled pixel each, no reference image):
+- [x] `glowBeadColour(0, h)` is fully transparent for every `h`: a silent amp adds nothing.
+- [x] Rising `level` raises alpha monotonically and never past the agreed ceiling.
+- [x] `glowBeadColour(1, 0)` and `glowBeadColour(1, 1)` differ **in hue**, not only in alpha, and
       their hues match `Colours::accent` and `Colours::red` at the ends of the ramp.
-- [ ] `heat` outside 0..1 and non-finite inputs clamp rather than producing a garbage colour.
-- [ ] Structural, by inspection and held by Review Focus 2: `paintPlate` gains no glow argument and
+- [x] `heat` outside 0..1 and non-finite inputs clamp rather than producing a garbage colour.
+- [x] Structural, by inspection and held by Review Focus 2: `paintPlate` gains no glow argument and
       no new call site, so `EffectsPanel` cannot light.
-- [ ] Manual check with `tools/sr_editor_snapshot` in both themes, attached to the PR. This is a
+- [x] Manual check with `tools/sr_editor_snapshot` in both themes (`drive=<level>:<heat>`), attached to the PR. This is a
       look, not an assertion — no reference PNG is committed.
 
 ---
@@ -328,20 +331,23 @@ the tone lock is next opened, not here.
 - Modify: `src/gui/AmpFaceplate.cpp`
 
 **Steps:**
-- [ ] In the light palette, replace the additive halo with a tinted bead: raise the piping stroke's
+- [x] In the light palette, replace the additive halo with a tinted bead: raise the piping stroke's
       own saturation and alpha with `level` instead of stacking outer strokes, so the signal reads
-      as the bead *colouring up* rather than as a grey smudge on white.
-- [ ] Branch inside `glowBeadColour()` on the palette's own luminance, not on a stored theme
+      as the bead *colouring up* rather than as a grey smudge on white. *As built:* alpha only
+      (ceiling `kGlowAlphaMaxBead` 0.6 vs the halo's 0.36, one 1.5 px stroke). The hue ramp is
+      already at full saturation at `accent`, and saturating `red` further darkens it on white
+      below the 4.5:1 text contrast this task's verification requires.
+- [x] Branch inside `glowBeadColour()` on the palette's own luminance, not on a stored theme
       index, so a future theme inherits the right treatment automatically — and so the branch is
       covered by the Task 2 unit tests rather than needing a render.
 
 **Verification** (extends `tests/glow_colour_tests.cpp`):
-- [ ] Switching the palette with `Colours::setTheme()` changes which branch `glowBeadColour()`
+- [x] Switching the palette with `Colours::setTheme()` changes which branch `glowBeadColour()`
       takes, and both branches return a visible colour at full drive.
-- [ ] Computed contrast of `Colours::text` against the lit bead colour still clears 4.5:1 in both
+- [x] Computed contrast of `Colours::text` against the lit bead colour still clears 4.5:1 in both
       themes at full drive, so the readouts stay legible (this is arithmetic on the palette, not a
       render).
-- [ ] Manual look in both themes via `tools/sr_editor_snapshot`, attached to the PR.
+- [x] Manual look in both themes via `tools/sr_editor_snapshot`, attached to the PR.
 
 ---
 

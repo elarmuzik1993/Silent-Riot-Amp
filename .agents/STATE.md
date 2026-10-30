@@ -5,7 +5,7 @@ _Updated 2026-10-30 (panel glow planned; tone lock measured on Linux/GCC)_
 ## Now
 - **Tone frozen at `tone-v1`** (059b209): `tests/tone_lock_tests.cpp` guards it (`docs/dev/tone-lock.md`).
 - Silent Riot v0.3.4 (JUCE 7 VST3/Standalone), GPL-3.0-or-later, free + optional donations. No tagged
-  release. `bash scripts/verify.sh`: static checks pass, **444/449 ctest on Linux/GCC** — the 5
+  release. `bash scripts/verify.sh`: static checks pass, **453/458 ctest on Linux/GCC** — the 5
   tone-lock cases fail on float noise, not tone (Known issues). The references were written on MSVC.
 - Docs are open-source ready (README, `docs/manual/`, `docs/dev/`, CONTRIBUTING/CoC/SECURITY, issue
   forms, CHANGELOG); `docs/README.md` indexes them. `dev/` + `manual/` track the code; `design/` +
@@ -64,7 +64,7 @@ _Updated 2026-10-30 (panel glow planned; tone lock measured on Linux/GCC)_
 - Latency is an exact integer, constant across cab modes.
 
 ## Known issues
-- **Tone lock fails 5/449 on Linux/GCC** (cases 394–398): worst band deltas 0.48 dB
+- **Tone lock fails 5/458 on Linux/GCC** (cases 394–398): worst band deltas 0.48 dB
   (`preset-3-full-drive`, a band at −99 dB) and 1.01 dB (`preset-5-heavy-sag`, −96 dB) against a
   0.1 dB per-band tolerance, while RMS agrees to 3.8e−05 dB. Float noise in numerically silent bands,
   not a tone change — 43 of 45 assertions pass in that case.
