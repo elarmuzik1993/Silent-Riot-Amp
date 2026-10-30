@@ -5,8 +5,14 @@
 
 namespace sr::Fonts {
 
-// Call once at startup (e.g. in editor constructor) to load typefaces from BinaryData
+// Call once at startup (e.g. in editor constructor) to load typefaces from BinaryData.
+// Later calls are no-ops, so a font set by previewUIFont() survives a new editor.
 void init();
+
+// Tools only (sr_editor_snapshot --font): draw every spaceMono() call in another
+// typeface, to compare candidate UI fonts in the real editor. A null bold falls
+// back to the regular face. Calls init() first.
+void previewUIFont(juce::Typeface::Ptr regular, juce::Typeface::Ptr bold);
 
 // Space Mono — monospace, used for labels, values, readouts
 juce::Font spaceMono(float size, bool bold = false);

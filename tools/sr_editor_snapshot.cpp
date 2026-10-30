@@ -6,7 +6,7 @@
 //
 //   sr_editor_snapshot <out.png> [fx] [ir] [adv] [off] [scale=<0..n>] [theme=<n>]
 //                      [set=<paramID>:<0..1>]... [loadir=<file.wav>]... [irview=<0|1>]
-//                      [settings] [settings=input]
+//                      [settings] [settings=input] [font=<regular.ttf>[,<bold.ttf>]]
 //
 // The flags open the matching panels (EFFECTS, IR LOADER, ADVANCED). With
 // the CAB toggle on (the default) the editor opens the IR LOADER itself. `off`
@@ -15,7 +15,9 @@
 // `loadir=` loads a user IR as the IR loader does (the last one stays selected);
 // `irview=` picks the IR LOADER view (0 = CAB, 1 = LIBRARY). `settings` opens the
 // Settings overlay (as the gear does); `settings=input` adds the standalone's AUDIO INPUT
-// section first, on a device manager with no device open (its list is empty). Panel states go through the same apvts.state
+// section first, on a device manager with no device open (its list is empty).
+// `font=` draws the whole UI in another typeface (Fonts::previewUIFont), to compare
+// candidate fonts before embedding one. Panel states go through the same apvts.state
 // properties the editor restores from, so the panels snap open with no
 // animation. Paints offscreen via paintEntireComponent; on Linux the editor
 // still opens an X11 connection, so run it under Xvfb (xvfb-run) when
@@ -25,6 +27,7 @@
 #include "PluginEditor.h"
 #include "gui/HeaderBar.h"
 #include "gui/SettingsPanel.h"
+#include "gui/FontData.h"
 
 #include <juce_gui_basics/juce_gui_basics.h>
 
@@ -81,6 +84,21 @@ int main(int argc, char** argv)
             state.setProperty("irView", arg.fromFirstOccurrenceOf("=", false, false).getIntValue(), nullptr);
         if (arg.startsWith("theme="))
             state.setProperty("theme", arg.fromFirstOccurrenceOf("=", false, false).getIntValue(), nullptr);
+        if (arg.startsWith("font="))
+        {
+            const auto load = [](const juce::String& path) -> juce::Typeface::Ptr {
+                juce::MemoryBlock data;
+                if (path.isEmpty() || !juce::File::getCurrentWorkingDirectory().getChildFile(path).loadFileAsData(data))
+                    return nullptr;
+                return juce::Typeface::createSystemTypefaceFor(data.getData(), data.getSize());
+            };
+            const auto spec = arg.fromFirstOccurrenceOf("=", false, false);
+            auto regular = load(spec.upToFirstOccurrenceOf(",", false, false));
+            if (regular == nullptr)
+                juce::Logger::writeToLog("Couldn't load " + arg);
+            else
+                sr::Fonts::previewUIFont(regular, load(spec.fromFirstOccurrenceOf(",", false, false)));
+        }
         if (arg == "settings") openSettings = true;
         if (arg == "settings=input") openSettings = settingsInput = true;
         if (arg.startsWith("scale="))

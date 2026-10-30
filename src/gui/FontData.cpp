@@ -10,6 +10,8 @@ static juce::Typeface::Ptr dmRegular, dmMedium, dmSemiBold, dmBold;
 
 void init()
 {
+    if (smRegular != nullptr)
+        return;
     smRegular  = juce::Typeface::createSystemTypefaceFor(BinaryData::SpaceMonoRegular_ttf,
                                                           BinaryData::SpaceMonoRegular_ttfSize);
     smBold     = juce::Typeface::createSystemTypefaceFor(BinaryData::SpaceMonoBold_ttf,
@@ -22,6 +24,13 @@ void init()
                                                           BinaryData::DMSansSemiBold_ttfSize);
     dmBold     = juce::Typeface::createSystemTypefaceFor(BinaryData::DMSansBold_ttf,
                                                           BinaryData::DMSansBold_ttfSize);
+}
+
+void previewUIFont(juce::Typeface::Ptr regular, juce::Typeface::Ptr bold)
+{
+    init();
+    smRegular = regular;
+    smBold    = bold != nullptr ? bold : regular;
 }
 
 juce::Font spaceMono(float size, bool bold)
