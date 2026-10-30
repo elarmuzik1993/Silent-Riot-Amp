@@ -52,8 +52,9 @@ Every change, whoever or whatever typed it, goes through the same steps:
    listening. The sound is frozen at `tone-v1` by the author's ear sign-off; an automated test
    fails on any change to it, and the references move only after the author approves an A/B
    comparison ([`docs/dev/tone-lock.md`](docs/dev/tone-lock.md)).
-5. **The author reviews and merges.** Changes arrive as pull requests. The author decides what
-   is merged, sent back or dropped, and tests the plugin on real hardware.
+5. **The author reviews and merges.** Changes arrive as pull requests, and every one was
+   reviewed manually by the author before it was merged. The author decides what is merged,
+   sent back or dropped, and tests the plugin on real hardware.
 
 The design decisions, measurements and their reasons are kept in the repository
 (`docs/plans/`, `docs/records/`, `CHANGELOG.md`), so anyone can see how and why the code got
@@ -63,6 +64,12 @@ Individual commits and pull requests do not carry AI attribution lines. That is 
 choice to keep the history clean and readable, not to hide anything: AI assistance is part of
 how the whole project is built, and this document discloses it once, for all of it.
 
+**The author's development system.** Silent Riot was built with a workflow the author
+designed for directing AI across machines and sessions, local and cloud. Project rules and
+decisions live in [`AGENTS.md`](AGENTS.md) and [`CLAUDE.md`](CLAUDE.md), a hand-off note
+([`.agents/STATE.md`](.agents/STATE.md)) lets every session resume from the repository alone,
+and the wider project context is kept in an Obsidian vault.
+
 ## 3. Human Authored Content / Substantial Human Input
 
 The author, Boris Miscenco, art-directed the whole project. In practice that meant:
@@ -70,11 +77,11 @@ The author, Boris Miscenco, art-directed the whole project. In practice that mea
 - **The sound.** The author set out the sound Silent Riot should have and pursued it through
   repeated listening rounds, judging every voicing change by ear. The shipped tone (`tone-v1`)
   is the author's sign-off, and it changes only with the author's approval after an A/B.
-- **The architecture.** The author decided the product's architecture: an original fictional
+- **The architecture.** The author decided the product's architecture and signal flow: an original fictional
   amp in the cascaded-ECC83 / EL84 push-pull family, its signal chain and controls (GAIN,
   SHAPE, VOLUME, 15W/7W, CAB), the effects, and what the plugin does and does not do. Where the
   AI tools proposed designs or alternatives, the author chose between them.
-- **The look.** The faceplate, knobs, toggles, cab view and layout were directed, iterated and
+- **The look.** The faceplate, knobs, toggles, cab view and layout were directed, iterated sketched and
   approved by the author.
 - **Direction.** The tasks, priorities and plans; what was built, in what order, and what was
   rejected for not meeting the bar.
