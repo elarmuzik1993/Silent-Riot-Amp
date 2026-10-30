@@ -456,8 +456,8 @@ In JUCE, implement with `juce::ComponentAnimator` or manually interpolate bounds
 > (340px single column, inline bat toggles) clipped its toggles and overflowed the window;
 > the code below is authoritative.
 
-**Panel**: overlay inside the scaled content area (so it follows UI scale), right-aligned
-8px from the window edge, 4px under the header, `SettingsPanel::panelW` 560px wide,
+**Panel**: overlay inside the scaled content area (so it follows UI scale), centred in the
+window below the header (at least 4px under it) over a black 45% backdrop that also closes it, `SettingsPanel::panelW` 560px wide,
 `panelHeight()` tall (289px; +85px with the standalone's AUDIO INPUT section). The editor
 static_asserts that the plugin's panel fits the smallest window; while the panel needs
 more room (standalone) the window grows and shrinks back on close.

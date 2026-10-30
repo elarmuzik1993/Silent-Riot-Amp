@@ -20,7 +20,7 @@ _Updated 2026-10-30 (Settings panel redesign)_
   Saved with the device setup, not presets; hidden in VST3. Confirmed on a KA6.
 - Settings overlay redesigned (`docs/plans/2026-10-30-settings-panel-layout.md`): 560 px, two
   columns + ABOUT, jewel toggles (the bat toggles were clipped to 28 of 48 px), scales with the UI,
-  closes on ✕/Esc/outside click; the window grows while it needs room (standalone AUDIO INPUT).
+  centred over a dimmed backdrop, closes on ✕/Esc/outside click; the window grows while it needs room (standalone AUDIO INPUT).
 - Contributor issues #37–#48 are open (GUI bugs, IR loader, installers, README screenshot).
 - Commit as `Boris Miscenco <219343213+elarmuzik1993@users.noreply.github.com>`: export
   `GIT_AUTHOR_EMAIL`/`GIT_COMMITTER_EMAIL`; the cloud env's values beat `git -c`. Public contact

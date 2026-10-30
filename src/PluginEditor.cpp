@@ -232,6 +232,7 @@ SilentRiotEditor::SilentRiotEditor(SilentRiotProcessor& p)
 
     // Settings overlay
     // Inside contentArea, so it scales with the UI like everything else.
+    contentArea.addChildComponent(settingsScrim);
     contentArea.addChildComponent(settingsPanel);
     contentArea.addMouseListener(this, true);
     header.onGearClick = [this] {
@@ -523,6 +524,7 @@ void SilentRiotEditor::setSettingsOpen(bool open)
     header.setGearActive(open);
     if (settingsPanel.isVisible() == open)
         return;
+    settingsScrim.setVisible(open);
     settingsPanel.setVisible(open);
     applyShapeMask();   // grow the window first if the panel needs it
     layoutContent();
@@ -802,9 +804,15 @@ void SilentRiotEditor::layoutContent()
 
     if (settingsPanel.isVisible())
     {
-        const int sw = sr::SettingsPanel::panelW;
-        settingsPanel.setBounds(kWindowW - kSettingsMargin - sw, kHeaderH + kSettingsInset,
-                                sw, settingsPanel.panelHeight());
+        // Centred in the window below the header; the header (and its gear)
+        // stays live above the backdrop.
+        const int sw = sr::SettingsPanel::panelW, sh = settingsPanel.panelHeight();
+        const int belowHeader = getWindowHeight() - kHeaderH;
+        settingsScrim.setBounds(0, kHeaderH, kWindowW, belowHeader);
+        settingsPanel.setBounds((kWindowW - sw) / 2,
+                                kHeaderH + juce::jmax(kSettingsInset, (belowHeader - sh) / 2),
+                                sw, sh);
+        settingsScrim.toFront(false);
         settingsPanel.toFront(false);
     }
 }
