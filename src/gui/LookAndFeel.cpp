@@ -265,18 +265,18 @@ void SilentRiotLookAndFeel::drawToggleButton(juce::Graphics& g, juce::ToggleButt
 {
     auto bounds = btn.getLocalBounds().toFloat();
     g.setColour(Colours::label);
-    g.setFont(Fonts::spaceMono(Fonts::Sizes::value));
+    g.setFont(Fonts::ui(Fonts::Sizes::value));
     g.drawText(btn.getButtonText(), bounds, juce::Justification::centred);
 }
 
 juce::Font SilentRiotLookAndFeel::getComboBoxFont(juce::ComboBox&)
 {
-    return Fonts::spaceMono(Fonts::Sizes::body);
+    return Fonts::ui(Fonts::Sizes::body);
 }
 
 juce::Font SilentRiotLookAndFeel::getPopupMenuFont()
 {
-    return Fonts::spaceMono(Fonts::Sizes::value);
+    return Fonts::ui(Fonts::Sizes::value);
 }
 
 } // namespace sr

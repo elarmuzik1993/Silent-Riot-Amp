@@ -78,7 +78,7 @@ void HeaderBar::paint(juce::Graphics& g)
 
     // Left: "SR" brand + divider + "SILENT RIOT"
     float x = 16.0f;
-    g.setFont(Fonts::spaceMono(Fonts::Sizes::title, true));
+    g.setFont(Fonts::ui(Fonts::Sizes::title, true));
     g.setColour(Colours::accent);
     g.drawText("SR", juce::Rectangle<float>(x, 0.0f, 28.0f, bounds.getHeight()),
                juce::Justification::centredLeft, false);
@@ -88,13 +88,13 @@ void HeaderBar::paint(juce::Graphics& g)
     g.fillRect(x, 10.0f, 1.0f, bounds.getHeight() - 20.0f);
     x += 8.0f;
 
-    g.setFont(Fonts::spaceMono(Fonts::Sizes::body));
+    g.setFont(Fonts::ui(Fonts::Sizes::body));
     g.setColour(Colours::label);
     g.drawText("SILENT RIOT", juce::Rectangle<float>(x, 0.0f, 100.0f, bounds.getHeight()),
                juce::Justification::centredLeft, false);
 
     // Right: "MONOLIT" + gear icon
-    g.setFont(Fonts::spaceMono(Fonts::Sizes::small));
+    g.setFont(Fonts::ui(Fonts::Sizes::small));
     g.setColour(Colours::dim);
     g.drawText("MONOLIT", juce::Rectangle<float>(bounds.getWidth() - 100.0f, 0.0f, 56.0f, bounds.getHeight()),
                juce::Justification::centredRight, false);

@@ -108,7 +108,7 @@ void ToggleSwitch::paint(juce::Graphics& g)
     }
 
     // Label above the lever
-    g.setFont(Fonts::spaceMono(Fonts::Sizes::small));
+    g.setFont(Fonts::ui(Fonts::Sizes::small));
     g.setColour(Colours::label);
     g.drawText(label.toUpperCase(), juce::Rectangle<float>(0, 0, bounds.getWidth(), kLabelH),
                juce::Justification::centred, false);
@@ -124,7 +124,7 @@ void ToggleSwitch::paintJewel(juce::Graphics& g, juce::Rectangle<float> bounds)
 
     if (showLabel)
     {
-        g.setFont(Fonts::spaceMono(Fonts::Sizes::small, true));
+        g.setFont(Fonts::ui(Fonts::Sizes::small, true));
         g.setColour(Colours::label.interpolatedWith(Colours::bright, thumbPos));
         g.drawText(label.toUpperCase(),
                    bounds.withRight(c.x - kJewelBezelR - kJewelLabelGap),

@@ -101,7 +101,7 @@ bool SettingsPanel::keyPressed(const juce::KeyPress& key)
 
 juce::Font SettingsPanel::rowLabelFont()
 {
-    return Fonts::spaceMono(Fonts::Sizes::body);
+    return Fonts::ui(Fonts::Sizes::body);
 }
 
 int SettingsPanel::labelColumnWidth()
@@ -205,12 +205,12 @@ void SettingsPanel::paint(juce::Graphics& g)
     g.setColour(Colours::border);
     g.drawRoundedRectangle(bounds.reduced(0.5f), 6.0f, 1.0f);
 
-    g.setFont(Fonts::spaceMono(Fonts::Sizes::title, true));
+    g.setFont(Fonts::ui(Fonts::Sizes::title, true));
     g.setColour(Colours::bright);
     g.drawText("SETTINGS", L.title, juce::Justification::centredLeft, false);
 
     const auto head = [&](juce::Rectangle<int> r, const juce::String& text) {
-        g.setFont(Fonts::spaceMono(Fonts::Sizes::small, true));
+        g.setFont(Fonts::ui(Fonts::Sizes::small, true));
         g.setColour(Colours::accent);
         g.drawText(text, r, juce::Justification::centredLeft, false);
     };
@@ -242,18 +242,18 @@ void SettingsPanel::paint(juce::Graphics& g)
     divider(L.aboutDivider);
     head(L.aboutHead, "ABOUT");
 
-    const auto nameFont = Fonts::spaceMono(Fonts::Sizes::body, true);
+    const auto nameFont = Fonts::ui(Fonts::Sizes::body, true);
     g.setFont(nameFont);
     g.setColour(Colours::text);
     const juce::String product = "Silent Riot";
     g.drawText(product, L.aboutName, juce::Justification::centredLeft, false);
     const int versionX = static_cast<int>(std::ceil(nameFont.getStringWidthFloat(product))) + 10;
-    g.setFont(Fonts::spaceMono(Fonts::Sizes::body));
+    g.setFont(Fonts::ui(Fonts::Sizes::body));
     g.setColour(Colours::label);
     g.drawText("v" JucePlugin_VersionString, L.aboutName.withTrimmedLeft(versionX),
                juce::Justification::centredLeft, false);
 
-    g.setFont(Fonts::spaceMono(Fonts::Sizes::small));
+    g.setFont(Fonts::ui(Fonts::Sizes::small));
     g.setColour(Colours::label);
     g.drawText(juce::CharPointer_UTF8("VST3 / Standalone \xe2\x80\x94 Monolit Beatz"), L.aboutDetail,
                juce::Justification::centredLeft, false);
@@ -266,7 +266,7 @@ void SettingsPanel::paint(juce::Graphics& g)
     g.drawRoundedRectangle(pill.reduced(0.5f), 4.0f, 1.0f);
     g.setColour(Colours::green);
     g.fillEllipse(pill.getX() + 10.0f, pill.getCentreY() - 4.0f, 8.0f, 8.0f);
-    g.setFont(Fonts::spaceMono(Fonts::Sizes::small));
+    g.setFont(Fonts::ui(Fonts::Sizes::small));
     g.setColour(Colours::text);
     g.drawText(juce::CharPointer_UTF8("Free & open source \xe2\x80\x94 GPLv3"),
                pill.withTrimmedLeft(26.0f), juce::Justification::centredLeft, false);

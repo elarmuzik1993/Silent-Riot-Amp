@@ -9,17 +9,14 @@ namespace sr::Fonts {
 // Later calls are no-ops, so a font set by previewUIFont() survives a new editor.
 void init();
 
-// Tools only (sr_editor_snapshot --font): draw every spaceMono() call in another
+// Tools only (sr_editor_snapshot font=): draw every ui() call in another
 // typeface, to compare candidate UI fonts in the real editor. A null bold falls
 // back to the regular face. Calls init() first.
 void previewUIFont(juce::Typeface::Ptr regular, juce::Typeface::Ptr bold);
 
-// Space Mono — monospace, used for labels, values, readouts
-juce::Font spaceMono(float size, bool bold = false);
-
-// DM Sans — used for body text, descriptions
-// weight: 400=Regular, 500=Medium, 600=SemiBold, 700=Bold
-juce::Font dmSans(float size, int weight = 400);
+// Oxanium — the one UI typeface (squared techno, proportional), for every
+// label, value and readout. Regular and Bold are embedded.
+juce::Font ui(float size, bool bold = false);
 
 // Type scale. These are JUCE font *heights* (ascent + descent), not CSS px — a
 // height of 9 renders with a cap height around 6.3px. The UI spec's size table

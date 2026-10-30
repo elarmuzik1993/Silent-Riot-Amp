@@ -218,7 +218,7 @@ void AmpFaceplate::paint(juce::Graphics& g)
     paintLamp(g, { lx, midY }, r, Colours::red, powered ? 1.0f : 0.0f);
 
     g.setColour(Colours::dim);
-    g.setFont(Fonts::spaceMono(Fonts::Sizes::micro, true));
+    g.setFont(Fonts::ui(Fonts::Sizes::micro, true));
     g.drawText("POWER", juce::Rectangle<float>(lx - 40.0f, midY + r + 8.0f, 80.0f, 14.0f),
                juce::Justification::centred, false);
 }

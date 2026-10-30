@@ -153,12 +153,8 @@ target_sources(SilentRiot
 # ── Binary resources ────────────────────────────
 juce_add_binary_data(SilentRiotData
     SOURCES
-        resources/fonts/SpaceMono-Regular.ttf
-        resources/fonts/SpaceMono-Bold.ttf
-        resources/fonts/DMSans-Regular.ttf
-        resources/fonts/DMSans-Medium.ttf
-        resources/fonts/DMSans-SemiBold.ttf
-        resources/fonts/DMSans-Bold.ttf
+        resources/fonts/Oxanium-Regular.ttf
+        resources/fonts/Oxanium-Bold.ttf
 )
 
 # ── Compile definitions ─────────────────────────

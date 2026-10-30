@@ -1,15 +1,15 @@
 # State
 
-_Updated 2026-10-30 (Settings panel redesign)_
+_Updated 2026-10-30 (Settings redesign, Oxanium font)_
 
 ## Now
 - **Tone frozen at `tone-v1`** (059b209): `tests/tone_lock_tests.cpp` guards it (`docs/dev/tone-lock.md`).
 - Silent Riot v0.3.4 (JUCE 7 VST3/Standalone), GPL-3.0-or-later, free + optional donations. No tagged
   release. ctest 450 (312 pure C++ / 81 JUCE / 57 processor). On Linux/GCC 445 pass and the 5 tone-lock
   cases fail, also at 857023b (before any GUI change): band deltas at −84…−100 dB, RMS ≤ 0.0002 dB.
-- Docs are open-source ready; `docs/README.md` indexes them. `dev/` + `manual/` track the code;
-  `design/` + `records/` are frozen. `verify.sh --quick` checks SPDX, links, tool lists, UI text.
-- `AI_USAGE.md` is the AI addendum, linked from CREDITS/README/CONTRIBUTING; keep it true.
+- Docs open-source ready (`docs/README.md` index; `design/`+`records/` frozen; `AI_USAGE.md` kept true).
+  `verify.sh --quick` checks SPDX, links, tool lists, UI text.
+- UI font is **Oxanium** (Regular + Bold, OFL) via `Fonts::ui()`; replaced Space Mono + unused DM Sans.
 - GUI: amp faceplate with satin pointer knobs and satin-black bat toggles on orange glass rings.
   EFFECTS cards share that style (jewel ON toggles). DELAY has no division row: SYNC and PP are bat
   toggles stacked left of TIME, and SYNC turns TIME into the division knob (`DelayTimeAttachment`).
@@ -18,9 +18,8 @@ _Updated 2026-10-30 (Settings panel redesign)_
 - Standalone: Settings (gear) has an AUDIO INPUT list (`src/gui/InputSelector.*`) that opens the
   interface with one input active, so Input 2 of a pair plays (the amp reads channel 0 only).
   Saved with the device setup, not presets; hidden in VST3. Confirmed on a KA6.
-- Settings overlay redesigned (`docs/plans/2026-10-30-settings-panel-layout.md`): 560 px, two
-  columns + ABOUT, jewel toggles (the bat toggles were clipped to 28 of 48 px), scales with the UI,
-  centred over a dimmed backdrop, closes on ✕/Esc/outside click; the window grows while it needs room (standalone AUDIO INPUT).
+- Settings overlay redesigned (`docs/plans/2026-10-30-settings-panel-layout.md`): 560 px, two columns
+  + ABOUT, jewel toggles, scales with the UI, centred over a dimmed backdrop, ✕/Esc/outside-click close.
 - Contributor issues #37–#48 are open (GUI bugs, IR loader, installers, README screenshot).
 - Commit as `Boris Miscenco <219343213+elarmuzik1993@users.noreply.github.com>`: export
   `GIT_AUTHOR_EMAIL`/`GIT_COMMITTER_EMAIL`; the cloud env's values beat `git -c`. Public contact
@@ -40,7 +39,8 @@ _Updated 2026-10-30 (Settings panel redesign)_
    tone lock fails on Linux/GCC (references are from MSVC; see Now): owner decides between a
    per-platform reference set or a noise floor below which bands are not compared.
 7. Owner, cab view: light theme keeps white tolex around the black grille — OK? Dim the cab when CAB is off?
-8. Owner: review the Settings redesign on the docs/settings-panel-plan branch, then open its PR.
+8. Owner: review Settings redesign + Oxanium on the docs/settings-panel-plan branch, then its PR.
+   Re-shoot the manual's `resources/images/` (still Space Mono) with `sr_editor_snapshot`.
 
 ## Decisions
 - Tone frozen at `tone-v1` (amp + cab + effects, steady state). Re-calibration (power Tasks 2–5,

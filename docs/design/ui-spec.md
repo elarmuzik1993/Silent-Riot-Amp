@@ -76,19 +76,16 @@ tealDim           #009980    Supply rail bar fill (start)
 
 ## 3. Typography
 
-Two font stacks are used. Ship both as embedded resources in the JUCE binary.
+> **As built (2026-10-30)**: the UI uses **one** embedded typeface, **Oxanium** (Regular +
+> Bold, SIL OFL 1.1, `resources/fonts/`), through `Fonts::ui()`. It replaced Space Mono and
+> DM Sans (DM Sans was embedded but never drawn) after the owner compared ten candidates in
+> the real editor (`sr_editor_snapshot font=`). Every "Space Mono" below now means Oxanium;
+> the sizes come from `Fonts::Sizes`, not from these CSS numbers.
 
-**Monospace (primary — all data, labels, readouts)**:
-- `Space Mono` (Google Fonts, OFL license)
-- Fallbacks: `SF Mono`, `Fira Code`, system monospace
-- Download: https://fonts.google.com/specimen/Space+Mono
-- Include Regular (400) and Bold (700) weights
+Original design (superseded):
 
-**UI font (body text only — settings descriptions)**:
-- `DM Sans` (Google Fonts, OFL license)
-- Fallbacks: `SF Pro Display`, system sans-serif
-- Download: https://fonts.google.com/specimen/DM+Sans
-- Include Regular (400), Medium (500), SemiBold (600), Bold (700)
+- Monospace (all data, labels, readouts): `Space Mono`, Regular (400) and Bold (700)
+- UI font (settings descriptions only): `DM Sans`, Regular to Bold
 
 ### Font size reference (at 100% scale)
 
