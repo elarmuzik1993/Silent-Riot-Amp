@@ -77,11 +77,11 @@ The author, Boris Miscenco, art-directed the whole project. In practice that mea
 - **The sound.** The author set out the sound Silent Riot should have and pursued it through
   repeated listening rounds, judging every voicing change by ear. The shipped tone (`tone-v1`)
   is the author's sign-off, and it changes only with the author's approval after an A/B.
-- **The architecture.** The author decided the product's architecture: an original fictional
+- **The architecture.** The author decided the product's architecture and signal flow: an original fictional
   amp in the cascaded-ECC83 / EL84 push-pull family, its signal chain and controls (GAIN,
   SHAPE, VOLUME, 15W/7W, CAB), the effects, and what the plugin does and does not do. Where the
   AI tools proposed designs or alternatives, the author chose between them.
-- **The look.** The faceplate, knobs, toggles, cab view and layout were directed, iterated and
+- **The look.** The faceplate, knobs, toggles, cab view and layout were directed, iterated sketched and
   approved by the author.
 - **Direction.** The tasks, priorities and plans; what was built, in what order, and what was
   rejected for not meeting the bar.
