@@ -52,8 +52,9 @@ Every change, whoever or whatever typed it, goes through the same steps:
    listening. The sound is frozen at `tone-v1` by the author's ear sign-off; an automated test
    fails on any change to it, and the references move only after the author approves an A/B
    comparison ([`docs/dev/tone-lock.md`](docs/dev/tone-lock.md)).
-5. **The author reviews and merges.** Changes arrive as pull requests. The author decides what
-   is merged, sent back or dropped, and tests the plugin on real hardware.
+5. **The author reviews and merges.** Changes arrive as pull requests, and every one was
+   reviewed manually by the author before it was merged. The author decides what is merged,
+   sent back or dropped, and tests the plugin on real hardware.
 
 The design decisions, measurements and their reasons are kept in the repository
 (`docs/plans/`, `docs/records/`, `CHANGELOG.md`), so anyone can see how and why the code got
