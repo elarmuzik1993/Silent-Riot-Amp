@@ -10,7 +10,9 @@ Licensed under the GNU General Public License v3 or later; see `LICENSE`.
 
 The Silent Riot DSP implementation — including all source code, the normalized voltage
 domain framework (VoltageScale), the signal chain architecture, and the DSP model
-specification — is original work written from scratch by Boris Miscenco.
+specification — is original work, designed, directed, reviewed and owned by Boris Miscenco,
+with AI-assisted implementation. [`AI_USAGE.md`](AI_USAGE.md) says what the AI tools did and
+what the author did.
 
 No source code has been copied, adapted, or derived from any third-party project,
 including but not limited to Guitarix, SwankyAmp, NAM (Neural Amp Modeler), ChowDSP,
@@ -139,7 +141,7 @@ not affiliated with, endorsed by or sponsored by any of them.
 
 | Item | Status |
 |---|---|
-| DSP source code | 100% original, written by Boris Miscenco |
+| DSP source code | Original; designed, directed, reviewed and owned by Boris Miscenco, AI-assisted implementation ([`AI_USAGE.md`](AI_USAGE.md)) |
 | Signal chain architecture | Original design |
 | Tube model equations | Public domain (Koren, published openly) |
 | Tube parameters | Public domain (datasheet values) |

@@ -1,6 +1,6 @@
 # State
 
-_Updated 2026-10-29 (tone frozen at tone-v1)_
+_Updated 2026-10-30 (AI addendum added)_
 
 ## Now
 - **Tone frozen at `tone-v1`** (059b209): `tests/tone_lock_tests.cpp` guards it (`docs/dev/tone-lock.md`).
@@ -9,6 +9,8 @@ _Updated 2026-10-29 (tone frozen at tone-v1)_
 - Docs are open-source ready (README, `docs/manual/`, `docs/dev/`, CONTRIBUTING/CoC/SECURITY, issue
   forms, CHANGELOG); `docs/README.md` indexes them. `dev/` + `manual/` track the code; `design/` +
   `records/` are frozen. `verify.sh --quick` (also CI) checks SPDX, links, tool source lists, UI text.
+- `AI_USAGE.md` is the AI addendum (scope, workflow, human authorship, IP, warranty limitation);
+  CREDITS/README/CONTRIBUTING link it. Keep it true if the way AI is used changes.
 - GUI: amp faceplate with satin pointer knobs and satin-black bat toggles on orange glass rings.
   EFFECTS cards share that style (jewel ON toggles). DELAY has no division row: SYNC and PP are bat
   toggles stacked left of TIME, and SYNC turns TIME into the division knob (`DelayTimeAttachment`).
