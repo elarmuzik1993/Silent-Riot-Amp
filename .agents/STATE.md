@@ -12,6 +12,8 @@ _Updated 2026-10-30 (panel glow planned; tone lock measured on Linux/GCC)_
   `records/` are frozen. `verify.sh --quick` (also CI) checks SPDX, links, tool source lists, UI text
   — `check_links.py` scans **tracked files only**, so a new doc's dangling paths surface only once it
   is committed; `scripts/linkcheck-allow.txt` carries paths a plan has yet to create.
+- `AI_USAGE.md` is the AI addendum (scope, workflow, human authorship, IP, warranty limitation);
+  CREDITS/README/CONTRIBUTING link it. Keep it true if the way AI is used changes.
 - GUI: amp faceplate with satin pointer knobs and satin-black bat toggles on orange glass rings;
   EFFECTS cards share that style (jewel ON toggles). SYNC turns DELAY's TIME into the division knob
   (`DelayTimeAttachment`). IR LOADER opens on a drawn 2x12 cab (`src/gui/CabinetView.*`) with arrows
@@ -27,7 +29,8 @@ _Updated 2026-10-30 (panel glow planned; tone lock measured on Linux/GCC)_
   peak in `processBlock`; the plan sets out why no task in it can reach the sound.
 - Contributor issues #37–#48 are open (GUI bugs, IR loader, installers, README screenshot).
 - Commit as `Boris Miscenco <219343213+elarmuzik1993@users.noreply.github.com>`: export
-  `GIT_AUTHOR_EMAIL`/`GIT_COMMITTER_EMAIL`; the cloud env's values beat `git -c`.
+  `GIT_AUTHOR_EMAIL`/`GIT_COMMITTER_EMAIL`; the cloud env's values beat `git -c`. Public contact
+  email (docs only, never commits): borismishchenkodev@gmail.com.
 
 ## Next
 1. Panel glow Task 0: measure sag travel and pick the hue carrier before any paint code. B2 may

@@ -62,7 +62,8 @@ Instances of abusive, harassing, or otherwise unacceptable behavior may be
 reported to the community leaders responsible for enforcement privately, via
 GitHub's private reporting: open the repository's **Security** tab and choose
 **Report a vulnerability**, and say in the report that it is a conduct matter.
-Only the maintainer sees it.
+Only the maintainer sees it. You can also email the maintainer at
+[borismishchenkodev@gmail.com](mailto:borismishchenkodev@gmail.com).
 All complaints will be reviewed and investigated promptly and fairly.
 
 All community leaders are obligated to respect the privacy and security of the
