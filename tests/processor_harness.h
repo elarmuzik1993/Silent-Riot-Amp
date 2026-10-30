@@ -26,6 +26,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <exception>
 #include <functional>
 #include <thread>
 #include <vector>
@@ -51,7 +52,10 @@ struct ProcessorHarness
 {
     enum class Mode { Process, Bypassed };
 
-    // MessageManager + JUCE statics (the APVTS and the IR AsyncUpdater need it).
+    // MessageManager + JUCE statics (the APVTS and the processor's timer need
+    // it). Nothing pumps the message loop unless a test does: a parameter
+    // change to IR_INDEX, and the host's copy of the latency after an
+    // oversample switch, only land while one does (withMessageLoop()).
     // First member, so it outlives the processor.
     juce::ScopedJuceInitialiser_GUI juceInit;
     SilentRiotProcessor proc;
@@ -72,6 +76,34 @@ struct ProcessorHarness
         auto* p = proc.apvts.getParameter(id);
         REQUIRE(p != nullptr);
         p->setValueNotifyingHost(p->convertTo0to1(natural));
+    }
+
+    // set() without the REQUIRE, for withMessageLoop()'s audio thread, where
+    // Catch2 assertions are not safe. Host automation arrives like this.
+    void setFromAudioThread(const juce::String& id, float natural)
+    {
+        if (auto* p = proc.apvts.getParameter(id))
+            p->setValueNotifyingHost(p->convertTo0to1(natural));
+    }
+
+    // Runs `audio` on a thread of its own while this thread — the message
+    // thread — pumps the message loop, as in a host. The processor's 20 Hz
+    // timer (latency report, IR_INDEX changes) only fires while it does.
+    // Once per harness: JUCE's stopDispatchLoop() is final for a
+    // MessageManager, and this harness owns the only one. `audio` must not
+    // REQUIRE or CHECK (Catch2 assertions are not thread-safe): record what
+    // it sees and assert after this returns.
+    void withMessageLoop(const std::function<void()>& audio)
+    {
+        auto* mm = juce::MessageManager::getInstance();
+        std::exception_ptr failed;
+        std::thread th([&] {
+            try { audio(); } catch (...) { failed = std::current_exception(); }
+            mm->stopDispatchLoop();
+        });
+        mm->runDispatchLoop();
+        th.join();
+        if (failed) std::rethrow_exception(failed);
     }
 
     // Renders `seconds` of `in` and returns the peak |output| over all channels.

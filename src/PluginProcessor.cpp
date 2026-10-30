@@ -83,49 +83,58 @@ SilentRiotProcessor::SilentRiotProcessor()
     // Init Miller caps (Spec §3.3)
     v1a_miller.init(CGP_12AX7, CGK_12AX7, V1A_RSOURCE_REAL, StageGains::V1A_GAIN);
     v1b_miller.init(CGP_12AX7, CGK_12AX7, V1B_RSOURCE_BASE_REAL, StageGains::V1B_GAIN);
+
+    // Latency reports and IR_INDEX changes reach the host and the convolution
+    // from here, on the message thread (RT-2, RT-3). The APVTS already needs
+    // a MessageManager, so this adds no dependency.
+    startTimerHz(20);
 }
 
 SilentRiotProcessor::~SilentRiotProcessor()
 {
-    cancelPendingUpdate(); // prevent callback after destruction
+    stopTimer();   // first: no callback into a half-destroyed processor
 }
 
-void SilentRiotProcessor::handleAsyncUpdate()
+void SilentRiotProcessor::timerCallback()
 {
-    // Runs on message thread — safe to allocate, do file I/O, acquire locks.
-    int idx = pendingIRIndex.exchange(-1);
-    if (idx < 0) return;
+    // Message thread. The audio thread never calls the host or posts to the
+    // message queue: it leaves a new latency in pendingLatency (oversample
+    // switch) and IR_INDEX in the parameter, and this picks both up within
+    // one tick (50 ms).
+    //
+    // RT-2: setLatencySamples() calls every host listener synchronously, and
+    // hosts recompile their graph in it. The host's delay compensation is up
+    // to one tick behind the engine; the switch is crossfading through
+    // silence then, so nothing is heard.
+    const int latency = pendingLatency.load(std::memory_order_acquire);
+    if (latency != getLatencySamples())
+        setLatencySamples(latency);
 
-    // An out-of-range index (host automation past the list) disables the
-    // convolution so a stale IR never stays active — see applyUserIRIndex().
-    sr::applyUserIRIndex(cabSim, userIRs, idx, sr::IRLoad::Async);
+    // RT-3: an IR_INDEX change (host automation) is applied here, not by a
+    // triggerAsyncUpdate() from processBlock (a lock, a write() syscall and a
+    // possible allocation on the audio thread). CabModeSwitcher waits for
+    // the real IR before entering IR mode, and JUCE builds that engine in
+    // longer than a tick, so the extra delay is not heard.
+    const int irIdx = static_cast<int>(
+        apvts.getRawParameterValue(sr::Params::IDs::IR_INDEX)->load());
+    if (irIdx != cachedIRIndex.load())
+        applyIRIndexParam(sr::IRLoad::Async);
 }
 
 void SilentRiotProcessor::applyIRIndexParam(sr::IRLoad load)
 {
-    // Message thread (state restore) or prepareToPlay. Syncs the convolution to
-    // IR_INDEX now — including disabling it when the index is past the IR list,
-    // which processBlock can't catch when the index equals cachedIRIndex
-    // (review S2). Drops any async load still pending: it would select from
-    // the old list by an old index.
-    //
-    // The index is marked seen BEFORE the pending slot is cleared (both are
-    // seq_cst atomics, so the audio thread observes the writes in this order):
-    // once the slot is empty, processBlock already compares against the new
-    // index and won't queue a redundant reload of it. A block that compared
-    // just before the cache write can still queue an index; handleAsyncUpdate()
-    // applies that against the current list on this thread, and the next block
-    // re-queues the parameter's value if it differs — so a stale index never
-    // sticks.
+    // Message thread (state restore, the timer, the GUI) or prepareToPlay.
+    // Syncs the convolution to IR_INDEX now — including disabling it when the
+    // index is past the IR list, which the timer can't catch when the index
+    // equals cachedIRIndex (review S2).
     //
     // `load` is IRLoad::Now only from prepareToPlay, where processBlock can't
     // run: the IR then plays from the first block instead of JUCE's
-    // pass-through. State restore can run alongside processBlock, so it stays
-    // Async (CabinetSim::installIRNow must not race the audio thread).
+    // pass-through. Everything else can run alongside processBlock, so it
+    // stays Async (CabinetSim::installIRNow must not race the audio thread).
     const int irIdx = static_cast<int>(
         apvts.getRawParameterValue(sr::Params::IDs::IR_INDEX)->load());
     cachedIRIndex = irIdx;
-    pendingIRIndex.store(-1);
     sr::applyUserIRIndex(cabSim, userIRs, irIdx, load);
 }
 
@@ -320,7 +329,7 @@ void SilentRiotProcessor::setEl84Bias(float bias)
     sag.setQuiescent(pentodeQuiescentTotal(bias, V_POWER_NOMINAL_N, V_SCREEN_NOMINAL_N));
 }
 
-void SilentRiotProcessor::recalcRateDependentCoeffs()
+void SilentRiotProcessor::recalcRateDependentCoeffs(LatencyPublish publish)
 {
     const int osFactor = oversampleSwitcher.activeFactor();
     const float effectiveSR = static_cast<float>(baseSampleRate) * osFactor;
@@ -354,7 +363,11 @@ void SilentRiotProcessor::recalcRateDependentCoeffs()
     int totalLatency = static_cast<int>(std::lround(oversampleSwitcher.active()->getLatencyInSamples()));
     if (limiterOversampler != nullptr)
         totalLatency += static_cast<int>(std::lround(limiterOversampler->getLatencyInSamples()));
-    setLatencySamples(totalLatency);
+    engineLatency = totalLatency;
+    pendingLatency.store(totalLatency, std::memory_order_release);
+    // Deferred (audio thread): timerCallback() reports it (RT-2).
+    if (publish == LatencyPublish::Now)
+        setLatencySamples(totalLatency);
 }
 
 void SilentRiotProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
@@ -378,7 +391,7 @@ void SilentRiotProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
     jassert(limiterLatency <= 16);   // iirPathAlign's capacity
     iirPathAlign.setDelay(limiterLatency);
 
-    recalcRateDependentCoeffs();
+    recalcRateDependentCoeffs(LatencyPublish::Now);
     syncBypassDelay();
 
     // Seed the amp-knob smoothers at the knobs' values. They were never seeded,
@@ -508,8 +521,10 @@ void SilentRiotProcessor::reset()
 
 void SilentRiotProcessor::syncBypassDelay()
 {
-    // setDelay clears the line, so only on a change. Allocation-free.
-    const int latency = getLatencySamples();
+    // setDelay clears the line, so only on a change. Allocation-free. The
+    // engine's own latency, not getLatencySamples(): after an oversample
+    // switch the host's copy lags it by up to one timer tick (RT-2).
+    const int latency = engineLatency;
     jassert(latency <= 32);   // bypassDelay's capacity
     if (latency != bypassDelay.getDelay()) bypassDelay.setDelay(latency);
 }
@@ -608,7 +623,6 @@ void SilentRiotProcessor::processChunk(juce::AudioBuffer<float>& buffer, juce::M
     bool  cabOn     = apvts.getRawParameterValue(Params::IDs::CAB_SIM)->load() > 0.5f;
     bool  powerOn   = apvts.getRawParameterValue(Params::IDs::POWER)->load() > 0.5f;
     bool  tunerMute = apvts.getRawParameterValue(Params::IDs::TUNER_MUTE)->load() > 0.5f;
-    int   irIndex   = static_cast<int>(apvts.getRawParameterValue(Params::IDs::IR_INDEX)->load());
 
     // Effects module parameters (run at base SR, outside the amp loop).
     // Float reads are sanitized at this boundary — a misbehaving host could
@@ -707,13 +721,8 @@ void SilentRiotProcessor::processChunk(juce::AudioBuffer<float>& buffer, juce::M
         if (bias != lastSagQuiescentBias) setEl84Bias(bias);
     }
 
-    // Detect IR parameter changes — defer actual loading to message thread
-    if (irIndex != cachedIRIndex)
-    {
-        cachedIRIndex = irIndex;
-        pendingIRIndex.store(irIndex);
-        triggerAsyncUpdate();  // handleAsyncUpdate() applies it via applyUserIRIndex() on message thread
-    }
+    // IR_INDEX changes are applied by timerCallback() on the message thread
+    // (RT-3); this block only sees their result, through useIR.
 
     // ── Cab mode (IR-path plan Task 3) ──
     // Requested: CAB off, else IR when one is selected (useIR is atomic, set
@@ -821,7 +830,7 @@ void SilentRiotProcessor::processChunk(juce::AudioBuffer<float>& buffer, juce::M
         // Complete pending switch at block boundary (after fade-out finished last block)
         if (oversampleSwitcher.readyToSwitch()) {
             oversampleSwitcher.commitSwitch();
-            recalcRateDependentCoeffs();
+            recalcRateDependentCoeffs(LatencyPublish::Deferred);   // audio thread (RT-2)
             // recalcAll() rebuilds the shape EQ at noon (FilterBank.cpp), so the
             // cached value must be invalidated or the per-sample guard below sees
             // "shape hasn't moved" and never restores the knob's actual position —
@@ -1308,7 +1317,7 @@ bool SilentRiotProcessor::loadUserIR(const juce::File& file)
 
     // Set IR_INDEX to the new IR (1-based)
     int newIndex = static_cast<int>(userIRs.size());
-    cachedIRIndex = newIndex;  // prevent audio thread from re-triggering async load
+    cachedIRIndex = newIndex;  // already applied: the timer must not reload it
     if (auto* param = apvts.getParameter(sr::Params::IDs::IR_INDEX))
         param->setValueNotifyingHost(param->convertTo0to1(static_cast<float>(newIndex)));
 
@@ -1332,9 +1341,11 @@ void SilentRiotProcessor::selectUserIR(int userIndex)
 
 void SilentRiotProcessor::selectBuiltInCab()
 {
-    // Message thread. Applied here rather than left to processBlock's change
-    // detection, like selectUserIR: the convolution turns off now, and the
-    // audio thread sees an index it already knows.
+    // Message thread. Applied here rather than left to the timer, like
+    // selectUserIR: the convolution turns off now. The cache is set first, as
+    // selectUserIR does, so no timer tick sees the new parameter value before
+    // it is applied.
+    cachedIRIndex = 0;
     if (auto* param = apvts.getParameter(sr::Params::IDs::IR_INDEX))
         param->setValueNotifyingHost(param->convertTo0to1(0.0f));
     applyIRIndexParam(sr::IRLoad::Async);

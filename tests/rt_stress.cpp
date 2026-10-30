@@ -499,9 +499,10 @@ void allEffectsOn(Amp& a)
 
 // ── Audio thread ────────────────────────────────────────────────
 // Every scenario runs on a thread of its own, while the real JUCE message
-// thread (main(), in runDispatchLoop()) pumps beside it — so AsyncUpdater
-// callbacks, the IR loader and the convolution's background thread all
-// behave as they do in a host, instead of being starved by the test.
+// thread (main(), in runDispatchLoop()) pumps beside it — so the processor's
+// timer (latency report, IR_INDEX changes), the IR loader and the
+// convolution's background thread all behave as they do in a host, instead
+// of being starved by the test.
 template <typename Fn>
 void onAudioThread(Fn&& fn)
 {
@@ -1401,7 +1402,7 @@ int main(int argc, char* argv[])
     // The scenarios run on their own thread so that main() can be the real
     // message thread for the whole run (JUCE's runDispatchLoopUntil is
     // compiled out of the plugin's modules, and the harness must not be the
-    // reason an AsyncUpdater never fires).
+    // reason a timer never fires).
     std::thread driver([&]
     {
         if (wanted("load"))      scenarioLoad(0.5 * s, quick);

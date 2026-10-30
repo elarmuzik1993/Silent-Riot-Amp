@@ -213,24 +213,24 @@ own), so this adds no new dependency, and the audio thread stops reaching out en
 
 **Steps**
 
-- [ ] `SilentRiotProcessor` also inherits `private juce::Timer`. `startTimerHz(20)` in the
+- [x] `SilentRiotProcessor` also inherits `private juce::Timer`. `startTimerHz(20)` in the
       constructor, `stopTimer()` first thing in the destructor.
-- [ ] Give `recalcRateDependentCoeffs()` a `LatencyPublish` argument: `Now` (from
+- [x] Give `recalcRateDependentCoeffs()` a `LatencyPublish` argument: `Now` (from
       `prepareToPlay`, on the message thread) calls `setLatencySamples()` as today; `Deferred`
       (from the oversample commit, on the audio thread) stores the value in
       `std::atomic<int> pendingLatency` and calls nothing.
-- [ ] Keep the audio thread's own copy of the latency it computed, and make
+- [x] Keep the audio thread's own copy of the latency it computed, and make
       `syncBypassDelay()` use **that** rather than `getLatencySamples()` — otherwise the
       bypass line lags the real latency by up to one timer period.
-- [ ] In `timerCallback()`: publish `pendingLatency` when it differs from
+- [x] In `timerCallback()`: publish `pendingLatency` when it differs from
       `getLatencySamples()`; then compare `IR_INDEX` with `cachedIRIndex` and, when they
       differ, call the existing `applyIRIndexParam(IRLoad::Async)`.
-- [ ] Delete the IR branch from `processBlock` — the `triggerAsyncUpdate()` call, the
+- [x] Delete the IR branch from `processBlock` — the `triggerAsyncUpdate()` call, the
       `pendingIRIndex` handshake and the ordering comment that goes with it. `cachedIRIndex`
       becomes message-thread-only state, which is simpler than what it replaces. Keep
       `handleAsyncUpdate()` only if something else still needs it; otherwise drop the
       `AsyncUpdater` base too (and its `cancelPendingUpdate()` in the destructor).
-- [ ] Re-check the two GUI paths still behave: `selectUserIR()` sets `cachedIRIndex` before
+- [x] Re-check the two GUI paths still behave: `selectUserIR()` sets `cachedIRIndex` before
       the parameter, `selectBuiltInCab()` just after. With the timer, the one-block window in
       `selectBuiltInCab()` becomes a one-tick window that resolves to the same index — but
       tighten it anyway by setting the cache first, like `selectUserIR()` does.
@@ -243,17 +243,17 @@ of one block. Nothing hears it: `CabModeSwitcher` already refuses to enter IR mo
 
 **Test**
 
-- [ ] With a running message loop, automating `IR_INDEX` still swaps the cab (and an index
+- [x] With a running message loop, automating `IR_INDEX` still swaps the cab (and an index
       past the list still disables the convolution, review S2). The existing processor tests
       drive IR selection through `loadUserIR`/`selectUserIR` directly, so this path needs a
       test that actually pumps the loop — `tests/rt_stress.cpp` shows the pattern.
-- [ ] An oversample switch still reports the right latency to the host, within one tick.
-- [ ] Host bypass is still exactly `getLatencySamples()` behind, across an oversample switch.
+- [x] An oversample switch still reports the right latency to the host, within one tick.
+- [x] Host bypass is still exactly `getLatencySamples()` behind, across an oversample switch.
 
 **Verification**
 
-- [ ] `SilentRiotRTStress --only=modes,ir,threads,mono` reports **no** lock findings.
-- [ ] ThreadSanitizer over `threads,ir,modes` stays at its one known race (RT-4) until Task 4
+- [x] `SilentRiotRTStress --only=modes,ir,threads,mono` reports **no** lock findings.
+- [x] ThreadSanitizer over `threads,ir,modes` stays at its one known race (RT-4) until Task 4
       removes it.
 
 ---

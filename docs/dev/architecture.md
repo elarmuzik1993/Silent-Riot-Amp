@@ -80,14 +80,15 @@ DSP code is in `namespace sr` and has no dependency on the GUI.
 
 | Thread | Does | Must not |
 |---|---|---|
-| Audio (`processBlock`) | All DSP; reads parameters; publishes meter values to atomics; writes the raw input to the tuner ring | Allocate, lock, or load files |
-| Message (GUI) | Editor painting, a 30 Hz timer that polls meters and runs pitch detection, IR file loading | Touch DSP state directly |
+| Audio (`processBlock`) | All DSP; reads parameters; publishes meter values to atomics; writes the raw input to the tuner ring | Allocate, lock, load files, call the host or post to the message queue |
+| Message (GUI) | Editor painting, a 30 Hz timer that polls meters and runs pitch detection, IR file loading; the processor's own 20 Hz timer, which reports a latency change to the host and applies an `IR_INDEX` change | Touch DSP state directly |
 | JUCE background | Builds new convolution engines for `juce::dsp::Convolution` | — |
 
 - **IR loading** reads and level-matches the file on the message thread, then hands the
   buffer over through a try-lock transfer the audio thread polls without blocking
   (`src/dsp/cabinet/CabinetSim.h`). The only synchronous install is in `prepareToPlay`,
-  so a saved session plays its IR from the first block.
+  so a saved session plays its IR from the first block. An automated `IR_INDEX` change is
+  picked up by the processor's timer, within 50 ms, not by `processBlock`.
 - **The tuner** gets raw input samples from a lock-free ring the audio thread writes
   (`pushTunerSamples`), before the power-off check, so it works with the amp silenced. The
   editor reads the latest window (`readLatestTunerSamples`) and detects pitch off the
@@ -102,7 +103,9 @@ DSP code is in `namespace sr` and has no dependency on the GUI.
 - Changing the oversampling factor fades out, reconfigures and fades back in
   (`OversampleSwitcher`), with the power supply frozen across the change so it can't pop.
 - Reported latency is an exact whole number of samples (10 at 2×, 12 at 4× and 8×), the
-  same in both cab modes; the built-in cab path is delayed to match the IR path.
+  same in both cab modes; the built-in cab path is delayed to match the IR path. After an
+  oversample switch the audio thread only stores the new value; the processor's timer
+  reports it to the host within 50 ms (`setLatencySamples()` calls the host synchronously).
 
 ## Start-up and state
 

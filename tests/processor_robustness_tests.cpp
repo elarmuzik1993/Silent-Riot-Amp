@@ -22,12 +22,19 @@
 // prepared-size views and renders exactly as the same input sent in
 // prepared-size blocks; a block at the maximum still takes one pass.
 //
+// And an oversample switch, which reported its new latency to the host from
+// the audio thread (RT-2: setLatencySamples() calls every host listener
+// synchronously). The audio thread now only stores it; the processor's
+// message-thread timer reports it within a tick, and host bypass follows the
+// engine's latency throughout.
+//
 // Each case runs a few seconds of a 4x-oversampled amp; keep them short.
 // ═══════════════════════════════════════════════════════════════
 #include <catch2/catch_test_macros.hpp>
 #include "processor_harness.h"
 
 #include <cfloat>
+#include <chrono>
 #include <cstring>
 #include <limits>
 
@@ -278,4 +285,79 @@ TEST_CASE("Processor: a block at the prepared maximum takes a single pass (RT-5)
         renderInHostBlocks(kPrepared + 1, 4 * (kPrepared + 1), mode, &split);
         CHECK(split == 4);   // one sample over is already a split
     }
+}
+
+namespace {
+
+// Where a lone 1.0 lands in a bypassed render of zeros with it at sample 100:
+// the bypass line's delay. -1 if it never does.
+int bypassDelayOf(ProcessorHarness& h)
+{
+    std::vector<float> out;
+    h.run(0.01, [](int i, int) { return i == 100 ? 1.0f : 0.0f; }, Mode::Bypassed, &out);
+    for (size_t i = 0; i < out.size(); ++i)
+        if (out[i] == 1.0f) return static_cast<int>(i) - 100;
+    return -1;
+}
+
+constexpr float kOS2x = 0.0f;   // OVERSAMPLE choice index
+constexpr int kLatency2x = 10, kLatency4x = 12;
+
+} // namespace
+
+TEST_CASE("Processor: an oversample switch reports its latency from the message thread, within a tick (RT-2)",
+          "[processor][robustness][latency]")
+{
+    ProcessorHarness h;   // 4x
+    REQUIRE(h.proc.getLatencySamples() == kLatency4x);
+
+    // Switch to 2x and play well past the commit (fade-out, then a block
+    // boundary). With no message loop running, the host has not been told:
+    // the audio thread no longer calls setLatencySamples() itself.
+    h.set(sr::Params::IDs::OVERSAMPLE, kOS2x);
+    h.silence(0.1);
+    REQUIRE(h.proc.getLatencySamples() == kLatency4x);
+
+    // As in a host, with the message loop running: the timer reports it.
+    int reported = -1;
+    double waitedMs = -1.0;
+    h.withMessageLoop([&] {
+        const auto t0 = std::chrono::steady_clock::now();
+        while (h.proc.getLatencySamples() != kLatency2x
+               && std::chrono::steady_clock::now() - t0 < std::chrono::seconds(2))
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        waitedMs = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
+        reported = h.proc.getLatencySamples();
+    });
+    REQUIRE(reported == kLatency2x);
+    // One tick is 50 ms; the rest is scheduling slack on a loaded test machine.
+    CHECK(waitedMs < 250.0);
+}
+
+TEST_CASE("Processor: host bypass stays exactly the latency behind across an oversample switch (RT-2)",
+          "[processor][robustness][latency][bypass]")
+{
+    ProcessorHarness h;   // 4x
+    REQUIRE(bypassDelayOf(h) == kLatency4x);
+
+    // Past the commit, before the host has been told (no message loop): the
+    // bypass line already follows the engine, not the host's stale copy.
+    h.set(sr::Params::IDs::OVERSAMPLE, kOS2x);
+    h.silence(0.1);
+    REQUIRE(h.proc.getLatencySamples() == kLatency4x);
+    REQUIRE(bypassDelayOf(h) == kLatency2x);
+
+    // Once the timer has reported it, the two agree.
+    int reported = -1, delay = -1;
+    h.withMessageLoop([&] {
+        const auto t0 = std::chrono::steady_clock::now();
+        while (h.proc.getLatencySamples() != kLatency2x
+               && std::chrono::steady_clock::now() - t0 < std::chrono::seconds(2))
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        reported = h.proc.getLatencySamples();
+        h.silence(0.05);   // a processed block in between, as on un-bypass
+        delay = bypassDelayOf(h);
+    });
+    REQUIRE(reported == kLatency2x);
+    REQUIRE(delay == reported);
 }

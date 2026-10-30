@@ -41,7 +41,7 @@
 #include "dsp/OversampleSwitcher.h"
 
 class SilentRiotProcessor : public juce::AudioProcessor,
-                            private juce::AsyncUpdater
+                            private juce::Timer
 {
 public:
     SilentRiotProcessor();
@@ -118,16 +118,26 @@ public:
 
 private:
     juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
-    void handleAsyncUpdate() override;  // deferred IR loading on message thread
-    // Sync cabSim to IR_INDEX now (restore: Async; prepareToPlay: Now — the
-    // only caller that may, since processBlock can't be running there).
+    // Message thread, 20 Hz: publishes a latency the audio thread computed
+    // (pendingLatency) to the host, and applies an IR_INDEX change (host
+    // automation) — so the audio thread never calls the host or posts to the
+    // message queue (RT-2, RT-3).
+    void timerCallback() override;
+    // Sync cabSim to IR_INDEX now (restore, timer, GUI: Async; prepareToPlay:
+    // Now — the only caller that may, since processBlock can't be running there).
     void applyIRIndexParam(sr::IRLoad load);
     void resetDSPState();               // clear all filter/integrator/cached state
     // Recompute every sample-rate-dependent coefficient for the current base
     // rate + oversample factor (filters, Millers, PSU/sag/OT, grid-charge decay,
-    // smoothers) and republish DAW latency. Shared by prepareToPlay and the
+    // smoothers) and the latency. Shared by prepareToPlay and the
     // oversample-switch commit path to avoid silent drift between the two.
-    void recalcRateDependentCoeffs();
+    // LatencyPublish::Now (prepareToPlay, message thread) reports the latency
+    // to the host at once; Deferred (the oversample commit, audio thread)
+    // only stores it in pendingLatency for timerCallback() — setLatencySamples()
+    // calls every host listener synchronously, which the audio thread must not
+    // do (RT-2).
+    enum class LatencyPublish { Now, Deferred };
+    void recalcRateDependentCoeffs(LatencyPublish publish);
 
     // User IR persistence
     std::vector<UserIREntry> userIRs;
@@ -186,6 +196,13 @@ private:
     // block into it, so the first bypassed block continues without a gap.
     sr::IntegerDelay<2, 32> bypassDelay;
     void syncBypassDelay();           // follow latency changes (oversample switch)
+    // The latency the engine runs at, as last computed by
+    // recalcRateDependentCoeffs() — the bypass line follows this, not
+    // getLatencySamples(), which lags it by up to one timer tick after an
+    // oversample switch. Audio thread (and prepareToPlay).
+    int engineLatency = 0;
+    // Latency waiting for timerCallback() to report it to the host.
+    std::atomic<int> pendingLatency { 0 };
 
     // The block size prepareToPlay sized every buffer for. A host block larger
     // than this is split into views of at most this many samples (RT-5); one
@@ -225,8 +242,12 @@ private:
     // audible block clears every effect tail on the audio thread (review B6).
     std::atomic<bool> tailsStale { false };
     double baseSampleRate = 44100.0;
-    std::atomic<int> cachedIRIndex { 0 };   // last IR index seen by audio thread (written msg+audio)
-    std::atomic<int> pendingIRIndex { -1 }; // deferred IR load (message thread)
+    // The IR_INDEX cabSim was last synced to: timerCallback() applies the
+    // parameter when it differs (RT-3). The audio thread never touches it;
+    // the timer, the GUI and state restore run on the message thread. Atomic
+    // only because a host may call prepareToPlay (which writes it) from
+    // another thread.
+    std::atomic<int> cachedIRIndex { 0 };
 
     // ── Live tuner ring buffer (single-producer audio / single-consumer GUI) ──
     // Power-of-two size; the writer stores a monotonically increasing total
