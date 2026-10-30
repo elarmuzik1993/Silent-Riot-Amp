@@ -94,7 +94,7 @@ hosts means reloading the plugin.
 
 **Steps**
 
-- [ ] At the very top of `processBlock`, before the tuner capture and the bypass-delay write,
+- [x] At the very top of `processBlock`, before the tuner capture and the bypass-delay write,
       replace every non-finite input sample with 0, across all channels:
       ```cpp
       for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
@@ -106,10 +106,10 @@ hosts means reloading the plugin.
       ```
       Before the tuner capture on purpose: the ring and the pitch detector should not see
       NaN either, and `bypassDelay` must not be primed with one.
-- [ ] Do the same in `processBlockBypassed`. It currently hands the host whatever it was
+- [x] Do the same in `processBlockBypassed`. It currently hands the host whatever it was
       given, delayed — so a bypassed plugin passes NaN straight through, and poisons the
       tuner ring and the bypass line on the way.
-- [ ] Note in `CLAUDE.md` (Important Pitfalls) that the input is a system boundary like the
+- [x] Note in `CLAUDE.md` (Important Pitfalls) that the input is a system boundary like the
       parameters are (review S1), and why the output scrub is not enough on its own.
 
 **Cost.** One `isfinite` and a predictable branch per input sample, at **base** rate — against
@@ -121,19 +121,24 @@ normal path.
 
 **Test** (new `tests/processor_robustness_tests.cpp`, in `SilentRiotProcessorTests`)
 
-- [ ] One NaN sample in an otherwise normal block: the amp still plays 2 s later, at the same
+- [x] One NaN sample in an otherwise normal block: the amp still plays 2 s later, at the same
       rms as before the event (within a few per cent).
-- [ ] Same for `+Inf`, `-Inf`, and a whole block of NaN.
-- [ ] `processBlockBypassed` with NaN input: output is finite.
-- [ ] The DSP readout (`getDSPReadout()`) stays finite throughout — it is what the ADVANCED
+- [x] Same for `+Inf`, `-Inf`, and a whole block of NaN.
+- [x] `processBlockBypassed` with NaN input: output is finite.
+- [x] The DSP readout (`getDSPReadout()`) stays finite throughout — it is what the ADVANCED
       panel shows, and today it goes NaN with the engine.
-- [ ] A normal signal is **bit-identical** with and without the scrub — pin it by rendering
+- [x] A normal signal is **bit-identical** with and without the scrub — pin it by rendering
       the same input through the harness and comparing samples exactly.
+      *Done as:* one binary cannot hold both versions, so the test pins the two halves —
+      a NaN input sample renders bit-identically to a 0 sample, and host bypass (a pure
+      delay behind the same scrub) passes finite edge values (−0, denormals, ±`FLT_MAX`)
+      bit-exact. The with/without comparison is the `sr_render` diff: four renders
+      (cab on, cab off, IR, 2× crank) `cmp`-identical to the pre-scrub build.
 
 **Verification**
 
-- [ ] `SilentRiotRTStress --only=recover` reports no findings (it currently reports four).
-- [ ] `SilentRiotRTStress --only=hostile` loses its "state poisoned" finding.
+- [x] `SilentRiotRTStress --only=recover` reports no findings (it currently reports four).
+- [x] `SilentRiotRTStress --only=hostile` loses its "state poisoned" finding.
 
 ---
 

@@ -21,6 +21,23 @@ float channelRms(const float* x, int n)
     return std::sqrt(sumSq / static_cast<float>(n));
 }
 
+// The audio input is a system boundary, like the parameters (review S1): an
+// upstream plugin, a failing interface or an uninitialised first host block
+// can hand over NaN or Inf. One such sample latches in every stateful stage
+// of the amp (filters, plate and cathode caches, grid charge, PSU, sag) and
+// silences it until the next prepareToPlay — and the output scrubs hide it,
+// since the host only ever hears 0 (RT-1). Replace them with 0 on the way in.
+// A finite sample is never touched, so the normal path stays bit-identical.
+void scrubNonFiniteInput(juce::AudioBuffer<float>& buffer)
+{
+    for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
+    {
+        auto* s = buffer.getWritePointer(ch);
+        for (int i = 0; i < buffer.getNumSamples(); ++i)
+            if (! std::isfinite(s[i])) s[i] = 0.0f;
+    }
+}
+
 } // namespace
 
 SilentRiotProcessor::SilentRiotProcessor()
@@ -486,6 +503,11 @@ void SilentRiotProcessor::processBlockBypassed(juce::AudioBuffer<float>& buffer,
     // (review B6). The tuner keeps getting the DI, as it does under power-off
     // and tuner mute — tuning with the plugin bypassed is a normal workflow.
     tailsStale = true;
+
+    // Scrubbed here too: bypass would otherwise pass a NaN straight to the
+    // host, and poison the tuner ring and the bypass line on the way (RT-1).
+    scrubNonFiniteInput(buffer);
+
     const int n = buffer.getNumSamples();
     const bool hasCh0 = buffer.getNumChannels() > 0;
     if (hasCh0)
@@ -519,6 +541,10 @@ bool SilentRiotProcessor::isBusesLayoutSupported(const BusesLayout& layouts) con
 void SilentRiotProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer&)
 {
     juce::ScopedNoDenormals noDenormals;
+
+    // First, before the tuner capture and the bypass-delay write below, so
+    // neither the tuner ring nor the bypass line ever holds a NaN (RT-1).
+    scrubNonFiniteInput(buffer);
 
     // Read parameters. The amp knobs are sanitized like the effects below: a
     // single host NaN on GAIN or VOLUME used to lock its ParamSmoother at NaN
