@@ -46,6 +46,9 @@ tagged release will collect everything below.
 
 ### Added
 
+- `AI_USAGE.md`, an AI addendum: the scope of AI usage, the AI-assisted workflow, the
+  author's contributions, ownership of the work and the non-infringement warranty limitation.
+  `CREDITS.md` now says the implementation is AI-assisted.
 - **EFFECTS panel** [#13, #18]:
   - UTILITY card: noise gate, a stereo widener (stereo tracks), and INPUT/OUTPUT level trims [#20].
   - BOOST: LEVEL, TIGHT and BRIGHT.

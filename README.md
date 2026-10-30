@@ -95,3 +95,5 @@ The DSP is original work. The tube models use the published Koren equations with
 datasheet parameters, and no code is taken from other amp simulators.
 [CREDITS.md](CREDITS.md) has the full statement and the third-party licences: JUCE
 (GPLv3), and the Space Mono and DM Sans fonts (SIL Open Font License 1.1).
+Silent Riot is built with AI-assisted implementation under the author's design, direction and
+review; [AI_USAGE.md](AI_USAGE.md) sets out the scope.
