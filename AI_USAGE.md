@@ -59,6 +59,10 @@ The design decisions, measurements and their reasons are kept in the repository
 (`docs/plans/`, `docs/records/`, `CHANGELOG.md`), so anyone can see how and why the code got
 the way it is, and re-run the measurements.
 
+Individual commits and pull requests do not carry AI attribution lines. That is a deliberate
+choice to keep the history clean and readable, not to hide anything: AI assistance is part of
+how the whole project is built, and this document discloses it once, for all of it.
+
 ## 3. Human Authored Content / Substantial Human Input
 
 The author, Boris Miscenco, art-directed the whole project. In practice that meant:
