@@ -23,7 +23,8 @@ _Updated 2026-10-30 (AI addendum added)_
   Saved with the device setup, not presets; hidden in VST3. Owner confirmed Input 2 plays on a KA6. Plan: `docs/plans/2026-10-29-standalone-input-select.md`.
 - Contributor issues #37–#48 are open (GUI bugs, IR loader, installers, README screenshot).
 - Commit as `Boris Miscenco <219343213+elarmuzik1993@users.noreply.github.com>`: export
-  `GIT_AUTHOR_EMAIL`/`GIT_COMMITTER_EMAIL`; the cloud env's values beat `git -c`.
+  `GIT_AUTHOR_EMAIL`/`GIT_COMMITTER_EMAIL`; the cloud env's values beat `git -c`. Public contact
+  email (docs only, never commits): borismishchenkodev@gmail.com.
 
 ## Next
 1. With owner OK: tag the tone-lock merge commit `tone-v1` and push the tag (`docs/dev/tone-lock.md`).
