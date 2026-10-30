@@ -87,10 +87,16 @@ The AI tools are not authors of the project.
 
 ## 4. Intellectual Property (IP) Assignment / Transfer of Rights
 
-- **Ownership of AI output.** Under the terms of service of the AI tools used, as they stood
-  when they were used, the provider assigns to the user whatever rights it has in the output.
-  As between the author and those providers, the author owns the AI-assisted output and the
-  project as a whole.
+- **Ownership of AI output.** The terms of both providers (Anthropic's Consumer and Commercial
+  Terms, and OpenAI's Terms of Use, as checked in October 2026) assign to the user all of the
+  provider's right, title and interest, *if any*, in the output, subject to the user complying
+  with those terms. So, as between the author and those providers, the author owns the
+  AI-assisted output. The project as a whole is the author's, apart from the third-party
+  libraries and fonts listed in [`CREDITS.md`](CREDITS.md), which stay under their own licences.
+- **Output is not exclusive.** OpenAI's terms note that output may not be unique and other
+  users may receive similar output. The assignment covers what the author received; it gives
+  no rights over anyone else's similar output, and nobody else's output gives rights over this
+  project.
 - **Copyright notice.** The project is © 2026 Boris Miscenco. The author's copyright covers
   the human contributions in section 3 and the selection, arrangement and modification of
   AI-assisted material. The law on copyright in AI-generated material differs between
