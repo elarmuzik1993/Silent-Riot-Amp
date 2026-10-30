@@ -17,6 +17,11 @@
 //   - a scrubbed sample is exactly a 0 sample (bit-identical render), and a
 //     finite sample is never touched (bypass passes it through bit-exact)
 //
+// And a host block larger than prepareToPlay's maximum (RT-5), which wrote
+// past the oversampler's buffer and crashed the host: it is split into
+// prepared-size views and renders exactly as the same input sent in
+// prepared-size blocks; a block at the maximum still takes one pass.
+//
 // Each case runs a few seconds of a 4x-oversampled amp; keep them short.
 // ═══════════════════════════════════════════════════════════════
 #include <catch2/catch_test_macros.hpp>
@@ -180,4 +185,97 @@ TEST_CASE("Processor: NaN input under processBlock never reaches the tuner ring 
     std::vector<float> out;
     h.run(0.05, [](int, int) { return 0.1f; }, Mode::Bypassed, &out);
     CHECK(allFinite(out));
+}
+
+// ── RT-5: a host block larger than the prepared maximum ──
+
+namespace {
+
+constexpr int kPrepared = 128;
+constexpr int kOversized = 2048;
+
+// Renders `totalSamples` (a multiple of `hostBlock`, both channels) of a
+// 220 Hz sine in `hostBlock`-sample host blocks through a processor prepared
+// at kPrepared. Returns the output, channels interleaved block by block.
+std::vector<float> renderInHostBlocks(int hostBlock, int totalSamples, Mode mode,
+                                      int* oversizedCount = nullptr)
+{
+    ProcessorHarness h(kSR, kPrepared);
+    // Delay and reverb on too: like the oversamplers, they size their buffers
+    // from prepareToPlay's block.
+    h.set(sr::Params::IDs::DELAY_ON, 1.0f);
+    h.set(sr::Params::IDs::REVERB_ON, 1.0f);
+    const Fill in = sine(220.0f, 0.18f, kSR);
+    juce::AudioBuffer<float> buf(h.numChannels, hostBlock);
+    juce::MidiBuffer midi;
+    std::vector<float> out;
+    for (int start = 0; start < totalSamples; start += hostBlock)
+    {
+        for (int ch = 0; ch < h.numChannels; ++ch)
+            for (int i = 0; i < hostBlock; ++i)
+                buf.setSample(ch, i, in(start + i, ch));
+        if (mode == Mode::Process) h.proc.processBlock(buf, midi);
+        else                       h.proc.processBlockBypassed(buf, midi);
+        for (int ch = 0; ch < h.numChannels; ++ch)
+            out.insert(out.end(), buf.getReadPointer(ch), buf.getReadPointer(ch) + hostBlock);
+    }
+    if (oversizedCount != nullptr) *oversizedCount = h.proc.getOversizedBlockCount();
+    return out;
+}
+
+// Re-orders a render made in `from`-sample blocks into `to`-sample blocks
+// (both interleave channels per block), so renders in different host block
+// sizes compare sample for sample.
+std::vector<float> reblock(const std::vector<float>& x, int from, int to, int channels)
+{
+    const int total = static_cast<int>(x.size()) / channels;
+    std::vector<float> y(x.size());
+    for (int ch = 0; ch < channels; ++ch)
+        for (int i = 0; i < total; ++i)
+        {
+            const auto src = static_cast<size_t>((i / from) * from * channels + ch * from + i % from);
+            const auto dst = static_cast<size_t>((i / to) * to * channels + ch * to + i % to);
+            y[dst] = x[src];
+        }
+    return y;
+}
+
+} // namespace
+
+TEST_CASE("Processor: a host block larger than the prepared maximum is split seamlessly (RT-5)", "[processor][robustness]")
+{
+    constexpr int kTotal = 16 * kOversized;   // ~0.74 s
+    for (const Mode mode : { Mode::Process, Mode::Bypassed })
+    {
+        INFO((mode == Mode::Process ? "processBlock" : "processBlockBypassed"));
+        int splitBig = -1, splitSmall = -1;
+        const auto big   = renderInHostBlocks(kOversized, kTotal, mode, &splitBig);
+        const auto small = reblock(renderInHostBlocks(kPrepared, kTotal, mode, &splitSmall),
+                                   kPrepared, kOversized, 2);
+        CHECK(splitBig == kTotal / kOversized);
+        CHECK(splitSmall == 0);
+
+        REQUIRE(allFinite(big));
+        float peak = 0.0f;
+        for (float v : big) peak = std::max(peak, std::abs(v));
+        CHECK(peak > dB(-40.0));   // it plays
+        CHECK(peak <= 1.0f);       // and stays bounded
+
+        // Each view runs exactly as a host block of that size would: the split
+        // is seamless, so the render is bit-identical.
+        REQUIRE(big.size() == small.size());
+        CHECK(std::memcmp(big.data(), small.data(), big.size() * sizeof(float)) == 0);
+    }
+}
+
+TEST_CASE("Processor: a block at the prepared maximum takes a single pass (RT-5)", "[processor][robustness]")
+{
+    for (const Mode mode : { Mode::Process, Mode::Bypassed })
+    {
+        int split = -1;
+        renderInHostBlocks(kPrepared, 4 * kPrepared, mode, &split);
+        CHECK(split == 0);
+        renderInHostBlocks(kPrepared + 1, 4 * (kPrepared + 1), mode, &split);
+        CHECK(split == 4);   // one sample over is already a split
+    }
 }

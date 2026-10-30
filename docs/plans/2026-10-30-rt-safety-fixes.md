@@ -157,19 +157,19 @@ whole host going down.
 
 **Steps**
 
-- [ ] Store the prepared maximum in `prepareToPlay` (`preparedBlockSize`), rather than
+- [x] Store the prepared maximum in `prepareToPlay` (`preparedBlockSize`), rather than
       trusting `getBlockSize()`, which a host can change with `setPlayConfigDetails` without
       preparing again.
-- [ ] At the top of `processBlock`, if `buffer.getNumSamples() > preparedBlockSize`, split the
+- [x] At the top of `processBlock`, if `buffer.getNumSamples() > preparedBlockSize`, split the
       buffer into views of at most that many samples and run the existing body on each:
       ```cpp
       juce::AudioBuffer<float> view(buffer.getArrayOfWritePointers(),
                                     buffer.getNumChannels(), offset, n);
       ```
       A view, so there is no copy and no allocation.
-- [ ] Same guard in `processBlockBypassed`. (`bypassDelay` is a ring sized by its maximum
+- [x] Same guard in `processBlockBypassed`. (`bypassDelay` is a ring sized by its maximum
       delay, not by the block, so it is already safe — but keep the two paths symmetrical.)
-- [ ] `jassert` on the over-sized case so a debug build still points at the misbehaving host.
+- [x] `jassert` on the over-sized case so a debug build still points at the misbehaving host.
 
 **Tone.** No effect at or below the prepared size: the loop body does not run, so the path is
 bit-identical. Above it, the only behavioural differences are that per-block work (metering,
@@ -177,14 +177,14 @@ the cab-mode commit, the oversample fade) happens per sub-block — finer, not d
 
 **Test**
 
-- [ ] Prepared at 128, fed 2048: output finite, bounded, and equal to the same input rendered
+- [x] Prepared at 128, fed 2048: output finite, bounded, and equal to the same input rendered
       in 128-sample blocks (the split must be seamless, not just safe).
-- [ ] A block of exactly `preparedBlockSize` still takes the single-pass path.
+- [x] A block of exactly `preparedBlockSize` still takes the single-pass path.
 
 **Verification**
 
-- [ ] `SilentRiotRTStress --only=overblock --overblock` completes instead of crashing.
-- [ ] The same under AddressSanitizer: 0 errors.
+- [x] `SilentRiotRTStress --only=overblock --overblock` completes instead of crashing.
+- [x] The same under AddressSanitizer: 0 errors.
 
 ---
 

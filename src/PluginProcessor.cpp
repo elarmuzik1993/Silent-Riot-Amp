@@ -38,6 +38,24 @@ void scrubNonFiniteInput(juce::AudioBuffer<float>& buffer)
     }
 }
 
+// A host may hand over a block larger than prepareToPlay's maximum (VST3 and
+// AU forbid it, but hosts do it, most often on an offline bounce or a freeze).
+// The oversamplers, convolution, delay and reverb are sized for that maximum
+// and a bigger block writes past their buffers (RT-5). Run `fn` on views of at
+// most `maxBlock` samples: non-owning, so no copy and no allocation (JUCE keeps
+// up to 32 channel pointers inline).
+template <typename Fn>
+void forEachPreparedChunk(juce::AudioBuffer<float>& buffer, int maxBlock, Fn&& fn)
+{
+    const int total = buffer.getNumSamples();
+    for (int offset = 0; offset < total; offset += maxBlock)
+    {
+        juce::AudioBuffer<float> view(buffer.getArrayOfWritePointers(), buffer.getNumChannels(),
+                                      offset, std::min(maxBlock, total - offset));
+        fn(view);
+    }
+}
+
 } // namespace
 
 SilentRiotProcessor::SilentRiotProcessor()
@@ -342,6 +360,7 @@ void SilentRiotProcessor::recalcRateDependentCoeffs()
 void SilentRiotProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 {
     baseSampleRate = sampleRate;
+    preparedBlockSize = samplesPerBlock;
 
     // Start in the saved oversample mode — otherwise every prepare starts at 4x
     // and a 2x/8x session fades out, goes silent and fades back in on its first
@@ -495,7 +514,22 @@ void SilentRiotProcessor::syncBypassDelay()
     if (latency != bypassDelay.getDelay()) bypassDelay.setDelay(latency);
 }
 
-void SilentRiotProcessor::processBlockBypassed(juce::AudioBuffer<float>& buffer, juce::MidiBuffer&)
+void SilentRiotProcessor::processBlockBypassed(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi)
+{
+    // Same guard as processBlock. bypassDelay is a ring sized by its maximum
+    // delay, not by the block, so this path was already safe — kept symmetrical.
+    if (preparedBlockSize <= 0 || buffer.getNumSamples() <= preparedBlockSize)
+    {
+        processChunkBypassed(buffer, midi);
+        return;
+    }
+    jassertfalse;   // the host broke its promised maximum block size (RT-5)
+    oversizedBlocks.fetch_add(1, std::memory_order_relaxed);
+    forEachPreparedChunk(buffer, preparedBlockSize,
+                         [&](juce::AudioBuffer<float>& view) { processChunkBypassed(view, midi); });
+}
+
+void SilentRiotProcessor::processChunkBypassed(juce::AudioBuffer<float>& buffer, juce::MidiBuffer&)
 {
     // Host bypass. processBlock doesn't run, so delay, reverb, IR convolution
     // and widener freeze holding their tails, exactly as under power-off: flag
@@ -538,7 +572,25 @@ bool SilentRiotProcessor::isBusesLayoutSupported(const BusesLayout& layouts) con
     return mainIn == mainOut;
 }
 
-void SilentRiotProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer&)
+void SilentRiotProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi)
+{
+    // At or below the prepared maximum (every well-behaved host): one direct
+    // pass, bit-identical. Above it, split into prepared-size views and run
+    // each as its own block (RT-5) — the same as the host sending them one by
+    // one, so per-block work (meters, cab-mode commit, oversample fade) just
+    // runs per view. Not prepared yet (0): left to the body, as before.
+    if (preparedBlockSize <= 0 || buffer.getNumSamples() <= preparedBlockSize)
+    {
+        processChunk(buffer, midi);
+        return;
+    }
+    jassertfalse;   // the host broke its promised maximum block size (RT-5)
+    oversizedBlocks.fetch_add(1, std::memory_order_relaxed);
+    forEachPreparedChunk(buffer, preparedBlockSize,
+                         [&](juce::AudioBuffer<float>& view) { processChunk(view, midi); });
+}
+
+void SilentRiotProcessor::processChunk(juce::AudioBuffer<float>& buffer, juce::MidiBuffer&)
 {
     juce::ScopedNoDenormals noDenormals;
 

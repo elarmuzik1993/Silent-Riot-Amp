@@ -58,6 +58,10 @@ public:
     using juce::AudioProcessor::processBlockBypassed;
     void processBlockBypassed(juce::AudioBuffer<float>&, juce::MidiBuffer&) override;
 
+    // Host blocks larger than prepareToPlay's maximum that were split (RT-5).
+    // A host-contract break; counted so a test can tell a split from a single pass.
+    int getOversizedBlockCount() const { return oversizedBlocks.load(std::memory_order_relaxed); }
+
     juce::AudioProcessorEditor* createEditor() override;
     bool hasEditor() const override;
 
@@ -182,6 +186,15 @@ private:
     // block into it, so the first bypassed block continues without a gap.
     sr::IntegerDelay<2, 32> bypassDelay;
     void syncBypassDelay();           // follow latency changes (oversample switch)
+
+    // The block size prepareToPlay sized every buffer for. A host block larger
+    // than this is split into views of at most this many samples (RT-5); one
+    // at or below it goes straight through, bit-identical. 0 = not prepared.
+    int preparedBlockSize = 0;
+    std::atomic<int> oversizedBlocks { 0 };
+    // processBlock / processBlockBypassed for a block of at most preparedBlockSize.
+    void processChunk(juce::AudioBuffer<float>&, juce::MidiBuffer&);
+    void processChunkBypassed(juce::AudioBuffer<float>&, juce::MidiBuffer&);
 
     // Triode plate voltage cache (inter-sample)
     sr::TriodeState v1aTriode, v1bTriode;
