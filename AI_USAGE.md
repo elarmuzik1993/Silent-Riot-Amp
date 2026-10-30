@@ -52,8 +52,9 @@ Every change, whoever or whatever typed it, goes through the same steps:
    listening. The sound is frozen at `tone-v1` by the author's ear sign-off; an automated test
    fails on any change to it, and the references move only after the author approves an A/B
    comparison ([`docs/dev/tone-lock.md`](docs/dev/tone-lock.md)).
-5. **The author reviews and merges.** Changes arrive as pull requests. The author decides what
-   is merged, sent back or dropped, and tests the plugin on real hardware.
+5. **The author reviews and merges.** Changes arrive as pull requests, and every one was
+   reviewed manually by the author before it was merged. The author decides what is merged,
+   sent back or dropped, and tests the plugin on real hardware.
 
 The design decisions, measurements and their reasons are kept in the repository
 (`docs/plans/`, `docs/records/`, `CHANGELOG.md`), so anyone can see how and why the code got
@@ -62,6 +63,12 @@ the way it is, and re-run the measurements.
 Individual commits and pull requests do not carry AI attribution lines. That is a deliberate
 choice to keep the history clean and readable, not to hide anything: AI assistance is part of
 how the whole project is built, and this document discloses it once, for all of it.
+
+**The author's development system.** Silent Riot was built with a workflow the author
+designed for directing AI across machines and sessions, local and cloud. Project rules and
+decisions live in [`AGENTS.md`](AGENTS.md) and [`CLAUDE.md`](CLAUDE.md), a hand-off note
+([`.agents/STATE.md`](.agents/STATE.md)) lets every session resume from the repository alone,
+and the wider project context is kept in an Obsidian vault.
 
 ## 3. Human Authored Content / Substantial Human Input
 
