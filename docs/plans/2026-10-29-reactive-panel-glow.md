@@ -370,10 +370,10 @@ plate-cache tests, one sampled pixel each, no reference image):
   result is the evidence for whichever hue carrier shipped.
 
 **Steps:**
-- [ ] `bash scripts/verify.sh` green, tone lock included.
-- [ ] Move this plan's row in the `docs/README.md` index from `planned` to `done`.
-- [ ] CHANGELOG entry under Unreleased → Added, naming it as a visual-only change.
-- [ ] Rewrite `.agents/STATE.md` as the repo will be once the branch merges.
+- [x] `bash scripts/verify.sh` green, tone lock included.
+- [x] Move this plan's row in the `docs/README.md` index from `planned` to `done`.
+- [x] CHANGELOG entry under Unreleased → Added, naming it as a visual-only change.
+- [x] Rewrite `.agents/STATE.md` as the repo will be once the branch merges.
 
 **Verification:** `bash scripts/verify.sh` passes; `git diff` reviewed before commit.
 
