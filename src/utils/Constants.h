@@ -423,6 +423,16 @@ constexpr float SPRING_SIZE_GLIDE_MS   = 20.0f;
 constexpr float SPRING_GLIDE_SNAP_SAMP = 1e-4f; // land the length glide (samples)
 constexpr float SPRING_GLIDE_SNAP_FB   = 1e-6f; // land the feedback glide
 
+// ── GUI metering (read-only; never touches a sample) ────────
+// Output block peak (outputPeakForGUI): a hardware peak meter's ballistics.
+// Instant attack; the held peak releases exponentially with this 1/e time
+// constant (~35 dB/s), applied as exp(-n / (tau * fs)) for a block of n
+// samples, so the release is the same at every host block size.
+constexpr float METER_PEAK_RELEASE_MS = 250.0f;
+// The held peak flushes to exactly 0 below this (-120 dBFS), so its decay
+// across silence never goes denormal. Metering state only — not ANTI_DENORMAL.
+constexpr float METER_PEAK_FLOOR      = 1e-6f;
+
 // ── Debug assertions ────────────────────────────────────────
 #ifdef DEBUG
 #define VS_ASSERT_RANGE(val, lo, hi, stage) \

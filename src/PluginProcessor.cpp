@@ -413,6 +413,11 @@ void SilentRiotProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
         cabWaitLogged = false;
         cabStartFresh = true;
     }
+
+    // Output peak meter: release follows the new rate; start from nothing.
+    meterPeakLogDecayPerSample =
+        -1.0f / (sr::METER_PEAK_RELEASE_MS * 0.001f * static_cast<float>(sampleRate));
+    clearOutputPeak();
 }
 
 int SilentRiotProcessor::cabFadeInHold(sr::CabMode entered, sr::CabMode left) const
@@ -468,6 +473,35 @@ void SilentRiotProcessor::reset()
     // thread, so this is safe from any thread. The amp stays on its operating
     // point: zeroing its filters here would replay the startup burst (B1).
     tailsStale = true;
+    // The output peak meter is GUI state, not DSP state: drop the held peak so
+    // it doesn't release from before the stop. Nothing else is touched.
+    clearOutputPeak();
+}
+
+void SilentRiotProcessor::publishOutputPeak(const float* ch0, int n)
+{
+    // Read-only scan of a finished block: |x| max, skipping NaN/Inf (as the
+    // post-effects soft-clip does). Then a peak meter's fold — instant attack,
+    // the held value released by exp(n * per-sample log decay) — and a flush
+    // to exactly 0 below METER_PEAK_FLOOR so the release never goes denormal.
+    float blockPeak = 0.0f;
+    if (ch0 != nullptr)
+        for (int i = 0; i < n; ++i)
+        {
+            const float a = std::abs(ch0[i]);
+            if (std::isfinite(a) && a > blockPeak) blockPeak = a;
+        }
+    const float decay = n > 0 ? std::exp(static_cast<float>(n) * meterPeakLogDecayPerSample) : 1.0f;
+    float held = std::max(blockPeak, meterPeak.load(std::memory_order_relaxed) * decay);
+    if (held < sr::METER_PEAK_FLOOR) held = 0.0f;
+    meterPeak.store(held, std::memory_order_relaxed);
+    outputPeakForGUI.store(held, std::memory_order_relaxed);
+}
+
+void SilentRiotProcessor::clearOutputPeak()
+{
+    meterPeak.store(0.0f, std::memory_order_relaxed);
+    outputPeakForGUI.store(0.0f, std::memory_order_relaxed);
 }
 
 void SilentRiotProcessor::syncBypassDelay()
@@ -506,6 +540,7 @@ void SilentRiotProcessor::processBlockBypassed(juce::AudioBuffer<float>& buffer,
     bypassDelay.process(buffer.getArrayOfWritePointers(), buffer.getNumChannels(), n);
     outputLevelForGUI.store(hasCh0 ? channelRms(buffer.getReadPointer(0), n) : 0.0f,
                             std::memory_order_relaxed);
+    publishOutputPeak(hasCh0 ? buffer.getReadPointer(0) : nullptr, n);
 }
 
 bool SilentRiotProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const {
@@ -594,6 +629,7 @@ void SilentRiotProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
                                           : 0.0f,
                                std::memory_order_relaxed);
         outputLevelForGUI.store(0.0f, std::memory_order_relaxed);
+        clearOutputPeak();   // silent, and nothing held to release from on return
         gridCurrentForGUI.store(0.0f, std::memory_order_relaxed);
         buffer.clear();
         tailsStale = true;
@@ -1094,6 +1130,10 @@ void SilentRiotProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     if (buffer.getNumSamples() > 0)
         outputLevelForGUI.store(channelRms(buffer.getReadPointer(0), buffer.getNumSamples()),
                                 std::memory_order_relaxed);
+    // Block peak of the same buffer, after its last write (review S6: every
+    // exit that publishes outputLevelForGUI publishes this too).
+    publishOutputPeak(buffer.getNumChannels() > 0 ? buffer.getReadPointer(0) : nullptr,
+                      buffer.getNumSamples());
 
     // ── Grid current readout (block peak across both EL84 grids) ──
     // The tracked drop is a voltage; the current is drop / source resistance

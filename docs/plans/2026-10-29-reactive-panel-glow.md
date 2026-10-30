@@ -231,28 +231,28 @@ the tone lock is next opened, not here.
   not change with block size.
 
 **Steps:**
-- [ ] Add `METER_PEAK_RELEASE_MS` (250) to `src/utils/Constants.h`, following the established
+- [x] Add `METER_PEAK_RELEASE_MS` (250) to `src/utils/Constants.h`, following the established
       `_MS` time suffix (`SAG_ATTACK_MS`, `TAU_POWER_MS`).
-- [ ] In `processBlock`, beside the existing `outputLevelForGUI.store(channelRms(...))`, scan
+- [x] In `processBlock`, beside the existing `outputLevelForGUI.store(channelRms(...))`, scan
       channel 0 for `std::abs` max (guarding non-finite samples, as the soft-clip loop does), fold
       it in as `meterPeak = max(blockPeak, meterPeak * decay)` and store. The existing conditional
       soft-clip loop runs only when an effect is live, so this needs its own pass.
-- [ ] Publish on the other two exits: `0.0f` under power-off and under tuner mute (the output is
+- [x] Publish on the other two exits: `0.0f` under power-off and under tuner mute (the output is
       silent); the delayed dry passthrough's own peak in `processBlockBypassed`.
-- [ ] Clear `meterPeak` in `prepareToPlay` and in `reset()`. This is metering state, not DSP
+- [x] Clear `meterPeak` in `prepareToPlay` and in `reset()`. This is metering state, not DSP
       state — the rule that `reset()` must not touch the amp (B1, the startup burst) still holds.
-- [ ] Flush `meterPeak` to exactly 0 below a small threshold. Decaying toward zero across silence
+- [x] Flush `meterPeak` to exactly 0 below a small threshold. Decaying toward zero across silence
       drives it denormal, and denormals are slow on some CPUs. Flush the **meter's own value**;
       never reach for `ANTI_DENORMAL` here, which belongs in IIR filter state inside the audio
       path and would be a tone change.
 
 **Verification:**
-- [ ] A single-sample spike in an otherwise silent block raises `outputPeakForGUI` where
+- [x] A single-sample spike in an otherwise silent block raises `outputPeakForGUI` where
       `outputLevelForGUI` (RMS) stays near 0.
-- [ ] The decay is block-size independent: the same signal at 64 and 2048 samples per block
+- [x] The decay is block-size independent: the same signal at 64 and 2048 samples per block
       reaches the same peak and releases at the same rate within tolerance.
-- [ ] Power off → 0. Tuner mute → 0. Host bypass → the passthrough's peak, not 0 and not stale.
-- [ ] `tests/tone_lock_tests.cpp` passes unchanged.
+- [x] Power off → 0. Tuner mute → 0. Host bypass → the passthrough's peak, not 0 and not stale.
+- [x] `tests/tone_lock_tests.cpp` passes unchanged.
 
 ---
 
