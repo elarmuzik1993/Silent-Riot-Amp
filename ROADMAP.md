@@ -182,7 +182,7 @@ no rough edges; level-matchable output.
   feed the trimmed input to `cabSim` (no change when the amp is on, so the tone lock is unaffected);
   a make-up gain, since IRs are level-matched to the amp's output; a delay to hold the reported
   latency; clean convolution/limiter resets on toggle; live meters. A new parameter is appended last.
-  Not planned.
+  Not planned by the maintainer; **open for contributions**.
 
 ---
 
