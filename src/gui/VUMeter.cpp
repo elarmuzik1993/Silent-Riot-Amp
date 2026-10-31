@@ -4,6 +4,8 @@
 #include "ColourPalette.h"
 #include "FontData.h"
 
+#include <cmath>
+
 namespace sr {
 
 VUMeter::VUMeter(const juce::String& l) : label(l)
@@ -11,9 +13,17 @@ VUMeter::VUMeter(const juce::String& l) : label(l)
     startTimerHz(60);
 }
 
-void VUMeter::setLevel(float newLevel)
+float VUMeter::barPositionFromAmplitude(float amplitude)
 {
-    targetLevel = juce::jlimit(0.0f, 1.0f, newLevel);
+    // Not finite or at/below silence reads as an empty bar, never NaN into the lerp.
+    if (!(amplitude > 0.0f) || !std::isfinite(amplitude)) return 0.0f;
+    const float db = 20.0f * std::log10(amplitude);
+    return juce::jlimit(0.0f, 1.0f, (db - kFloorDb) / -kFloorDb);
+}
+
+void VUMeter::setLevel(float amplitude)
+{
+    targetLevel = barPositionFromAmplitude(amplitude);
 }
 
 void VUMeter::setBallistics(int mode)

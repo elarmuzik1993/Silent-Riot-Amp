@@ -76,8 +76,9 @@ reverb tails, so nothing from before power-off replays.
 ## Meters
 
 The **IN** meter (left) shows the input after the INPUT trim; the **OUT** meter
-(right) shows the final output after the OUTPUT trim. Ballistics and peak hold
-are set in [Settings](presets-and-settings.md#settings).
+(right) shows the final output after the OUTPUT trim. Both read RMS level on a dB
+scale, −60 to 0 dBFS from bottom to top: green to −18, yellow to −9, red above. Ballistics
+and peak hold are set in [Settings](presets-and-settings.md#settings).
 
 ## Footer
 
