@@ -60,6 +60,7 @@ Dated defect investigations and reviews. Each one is a measurement you can re-ru
 | [`records/handoffs/handoff-ir-path-sound.md`](records/handoffs/handoff-ir-path-sound.md) | Measurements for the IR-path sound fixes (level match, mode fades) |
 | [`records/reviews/review-dsp-2026-10-15.md`](records/reviews/review-dsp-2026-10-15.md) | Full DSP code review, 2026-10-15 (findings B1–B8, S1–S8) |
 | [`records/reviews/review-dsp-2026-10-15-probe.cpp`](records/reviews/review-dsp-2026-10-15-probe.cpp) | The probe program behind that review |
+| [`records/reviews/review-rt-stress-2026-10-29.md`](records/reviews/review-rt-stress-2026-10-29.md) | Real-time stress review, 2026-10-29 (findings RT-1–RT-6): allocations, locks, deadlines, NaN recovery |
 | [`records/roadmap-2026-06-audit.md`](records/roadmap-2026-06-audit.md) | June 2026 engineering audit roadmap (archived; the live plan is [`../ROADMAP.md`](../ROADMAP.md)) |
 
 ## Plans
@@ -70,6 +71,7 @@ Dated defect investigations and reviews. Each one is a measurement you can re-ru
 | [`plans/2026-10-23-power-section-fixes.md`](plans/2026-10-23-power-section-fixes.md) | in progress (Tasks 0–1 done) |
 | [`plans/2026-10-26-ir-path-sound-fixes.md`](plans/2026-10-26-ir-path-sound-fixes.md) | done |
 | [`plans/2026-10-28-open-source-docs-prep.md`](plans/2026-10-28-open-source-docs-prep.md) | in progress |
+| [`plans/2026-10-30-rt-safety-fixes.md`](plans/2026-10-30-rt-safety-fixes.md) | not started (fixes RT-1…RT-6) |
 | [`plans/2026-10-29-reactive-panel-glow.md`](plans/2026-10-29-reactive-panel-glow.md) | done |
 
 Current project status and the next steps are in [`../.agents/STATE.md`](../.agents/STATE.md);

@@ -185,7 +185,7 @@ struct CabinetSim
     // Called from audio thread only
     void processBlock(juce::dsp::AudioBlock<float>& block);
 
-    // Called from message thread only (via AsyncUpdater)
+    // Called from message thread only
     void setIRIndex(int newIndex);
     void loadStockIR(int stockIndex);
     void loadIRFromFile(const juce::File& file);

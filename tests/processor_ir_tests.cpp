@@ -6,10 +6,11 @@
 // into a live instance.
 //
 // applyUserIRIndex() is unit-tested in user_ir_state_tests.cpp; what only the
-// processor can show is that the restore path actually calls it. processBlock
-// reacts to IR_INDEX only when it differs from the last index it saw, so a
-// restore that leaves the index unchanged but shrinks the IR list is caught
-// by nothing else — the previous IR would keep playing in IIR mode's place.
+// processor can show is that the restore path actually calls it. The
+// processor's timer reacts to IR_INDEX only when it differs from the last
+// index applied (RT-3; processBlock no longer looks), so a restore that leaves
+// the index unchanged but shrinks the IR list is caught by nothing else — the
+// previous IR would keep playing in IIR mode's place.
 //
 // Also: the active IR is installed synchronously by prepareToPlay (IR-path
 // plan Task 1), so a session restored before prepare plays its cab from the
@@ -21,7 +22,9 @@
 #include "dsp/cabinet/CabModeSwitcher.h"
 
 #include <algorithm>
+#include <atomic>
 #include <cstdint>
+#include <limits>
 #include <vector>
 
 using namespace sr::test;
@@ -468,8 +471,7 @@ TEST_CASE("Processor: a cab mode set after prepare, before the first block, does
 
 // The IR loader's CAB view steps to the built-in cab as well as to each IR.
 // selectBuiltInCab() applies IR_INDEX 0 itself, as selectUserIR() does for an
-// IR, so the convolution is off before the next block, not after the message
-// loop has run processBlock's async update.
+// IR, so the convolution is off before the next block, not a timer tick later.
 TEST_CASE("Processor: selectBuiltInCab turns the IR off, selectUserIR brings it back",
           "[processor][ir]")
 {
@@ -495,4 +497,74 @@ TEST_CASE("Processor: selectBuiltInCab turns the IR off, selectUserIR brings it 
     }
     h.silence(0.5);
     REQUIRE(tailAfterNote(h) > dB(-100.0));
+}
+
+// IR_INDEX automation (RT-3). processBlock used to notice the change and post
+// it to the message queue with triggerAsyncUpdate() — a lock, a write()
+// syscall and a possible allocation on the audio thread. Now the processor's
+// message-thread timer polls the parameter, so this needs a pumped message
+// loop, as in a host: the audio runs on a thread of its own and sets the
+// parameter the way host automation does.
+TEST_CASE("Processor: automating IR_INDEX swaps the cab via the message-thread timer (RT-3, review S2)",
+          "[processor][ir]")
+{
+    juce::TemporaryFile irFile1(".wav"), irFile2(".wav");
+    ProcessorHarness h;
+    h.loadIR(writeWav(irFile1, longDecayIR(4242u), 8000.0));
+    h.loadIR(writeWav(irFile2, longDecayIR(2424u), 8000.0));   // IR_INDEX = 2, playing
+    REQUIRE(irIndex(h) == 2);
+    REQUIRE(tailAfterNote(h) > dB(-100.0));
+
+    // Blocks at roughly real-time pace, so the timer ticks several times and
+    // JUCE's background thread can build an engine; then past the cab fade.
+    auto settle = [&h] {
+        for (int i = 0; i < 60; ++i)
+        {
+            h.silence(512.0 / 44100.0);
+            std::this_thread::sleep_for(std::chrono::milliseconds(5));
+        }
+        h.silence(0.5);
+    };
+
+    // getTailLengthSeconds() reads the cab state the timer writes, so read it
+    // on the message thread, between ticks, not on this audio thread.
+    auto tailLength = [&h] {
+        std::atomic<bool> done { false };
+        double v = std::numeric_limits<double>::quiet_NaN();   // NaN fails every check below
+        if (! juce::MessageManager::callAsync([&] { v = h.proc.getTailLengthSeconds(); done = true; }))
+            return v;
+        while (! done.load())
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        return v;
+    };
+
+    float tailBuiltIn = 0.0f, tailIR1 = 0.0f, tailPast = 0.0f;
+    const double kUnread = std::numeric_limits<double>::quiet_NaN();
+    double lengthBuiltIn = kUnread, lengthIR1 = kUnread, lengthPast = kUnread;
+    h.withMessageLoop([&] {
+        h.setFromAudioThread(IDs::IR_INDEX, 0.0f);   // the built-in cab
+        settle();
+        lengthBuiltIn = tailLength();
+        tailBuiltIn = tailAfterNote(h);
+
+        h.setFromAudioThread(IDs::IR_INDEX, 1.0f);   // the first IR
+        settle();
+        lengthIR1 = tailLength();
+        tailIR1 = tailAfterNote(h);
+
+        h.setFromAudioThread(IDs::IR_INDEX, 5.0f);   // past the list: convolution off
+        settle();
+        lengthPast = tailLength();
+        tailPast = tailAfterNote(h);
+    });
+
+    INFO("IR_INDEX 0: the IR kept ringing");
+    CHECK(lengthBuiltIn <= 0.0);
+    CHECK(tailBuiltIn < dB(-100.0));
+    INFO("IR_INDEX 1: the IR did not come back");
+    CHECK(lengthIR1 > 0.5);
+    CHECK(tailIR1 > dB(-100.0));
+    INFO("IR_INDEX past the list: a stale IR kept playing (review S2)");
+    CHECK(lengthPast <= 0.0);
+    CHECK(tailPast < dB(-100.0));
 }

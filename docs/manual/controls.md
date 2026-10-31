@@ -92,6 +92,27 @@ There is no on-screen switch: change it from your host's parameter list or
 automation (**Oversample**). The change crossfades, and the reported latency
 updates (10 samples at 2×, 12 at 4× and 8×).
 
+What oversampling costs grows with the session sample rate times the factor:
+8× costs about four times what 2× does, and doubling the session rate doubles
+it again. At 88.2 kHz and above, the top settings may not keep up on a modest
+machine — if you hear dropouts after raising the factor, step it back down. As
+a guide, this is the share of the audio deadline the amp used per 512-sample
+block at cranked settings, measured on a slow machine (one Intel Xeon 2.1 GHz
+cloud vCPU, GCC 13 Release build — roughly 2–3× slower per core than a current
+desktop). Anything over 100% cannot keep up there; a faster computer moves
+every number down, but not the ratios between them.
+
+| Session rate | 2× | 4× | 8× |
+|---|---:|---:|---:|
+| 44.1 kHz | 21% | 44% | 70% |
+| 48 kHz | 23% | 40% | 74% |
+| 88.2 kHz | 41% | 70% | 123% |
+| 96 kHz | 46% | 84% | 140% |
+| 176.4 kHz | 80% | 140% | 242% |
+| 192 kHz | 97% | 157% | 284% |
+
+Turning on every effect adds a few percent more.
+
 ## Advanced panel
 
 ![Advanced panel](../../resources/images/advanced-panel.png)

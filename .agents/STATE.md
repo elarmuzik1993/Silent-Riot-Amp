@@ -23,6 +23,10 @@ _Updated 2026-10-30 (Settings redesign, Oxanium font)_
 - **Reactive panel glow** (`docs/plans/2026-10-29-reactive-panel-glow.md`): faceplate piping lights with
   the output peak (`outputPeakForGUI`), reddens with compression; the lamp's bloom breathes. Code:
   `GlowDriveFollower`, `glowBeadColour()` in `src/gui/AmpFaceplate.h`; editor timer drives it.
+- Real-time stress harness `SilentRiotRTStress` (`docs/dev/testing.md`): built by verify, not a ctest, exit 1
+  on a violated contract. Its review (`docs/records/reviews/review-rt-stress-2026-10-29.md`) is closed by
+  `docs/plans/2026-10-30-rt-safety-fixes.md`: input NaN/Inf scrubbed, over-sized host blocks split, latency +
+  `IR_INDEX` published by a 20 Hz message-thread timer, atomic tuner ring. RT-6 documented, not enforced.
 - Contributor issues #37–#48 are open (GUI bugs, IR loader, installers, README screenshot).
 - Commit as `Boris Miscenco <219343213+elarmuzik1993@users.noreply.github.com>`: export
   `GIT_AUTHOR_EMAIL`/`GIT_COMMITTER_EMAIL`; the cloud env's values beat `git -c`. Public contact

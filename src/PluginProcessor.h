@@ -41,7 +41,7 @@
 #include "dsp/OversampleSwitcher.h"
 
 class SilentRiotProcessor : public juce::AudioProcessor,
-                            private juce::AsyncUpdater
+                            private juce::Timer
 {
 public:
     SilentRiotProcessor();
@@ -57,6 +57,10 @@ public:
     // tails stale, since processBlock (and so every effect) stops running.
     using juce::AudioProcessor::processBlockBypassed;
     void processBlockBypassed(juce::AudioBuffer<float>&, juce::MidiBuffer&) override;
+
+    // Host blocks larger than prepareToPlay's maximum that were split (RT-5).
+    // A host-contract break; counted so a test can tell a split from a single pass.
+    int getOversizedBlockCount() const { return oversizedBlocks.load(std::memory_order_relaxed); }
 
     juce::AudioProcessorEditor* createEditor() override;
     bool hasEditor() const override;
@@ -114,16 +118,26 @@ public:
 
 private:
     juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
-    void handleAsyncUpdate() override;  // deferred IR loading on message thread
-    // Sync cabSim to IR_INDEX now (restore: Async; prepareToPlay: Now — the
-    // only caller that may, since processBlock can't be running there).
+    // Message thread, 20 Hz: publishes a latency the audio thread computed
+    // (pendingLatency) to the host, and applies an IR_INDEX change (host
+    // automation) — so the audio thread never calls the host or posts to the
+    // message queue (RT-2, RT-3).
+    void timerCallback() override;
+    // Sync cabSim to IR_INDEX now (restore, timer, GUI: Async; prepareToPlay:
+    // Now — the only caller that may, since processBlock can't be running there).
     void applyIRIndexParam(sr::IRLoad load);
     void resetDSPState();               // clear all filter/integrator/cached state
     // Recompute every sample-rate-dependent coefficient for the current base
     // rate + oversample factor (filters, Millers, PSU/sag/OT, grid-charge decay,
-    // smoothers) and republish DAW latency. Shared by prepareToPlay and the
+    // smoothers) and the latency. Shared by prepareToPlay and the
     // oversample-switch commit path to avoid silent drift between the two.
-    void recalcRateDependentCoeffs();
+    // LatencyPublish::Now (prepareToPlay, message thread) reports the latency
+    // to the host at once; Deferred (the oversample commit, audio thread)
+    // only stores it in pendingLatency for timerCallback() — setLatencySamples()
+    // calls every host listener synchronously, which the audio thread must not
+    // do (RT-2).
+    enum class LatencyPublish { Now, Deferred };
+    void recalcRateDependentCoeffs(LatencyPublish publish);
 
     // User IR persistence
     std::vector<UserIREntry> userIRs;
@@ -182,6 +196,22 @@ private:
     // block into it, so the first bypassed block continues without a gap.
     sr::IntegerDelay<2, 32> bypassDelay;
     void syncBypassDelay();           // follow latency changes (oversample switch)
+    // The latency the engine runs at, as last computed by
+    // recalcRateDependentCoeffs() — the bypass line follows this, not
+    // getLatencySamples(), which lags it by up to one timer tick after an
+    // oversample switch. Audio thread (and prepareToPlay).
+    int engineLatency = 0;
+    // Latency waiting for timerCallback() to report it to the host.
+    std::atomic<int> pendingLatency { 0 };
+
+    // The block size prepareToPlay sized every buffer for. A host block larger
+    // than this is split into views of at most this many samples (RT-5); one
+    // at or below it goes straight through, bit-identical. 0 = not prepared.
+    int preparedBlockSize = 0;
+    std::atomic<int> oversizedBlocks { 0 };
+    // processBlock / processBlockBypassed for a block of at most preparedBlockSize.
+    void processChunk(juce::AudioBuffer<float>&, juce::MidiBuffer&);
+    void processChunkBypassed(juce::AudioBuffer<float>&, juce::MidiBuffer&);
 
     // Output peak meter (outputPeakForGUI): the held peak and its release, as
     // a natural-log decay per sample, -1 / (METER_PEAK_RELEASE_MS * fs), set in
@@ -225,16 +255,36 @@ private:
     // audible block clears every effect tail on the audio thread (review B6).
     std::atomic<bool> tailsStale { false };
     double baseSampleRate = 44100.0;
-    std::atomic<int> cachedIRIndex { 0 };   // last IR index seen by audio thread (written msg+audio)
-    std::atomic<int> pendingIRIndex { -1 }; // deferred IR load (message thread)
+    // The IR_INDEX cabSim was last synced to: timerCallback() applies the
+    // parameter when it differs (RT-3). The audio thread never touches it;
+    // every access is under irStateLock (below), so the atomic is only
+    // belt and braces.
+    std::atomic<int> cachedIRIndex { 0 };
+    // Guards userIRs, cachedIRIndex and the cab's IR state against each other
+    // on the non-audio threads. The timer polls IR_INDEX all the time (the old
+    // AsyncUpdater only fired on a change), so a host that restores state or
+    // prepares off the message thread would otherwise race it: a tick could
+    // index a userIRs being reassigned, or queue a load beside
+    // installIRNow(). Held by the timer's IR branch, setStateInformation's
+    // restore, prepareToPlay and the GUI's loadUserIR/selectUserIR/
+    // selectBuiltInCab. NEVER on the audio thread (RT-3): processBlock only
+    // reads useIR and the try-lock bufferTransfer. Recursive, so the GUI
+    // paths may call applyIRIndexParam() under it.
+    juce::CriticalSection irStateLock;
 
     // ── Live tuner ring buffer (single-producer audio / single-consumer GUI) ──
     // Power-of-two size; the writer stores a monotonically increasing total
-    // sample count and the reader grabs the last N samples ending there. Torn
-    // reads are harmless — the next 30Hz frame recovers a clean window.
+    // sample count and the reader grabs the last N samples ending there. Each
+    // sample is a relaxed atomic (RT-4), so overlapping access is well defined;
+    // the release/acquire pair on tunerWritePos orders the samples against the
+    // count. A window the writer laps mid-copy can still mix old and new
+    // samples — that is tolerated by design: the next 30Hz frame recovers a
+    // clean window.
     static constexpr int kTunerRingSize = 8192;          // must be a power of two
     static constexpr int kTunerRingMask = kTunerRingSize - 1;
-    std::array<float, kTunerRingSize> tunerRing {};      // zero-initialised
+    static_assert(std::atomic<float>::is_always_lock_free,
+                  "the tuner ring must stay lock-free on the audio thread");
+    std::array<std::atomic<float>, kTunerRingSize> tunerRing {}; // value-initialised to 0
     std::atomic<uint64_t> tunerWritePos { 0 };
     void pushTunerSamples(const float* data, int n);     // audio thread only
 

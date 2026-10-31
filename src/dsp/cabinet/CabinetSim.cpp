@@ -146,7 +146,7 @@ void CabinetSim::publishQueuedIR(double sessionRate)
 
 void CabinetSim::setIRIndex(int newIndex)
 {
-    // Called from message thread only (via AsyncUpdater).
+    // Called from message thread only.
     // No allocation or lock acquisition happens on the audio thread.
     currentIRIndex = newIndex;
 

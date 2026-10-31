@@ -26,7 +26,7 @@ The static checks, run in both modes:
 
 The full run then configures Release with `SR_BUILD_TESTS=ON`, builds, and runs `ctest`.
 
-## The three test targets
+## The test targets
 
 Tests use Catch2 v3, one test file per DSP module, all under `tests/`.
 
@@ -36,7 +36,9 @@ Tests use Catch2 v3, one test file per DSP module, all under `tests/`.
 | `SilentRiotJuceTests` | Code that needs JUCE: cabinet IRs, convolution, IR level match and loading, the oversample switcher and latency, delay and reverb | JUCE modules |
 | `SilentRiotProcessorTests` | Anything in `processBlock`'s wiring, on the real `SilentRiotProcessor` | The plugin's own SharedCode target |
 
-A new test file is added to its target's list in `tests/CMakeLists.txt`.
+A new test file is added to its target's list in `tests/CMakeLists.txt`. A fourth
+executable, `SilentRiotRTStress`, is built from the same directory but is not a ctest —
+see [Real-time stress](#real-time-stress-silentriotrtstress) below.
 
 Run one target, or one test case by name:
 
@@ -68,6 +70,63 @@ TEST_CASE("Processor: power off silences the output", "[processor]")
 It also offers `Mode::Bypassed` (runs `processBlockBypassed`), `loadIR()` (loads a user IR
 and waits for the convolution to pick it up) and `writeWav()` for IR fixtures. Each case
 runs the 4× oversampled amp, so it takes seconds: keep the rendered durations short.
+
+## Real-time stress: `SilentRiotRTStress`
+
+Unit tests prove the DSP is right; they do not prove the plugin is a good real-time
+citizen. `tests/rt_stress.cpp` drives the real processor from a dedicated audio thread,
+with a live JUCE message thread beside it, and holds it to three contracts measured
+rather than argued about (`tests/rt_probe.h`):
+
+- **no allocation on the audio thread** — global `operator new`/`delete` are replaced, and
+  every allocation made inside `processBlock` is counted with a backtrace;
+- **no blocking lock** — `pthread_mutex_lock` is interposed, and locks taken inside
+  `processBlock` are counted (contended ones separately);
+- **no missed deadline** — every block is timed against `numSamples / sampleRate`.
+
+Every scenario also checks what the host receives: finite samples inside ±1.
+
+It is built by `verify.sh` but is **not** a ctest — it runs for minutes and is meant to be
+run on demand, and before a release:
+
+```bash
+cmake -B build-verify -G Ninja -DCMAKE_BUILD_TYPE=Release -DSR_BUILD_TESTS=ON
+cmake --build build-verify --target SilentRiotRTStress
+./build-verify/tests/SilentRiotRTStress --help
+./build-verify/tests/SilentRiotRTStress --quick                 # ~1 minute
+./build-verify/tests/SilentRiotRTStress --md=rt-report.md       # full run, Markdown report
+./build-verify/tests/SilentRiotRTStress --only=modes,ir         # one or more scenarios
+```
+
+| Scenario | What it stresses |
+|---|---|
+| `load` | Every sample rate × oversample factor × block size × effects on/off: can it hold its deadline at all |
+| `blocks` | Host block size changing on every call, down to 1 sample |
+| `params` | Every parameter re-randomised each block, with NaN/Inf injected past the parameter objects |
+| `hostile` | NaN, Inf, 1e30, denormals, full-scale square and Nyquist input, then whether the amp recovers |
+| `modes` | Power, tuner mute, CAB, 7W, oversample, host bypass and `reset()` churn |
+| `ir` | IR loading and IR_INDEX automation, including indices past the list |
+| `threads` | State save/restore, presets and IR loads on the message thread during playback |
+| `recover` | Whether one non-finite input sample permanently silences the amp |
+| `overhead` | Fixed cost per block before any DSP runs |
+| `mono` | The 1-in/1-out bus: widener skipped, IR channel 0 only, single-channel loops |
+| `denormals` | Block time while a tail decays into denormal range |
+| `stability` | Every knob maxed, long run, then silence |
+
+Exit code is 1 when a CRITICAL finding is recorded, so it can gate a release. The findings
+of the first run are in
+[`../records/reviews/review-rt-stress-2026-10-29.md`](../records/reviews/review-rt-stress-2026-10-29.md).
+
+Under a sanitizer the interposers compile themselves out, so the same binary can be built
+with ThreadSanitizer and the sanitizer stays the instrument:
+
+```bash
+cmake -B build-tsan -G Ninja -DCMAKE_BUILD_TYPE=Debug -DSR_BUILD_TESTS=ON \
+      -DCMAKE_CXX_FLAGS="-fsanitize=thread -O1 -g -DNDEBUG" \
+      -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=thread"
+cmake --build build-tsan --target SilentRiotRTStress
+./build-tsan/tests/SilentRiotRTStress --only=threads,ir --quick
+```
 
 ## Tone sign-off
 
