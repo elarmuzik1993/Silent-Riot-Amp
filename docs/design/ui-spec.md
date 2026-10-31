@@ -76,19 +76,16 @@ tealDim           #009980    Supply rail bar fill (start)
 
 ## 3. Typography
 
-Two font stacks are used. Ship both as embedded resources in the JUCE binary.
+> **As built (2026-10-30)**: the UI uses **one** embedded typeface, **Oxanium** (Regular +
+> Bold, SIL OFL 1.1, `resources/fonts/`), through `Fonts::ui()`. It replaced Space Mono and
+> DM Sans (DM Sans was embedded but never drawn) after the owner compared ten candidates in
+> the real editor (`sr_editor_snapshot font=`). Every "Space Mono" below now means Oxanium;
+> the sizes come from `Fonts::Sizes`, not from these CSS numbers.
 
-**Monospace (primary — all data, labels, readouts)**:
-- `Space Mono` (Google Fonts, OFL license)
-- Fallbacks: `SF Mono`, `Fira Code`, system monospace
-- Download: https://fonts.google.com/specimen/Space+Mono
-- Include Regular (400) and Bold (700) weights
+Original design (superseded):
 
-**UI font (body text only — settings descriptions)**:
-- `DM Sans` (Google Fonts, OFL license)
-- Fallbacks: `SF Pro Display`, system sans-serif
-- Download: https://fonts.google.com/specimen/DM+Sans
-- Include Regular (400), Medium (500), SemiBold (600), Bold (700)
+- Monospace (all data, labels, readouts): `Space Mono`, Regular (400) and Bold (700)
+- UI font (settings descriptions only): `DM Sans`, Regular to Bold
 
 ### Font size reference (at 100% scale)
 
@@ -452,33 +449,38 @@ In JUCE, implement with `juce::ComponentAnimator` or manually interpolate bounds
 **Active state**: background `accent 18% opacity`, border 1px `accent 40%`, stroke `accent`, icon rotates 60°  
 **Inactive state**: transparent bg, no border, stroke `label`
 
-**Panel**: absolute positioned overlay, top = 38px (below header), right = 0, width = 340px  
-**Background**: `panel`, border 1px `border` (no top border), border-radius 0 0 6px 6px  
-**Shadow**: `0 16px 48px rgba(0,0,0,0.5)`  
-**Animation**: same max-height collapse pattern, max 600px  
-**Z-index**: 50 (above all other content)
+> **As built (2026-10-30, `src/gui/SettingsPanel.*`)** — this section's original design
+> (340px single column, inline bat toggles) clipped its toggles and overflowed the window;
+> the code below is authoritative.
 
-**Panel header**: "SETTINGS" label + ✕ close button  
+**Panel**: overlay inside the scaled content area (so it follows UI scale), centred in the
+window below the header (at least 4px under it) over a black 45% backdrop that also closes it, `SettingsPanel::panelW` 560px wide,
+`panelHeight()` tall (289px; +85px with the standalone's AUDIO INPUT section). The editor
+static_asserts that the plugin's panel fits the smallest window; while the panel needs
+more room (standalone) the window grows and shrinks back on close.
+**Background**: `panel`, 1px `border`, radius 6px, 2px drop shadow.
+**Closing**: drawn ✕ button (28px target, hover tint, focusable), Escape, or a click
+anywhere outside the panel. The gear's rotation follows every close path.
 
-**UI Preferences section**:
+**Layout** — one row grid, every rectangle from `SettingsPanel::layout()` (paint and
+resized both read it): 20px padding, "SETTINGS" title (`title`, bold), section heads
+(`small` bold, accent), rows on a 34px pitch with 26px controls, row labels in `body`
+(`label` colour) in a column sized to the widest label + 14px, 1px dividers with 13px
+either side, 32px column gutter.
 
-| Setting          | Type     | Options                       | Default |
-|------------------|----------|-------------------------------|---------|
-| Theme            | Select   | Dark, Midnight, OLED          | Dark    |
-| Meter Ballistics | Select   | VU, PPM, K-20                 | VU      |
-| Peak Hold        | Toggle   | on/off                        | ON      |
-| Knob Mode        | Select   | Linear, Circular              | Linear  |
-| Tooltips         | Toggle   | on/off                        | ON      |
-| UI Scale         | Select   | 75%, 100%, 125%, 150%         | 100%    |
+| Section (column)           | Rows                                   |
+|----------------------------|----------------------------------------|
+| AUDIO INPUT (full width, standalone only) | Input (dropdown)        |
+| DISPLAY (left)             | Theme (DARK/LIGHT), UI scale (75–150%), Tooltips |
+| METERS & KNOBS (right)     | Ballistics (FAST/MED/SLOW), Peak hold, Knob mode (LINEAR/ROTARY) |
 
-**Select control**: segmented button group — `border: 1px border`, each option is a button, active option has `accent` background + white text, inactive has `surface` background + `label` text. Font: Space Mono 8px, letter-spacing 0.5px, weight 600, padding 3px 10px.
+**Select control**: `SegmentedSelector` (accent fill on the active segment).
+**Toggle control**: `ToggleSwitch::Style::Jewel` (the EFFECTS cards' ON lamp) with its own
+label hidden; the toggle spans its whole row, so the label is clickable too, and the lamp
+lines up with the selectors' right edges.
 
-**Toggle control**: same as §5.3 but inline (horizontal layout) with 16px left margin, no label above.
-
-**About section**:
-- Product info grid: PRODUCT, VERSION, FORMAT, DEVELOPER
-- License status card: green dot with glow + "Free & open source — GPLv3" (the project is GPLv3 with no activation; there is no registration email)
-- Action buttons: MANUAL, SUPPORT, CHANGELOG — same style as IR action buttons
+**About section**: "Silent Riot" + version (left, two lines: name/version, then format and
+developer) beside the licence pill (green dot + "Free & open source — GPLv3").
 
 ### 5.7 IR Loader Panel
 

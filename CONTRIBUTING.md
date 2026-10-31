@@ -78,7 +78,9 @@ Pitfalls* section, which records mistakes that have already cost real debugging 
 AI-assisted work is welcome on the same terms as any other: you are responsible for it, it
 must pass `verify.sh`, and it follows the commit rule above. [`AGENTS.md`](AGENTS.md) and
 [`CLAUDE.md`](CLAUDE.md) are the project instructions for coding agents, and
-[`.agents/STATE.md`](.agents/STATE.md) is the current-state note they read first.
+[`.agents/STATE.md`](.agents/STATE.md) is the current-state note they read first. How the
+project itself uses AI, and what you confirm when you contribute AI-assisted work, is in
+[`AI_USAGE.md`](AI_USAGE.md).
 
 ## Releasing
 

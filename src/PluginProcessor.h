@@ -213,6 +213,19 @@ private:
     void processChunk(juce::AudioBuffer<float>&, juce::MidiBuffer&);
     void processChunkBypassed(juce::AudioBuffer<float>&, juce::MidiBuffer&);
 
+    // Output peak meter (outputPeakForGUI): the held peak and its release, as
+    // a natural-log decay per sample, -1 / (METER_PEAK_RELEASE_MS * fs), set in
+    // prepareToPlay. A block of n samples decays it by exp(n * that), so the
+    // ballistics follow the block actually processed, not the size the host
+    // announced. Atomic only because reset() clears it and the project treats
+    // reset() as callable from any thread; the audio thread uses it relaxed.
+    std::atomic<float> meterPeak { 0.0f };
+    float meterPeakLogDecayPerSample = -1.0f / (sr::METER_PEAK_RELEASE_MS * 0.001f * 44100.0f);
+    // Folds channel 0 of a finished block (nullptr / n <= 0: nothing new) into
+    // meterPeak and publishes it. Read-only on the samples.
+    void publishOutputPeak(const float* ch0, int n);
+    void clearOutputPeak();           // meterPeak and outputPeakForGUI to 0
+
     // Triode plate voltage cache (inter-sample)
     sr::TriodeState v1aTriode, v1bTriode;
 
@@ -279,6 +292,7 @@ public:
     // GUI level metering (atomic, updated per block from audio thread)
     std::atomic<float> inputLevelForGUI  { 0.0f };
     std::atomic<float> outputLevelForGUI { 0.0f };
+    std::atomic<float> outputPeakForGUI  { 0.0f };   // block peak of channel 0 (post-trim), with release
     std::atomic<float> gridCurrentForGUI { 0.0f };   // normalized current, block peak of the EL84 grids
 
     // GUI DSP-state telemetry — published once per block by the audio thread,

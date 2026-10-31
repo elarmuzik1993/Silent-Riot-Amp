@@ -87,7 +87,7 @@ void NotchKnob::paint(juce::Graphics& g)
     const float pos = static_cast<float>(slider.getValue());
     const juce::String valText = valueFormatter ? valueFormatter(pos)
                                                 : juce::String(pos * 10.0f, 1);
-    auto valFont = Fonts::spaceMono(juce::jmax(Fonts::Sizes::small,
+    auto valFont = Fonts::ui(juce::jmax(Fonts::Sizes::small,
                                                Fonts::Sizes::value * scale));
     g.setFont(valFont);
 
@@ -114,7 +114,7 @@ void NotchKnob::paint(juce::Graphics& g)
     }
 
     // Parameter name — full size at any scale (see setScale)
-    g.setFont(Fonts::spaceMono(Fonts::Sizes::body, true));
+    g.setFont(Fonts::ui(Fonts::Sizes::body, true));
     g.setColour(Colours::label);
     g.drawText(label.toUpperCase(), labelBox, juce::Justification::centred, false);
 }

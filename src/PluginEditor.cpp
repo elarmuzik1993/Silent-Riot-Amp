@@ -6,6 +6,9 @@
 #include "StandaloneDevice.h"
 #include "utils/Parameters.h"
 
+#include <cmath>
+#include <cstdint>
+
 #if JUCE_LINUX
 #include <X11/Xlib.h>
 #include <X11/Xatom.h>
@@ -231,19 +234,19 @@ SilentRiotEditor::SilentRiotEditor(SilentRiotProcessor& p)
     };
 
     // Settings overlay
-    addChildComponent(settingsPanel);
+    // Inside contentArea, so it scales with the UI like everything else.
+    contentArea.addChildComponent(settingsScrim);
+    contentArea.addChildComponent(settingsPanel);
+    contentArea.addMouseListener(this, true);
     header.onGearClick = [this] {
         // Standalone only: the AUDIO INPUT section. Attached on first open,
         // when the app's window (and so its device manager) surely exists.
         if (!settingsPanel.hasInputSelector())
             if (auto* deviceManager = sr::standaloneDeviceManager())
                 settingsPanel.attachInputSelector(*deviceManager);
-        settingsPanel.setVisible(!settingsPanel.isVisible());
-        resized();
+        setSettingsOpen(!settingsPanel.isVisible());
     };
-    settingsPanel.onClose = [this] {
-        settingsPanel.setVisible(false);
-    };
+    settingsPanel.onClose = [this] { setSettingsOpen(false); };
     settingsPanel.onSettingsChanged = [this] { applySettings(); };
     settingsPanel.onScaleChanged = [this](int scaleIdx) {
         static const float scales[] = { 0.75f, 1.0f, 1.25f, 1.5f };
@@ -251,7 +254,7 @@ SilentRiotEditor::SilentRiotEditor(SilentRiotProcessor& p)
         contentArea.setTransform(juce::AffineTransform::scale(currentScale));
         setWindowBackground();
         setSize(static_cast<int>(kWindowW * currentScale),
-                static_cast<int>(getContentHeight() * currentScale));
+                static_cast<int>(getWindowHeight() * currentScale));
         saveUIState();
     };
 
@@ -382,12 +385,13 @@ SilentRiotEditor::SilentRiotEditor(SilentRiotProcessor& p)
     // constraints — a window taller than the screen got pinned to the top edge
     // and could not be dragged. Sizing to content keeps it on-screen and movable.
     setSize(static_cast<int>(kWindowW * currentScale),
-            static_cast<int>(getContentHeight() * currentScale));
+            static_cast<int>(getWindowHeight() * currentScale));
     startTimerHz(30);
 }
 
 SilentRiotEditor::~SilentRiotEditor()
 {
+    contentArea.removeMouseListener(this);
     saveUIState();
     stopTimer();
     setLookAndFeel(nullptr);
@@ -510,6 +514,38 @@ int SilentRiotEditor::getContentHeight() const
          + static_cast<int>(advPanelAnimH);
 }
 
+int SilentRiotEditor::getWindowHeight() const
+{
+    if (!settingsPanel.isVisible())
+        return getContentHeight();
+    return juce::jmax(getContentHeight(),
+                      kHeaderH + kSettingsInset + settingsPanel.panelHeight() + kSettingsMargin);
+}
+
+void SilentRiotEditor::setSettingsOpen(bool open)
+{
+    header.setGearActive(open);
+    if (settingsPanel.isVisible() == open)
+        return;
+    settingsScrim.setVisible(open);
+    settingsPanel.setVisible(open);
+    applyShapeMask();   // grow the window first if the panel needs it
+    layoutContent();
+    repaint();
+    if (open)
+        settingsPanel.grabKeyboardFocus();   // so Escape closes it
+}
+
+void SilentRiotEditor::mouseDown(const juce::MouseEvent& e)
+{
+    // The gear toggles Settings itself (its own mouseDown runs first).
+    if (!settingsPanel.isVisible() || e.eventComponent == &header.getGearButton())
+        return;
+    if (e.eventComponent == &settingsPanel || settingsPanel.isParentOf(e.eventComponent))
+        return;
+    setSettingsOpen(false);
+}
+
 void SilentRiotEditor::applyShapeMask()
 {
     // Resize the window to match the current content height. (Formerly an X11
@@ -517,7 +553,7 @@ void SilentRiotEditor::applyShapeMask()
     // screen and pinned it to the top — see the constructor note.) Called every
     // animation frame; the size guard makes the steady-state case a no-op.
     int w = static_cast<int>(kWindowW * currentScale);
-    int h = static_cast<int>(getContentHeight() * currentScale);
+    int h = static_cast<int>(getWindowHeight() * currentScale);
     if (getWidth() != w || getHeight() != h)
         setSize(w, h);
 }
@@ -561,6 +597,59 @@ void SilentRiotEditor::disableCompositorEffects()
 #else
     compositorBypassed = true;
 #endif
+}
+
+void SilentRiotEditor::runTimerFrameForTest(double dtSeconds)
+{
+    glowDtOverride = dtSeconds;
+    timerCallback();
+    glowDtOverride = -1.0;
+}
+
+uint32_t SilentRiotEditor::glowParamsSignature() const
+{
+    // FNV-1a over the settings the out/in ratio depends on, quantised so
+    // float noise on an untouched knob is not a change. Turning one of these
+    // re-learns the clean ratio on every frame of the turn, so the glow reads
+    // clean while a knob moves; it warms again once playing compresses.
+    namespace IDs = sr::Params::IDs;
+    const auto raw = [this](const juce::String& id) {
+        const float v = proc.apvts.getRawParameterValue(id)->load();
+        return std::isfinite(v) ? v : 0.0f;
+    };
+    const auto knob = [](float v) { return static_cast<int32_t>(std::lround(v * 200.0f)); };
+    const auto onOff = [](float v) { return static_cast<int32_t>(v > 0.5f); };
+    const auto engaged = [](float v) { return static_cast<int32_t>(v > 0.0f); };
+    const int32_t fields[] = {
+        knob(raw(IDs::GAIN)), knob(raw(IDs::VOLUME)), knob(raw(IDs::OUTPUT_LEVEL)),
+        onOff(raw(IDs::HALF_POWER)), onOff(raw(IDs::CAB_SIM)),
+        static_cast<int32_t>(std::lround(raw(IDs::IR_INDEX))),
+        onOff(raw(IDs::BOOST_ON)), onOff(raw(IDs::DELAY_ON)), onOff(raw(IDs::REVERB_ON)),
+        engaged(raw(IDs::GATE_THRESHOLD)), engaged(raw(IDs::WIDTH)),   // self-gating at 0
+    };
+    uint32_t h = 2166136261u;
+    for (int32_t f : fields)
+        for (int b = 0; b < 4; ++b)
+        {
+            h ^= (static_cast<uint32_t>(f) >> (8 * b)) & 0xffu;
+            h *= 16777619u;
+        }
+    return h;
+}
+
+void SilentRiotEditor::updateFaceplateGlow(bool powerOn, double dtSeconds)
+{
+    if (!powerOn)
+    {
+        glowFollower.reset();
+        faceplate.setDrive(0.0f, 0.0f);
+        return;
+    }
+    const auto drive = glowFollower.update(proc.outputPeakForGUI.load(std::memory_order_relaxed),
+                                           proc.inputLevelForGUI.load(std::memory_order_relaxed),
+                                           proc.outputLevelForGUI.load(std::memory_order_relaxed),
+                                           dtSeconds, glowParamsSignature());
+    faceplate.setDrive(drive.level, drive.heat);
 }
 
 void SilentRiotEditor::timerCallback()
@@ -631,6 +720,16 @@ void SilentRiotEditor::timerCallback()
         vuOut.setLevel(0.0f);
     }
 
+    // Faceplate glow, on the frame's real length (hosts stall the timer)
+    {
+        const double nowMs = juce::Time::getMillisecondCounterHiRes();
+        double dt = (lastGlowFrameMs > 0.0) ? (nowMs - lastGlowFrameMs) * 0.001 : 1.0 / 30.0;
+        if (glowDtOverride >= 0.0)
+            dt = glowDtOverride;
+        lastGlowFrameMs = nowMs;
+        updateFaceplateGlow(powerOn, dt);
+    }
+
     // Live tuner — detects from captured DI input (works even with PWR off).
     // The detector converts lag to Hz using its assumed sample rate, so that
     // rate MUST track the host's or every reading is transposed (a detector
@@ -684,9 +783,9 @@ void SilentRiotEditor::paint(juce::Graphics& g)
         false));
     g.fillAll();
 
-    // Border at content height (the window is sized to this)
+    // Border at the window's height (content, or taller while Settings needs it)
     float cw = kWindowW * currentScale;
-    float ch = getContentHeight() * currentScale;
+    float ch = getWindowHeight() * currentScale;
     g.setColour(sr::Colours::border);
     g.drawRoundedRectangle(
         juce::Rectangle<float>(0.5f, 0.5f, cw - 1.0f, ch - 1.0f),
@@ -771,9 +870,15 @@ void SilentRiotEditor::layoutContent()
 
     if (settingsPanel.isVisible())
     {
-        int sw = sr::SettingsPanel::panelW, sh = settingsPanel.panelHeight();
-        int sy = static_cast<int>(kHeaderH * currentScale);
-        settingsPanel.setBounds(getWidth() - sw, sy, sw, sh);
+        // Centred in the window below the header; the header (and its gear)
+        // stays live above the backdrop.
+        const int sw = sr::SettingsPanel::panelW, sh = settingsPanel.panelHeight();
+        const int belowHeader = getWindowHeight() - kHeaderH;
+        settingsScrim.setBounds(0, kHeaderH, kWindowW, belowHeader);
+        settingsPanel.setBounds((kWindowW - sw) / 2,
+                                kHeaderH + juce::jmax(kSettingsInset, (belowHeader - sh) / 2),
+                                sw, sh);
+        settingsScrim.toFront(false);
         settingsPanel.toFront(false);
     }
 }

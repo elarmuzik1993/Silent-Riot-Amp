@@ -19,6 +19,11 @@ public:
 
     void toggle();  // flip state with notification
 
+    // Set the state without onClick (a restore, not a user edit) and still
+    // animate to it: a dontSendNotification setToggleState() on the button
+    // sends no state message either, so the lever/lamp would stay stale.
+    void setOnSilently(bool on);
+
     // How the state is drawn under the label.
     //   Switch — a satin-black bat toggle through a hex nut on a glass ring that
     //            lights in activeColor; lever up is on. The amp row uses this.
@@ -29,6 +34,10 @@ public:
     // Both animate off the same thumbPos, so the jewel fades rather than snaps.
     enum class Style { Switch, Jewel };
     void setStyle(Style s);
+
+    // Jewel only: hide the painted label when the owner draws the row's label
+    // itself (SettingsPanel). The label stays the accessible title.
+    void setShowLabel(bool show) { showLabel = show; repaint(); }
 
     // Vertical room paint() needs: the label, the gap under it, and the state
     // graphic. JUCE clips paint() to the component's own bounds, so a
@@ -55,6 +64,7 @@ private:
     juce::String label;
     juce::Colour activeColor;
     Style style = Style::Switch;
+    bool showLabel = true;
     float thumbPos = 0.0f; // 0=off, 1=on (animated)
 
     static constexpr float kLabelH   = 14.0f;

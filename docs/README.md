@@ -23,6 +23,7 @@ When two sources disagree, trust them in this order: **the code** > `CLAUDE.md` 
 | [`dev/tone-lock.md`](dev/tone-lock.md) | The frozen sound (`tone-v1`): what the tone lock test guards and how the sound may change | maintained |
 | [`dev/tone-signoff.md`](dev/tone-signoff.md) | The tone sign-off protocol: references, gates, how "tone is frozen" is decided | maintained (2026-06; gates in `tools/signoff_gates.json`) |
 | [`../tools/README.md`](../tools/README.md) | The sign-off render and analysis tools | maintained |
+| [`../AI_USAGE.md`](../AI_USAGE.md) | AI addendum: scope of AI usage, the AI-assisted workflow, human authorship, ownership, warranty | maintained |
 | [`../CLAUDE.md`](../CLAUDE.md) | Detailed engineering notes and pitfalls (written for coding agents, useful to anyone) | maintained |
 
 ## User manual
@@ -71,6 +72,7 @@ Dated defect investigations and reviews. Each one is a measurement you can re-ru
 | [`plans/2026-10-26-ir-path-sound-fixes.md`](plans/2026-10-26-ir-path-sound-fixes.md) | done |
 | [`plans/2026-10-28-open-source-docs-prep.md`](plans/2026-10-28-open-source-docs-prep.md) | in progress |
 | [`plans/2026-10-30-rt-safety-fixes.md`](plans/2026-10-30-rt-safety-fixes.md) | not started (fixes RT-1…RT-6) |
+| [`plans/2026-10-29-reactive-panel-glow.md`](plans/2026-10-29-reactive-panel-glow.md) | done |
 
 Current project status and the next steps are in [`../.agents/STATE.md`](../.agents/STATE.md);
 the product roadmap is [`../ROADMAP.md`](../ROADMAP.md).

@@ -10,7 +10,9 @@ Licensed under the GNU General Public License v3 or later; see `LICENSE`.
 
 The Silent Riot DSP implementation — including all source code, the normalized voltage
 domain framework (VoltageScale), the signal chain architecture, and the DSP model
-specification — is original work written from scratch by Boris Miscenco.
+specification — is original work, designed, directed, reviewed and owned by Boris Miscenco,
+with AI-assisted implementation. [`AI_USAGE.md`](AI_USAGE.md) says what the AI tools did and
+what the author did.
 
 No source code has been copied, adapted, or derived from any third-party project,
 including but not limited to Guitarix, SwankyAmp, NAM (Neural Amp Modeler), ChowDSP,
@@ -110,13 +112,12 @@ infrastructure. The DSP model running inside those utilities is original work.
 
 ### Fonts
 
-Both fonts are embedded in the plugin binary (via JUCE BinaryData) and are used under the
+The font (Regular and Bold) is embedded in the plugin binary (via JUCE BinaryData) and are used under the
 SIL Open Font License 1.1. The licence text ships next to the font files.
 
 | Font | Copyright | License | Files |
 |---|---|---|---|
-| [Space Mono](https://github.com/googlefonts/spacemono) | Copyright 2016 Google Inc. | SIL OFL 1.1 — `resources/fonts/OFL-SpaceMono.txt` | `resources/fonts/SpaceMono-*.ttf` |
-| [DM Sans](https://github.com/googlefonts/dm-fonts) | Copyright 2014 The DM Sans Project Authors | SIL OFL 1.1 — `resources/fonts/OFL-DMSans.txt` | `resources/fonts/DMSans-*.ttf` |
+| [Oxanium](https://github.com/sevmeyer/oxanium) | Copyright 2019 The Oxanium Project Authors | SIL OFL 1.1 — `resources/fonts/OFL-Oxanium.txt` | `resources/fonts/Oxanium-*.ttf` |
 
 ### Test fixtures
 
@@ -139,7 +140,7 @@ not affiliated with, endorsed by or sponsored by any of them.
 
 | Item | Status |
 |---|---|
-| DSP source code | 100% original, written by Boris Miscenco |
+| DSP source code | Original; designed, directed, reviewed and owned by Boris Miscenco, AI-assisted implementation ([`AI_USAGE.md`](AI_USAGE.md)) |
 | Signal chain architecture | Original design |
 | Tube model equations | Public domain (Koren, published openly) |
 | Tube parameters | Public domain (datasheet values) |

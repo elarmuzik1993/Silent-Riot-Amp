@@ -5,41 +5,28 @@
 
 namespace sr::Fonts {
 
-static juce::Typeface::Ptr smRegular, smBold;
-static juce::Typeface::Ptr dmRegular, dmMedium, dmSemiBold, dmBold;
+static juce::Typeface::Ptr uiRegular, uiBold;
 
 void init()
 {
-    smRegular  = juce::Typeface::createSystemTypefaceFor(BinaryData::SpaceMonoRegular_ttf,
-                                                          BinaryData::SpaceMonoRegular_ttfSize);
-    smBold     = juce::Typeface::createSystemTypefaceFor(BinaryData::SpaceMonoBold_ttf,
-                                                          BinaryData::SpaceMonoBold_ttfSize);
-    dmRegular  = juce::Typeface::createSystemTypefaceFor(BinaryData::DMSansRegular_ttf,
-                                                          BinaryData::DMSansRegular_ttfSize);
-    dmMedium   = juce::Typeface::createSystemTypefaceFor(BinaryData::DMSansMedium_ttf,
-                                                          BinaryData::DMSansMedium_ttfSize);
-    dmSemiBold = juce::Typeface::createSystemTypefaceFor(BinaryData::DMSansSemiBold_ttf,
-                                                          BinaryData::DMSansSemiBold_ttfSize);
-    dmBold     = juce::Typeface::createSystemTypefaceFor(BinaryData::DMSansBold_ttf,
-                                                          BinaryData::DMSansBold_ttfSize);
+    if (uiRegular != nullptr)
+        return;
+    uiRegular = juce::Typeface::createSystemTypefaceFor(BinaryData::OxaniumRegular_ttf,
+                                                         BinaryData::OxaniumRegular_ttfSize);
+    uiBold    = juce::Typeface::createSystemTypefaceFor(BinaryData::OxaniumBold_ttf,
+                                                         BinaryData::OxaniumBold_ttfSize);
 }
 
-juce::Font spaceMono(float size, bool bold)
+void previewUIFont(juce::Typeface::Ptr regular, juce::Typeface::Ptr bold)
 {
-    auto tf = bold ? smBold : smRegular;
-    if (tf == nullptr) return juce::Font(size);
-    juce::Font f(tf);
-    f.setHeight(size);
-    return f;
+    init();
+    uiRegular = regular;
+    uiBold    = bold != nullptr ? bold : regular;
 }
 
-juce::Font dmSans(float size, int weight)
+juce::Font ui(float size, bool bold)
 {
-    juce::Typeface::Ptr tf;
-    if (weight >= 700)      tf = dmBold;
-    else if (weight >= 600) tf = dmSemiBold;
-    else if (weight >= 500) tf = dmMedium;
-    else                    tf = dmRegular;
+    auto tf = bold ? uiBold : uiRegular;
     if (tf == nullptr) return juce::Font(size);
     juce::Font f(tf);
     f.setHeight(size);

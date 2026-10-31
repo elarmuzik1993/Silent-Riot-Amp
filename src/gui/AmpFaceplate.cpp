@@ -10,6 +10,111 @@
 
 namespace sr {
 
+namespace {
+
+constexpr float kPlateRadius = 6.0f;      // the faceplate's corner radius (and its piping's)
+constexpr float kDriveEpsilon = 0.004f;   // ~1/255: smaller moves are not visible
+constexpr float kLampBloomBase = 3.2f;    // paintLamp's default bloom
+constexpr float kLampBloomGain = 0.35f;   // full drive widens the bloom by 35%
+constexpr float kLampRadius = 8.0f;       // the pilot lamp's lens radius
+
+float sanitiseUnit(float v)
+{
+    return std::isfinite(v) ? juce::jlimit(0.0f, 1.0f, v) : 0.0f;
+}
+
+// The plate's outline in local coordinates; the piping is stroked on it.
+juce::Rectangle<float> plateBounds(const juce::Component& c)
+{
+    return c.getLocalBounds().toFloat().reduced(0.5f);
+}
+
+// The piping path inset so a stroke of `width` stays inside the component:
+// JUCE clips paint() to the bounds, so the glow spills inward onto the plate.
+juce::Rectangle<float> pipingStrokeRect(juce::Rectangle<float> plate, float width)
+{
+    return plate.reduced(juce::jmax(0.0f, width * 0.5f - 0.5f));
+}
+
+float dbToGain(float db) { return std::pow(10.0f, db / 20.0f); }
+
+} // namespace
+
+bool glowUsesHalo()
+{
+    return Colours::panel.getPerceivedBrightness() <= 0.5f;
+}
+
+juce::Colour glowBeadColour(float level, float heat)
+{
+    const float lv = sanitiseUnit(level), ht = sanitiseUnit(heat);
+
+    // Hue along the shorter arc from accent to red, so the ramp never swings
+    // through green or blue whatever the palette holds.
+    const juce::Colour from = Colours::accent, to = Colours::red;
+    float dh = to.getHue() - from.getHue();
+    if (dh > 0.5f)  dh -= 1.0f;
+    if (dh < -0.5f) dh += 1.0f;
+    float hue = from.getHue() + dh * ht;
+    hue -= std::floor(hue);
+    const float sat = from.getSaturation() + (to.getSaturation() - from.getSaturation()) * ht;
+    const float bri = from.getBrightness() + (to.getBrightness() - from.getBrightness()) * ht;
+
+    const float ceiling = glowUsesHalo() ? kGlowAlphaMaxHalo : kGlowAlphaMaxBead;
+    return juce::Colour::fromHSV(hue, sat, bri, ceiling * lv);
+}
+
+GlowDriveFollower::Drive GlowDriveFollower::update(float outPeak, float inRms, float outRms,
+                                                   double dtSeconds, uint32_t paramsSignature)
+{
+    const auto clean = [](float v) { return std::isfinite(v) && v > 0.0f ? v : 0.0f; };
+    outPeak = clean(outPeak);
+    inRms = clean(inRms);
+    outRms = clean(outRms);
+    const float dt = std::isfinite(dtSeconds)
+        ? static_cast<float>(juce::jlimit(0.0, kGlowMaxFrameSeconds, dtSeconds)) : 0.0f;
+
+    if (!haveSignature || paramsSignature != signature)
+    {
+        signature = paramsSignature;
+        haveSignature = true;
+        ref = 0.0f;
+    }
+
+    float level = 0.0f;
+    if (outPeak > 0.0f)
+        level = sanitiseUnit((20.0f * std::log10(outPeak) - kGlowLevelFloorDb)
+                             / (kGlowLevelCeilDb - kGlowLevelFloorDb));
+
+    float target = 0.0f;
+    if (inRms >= dbToGain(kGlowInputGateDb))
+    {
+        const float ratio = outRms / inRms;
+        ref *= dbToGain(-kGlowRefReleaseDbPerSec * dt);
+        if (ratio > ref)
+            ref = ratio;
+        // A silent output under a live input (tuner mute, OUTPUT trim at 0)
+        // is not compression: there is nothing to glow, so it stays cool.
+        if (ratio > 0.0f && ref > 0.0f)
+        {
+            const float compDb = 20.0f * std::log10(ref / ratio);
+            target = sanitiseUnit((compDb - kGlowHeatKneeDb) / kGlowHeatSpanDb);
+        }
+    }
+
+    const float tau = target > heat ? kGlowHeatAttackSec : kGlowHeatReleaseSec;
+    heat += (target - heat) * (1.0f - std::exp(-dt / tau));
+    heat = sanitiseUnit(heat);
+    return { level, heat };
+}
+
+void GlowDriveFollower::reset()
+{
+    ref = 0.0f;
+    heat = 0.0f;
+    haveSignature = false;
+}
+
 AmpFaceplate::AmpFaceplate()
 {
     setInterceptsMouseClicks(false, false);
@@ -29,6 +134,40 @@ void AmpFaceplate::setPowered(bool on)
         return;
     powered = on;
     repaint();
+}
+
+void AmpFaceplate::setDrive(float level, float heat)
+{
+    const float lv = sanitiseUnit(level), ht = sanitiseUnit(heat);
+    const auto moved = [](float now, float was) {
+        return std::abs(now - was) > kDriveEpsilon || ((now == 0.0f) != (was == 0.0f));
+    };
+    if (!moved(lv, driveLevel) && !moved(ht, driveHeat))
+        return;
+    driveLevel = lv;
+    driveHeat = ht;
+    if (powered)
+        repaintGlow();
+}
+
+void AmpFaceplate::repaintGlow()
+{
+    // Only the piping strip and the lamp's bloom change with drive. A whole-
+    // component repaint would also repaint the knobs and toggles laid over the
+    // plate on every 30 Hz frame; these regions stay clear of them.
+    float glowWidth = kGlowBeadWidth;
+    for (const auto& s : kGlowHaloStrokes)
+        glowWidth = juce::jmax(glowWidth, s.width);
+    const int strip = static_cast<int>(std::ceil(glowWidth)) + 2;   // + inset + antialiasing
+    const auto b = getLocalBounds();
+    repaint(b.withHeight(strip));
+    repaint(b.withTop(b.getBottom() - strip));
+    repaint(b.withWidth(strip));
+    repaint(b.withLeft(b.getRight() - strip));
+
+    const float bloomR = kLampRadius * kLampBloomBase * (1.0f + kLampBloomGain) + 2.0f;
+    repaint(juce::Rectangle<float>(lampCentre.x - bloomR, lampCentre.y - bloomR,
+                                   bloomR * 2.0f, bloomR * 2.0f).getSmallestIntegerContainer());
 }
 
 static void drawScrew(juce::Graphics& g, float cx, float cy)
@@ -144,7 +283,7 @@ void AmpFaceplate::paintLamp(juce::Graphics& g, juce::Point<float> c, float r,
     // Caustic: light leaving the lower right of the dome, with a brighter meniscus line
     const juce::Colour caustic = lighten(colour, 0.75f), meniscus = lighten(colour, 0.9f);
     fillLune(0.93f, -0.12f, -0.2f, 0.93f, linear(-0.2f, -0.2f, caustic.withAlpha(0.0f),
-                                                 0.65f, 0.65f, caustic.withAlpha(mixf(0.3f, 0.9f) * 1.15f)));
+                                                 0.65f, 0.65f, caustic.withAlpha(juce::jmin(1.0f, mixf(0.3f, 0.9f) * 1.15f))));
     fillLune(0.95f, -0.05f, -0.08f, 0.95f, linear(-0.2f, -0.2f, meniscus.withAlpha(0.0f),
                                                   0.65f, 0.65f, meniscus.withAlpha(mixf(0.22f, 0.7f) * 1.15f)));
 
@@ -201,10 +340,19 @@ void AmpFaceplate::paintPlate(juce::Graphics& g, juce::Rectangle<float> b, float
     g.drawRoundedRectangle(b.reduced(2.0f), radius - 1.5f, 1.0f);
 }
 
-void AmpFaceplate::paint(juce::Graphics& g)
+void AmpFaceplate::renderPlateCache(float scale)
 {
-    const auto b = getLocalBounds().toFloat().reduced(0.5f);
-    paintPlate(g, b, 6.0f);
+    const int w = juce::jmax(1, juce::roundToInt(static_cast<float>(getWidth()) * scale));
+    const int h = juce::jmax(1, juce::roundToInt(static_cast<float>(getHeight()) * scale));
+    plateCache = juce::Image(juce::Image::ARGB, w, h, true);
+    plateCacheTheme = Colours::panel.getARGB();
+    plateCacheScale = scale;
+
+    juce::Graphics g(plateCache);
+    g.addTransform(juce::AffineTransform::scale(static_cast<float>(w) / static_cast<float>(getWidth()),
+                                                static_cast<float>(h) / static_cast<float>(getHeight())));
+    const auto b = plateBounds(*this);
+    paintPlate(g, b, kPlateRadius);
 
     // Corner screws
     const float inset = 10.0f;
@@ -212,13 +360,61 @@ void AmpFaceplate::paint(juce::Graphics& g)
     drawScrew(g, b.getRight() - inset, b.getY() + inset);
     drawScrew(g, b.getX() + inset, b.getBottom() - inset);
     drawScrew(g, b.getRight() - inset, b.getBottom() - inset);
+}
+
+void AmpFaceplate::paint(juce::Graphics& g)
+{
+    if (getWidth() <= 0 || getHeight() <= 0)
+        return;
+
+    // ── Static plate, from the cache ──
+    // There is no theme-change callback (applySettings() swaps the Colours
+    // globals and repaints from the top), so the key carries a theme token as
+    // well as the size. It is rendered at the physical pixel scale, so the UI
+    // scale's transform and HiDPI screens get a sharp plate, not an upscale.
+    const float scale = juce::jmax(0.01f, g.getInternalContext().getPhysicalPixelScaleFactor());
+    if (plateCache.isNull()
+        || plateCacheTheme != Colours::panel.getARGB()
+        || plateCacheScale != scale
+        || plateCache.getWidth() != juce::jmax(1, juce::roundToInt(static_cast<float>(getWidth()) * scale))
+        || plateCache.getHeight() != juce::jmax(1, juce::roundToInt(static_cast<float>(getHeight()) * scale)))
+        renderPlateCache(scale);
+    g.drawImage(plateCache, getLocalBounds().toFloat());
+
+    // ── Piping glow ──
+    const float level = powered ? driveLevel : 0.0f;
+    if (level > 0.0f)
+    {
+        const auto b = plateBounds(*this);
+        const juce::Colour bead = glowBeadColour(level, driveHeat);
+        if (glowUsesHalo())
+        {
+            // Widest and faintest first, so the bright core sits on top
+            for (int i = static_cast<int>(std::size(kGlowHaloStrokes)) - 1; i >= 0; --i)
+            {
+                const auto& s = kGlowHaloStrokes[i];
+                const auto r = pipingStrokeRect(b, s.width);
+                g.setColour(bead.withMultipliedAlpha(s.alphaScale));
+                g.drawRoundedRectangle(r, kPlateRadius - (r.getX() - b.getX()), s.width);
+            }
+        }
+        else
+        {
+            // Light panel: the bead itself colours up, no halo
+            const auto r = pipingStrokeRect(b, kGlowBeadWidth);
+            g.setColour(bead);
+            g.drawRoundedRectangle(r, kPlateRadius - (r.getX() - b.getX()), kGlowBeadWidth);
+        }
+    }
 
     // ── Glass pilot lamp, placed by the editor in the knob row ──
-    const float midY = lampCentre.y, lx = lampCentre.x, r = 8.0f;
-    paintLamp(g, { lx, midY }, r, Colours::red, powered ? 1.0f : 0.0f);
+    // Lit means powered, so brightness stays binary; playing only widens the bloom.
+    const float midY = lampCentre.y, lx = lampCentre.x, r = kLampRadius;
+    paintLamp(g, { lx, midY }, r, Colours::red, powered ? 1.0f : 0.0f,
+              kLampBloomBase * (1.0f + kLampBloomGain * level));
 
     g.setColour(Colours::dim);
-    g.setFont(Fonts::spaceMono(Fonts::Sizes::micro, true));
+    g.setFont(Fonts::ui(Fonts::Sizes::micro, true));
     g.drawText("POWER", juce::Rectangle<float>(lx - 40.0f, midY + r + 8.0f, 80.0f, 14.0f),
                juce::Justification::centred, false);
 }

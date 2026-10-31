@@ -5,6 +5,7 @@
 
 # Built outputs and directories the tone protocol proposes but the repo does not carry.
 docs/dev/tone-signoff.md tools/sr_render
+docs/plans/2026-10-29-reactive-panel-glow.md tools/sr_editor_snapshot
 
 # Git branch names, not paths.
 docs/records/handoffs/handoff-ir-path-sound.md docs/ir-path-sound-plan
