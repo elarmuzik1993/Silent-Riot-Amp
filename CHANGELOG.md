@@ -46,6 +46,9 @@ tagged release will collect everything below.
 
 ### Added
 
+- The amp's faceplate now reacts to playing: its orange piping glows with the output level and
+  shifts toward red as the amp compresses, and the pilot lamp's glow breathes with it. Visual
+  only: nothing about the sound, presets or saved sessions changes, and the window does not grow.
 - `AI_USAGE.md`, an AI addendum: the scope of AI usage, the AI-assisted workflow, the
   author's contributions, ownership of the work and the non-infringement warranty limitation.
   `CREDITS.md` now says the implementation is AI-assisted.

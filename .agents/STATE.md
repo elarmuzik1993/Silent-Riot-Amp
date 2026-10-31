@@ -20,6 +20,9 @@ _Updated 2026-10-30 (Settings redesign, Oxanium font)_
   Saved with the device setup, not presets; hidden in VST3. Confirmed on a KA6.
 - Settings overlay redesigned (`docs/plans/2026-10-30-settings-panel-layout.md`): 560 px, two columns
   + ABOUT, jewel toggles, scales with the UI, centred over a dimmed backdrop, ✕/Esc/outside-click close.
+- **Reactive panel glow** (`docs/plans/2026-10-29-reactive-panel-glow.md`): faceplate piping lights with
+  the output peak (`outputPeakForGUI`), reddens with compression; the lamp's bloom breathes. Code:
+  `GlowDriveFollower`, `glowBeadColour()` in `src/gui/AmpFaceplate.h`; editor timer drives it.
 - Contributor issues #37–#48 are open (GUI bugs, IR loader, installers, README screenshot).
 - Commit as `Boris Miscenco <219343213+elarmuzik1993@users.noreply.github.com>`: export
   `GIT_AUTHOR_EMAIL`/`GIT_COMMITTER_EMAIL`; the cloud env's values beat `git -c`. Public contact

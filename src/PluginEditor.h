@@ -63,8 +63,16 @@ public:
     void paint(juce::Graphics&) override;
     void resized() override;
 
+    // Runs one editor timer frame now, as if dtSeconds had passed since the
+    // last one. For tests: the 30 Hz timer itself needs a running message loop.
+    void runTimerFrameForTest(double dtSeconds);
+
 private:
     void timerCallback() override;
+    // The faceplate glow's frame: meters -> GlowDriveFollower -> setDrive.
+    void updateFaceplateGlow(bool powerOn, double dtSeconds);
+    // Hash of the settings the glow's clean ratio depends on (GlowDriveFollower).
+    uint32_t glowParamsSignature() const;
     void layoutContent();
     void saveUIState();
     void loadUIState();
@@ -169,6 +177,11 @@ private:
     // known (editor built before prepareToPlay); timerCallback re-prepares when
     // this stops matching the processor's rate.
     double preparedTunerSR = 0.0;
+    // Faceplate glow: the follower, the last frame's time (0 = none yet) and
+    // a frame length forced by runTimerFrameForTest (< 0 = measure the clock).
+    sr::GlowDriveFollower glowFollower;
+    double lastGlowFrameMs = 0.0;
+    double glowDtOverride = -1.0;
     void* x11Display = nullptr;   // cached Linux X11 connection (closed in dtor)
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(SilentRiotEditor)
