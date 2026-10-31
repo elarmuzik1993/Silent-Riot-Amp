@@ -5,7 +5,7 @@ _Updated 2026-10-31 (worn textures: amp plate, knobs, cab; brick-wall and steel 
 ## Now
 - **Tone frozen at `tone-v1`** (059b209): `tests/tone_lock_tests.cpp` guards it (`docs/dev/tone-lock.md`).
 - Silent Riot v0.3.4 (JUCE 7 VST3/Standalone), GPL-3.0-or-later, free + optional donations. No tagged
-  release. ctest 504 (312 pure C++ / 81 JUCE / 111 processor), all passing on Windows/MSVC 2026-10-31.
+  release. ctest 508 (312 pure C++ / 81 JUCE / 115 processor), all passing on Windows/MSVC 2026-10-31.
   On Linux/GCC the 5 tone-lock cases fail, also at 857023b (before any GUI change): band deltas at
   −84…−100 dB, RMS ≤ 0.0002 dB (last checked before the texture tests were added).
 - Docs open-source ready (`docs/README.md` index; `design/`+`records/` frozen; `AI_USAGE.md` kept true).
@@ -27,9 +27,11 @@ _Updated 2026-10-31 (worn textures: amp plate, knobs, cab; brick-wall and steel 
   Saved with the device setup, not presets; hidden in VST3. Confirmed on a KA6.
 - Settings overlay redesigned (`docs/plans/2026-10-30-settings-panel-layout.md`): 560 px, two columns
   + ABOUT, jewel toggles, scales with the UI, centred over a dimmed backdrop, ✕/Esc/outside-click close.
-- **Reactive panel glow** (`docs/plans/2026-10-29-reactive-panel-glow.md`): faceplate piping lights with
-  the output peak (`outputPeakForGUI`), reddens with compression; the lamp's bloom breathes. Code:
-  `GlowDriveFollower`, `glowBeadColour()` in `src/gui/AmpFaceplate.h`; editor timer drives it.
+- **Reactive glow** (`docs/plans/2026-10-29-reactive-panel-glow.md`): the **cab's** piping lights with
+  the output peak (`outputPeakForGUI`, eased 60/120 ms), reddens with compression; the amp lamp's bloom
+  breathes. A soft blurred halo from a cached mask (`CabinetView::glowMask`), owner-approved 2026-10-31
+  after the stacked-stroke version looked "too much and not smooth". Code: `GlowDriveFollower`,
+  `glowBeadColour()` in `src/gui/AmpFaceplate.h`, `CabinetView::setDrive`; editor timer drives it.
 - Real-time stress harness `SilentRiotRTStress` (`docs/dev/testing.md`): built by verify, not a ctest, exit 1
   on a violated contract. Its review (`docs/records/reviews/review-rt-stress-2026-10-29.md`) is closed by
   `docs/plans/2026-10-30-rt-safety-fixes.md`: input NaN/Inf scrubbed, over-sized host blocks split, latency +

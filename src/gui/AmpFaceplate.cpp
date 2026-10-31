@@ -78,10 +78,15 @@ GlowDriveFollower::Drive GlowDriveFollower::update(float outPeak, float inRms, f
         ref = 0.0f;
     }
 
-    float level = 0.0f;
+    float levelTarget = 0.0f;
     if (outPeak > 0.0f)
-        level = sanitiseUnit((20.0f * std::log10(outPeak) - kGlowLevelFloorDb)
-                             / (kGlowLevelCeilDb - kGlowLevelFloorDb));
+        levelTarget = sanitiseUnit((20.0f * std::log10(outPeak) - kGlowLevelFloorDb)
+                                   / (kGlowLevelCeilDb - kGlowLevelFloorDb));
+    const float levelTau = levelTarget > level ? kGlowLevelAttackSec : kGlowLevelReleaseSec;
+    level += (levelTarget - level) * (1.0f - std::exp(-dt / levelTau));
+    level = sanitiseUnit(level);
+    if (levelTarget == 0.0f && level < kGlowLevelOffBelow)
+        level = 0.0f;
 
     float target = 0.0f;
     if (inRms >= dbToGain(kGlowInputGateDb))
@@ -108,6 +113,7 @@ GlowDriveFollower::Drive GlowDriveFollower::update(float outPeak, float inRms, f
 void GlowDriveFollower::reset()
 {
     ref = 0.0f;
+    level = 0.0f;
     heat = 0.0f;
     haveSignature = false;
 }

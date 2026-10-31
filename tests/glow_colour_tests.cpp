@@ -21,6 +21,7 @@
 
 #include <cmath>
 #include <limits>
+#include <vector>
 
 namespace {
 
@@ -320,5 +321,58 @@ TEST_CASE("Cab: the piping glows with drive and goes dark again", "[gui][glow]")
         CHECK_FALSE(sameImage(idle, snap()));
         cab.setDrive(0.0f, 0.0f);
         CHECK(sameImage(idle, snap()));   // silence: no residual glow
+    }
+}
+
+TEST_CASE("Cab: the halo falls off smoothly away from the piping, with no bands", "[gui][glow]")
+{
+    ThemeGuard guard(sr::Colours::Dark);
+    juce::ScopedJuceInitialiser_GUI juceInit;
+    sr::CabinetView cab;
+    cab.setSize(400, 260);
+    const auto snap = [&] { return cab.createComponentSnapshot(cab.getLocalBounds(), true, 1.0f); };
+
+    cab.setDrive(0.0f, 0.0f);
+    const auto idle = snap();
+    cab.setDrive(1.0f, 0.0f);
+    const auto lit = snap();
+
+    // The glow's own opacity at each pixel of the column through the top run's
+    // middle (the torn-out gap is on the bottom run), recovered from the red
+    // channel: at heat 0 the halo is Colours::accent, whose red is 255, so
+    // lit = idle + a * (255 - idle). Read the tolex, not the piping, whose red
+    // is already near 255.
+    REQUIRE(sr::Colours::accent.getRed() == 255);
+    const int x = lit.getWidth() / 2;
+    const auto alpha = [&](int y) {
+        const float l = lit.getPixelAt(x, y).getRed(), i = idle.getPixelAt(x, y).getRed();
+        return i > 215.0f ? -1.0f : (l - i) / (255.0f - i);
+    };
+    // The top run of piping: the first orange row from the top of the idle cab
+    int pipe = -1;
+    for (int y = 0; y < lit.getHeight() / 2 && pipe < 0; ++y)
+    {
+        const auto c = idle.getPixelAt(x, y);
+        if (c.getRed() - c.getBlue() > 80)
+            pipe = y;
+    }
+    REQUIRE(pipe > 12);
+
+    // Outward from it, over the seam and the tolex: soft (still lit several
+    // pixels out), fading monotonically, with no cliff between neighbours,
+    // which is what stacked strokes of a few fixed widths leave
+    std::vector<float> a;
+    for (int k = 1; k <= 9; ++k)
+        a.push_back(alpha(pipe - k));
+    for (float v : a)
+        REQUIRE(v >= -0.01f);   // all tolex, no piping in the way
+    CHECK(a.front() > 0.1f);
+    CHECK(a.front() <= 0.5f);   // restrained: half-opaque at most beside the bead
+    CHECK(a[3] > 0.1f);         // still clearly lit 4 px out
+    CHECK(a.back() < 0.05f);    // and gone by the reach
+    for (size_t k = 0; k + 1 < a.size(); ++k)
+    {
+        CHECK(a[k + 1] <= a[k] + 0.02f);
+        CHECK(a[k] - a[k + 1] <= 0.12f);
     }
 }

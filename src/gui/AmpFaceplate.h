@@ -54,10 +54,17 @@ juce::Colour glowBeadColour(float level, float heat);
 // Level: outputPeakForGUI in dBFS, mapped linearly onto 0..1 between these.
 // Silence and the idle noise floor sit under the floor; a nominal DI at the
 // default knobs peaks around -18 dBFS (~0.7) and a cranked amp (-14 LUFS)
-// near the ceiling. No display smoothing: the audio side's peak release
-// (METER_PEAK_RELEASE_MS) already gives the fall, so a rise shows at once.
+// near the ceiling.
 inline constexpr float kGlowLevelFloorDb = -48.0f;
 inline constexpr float kGlowLevelCeilDb  = -6.0f;
+// Level's display easing. The raw peak jumps on every pick attack and moves in
+// 30 Hz steps, which reads as flicker on a soft glow; a short attack keeps the
+// response quick and the release irons the steps on top of the audio side's
+// own peak release (METER_PEAK_RELEASE_MS). Under kGlowLevelOffBelow with
+// nothing to show, level snaps to 0 so a silent amp goes fully dark.
+inline constexpr float kGlowLevelAttackSec  = 0.06f;
+inline constexpr float kGlowLevelReleaseSec = 0.12f;
+inline constexpr float kGlowLevelOffBelow   = 0.004f;
 
 // Heat is compression, not sag (plan Task 0's result: sag barely travels).
 // ratio = outRms / inRms, read only while the input is above this gate.
@@ -95,6 +102,7 @@ public:
 
 private:
     float ref = 0.0f;
+    float level = 0.0f;
     float heat = 0.0f;
     uint32_t signature = 0;
     bool haveSignature = false;
