@@ -286,7 +286,7 @@ void CabinetView::paint(juce::Graphics& g)
         const auto pill = cab.withSizeKeepingCentre(120.0f, 22.0f);
         g.setColour(Colours::surface.withAlpha(0.9f));
         g.fillRoundedRectangle(pill, 4.0f);
-        g.setFont(Fonts::spaceMono(Fonts::Sizes::small, true));
+        g.setFont(Fonts::ui(Fonts::Sizes::small, true));
         g.setColour(Colours::accent);
         g.drawText("DROP TO LOAD", pill, juce::Justification::centred, false);
     }
@@ -295,11 +295,11 @@ void CabinetView::paint(juce::Graphics& g)
         paintArrowButton(g, arrowCentre(dir), dir, canStep, hoverArrow == dir);
 
     const float textW = static_cast<float>(getWidth()) - 32.0f, textX = 16.0f;
-    g.setFont(Fonts::spaceMono(Fonts::Sizes::value, true));
+    g.setFont(Fonts::ui(Fonts::Sizes::value, true));
     g.setColour(Colours::bright);
     g.drawText(name, juce::Rectangle<float>(textX, cab.getBottom() + 6.0f, textW, 16.0f),
                juce::Justification::centred, true);
-    g.setFont(Fonts::spaceMono(Fonts::Sizes::micro));
+    g.setFont(Fonts::ui(Fonts::Sizes::micro));
     g.setColour(Colours::dim);
     g.drawText(detail, juce::Rectangle<float>(textX, cab.getBottom() + 23.0f, textW, 12.0f),
                juce::Justification::centred, true);

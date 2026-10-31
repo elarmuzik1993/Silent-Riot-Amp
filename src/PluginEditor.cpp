@@ -234,19 +234,19 @@ SilentRiotEditor::SilentRiotEditor(SilentRiotProcessor& p)
     };
 
     // Settings overlay
-    addChildComponent(settingsPanel);
+    // Inside contentArea, so it scales with the UI like everything else.
+    contentArea.addChildComponent(settingsScrim);
+    contentArea.addChildComponent(settingsPanel);
+    contentArea.addMouseListener(this, true);
     header.onGearClick = [this] {
         // Standalone only: the AUDIO INPUT section. Attached on first open,
         // when the app's window (and so its device manager) surely exists.
         if (!settingsPanel.hasInputSelector())
             if (auto* deviceManager = sr::standaloneDeviceManager())
                 settingsPanel.attachInputSelector(*deviceManager);
-        settingsPanel.setVisible(!settingsPanel.isVisible());
-        resized();
+        setSettingsOpen(!settingsPanel.isVisible());
     };
-    settingsPanel.onClose = [this] {
-        settingsPanel.setVisible(false);
-    };
+    settingsPanel.onClose = [this] { setSettingsOpen(false); };
     settingsPanel.onSettingsChanged = [this] { applySettings(); };
     settingsPanel.onScaleChanged = [this](int scaleIdx) {
         static const float scales[] = { 0.75f, 1.0f, 1.25f, 1.5f };
@@ -254,7 +254,7 @@ SilentRiotEditor::SilentRiotEditor(SilentRiotProcessor& p)
         contentArea.setTransform(juce::AffineTransform::scale(currentScale));
         setWindowBackground();
         setSize(static_cast<int>(kWindowW * currentScale),
-                static_cast<int>(getContentHeight() * currentScale));
+                static_cast<int>(getWindowHeight() * currentScale));
         saveUIState();
     };
 
@@ -385,12 +385,13 @@ SilentRiotEditor::SilentRiotEditor(SilentRiotProcessor& p)
     // constraints — a window taller than the screen got pinned to the top edge
     // and could not be dragged. Sizing to content keeps it on-screen and movable.
     setSize(static_cast<int>(kWindowW * currentScale),
-            static_cast<int>(getContentHeight() * currentScale));
+            static_cast<int>(getWindowHeight() * currentScale));
     startTimerHz(30);
 }
 
 SilentRiotEditor::~SilentRiotEditor()
 {
+    contentArea.removeMouseListener(this);
     saveUIState();
     stopTimer();
     setLookAndFeel(nullptr);
@@ -513,6 +514,38 @@ int SilentRiotEditor::getContentHeight() const
          + static_cast<int>(advPanelAnimH);
 }
 
+int SilentRiotEditor::getWindowHeight() const
+{
+    if (!settingsPanel.isVisible())
+        return getContentHeight();
+    return juce::jmax(getContentHeight(),
+                      kHeaderH + kSettingsInset + settingsPanel.panelHeight() + kSettingsMargin);
+}
+
+void SilentRiotEditor::setSettingsOpen(bool open)
+{
+    header.setGearActive(open);
+    if (settingsPanel.isVisible() == open)
+        return;
+    settingsScrim.setVisible(open);
+    settingsPanel.setVisible(open);
+    applyShapeMask();   // grow the window first if the panel needs it
+    layoutContent();
+    repaint();
+    if (open)
+        settingsPanel.grabKeyboardFocus();   // so Escape closes it
+}
+
+void SilentRiotEditor::mouseDown(const juce::MouseEvent& e)
+{
+    // The gear toggles Settings itself (its own mouseDown runs first).
+    if (!settingsPanel.isVisible() || e.eventComponent == &header.getGearButton())
+        return;
+    if (e.eventComponent == &settingsPanel || settingsPanel.isParentOf(e.eventComponent))
+        return;
+    setSettingsOpen(false);
+}
+
 void SilentRiotEditor::applyShapeMask()
 {
     // Resize the window to match the current content height. (Formerly an X11
@@ -520,7 +553,7 @@ void SilentRiotEditor::applyShapeMask()
     // screen and pinned it to the top — see the constructor note.) Called every
     // animation frame; the size guard makes the steady-state case a no-op.
     int w = static_cast<int>(kWindowW * currentScale);
-    int h = static_cast<int>(getContentHeight() * currentScale);
+    int h = static_cast<int>(getWindowHeight() * currentScale);
     if (getWidth() != w || getHeight() != h)
         setSize(w, h);
 }
@@ -750,9 +783,9 @@ void SilentRiotEditor::paint(juce::Graphics& g)
         false));
     g.fillAll();
 
-    // Border at content height (the window is sized to this)
+    // Border at the window's height (content, or taller while Settings needs it)
     float cw = kWindowW * currentScale;
-    float ch = getContentHeight() * currentScale;
+    float ch = getWindowHeight() * currentScale;
     g.setColour(sr::Colours::border);
     g.drawRoundedRectangle(
         juce::Rectangle<float>(0.5f, 0.5f, cw - 1.0f, ch - 1.0f),
@@ -837,9 +870,15 @@ void SilentRiotEditor::layoutContent()
 
     if (settingsPanel.isVisible())
     {
-        int sw = sr::SettingsPanel::panelW, sh = settingsPanel.panelHeight();
-        int sy = static_cast<int>(kHeaderH * currentScale);
-        settingsPanel.setBounds(getWidth() - sw, sy, sw, sh);
+        // Centred in the window below the header; the header (and its gear)
+        // stays live above the backdrop.
+        const int sw = sr::SettingsPanel::panelW, sh = settingsPanel.panelHeight();
+        const int belowHeader = getWindowHeight() - kHeaderH;
+        settingsScrim.setBounds(0, kHeaderH, kWindowW, belowHeader);
+        settingsPanel.setBounds((kWindowW - sw) / 2,
+                                kHeaderH + juce::jmax(kSettingsInset, (belowHeader - sh) / 2),
+                                sw, sh);
+        settingsScrim.toFront(false);
         settingsPanel.toFront(false);
     }
 }

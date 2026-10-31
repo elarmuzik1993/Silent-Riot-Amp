@@ -414,7 +414,7 @@ void AmpFaceplate::paint(juce::Graphics& g)
               kLampBloomBase * (1.0f + kLampBloomGain * level));
 
     g.setColour(Colours::dim);
-    g.setFont(Fonts::spaceMono(Fonts::Sizes::micro, true));
+    g.setFont(Fonts::ui(Fonts::Sizes::micro, true));
     g.drawText("POWER", juce::Rectangle<float>(lx - 40.0f, midY + r + 8.0f, 80.0f, 14.0f),
                juce::Justification::centred, false);
 }

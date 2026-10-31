@@ -27,6 +27,12 @@ void ToggleSwitch::toggle()
     button.setToggleState(!button.getToggleState(), juce::sendNotification);
 }
 
+void ToggleSwitch::setOnSilently(bool on)
+{
+    button.setToggleState(on, juce::dontSendNotification);
+    startTimerHz(60);
+}
+
 void ToggleSwitch::mouseDown(const juce::MouseEvent&)
 {
     toggle();
@@ -102,7 +108,7 @@ void ToggleSwitch::paint(juce::Graphics& g)
     }
 
     // Label above the lever
-    g.setFont(Fonts::spaceMono(Fonts::Sizes::small));
+    g.setFont(Fonts::ui(Fonts::Sizes::small));
     g.setColour(Colours::label);
     g.drawText(label.toUpperCase(), juce::Rectangle<float>(0, 0, bounds.getWidth(), kLabelH),
                juce::Justification::centred, false);
@@ -116,11 +122,14 @@ void ToggleSwitch::paintJewel(juce::Graphics& g, juce::Rectangle<float> bounds)
     // jewel toggles right-aligns on their lamps whatever the label length.
     const juce::Point<float> c(bounds.getRight() - kJewelGlowR, bounds.getCentreY());
 
-    g.setFont(Fonts::spaceMono(Fonts::Sizes::small, true));
-    g.setColour(Colours::label.interpolatedWith(Colours::bright, thumbPos));
-    g.drawText(label.toUpperCase(),
-               bounds.withRight(c.x - kJewelBezelR - kJewelLabelGap),
-               juce::Justification::centredRight, false);
+    if (showLabel)
+    {
+        g.setFont(Fonts::ui(Fonts::Sizes::small, true));
+        g.setColour(Colours::label.interpolatedWith(Colours::bright, thumbPos));
+        g.drawText(label.toUpperCase(),
+                   bounds.withRight(c.x - kJewelBezelR - kJewelLabelGap),
+                   juce::Justification::centredRight, false);
+    }
 
     AmpFaceplate::paintLamp(g, c, kJewelR, activeColor, thumbPos, kJewelGlowR / kJewelR);
 

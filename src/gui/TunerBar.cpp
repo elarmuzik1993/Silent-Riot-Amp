@@ -33,7 +33,7 @@ void MuteButton::paintButton(juce::Graphics& g, bool highlighted, bool /*down*/)
         g.drawRoundedRectangle(r.expanded(1.0f), 5.0f, 1.5f);
     }
 
-    g.setFont(Fonts::spaceMono(Fonts::Sizes::small, true));
+    g.setFont(Fonts::ui(Fonts::Sizes::small, true));
     g.setColour(on ? Colours::accent : Colours::dim);
     g.drawText("MUTE", getLocalBounds(), juce::Justification::centred, false);
 }
@@ -128,7 +128,7 @@ void TunerBar::paint(juce::Graphics& g)
     g.fillRect(0.0f, bounds.getHeight() - 1.0f, bounds.getWidth(), 1.0f);
 
     // "TUNER" label, left
-    g.setFont(Fonts::spaceMono(Fonts::Sizes::small, true));
+    g.setFont(Fonts::ui(Fonts::Sizes::small, true));
     g.setColour(Colours::label);
     g.drawText("TUNER", juce::Rectangle<float>(16.0f, 0.0f, 60.0f, bounds.getHeight()),
                juce::Justification::centredLeft, false);
@@ -176,14 +176,14 @@ void TunerBar::paint(juce::Graphics& g)
     if (hasPitch)
     {
         g.setColour(liveColour);
-        g.setFont(Fonts::spaceMono(Fonts::Sizes::hero, true));
+        g.setFont(Fonts::ui(Fonts::Sizes::hero, true));
         g.drawText(juce::String(note.name) + juce::String(note.octave),
                    noteBox, juce::Justification::centredRight, false);
     }
     else
     {
         g.setColour(Colours::dim);
-        g.setFont(Fonts::spaceMono(Fonts::Sizes::value));
+        g.setFont(Fonts::ui(Fonts::Sizes::value));
         g.drawText("--", noteBox, juce::Justification::centredRight, false);
     }
 
@@ -194,7 +194,7 @@ void TunerBar::paint(juce::Graphics& g)
 
     // ── Frequency + cents readout, right (left of the MUTE button) ──
     auto readBox = juce::Rectangle<float>(bounds.getWidth() - 162.0f, 0.0f, 100.0f, bounds.getHeight());
-    g.setFont(Fonts::spaceMono(Fonts::Sizes::body));
+    g.setFont(Fonts::ui(Fonts::Sizes::body));
     if (hasPitch)
     {
         g.setColour(Colours::text);

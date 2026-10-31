@@ -88,7 +88,7 @@ void VUMeter::paint(juce::Graphics& g)
     }
 
     // Label below
-    g.setFont(Fonts::spaceMono(Fonts::Sizes::small));
+    g.setFont(Fonts::ui(Fonts::Sizes::small));
     g.setColour(Colours::dim);
     juce::Rectangle<float> labelBox(0.0f, meterH + 2.0f, bounds.getWidth(), labelH);
     g.drawText(label, labelBox, juce::Justification::centredTop, false);
