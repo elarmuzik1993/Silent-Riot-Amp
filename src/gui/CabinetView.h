@@ -27,6 +27,15 @@ public:
     void setSelection(const juce::String& name, const juce::String& detail, bool canStep);
     void setDragOver(bool over);
 
+    // Output level and compression heat, 0..1 each (sanitised): lights the
+    // cab's orange piping bead with glowBeadColour(), the same live signal
+    // state the amp plate used to carry. Repaints only on a visible move, or
+    // to/from exactly 0, so a silent amp stays idle. Drawn over the cached
+    // cab front, so a 30 Hz update never re-renders it.
+    void setDrive(float level, float heat);
+    float getDriveLevel() const noexcept { return driveLevel; }
+    float getDriveHeat() const noexcept { return driveHeat; }
+
     std::function<void(int)> onStep;   // -1 previous, +1 next
 
     // The cabinet front alone, filling `bounds`. The trim (frame, corners,
@@ -54,6 +63,7 @@ private:
     bool canStep = false;
     bool dragOver = false;
     int hoverArrow = 0;
+    float driveLevel = 0.0f, driveHeat = 0.0f;
 
     // The cab front rendered once, like AmpFaceplate's plate: keyed on size,
     // physical pixel scale and a theme token (applySettings() swaps the

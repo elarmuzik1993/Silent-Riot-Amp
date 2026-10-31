@@ -645,13 +645,15 @@ void SilentRiotEditor::updateFaceplateGlow(bool powerOn, double dtSeconds)
     {
         glowFollower.reset();
         faceplate.setDrive(0.0f, 0.0f);
+        irLoaderPanel.setDrive(0.0f, 0.0f);
         return;
     }
     const auto drive = glowFollower.update(proc.outputPeakForGUI.load(std::memory_order_relaxed),
                                            proc.inputLevelForGUI.load(std::memory_order_relaxed),
                                            proc.outputLevelForGUI.load(std::memory_order_relaxed),
                                            dtSeconds, glowParamsSignature());
-    faceplate.setDrive(drive.level, drive.heat);
+    faceplate.setDrive(drive.level, drive.heat);       // the lamp's bloom
+    irLoaderPanel.setDrive(drive.level, drive.heat);   // the cab's piping glow
 }
 
 void SilentRiotEditor::timerCallback()

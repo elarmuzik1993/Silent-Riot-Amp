@@ -33,13 +33,6 @@ juce::Rectangle<float> plateBounds(const juce::Component& c)
     return c.getLocalBounds().toFloat().reduced(0.5f);
 }
 
-// The piping path inset so a stroke of `width` stays inside the component:
-// JUCE clips paint() to the bounds, so the glow spills inward onto the plate.
-juce::Rectangle<float> pipingStrokeRect(juce::Rectangle<float> plate, float width)
-{
-    return plate.reduced(juce::jmax(0.0f, width * 0.5f - 0.5f));
-}
-
 float dbToGain(float db) { return std::pow(10.0f, db / 20.0f); }
 
 } // namespace
@@ -156,19 +149,8 @@ void AmpFaceplate::setDrive(float level, float heat)
 
 void AmpFaceplate::repaintGlow()
 {
-    // Only the piping strip and the lamp's bloom change with drive. A whole-
-    // component repaint would also repaint the knobs and toggles laid over the
-    // plate on every 30 Hz frame; these regions stay clear of them.
-    float glowWidth = kGlowBeadWidth;
-    for (const auto& s : kGlowHaloStrokes)
-        glowWidth = juce::jmax(glowWidth, s.width);
-    const int strip = static_cast<int>(std::ceil(glowWidth)) + 2;   // + inset + antialiasing
-    const auto b = getLocalBounds();
-    repaint(b.withHeight(strip));
-    repaint(b.withTop(b.getBottom() - strip));
-    repaint(b.withWidth(strip));
-    repaint(b.withLeft(b.getRight() - strip));
-
+    // Only the lamp's bloom changes with drive. A whole-component repaint would
+    // also repaint the knobs and toggles laid over the plate on every 30 Hz frame.
     const float bloomR = kLampRadius * kLampBloomBase * (1.0f + kLampBloomGain) + 2.0f;
     repaint(juce::Rectangle<float>(lampCentre.x - bloomR, lampCentre.y - bloomR,
                                    bloomR * 2.0f, bloomR * 2.0f).getSmallestIntegerContainer());
@@ -632,31 +614,9 @@ void AmpFaceplate::paint(juce::Graphics& g)
         renderPlateCache(scale);
     g.drawImage(plateCache, getLocalBounds().toFloat());
 
-    // ── Piping glow ──
+    // The piping glow now lives on the cab (CabinetView::setDrive); the amp
+    // plate keeps only the lamp bloom below.
     const float level = powered ? driveLevel : 0.0f;
-    if (level > 0.0f)
-    {
-        const auto b = plateBounds(*this);
-        const juce::Colour bead = glowBeadColour(level, driveHeat);
-        if (glowUsesHalo())
-        {
-            // Widest and faintest first, so the bright core sits on top
-            for (int i = static_cast<int>(std::size(kGlowHaloStrokes)) - 1; i >= 0; --i)
-            {
-                const auto& s = kGlowHaloStrokes[i];
-                const auto r = pipingStrokeRect(b, s.width);
-                g.setColour(bead.withMultipliedAlpha(s.alphaScale));
-                g.drawRoundedRectangle(r, kPlateRadius - (r.getX() - b.getX()), s.width);
-            }
-        }
-        else
-        {
-            // Light panel: the bead itself colours up, no halo
-            const auto r = pipingStrokeRect(b, kGlowBeadWidth);
-            g.setColour(bead);
-            g.drawRoundedRectangle(r, kPlateRadius - (r.getX() - b.getX()), kGlowBeadWidth);
-        }
-    }
 
     // ── Glass pilot lamp, placed by the editor in the knob row ──
     // Lit means powered, so brightness stays binary; playing only widens the bloom.

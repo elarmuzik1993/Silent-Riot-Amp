@@ -25,6 +25,9 @@ public:
     void mouseDown(const juce::MouseEvent&) override;
     void mouseWheelMove(const juce::MouseEvent&, const juce::MouseWheelDetails&) override;
 
+    // Live output level / compression heat (0..1) for the cab's piping glow.
+    void setDrive(float level, float heat) { cabView.setDrive(level, heat); }
+
     void setSelectedIR(int index);
     int getSelectedIR() const { return selectedIRIndex; }
 

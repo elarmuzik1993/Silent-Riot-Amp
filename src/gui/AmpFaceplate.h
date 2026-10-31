@@ -104,10 +104,10 @@ private:
 // raised panel, grille-cloth weave, piping, corner screws and a jewel pilot
 // lamp that lights with PWR. No wordmark: the header already carries the name.
 // Drawn in code so it follows the theme and the UI scale; it never takes mouse
-// clicks. It carries live signal state: setDrive() lights the piping bead
-// (glowBeadColour()) and widens the lamp's bloom with playing. The static
-// plate is cached in an Image keyed on size, theme and display scale, so a
-// 30 Hz drive update redraws only the glow, the lamp and its label.
+// clicks. It carries live signal state: setDrive() widens the lamp's bloom
+// with playing (the piping glow moved to CabinetView). The static plate is
+// cached in an Image keyed on size, theme and display scale, so a 30 Hz drive
+// update redraws only the lamp and its label.
 class AmpFaceplate : public juce::Component {
 public:
     AmpFaceplate();
@@ -117,8 +117,8 @@ public:
 
     // Output level and compression heat, 0..1 each (sanitised). Repaints only
     // when either moves by more than a small step, or to/from exactly 0, so a
-    // silent amp stays idle, and then only the piping strip and the lamp's
-    // bloom, so the knobs over the plate are not repainted with it. Ignored
+    // silent amp stays idle, and then only the lamp's bloom, so the knobs over
+    // the plate are not repainted with it. Ignored
     // for painting while unpowered.
     void setDrive(float level, float heat);
     float getDriveLevel() const noexcept { return driveLevel; }
@@ -142,7 +142,7 @@ public:
 
 private:
     void renderPlateCache(float scale);
-    void repaintGlow();   // the regions setDrive() changes: piping strip + lamp bloom
+    void repaintGlow();   // the region setDrive() changes: the lamp bloom
 
     bool powered = true;
     juce::Point<float> lampCentre;

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Boris Miscenco
 #include "CabinetView.h"
+#include "AmpFaceplate.h"
 #include "ColourPalette.h"
 #include "FontData.h"
 #include "ProceduralTexture.h"
@@ -8,6 +9,38 @@
 #include <vector>
 
 namespace sr {
+
+namespace {
+
+constexpr float kDriveEpsilon = 0.004f;   // ~1/255: smaller moves are not visible
+
+// The cab's glow is bolder than the amp plate's was: no value readouts sit on
+// the cab, so the plate's text-contrast ceiling (kGlowAlphaMaxHalo) does not
+// apply. Wide, faint strokes bloom onto the grille and the tolex around it.
+constexpr float kCabGlowAlphaMax = 0.95f;
+constexpr GlowStroke kCabHaloStrokes[] = { { 2.0f, 1.0f }, { 5.0f, 0.55f }, { 10.0f, 0.3f }, { 18.0f, 0.14f } };
+constexpr float kCabBeadWidth = 3.0f;   // light theme: no halo, a thicker bead
+
+float sanitiseUnit(float v)
+{
+    return std::isfinite(v) ? juce::jlimit(0.0f, 1.0f, v) : 0.0f;
+}
+
+// The orange piping bead around the grille, as paintCabinet() lays it out, and
+// the stretch of its bottom run that has torn out of the channel (no glow there).
+struct Piping { juce::Rectangle<float> bead; float radius; juce::Rectangle<float> gap; };
+
+Piping pipingFor(juce::Rectangle<float> cab)
+{
+    const float side = juce::jmin(cab.getWidth(), cab.getHeight());
+    const float gr = side * 0.035f * 0.5f;
+    const auto grille = cab.reduced(side * 0.095f);
+    const auto bead = grille.expanded(1.2f);
+    const float gapX = grille.getX() + grille.getWidth() * 0.38f, gapW = side * 0.07f;
+    return { bead, gr + 1.2f, { gapX, bead.getBottom() - 3.0f, gapW, 6.0f } };
+}
+
+} // namespace
 
 CabinetView::CabinetView()
 {
@@ -23,6 +56,20 @@ void CabinetView::setSelection(const juce::String& newName, const juce::String& 
     canStep = step;
     setDescription(name);   // read out by screen readers
     repaint();
+}
+
+void CabinetView::setDrive(float level, float heat)
+{
+    const float lv = sanitiseUnit(level), ht = sanitiseUnit(heat);
+    const auto moved = [](float now, float was) {
+        return std::abs(now - was) > kDriveEpsilon || ((now == 0.0f) != (was == 0.0f));
+    };
+    if (!moved(lv, driveLevel) && !moved(ht, driveHeat))
+        return;
+    driveLevel = lv;
+    driveHeat = ht;
+    const auto p = pipingFor(cabBounds());
+    repaint(p.bead.expanded(kCabHaloStrokes[std::size(kCabHaloStrokes) - 1].width).getSmallestIntegerContainer());
 }
 
 void CabinetView::setDragOver(bool over)
@@ -554,6 +601,33 @@ void CabinetView::paint(juce::Graphics& g)
             paintCabinet(cg, cab.withPosition(kCacheMargin, kCacheMargin), scale);
         }
         g.drawImage(cabCache, area);
+    }
+
+    if (driveLevel > 0.0f)
+    {
+        // Piping glow over the cached cab front; the torn-out stretch stays dark
+        const auto p = pipingFor(cab);
+        // Hue from the shared ramp (heat); alpha from level, lifted so a quiet
+        // signal still shows
+        const juce::Colour bead = glowBeadColour(1.0f, driveHeat)
+                                      .withAlpha(kCabGlowAlphaMax * std::sqrt(driveLevel));
+        juce::Graphics::ScopedSaveState save(g);
+        g.excludeClipRegion(p.gap.toNearestInt());
+        if (glowUsesHalo())
+        {
+            // Widest and faintest first, so the bright core sits on top
+            for (int i = static_cast<int>(std::size(kCabHaloStrokes)) - 1; i >= 0; --i)
+            {
+                const auto& s = kCabHaloStrokes[i];
+                g.setColour(bead.withMultipliedAlpha(s.alphaScale));
+                g.drawRoundedRectangle(p.bead, p.radius, s.width);
+            }
+        }
+        else
+        {
+            g.setColour(bead);
+            g.drawRoundedRectangle(p.bead, p.radius, kCabBeadWidth);
+        }
     }
 
     if (dragOver)

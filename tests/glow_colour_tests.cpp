@@ -14,6 +14,7 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 #include "gui/AmpFaceplate.h"
+#include "gui/CabinetView.h"
 #include "gui/ColourPalette.h"
 
 #include <juce_events/juce_events.h>
@@ -261,7 +262,7 @@ TEST_CASE("Faceplate: a theme switch rebuilds the cached plate", "[gui][glow]")
     CHECK(p.pixel(x, y, 2.0f).getPerceivedBrightness() < 0.5f);
 }
 
-TEST_CASE("Faceplate: the bead lights only while powered and driven", "[gui][glow]")
+TEST_CASE("Faceplate: the piping no longer glows with drive (it moved to the cab)", "[gui][glow]")
 {
     for (int theme : kThemes)
     {
@@ -271,13 +272,53 @@ TEST_CASE("Faceplate: the bead lights only while powered and driven", "[gui][glo
 
         p.plate.setDrive(0.0f, 0.0f);
         const auto idle = p.pixel(x, y);
+        p.plate.setDrive(1.0f, 1.0f);
+        CHECK(p.pixel(x, y) == idle);
+    }
+}
 
-        p.plate.setDrive(1.0f, 0.0f);
-        const auto lit = p.pixel(x, y);
-        CHECK(lit != idle);
-        CHECK(lit.getRed() > idle.getRed());   // warmer: the glow is orange to red
+namespace {
 
-        p.plate.setPowered(false);
-        CHECK(p.pixel(x, y) == idle);           // power off: no residual bead colour
+bool sameImage(const juce::Image& a, const juce::Image& b)
+{
+    if (a.getBounds() != b.getBounds()) return false;
+    for (int y = 0; y < a.getHeight(); ++y)
+        for (int x = 0; x < a.getWidth(); ++x)
+            if (a.getPixelAt(x, y) != b.getPixelAt(x, y)) return false;
+    return true;
+}
+
+} // namespace
+
+TEST_CASE("Cab: setDrive stores sanitised values and ignores invisible moves", "[gui][glow]")
+{
+    juce::ScopedJuceInitialiser_GUI juceInit;
+    sr::CabinetView cab;
+    cab.setSize(400, 260);
+    cab.setDrive(0.5f, 0.25f);
+    CHECK(cab.getDriveLevel() == 0.5f);
+    cab.setDrive(0.501f, 0.251f);
+    CHECK(cab.getDriveLevel() == 0.5f);
+    cab.setDrive(std::numeric_limits<float>::quiet_NaN(), 5.0f);
+    CHECK(cab.getDriveLevel() == 0.0f);
+    CHECK(cab.getDriveHeat() == 1.0f);
+}
+
+TEST_CASE("Cab: the piping glows with drive and goes dark again", "[gui][glow]")
+{
+    for (int theme : kThemes)
+    {
+        ThemeGuard guard(theme);
+        juce::ScopedJuceInitialiser_GUI juceInit;
+        sr::CabinetView cab;
+        cab.setSize(400, 260);
+        const auto snap = [&] { return cab.createComponentSnapshot(cab.getLocalBounds(), true, 1.0f); };
+
+        cab.setDrive(0.0f, 0.0f);
+        const auto idle = snap();
+        cab.setDrive(1.0f, 0.0f);
+        CHECK_FALSE(sameImage(idle, snap()));
+        cab.setDrive(0.0f, 0.0f);
+        CHECK(sameImage(idle, snap()));   // silence: no residual glow
     }
 }
