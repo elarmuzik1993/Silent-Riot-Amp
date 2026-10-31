@@ -156,6 +156,8 @@ juce_add_binary_data(SilentRiotData
     SOURCES
         resources/fonts/Oxanium-Regular.ttf
         resources/fonts/Oxanium-Bold.ttf
+        resources/textures/brick-wall.jpg
+        resources/textures/faceplate-steel.jpg
 )
 
 # ── Compile definitions ─────────────────────────

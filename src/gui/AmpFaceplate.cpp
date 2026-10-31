@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Boris Miscenco
 #include "AmpFaceplate.h"
+#include "BinaryData.h"
 #include "ColourPalette.h"
 #include "FontData.h"
 #include "ProceduralTexture.h"
@@ -513,6 +514,81 @@ static void paintGrunge(juce::Graphics& g, juce::Rectangle<float> b, float radiu
     }
 }
 
+// A photo of scratched, rust-streaked steel supplied by the owner
+// (`resources/textures/faceplate-steel.jpg`; source to confirm and credit in
+// CREDITS.md before the repo goes public), laid over the powder coat as a
+// layer. Not pasted opaque, which would turn the plate silver: each pixel's
+// opacity follows how far it stands out from its surroundings, so the flat
+// steel only tints the coat a little while the scratches, the rust streak and
+// the dark specks come through. Built once from the photo, theme-independent;
+// the light palette takes it at reduced opacity, like the grunge.
+static const juce::Image& steelLayer()
+{
+    static const juce::Image layer = [] {
+        const juce::Image photo = juce::ImageCache::getFromMemory(BinaryData::faceplatesteel_jpg,
+                                                                  BinaryData::faceplatesteel_jpgSize);
+        const int w = photo.getWidth(), h = photo.getHeight();
+        juce::Image out(juce::Image::ARGB, juce::jmax(1, w), juce::jmax(1, h), true);
+        if (w <= 0 || h <= 0)
+            return out;
+
+        // Luminance, and its local mean over a ~29 px box (summed-area table)
+        std::vector<float> lum(static_cast<size_t>(w) * static_cast<size_t>(h));
+        const juce::Image::BitmapData src(photo, juce::Image::BitmapData::readOnly);
+        for (int y = 0; y < h; ++y)
+            for (int x = 0; x < w; ++x)
+                lum[static_cast<size_t>(y * w + x)] = src.getPixelColour(x, y).getPerceivedBrightness();
+        std::vector<double> sat(static_cast<size_t>(w + 1) * static_cast<size_t>(h + 1), 0.0);
+        for (int y = 0; y < h; ++y)
+            for (int x = 0; x < w; ++x)
+                sat[static_cast<size_t>((y + 1) * (w + 1) + x + 1)] = lum[static_cast<size_t>(y * w + x)]
+                    + sat[static_cast<size_t>(y * (w + 1) + x + 1)] + sat[static_cast<size_t>((y + 1) * (w + 1) + x)]
+                    - sat[static_cast<size_t>(y * (w + 1) + x)];
+        const int r = 14;
+
+        juce::Image::BitmapData dst(out, juce::Image::BitmapData::writeOnly);
+        for (int y = 0; y < h; ++y)
+            for (int x = 0; x < w; ++x)
+            {
+                const int x0 = juce::jmax(0, x - r), x1 = juce::jmin(w, x + r + 1);
+                const int y0 = juce::jmax(0, y - r), y1 = juce::jmin(h, y + r + 1);
+                const double area = static_cast<double>((x1 - x0) * (y1 - y0));
+                const double sum = sat[static_cast<size_t>(y1 * (w + 1) + x1)] - sat[static_cast<size_t>(y0 * (w + 1) + x1)]
+                                 - sat[static_cast<size_t>(y1 * (w + 1) + x0)] + sat[static_cast<size_t>(y0 * (w + 1) + x0)];
+                const float dev = lum[static_cast<size_t>(y * w + x)] - static_cast<float>(sum / area);
+
+                const juce::Colour c = src.getPixelColour(x, y);
+                const float chroma = juce::jmax(c.getFloatRed(), c.getFloatGreen(), c.getFloatBlue())
+                                   - juce::jmin(c.getFloatRed(), c.getFloatGreen(), c.getFloatBlue());
+                // Scratches and highlights in the steel's own colour; specks and
+                // stains darken, so they read as dark on a dark plate too
+                const float alpha = juce::jlimit(0.0f, 0.75f, 0.10f + 2.2f * std::abs(dev) + 1.1f * chroma);
+                const juce::Colour ink = dev >= 0.0f ? c : c.withMultipliedBrightness(0.35f);
+                dst.setPixelColour(x, y, ink.withAlpha(alpha));
+            }
+        return out;
+    }();
+    return layer;
+}
+
+// How much of the steel layer shows: almost transparent (owner's call), so it
+// reads as a faint memory of bare metal under the coat, not as a photo
+constexpr float kSteelOpacityDark  = 0.2f;
+constexpr float kSteelOpacityLight = 0.14f;
+
+static void paintSteelLayer(juce::Graphics& g, juce::Rectangle<float> b, float radius)
+{
+    const bool darkPanel = Colours::panel.getPerceivedBrightness() < 0.5f;
+    juce::Graphics::ScopedSaveState save(g);
+    juce::Path clip;
+    clip.addRoundedRectangle(b.reduced(2.0f), radius - 1.5f); // inside the piping
+    g.reduceClipRegion(clip);
+    g.setImageResamplingQuality(juce::Graphics::highResamplingQuality);
+    g.setOpacity(darkPanel ? kSteelOpacityDark : kSteelOpacityLight);
+    g.drawImage(steelLayer(), b,
+                juce::RectanglePlacement(juce::RectanglePlacement::centred | juce::RectanglePlacement::fillDestination));
+}
+
 void AmpFaceplate::renderPlateCache(float scale)
 {
     const int w = juce::jmax(1, juce::roundToInt(static_cast<float>(getWidth()) * scale));
@@ -527,6 +603,7 @@ void AmpFaceplate::renderPlateCache(float scale)
     const auto b = plateBounds(*this);
     paintPlateFace(g, b, kPlateRadius, false); // no weave: the powder coat is the surface
     paintGrunge(g, b, kPlateRadius, scale);    // amp plate only: the EFFECTS cards share paintPlate, not this
+    paintSteelLayer(g, b, kPlateRadius);        // the steel photo over the coat, amp plate only
 
     // Corner screws
     const float inset = 10.0f;

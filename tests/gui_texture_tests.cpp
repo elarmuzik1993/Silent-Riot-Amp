@@ -12,8 +12,10 @@
 // are juce::Components, and the pure C++ target has no JUCE.
 // ═══════════════════════════════════════════════════════════════
 #include <catch2/catch_test_macros.hpp>
+#include "gui/AmpFaceplate.h"
 #include "gui/CabinetView.h"
 #include "gui/ColourPalette.h"
+#include "gui/IRLoaderPanel.h"
 #include "gui/LookAndFeel.h"
 #include "gui/ProceduralTexture.h"
 
@@ -156,6 +158,113 @@ TEST_CASE("Cab: a theme switch rebuilds the cached front", "[gui][texture]")
     const auto hi = cab.snapshot(2.0f);
     CHECK(hi.getWidth() == 1200);
     CHECK(hi.getPixelAt(kTolexX * 2, kTolexY * 2).getPerceivedBrightness() < 0.5f);
+}
+
+// ── Brick wall behind the CAB view ─────────────────────────────────
+
+namespace {
+
+// Left of the cab and its arrow, clear of the header and the name lines
+const juce::Rectangle<int> kWallPatch { 20, 80, 60, 60 };
+
+struct Loader
+{
+    juce::ScopedJuceInitialiser_GUI juceInit;   // first: outlives the panel
+    sr::IRLoaderPanel panel;
+
+    Loader() { panel.setSize(700, sr::IRLoaderPanel::panelHeight); }
+
+    juce::Image patch()
+    {
+        return panel.createComponentSnapshot(panel.getLocalBounds(), true, 1.0f).getClippedImage(kWallPatch);
+    }
+};
+
+struct Mean { float r = 0, g = 0, b = 0, spread = 0; };
+
+Mean meanOf(const juce::Image& img)
+{
+    Mean m;
+    float lo = 1.0f, hi = 0.0f;
+    const float n = static_cast<float>(img.getWidth() * img.getHeight());
+    for (int y = 0; y < img.getHeight(); ++y)
+        for (int x = 0; x < img.getWidth(); ++x)
+        {
+            const auto c = img.getPixelAt(x, y);
+            m.r += c.getFloatRed() / n;
+            m.g += c.getFloatGreen() / n;
+            m.b += c.getFloatBlue() / n;
+            lo = std::min(lo, c.getPerceivedBrightness());
+            hi = std::max(hi, c.getPerceivedBrightness());
+        }
+    m.spread = hi - lo;
+    return m;
+}
+
+} // namespace
+
+TEST_CASE("Brick wall: CAB view only, dimmed in dark, washed pale in light", "[gui][texture]")
+{
+    Loader l;
+    REQUIRE(l.panel.getView() == sr::IRLoaderPanel::View::Cab);
+
+    const auto dark = meanOf(l.patch());
+    INFO("dark mean " << dark.r << " " << dark.g << " " << dark.b << " spread " << dark.spread);
+    CHECK(dark.r > dark.b + 0.03f);                 // warm clay, not the cool panel
+    CHECK(dark.spread > 0.08f);                     // bricks and joints, not a flat fill
+    CHECK((dark.r + dark.g + dark.b) / 3.0f < 0.3f); // dimmed: the UI stays the bright part
+
+    {
+        ThemeGuard guard(sr::Colours::Light);
+        const auto light = meanOf(l.patch());
+        INFO("light mean " << light.r << " " << light.g << " " << light.b);
+        CHECK((light.r + light.g + light.b) / 3.0f > 0.6f); // washed pale
+        CHECK(light.spread > 0.08f);
+    }
+
+    // LIBRARY keeps the plain panel behind its list
+    l.panel.setView(sr::IRLoaderPanel::View::Library);
+    const auto lib = meanOf(l.patch());
+    CHECK(lib.spread < 0.02f);
+}
+
+TEST_CASE("Brick wall: same on every render, and while the section animates open", "[gui][texture]")
+{
+    Loader a, b;
+    const auto full = a.patch();
+    CHECK(sameImage(full, b.patch()));     // fixed seeds
+    CHECK(sameImage(full, a.patch()));     // and the cache serves the same wall
+
+    // The open/close animation resizes the panel every frame: the wall is
+    // rendered at full height and drawn from the top, so it neither moves nor rescales
+    a.panel.setSize(700, 150);
+    CHECK(sameImage(full, a.patch()));
+}
+
+// ── Steel layer on the amp plate ───────────────────────────────────
+
+TEST_CASE("Steel layer: the photo's rust streak shows on the amp plate", "[gui][texture]")
+{
+    juce::ScopedJuceInitialiser_GUI juceInit;
+    sr::AmpFaceplate plate;
+    plate.setSize(604, 180);                      // the plate's own proportions
+    const auto img = plate.createComponentSnapshot(plate.getLocalBounds(), true, 1.0f);
+
+    // Warmth (red minus blue) of a vertical strip, away from the rim
+    const auto warmth = [&img](float fx0, float fx1) {
+        const int x0 = juce::roundToInt(fx0 * 604.0f), x1 = juce::roundToInt(fx1 * 604.0f);
+        double sum = 0.0;
+        int n = 0;
+        for (int y = 36; y < 144; ++y)
+            for (int x = x0; x < x1; ++x, ++n)
+                sum += img.getPixelAt(x, y).getFloatRed() - img.getPixelAt(x, y).getFloatBlue();
+        return sum / n;
+    };
+    const double rust = warmth(0.49f, 0.53f);   // the streak sits just left of centre in the photo
+    const double plain = warmth(0.12f, 0.16f);
+    INFO("rust " << rust << " plain " << plain);
+    // Almost transparent by design: +0.0098 with the layer, -0.0001 without (measured)
+    CHECK(rust > plain + 0.005);
 }
 
 // ── Knob wear ──────────────────────────────────────────────────────

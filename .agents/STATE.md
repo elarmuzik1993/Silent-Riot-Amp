@@ -1,11 +1,11 @@
 # State
 
-_Updated 2026-10-31 (worn textures: amp plate, knobs, cab)_
+_Updated 2026-10-31 (worn textures: amp plate, knobs, cab; brick-wall and steel photos)_
 
 ## Now
 - **Tone frozen at `tone-v1`** (059b209): `tests/tone_lock_tests.cpp` guards it (`docs/dev/tone-lock.md`).
 - Silent Riot v0.3.4 (JUCE 7 VST3/Standalone), GPL-3.0-or-later, free + optional donations. No tagged
-  release. ctest 501 (312 pure C++ / 81 JUCE / 108 processor), all passing on Windows/MSVC 2026-10-31.
+  release. ctest 504 (312 pure C++ / 81 JUCE / 111 processor), all passing on Windows/MSVC 2026-10-31.
   On Linux/GCC the 5 tone-lock cases fail, also at 857023b (before any GUI change): band deltas at
   −84…−100 dB, RMS ≤ 0.0002 dB (last checked before the texture tests were added).
 - Docs open-source ready (`docs/README.md` index; `design/`+`records/` frozen; `AI_USAGE.md` kept true).
@@ -19,7 +19,9 @@ _Updated 2026-10-31 (worn textures: amp plate, knobs, cab)_
 - **Worn look**: the amp plate has a worn powder coat (`paintGrunge()`), the 17
   pointer knobs per-knob handling wear (`kKnobWearProperty`), the cab pebbled tolex with tears to
   plywood, dents, rubbed-through edges, torn piping and grille dust/rust; the cab front is now cached.
-  All procedural (`src/gui/ProceduralTexture.h`), fixed seeds, rendered once; light theme checked.
+  The procedural parts share `src/gui/ProceduralTexture.h` (fixed seeds, rendered once). Two photos the
+  owner supplied are embedded (`resources/textures/`): a brick wall behind the CAB view, dimmed to half,
+  and scratched steel layered over the amp plate's coat at 20% (14% light). Light theme checked.
 - Standalone: Settings (gear) has an AUDIO INPUT list (`src/gui/InputSelector.*`) that opens the
   interface with one input active, so Input 2 of a pair plays (the amp reads channel 0 only).
   Saved with the device setup, not presets; hidden in VST3. Confirmed on a KA6.
@@ -51,11 +53,15 @@ _Updated 2026-10-31 (worn textures: amp plate, knobs, cab)_
    tone lock fails on Linux/GCC (references are from MSVC; see Now): owner decides between a
    per-platform reference set or a noise floor below which bands are not compared.
 7. Owner, cab view: light theme keeps white tolex around the black grille — OK? Dim the cab when CAB is off?
-   Worn look: wear on the EFFECTS knobs too, or the amp row only? How much damage on the cab?
+   Worn look: wear on the EFFECTS knobs too, or the amp row only? How much damage on the cab? Wall brightness,
+   steel-layer opacity (`kSteelOpacityDark`)?
 8. Owner: review Settings redesign + Oxanium on the docs/settings-panel-plan branch, then its PR.
    Re-shoot the manual's `resources/images/` (still Space Mono) with `sr_editor_snapshot`.
 9. Make `tests/rt_stress.cpp` build on MSVC (`_aligned_malloc`/`_aligned_free` there, `posix_memalign`
    elsewhere), so the full `verify.sh` runs on Windows (see Known issues).
+10. **Blocks merging PR #64:** owner confirms where `resources/textures/brick-wall.jpg` and
+   `faceplate-steel.jpg` come from (own photos, or a source whose licence allows redistribution under
+   GPL); credit both in CREDITS.md. Wider originals would also keep them sharp at UI scale 1.5 / HiDPI.
 
 ## Decisions
 - Tone frozen at `tone-v1` (amp + cab + effects, steady state). Re-calibration (power Tasks 2–5,
