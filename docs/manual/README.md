@@ -18,7 +18,7 @@ live tuner sit around it. It runs as a VST3 plugin or as a standalone app.
 | Page | What it covers |
 |---|---|
 | [Controls](controls.md) | GAIN, SHAPE, VOLUME, 7W, CAB, PWR, oversampling, meters |
-| [Effects](effects.md) | UTILITY (gate, width, input/output trims), BOOST, DELAY, REVERB |
+| [Effects](effects.md) | Gate, width and input/output trims (beside the meters), BOOST, DELAY, REVERB |
 | [Cabinets and IRs](cabinets-and-irs.md) | The built-in cab, loading impulse responses, their limits |
 | [Presets and settings](presets-and-settings.md) | Factory presets, the settings panel, what is saved with a project |
 | [Tuner](tuner.md) | The always-on tuner and its mute |
@@ -38,13 +38,13 @@ shows for automation, the range and the default.
    The amp responds to how hard you hit it, so a level that is too low makes
    every GAIN setting sound cleaner than it should. Aim for a DI peaking around
    −12 to −6 dBFS in your interface; if you can't change the interface gain, use
-   the **INPUT** trim in EFFECTS → UTILITY (±12 dB).
+   the **INPUT** trim beside the IN meter (±12 dB).
 3. **Dial a tone.** Start at GAIN 6, SHAPE 5, VOLUME 5 (the defaults).
    - Cleaner: GAIN down. Dirtier: GAIN up.
    - More mids and push: SHAPE counter-clockwise. Scooped and modern: clockwise.
    - VOLUME drives the power tubes, not just the loudness — turn it up for more
      sag, compression and power-amp breakup ([Controls](controls.md#volume)).
-4. **Set the output level** with the **OUTPUT** trim (EFFECTS → UTILITY) or your
+4. **Set the output level** with the **OUTPUT** trim (beside the OUT meter) or your
    host's fader. OUTPUT is after the amp, so it changes level, never tone.
 5. Want a starting point? Step through the factory presets with the arrows in
    the header ([Presets](presets-and-settings.md)).

@@ -32,7 +32,7 @@ When two sources disagree, trust them in this order: **the code** > `CLAUDE.md` 
 |---|---|---|
 | [`manual/README.md`](manual/README.md) | Overview, quick start, keyboard, signal flow | maintained |
 | [`manual/controls.md`](manual/controls.md) | GAIN, SHAPE, VOLUME, 15W/7W, CAB, PWR, oversampling | maintained |
-| [`manual/effects.md`](manual/effects.md) | UTILITY, BOOST, DELAY, REVERB | maintained |
+| [`manual/effects.md`](manual/effects.md) | Gate, width, trims; BOOST, DELAY, REVERB | maintained |
 | [`manual/cabinets-and-irs.md`](manual/cabinets-and-irs.md) | Built-in cab vs IRs, formats, level matching, loader limits | maintained |
 | [`manual/presets-and-settings.md`](manual/presets-and-settings.md) | Presets, settings panel, saved state | maintained |
 | [`manual/tuner.md`](manual/tuner.md) | The live tuner | maintained |

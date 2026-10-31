@@ -125,6 +125,7 @@ add_executable(SilentRiotProcessorTests
     gui_settings_panel_tests.cpp
     gui_vu_meter_tests.cpp
     gui_texture_tests.cpp
+    gui_layout_tests.cpp
     tone_lock_core_tests.cpp
     tone_lock_tests.cpp
 )

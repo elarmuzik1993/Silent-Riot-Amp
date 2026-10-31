@@ -184,17 +184,17 @@ The plugin is a vertical stack of sections. Each section is full-width.
 ├─────────────────────────────────────────────────────────┤
 │  TUNER BAR (always visible, not collapsible)   h=34px   │
 ├─────────┬───────────────────────────────────┬───────────┤
-│  VU IN  │         KNOBS + TOGGLES           │  VU OUT   │
-│  w=40px │         (center area)             │  w=40px   │
-│         │                                   │           │
-│         │   [GAIN]   [SHAPE]   [VOLUME]     │           │
+│ VU IN + │         KNOBS + TOGGLES           │ OUTPUT +  │
+│ INPUT / │         (center area)             │ WIDTH /   │
+│ THRESH  │                                   │ VU OUT    │
+│ w=104px │   [GAIN]   [SHAPE]   [VOLUME]     │ w=104px   │
 │         │         ── separator ──            │           │
 │         │      [7W]  [CAB]  [PWR]           │           │
 │         │                                   │           │
 ├─────────┴───────────────────────────────────┴───────────┤
 │  EFFECTS SECTION BAR                         h=~26px    │
 ├─────────────────────────────────────────────────────────┤
-│  EFFECTS PANEL (collapsible)                 h=0–320px  │
+│  EFFECTS PANEL (collapsible)                 h=0–156px  │
 ├─────────────────────────────────────────────────────────┤
 │  IR LOADER SECTION BAR                       h=~26px    │
 ├─────────────────────────────────────────────────────────┤
@@ -239,12 +239,17 @@ The plugin is a vertical stack of sections. Each section is full-width.
 - **Min height**: 230px
 - **Align items**: center
 
-**Column 1 (VU IN)**: border-right 1px, centered VU meter, label "IN"  
+**Column 1 (VU IN)**: 104px — the VU meter (label "IN") on the outer edge, and
+beside it INPUT over THRESH (gate), stacked, as the EFFECTS knobs  
 **Column 2 (Controls)**: vertical flex, centered:
 - Knobs row: 3 knobs, gap 36px, center-justified
 - Separator line: 260px wide, 1px, gradient `transparent → border → transparent`
 - Toggles row: 3 toggles, gap 32px
-**Column 3 (VU OUT)**: border-left 1px, centered VU meter, label "OUT"
+**Column 3 (VU OUT)**: mirrored — OUTPUT over WIDTH, then the VU meter (label "OUT")
+on the outer edge. The input-side controls sit at the input end, the output-side
+ones at the output end; all four are autonomous (the gate and width self-gate at
+0, the trims are unity at centre), so none has an ON toggle. They were the
+EFFECTS panel's UTILITY card until 2026-10-31, which made that panel two rows tall.
 
 ### 4.3 Section Bars (EFFECTS, IR LOADER, ADVANCED)
 
@@ -619,27 +624,21 @@ saved state — a session saved with it engaged would reopen silent.
 
 ### 5.10 Effects Panel
 
-Collapsible 2×2 grid of effect "cards" (`EffectsPanel.h/.cpp`), `panelHeight`
-320px:
+Collapsible row of three effect "cards" (`EffectsPanel.h/.cpp`), `panelHeight`
+156px:
 
 ```
-┌ UTILITY ──────────┐ ┌ BOOST ──────── ON ┐
-│THRESH WIDTH IN OUT│ │ LEVEL TIGHT BRIGHT│
-└───────────────────┘ └───────────────────┘
-┌ DELAY ─── PP  ON ─┐ ┌ REVERB ─────── ON ┐
-│ [sync divisions]  │ │  MIX  SIZE  TONE  │
-│ TIME FBK MIX TONE │ │                   │
-└───────────────────┘ └───────────────────┘
+┌ BOOST ─────── ON ┐ ┌ DELAY ─────────────── ON ┐ ┌ REVERB ────── ON ┐
+│ LEVEL TIGHT BRIGHT│ │ SYNC                     │ │ MIX  SIZE  TONE  │
+│                   │ │ PP   TIME FBK  MIX  TONE │ │                  │
+└───────────────────┘ └──────────────────────────┘ └──────────────────┘
 ```
 
-- Cards stretch to fill the panel; 10px gap, title strip 16px.
-- **UTILITY** has **no ON/OFF toggle** — all of its knobs are autonomous.
-  THRESH and WIDTH self-gate at 0 (gate bypassed, widener skipped); INPUT and
-  OUTPUT are unity at centre. This is why the card is named UTILITY rather than
-  NOISE GATE — none of it is part of the amp's voice.
-- **DELAY** is bespoke: PP (ping-pong) and ON toggles share the title row, and a
-  sync-division `SegmentedSelector` sits above the knob row.
+- Cards hug their contents (54px per knob) and the row is centred; 12px gap.
+- **DELAY** is bespoke: SYNC over PP as bat toggles before TIME; SYNC turns TIME
+  into the division selector.
 - BOOST and REVERB use the standard title-strip-plus-ON-toggle card.
+- The gate, width and INPUT/OUTPUT trims sit beside the meters (§4.2), not here.
 
 ---
 
@@ -683,7 +682,7 @@ presetIndex     int     0–4          0         Preset
 irIndex         int     0–N          0         IR Selection
 tunerMute       bool    off/on       false     Tuner Mute  (never restored)
 
-── Effects: UTILITY (no ON toggle — knobs self-gate at 0 or unity at centre) ─
+── Meter columns (no ON toggle — knobs self-gate at 0 or unity at centre) ───
 gateThreshold   float   0–1          0.0       Gate Threshold (0 = off)
 width           float   0–1          0.0       Width (0 = off)
 inputLevel      float   0–1          0.5       Input Level  (centre = unity, ±12 dB)

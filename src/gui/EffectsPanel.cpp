@@ -9,14 +9,14 @@
 
 namespace sr {
 
-// Card geometry — kept in sync between paint() and resized(). Cards are a
-// fixed size (sized to hug the title row + one knob row) and the 2×2 grid is
-// centred in the panel, rather than stretched to fill it — otherwise the knobs
-// float in oversized boxes.
+// Card geometry — kept in sync between paint() and resized(). Cards hug their
+// title row + one knob row, and the row of three is centred in the panel,
+// rather than stretched to fill it — otherwise the knobs float in oversized
+// boxes.
 namespace {
     constexpr int kCardGap = 12;
-    constexpr int kCardW   = 328;  // two fit the 680 px inside the panel margin
     constexpr int kCardH   = 136;  // title row + one knob row (or DELAY's switch stack)
+    constexpr int kCardPadX = 10;
 
     // Card chrome metrics, shared by paint() and resized().
     constexpr int kCardPadY = 6;
@@ -26,8 +26,10 @@ namespace {
     // engraved below) drawn smaller. kKnobH must hold the text strip *and* a
     // dial big enough for the pointer bar to read — under ~50 px the bar's
     // chamfer turns to mush. The name keeps its full size at any scale.
-    constexpr float kKnobScale = 0.7f;
-    constexpr int   kKnobW     = 70;
+    // kKnobW is what three cards in one row leave each of their ten knobs
+    // inside the 680 px panel; the names still fit at body size.
+    constexpr float kKnobScale = EffectsPanel::knobScale;
+    constexpr int   kKnobW     = 54;
     constexpr int   kKnobH     = 80;
     constexpr int   kMinDial   = 52;
     static_assert(kKnobH >= NotchKnob::stripHeight(kKnobScale, true) + kMinDial,
@@ -58,8 +60,17 @@ namespace {
                   "the jewel gets clipped and the toggle looks dead");
     static_assert(kCardH >= 2 * kCardPadY + kToggleH + kRowGap + kKnobH,
                   "kCardH leaves the cards too little for a full knob row");
-    static_assert(EffectsPanel::panelHeight >= 2 * kCardH + kCardGap + 2 * 10,
-                  "panelHeight is shorter than the card grid it holds");
+    static_assert(EffectsPanel::panelHeight >= kCardH + 2 * 10,
+                  "panelHeight is shorter than the card row it holds");
+
+    // BOOST and REVERB hold three knobs; DELAY its SYNC/PP stack and four.
+    constexpr int kStackGap = 4;
+    constexpr int kCardW[3] = { 2 * kCardPadX + 3 * kKnobW,
+                                2 * kCardPadX + kStackW + kStackGap + 4 * kKnobW,
+                                2 * kCardPadX + 3 * kKnobW };
+    constexpr int kRowW = kCardW[0] + kCardW[1] + kCardW[2] + 2 * kCardGap;
+    static_assert(kRowW <= 700 - 2 * 10,
+                  "the three cards no longer fit the window's width in one row");
 }
 
 EffectsPanel::EffectsPanel()
@@ -77,19 +88,15 @@ EffectsPanel::EffectsPanel()
     for (auto* t : { &delaySyncTgl, &delayPP })
         t->setStyle(kStackStyle);
 
-    int wearSeed = 100; // each knob wears differently (see kKnobWearProperty)
-    for (auto* k : { &gateThresh, &width, &inputLevel, &outputLevel,
-                     &boostLevel, &boostTight, &boostBright,
+    // Each knob wears differently (see kKnobWearProperty). Seeds 100..103
+    // went to the gate/width/trim knobs, which the editor now owns and seeds
+    // the same, so every knob keeps the wear it had.
+    int wearSeed = 104;
+    for (auto* k : { &boostLevel, &boostTight, &boostBright,
                      &delayTime, &delayFb, &delayMix, &delayTone,
                      &reverbMix, &reverbSize, &reverbTone })
     {
-        // Same knob as the amp row, smaller, so the panel reads as part of
-        // the same piece of hardware.
-        k->setScale(kKnobScale);
-        k->setLabelOnTop(true);
-        k->setEngravedReadout(true);
-        k->getSlider().getProperties().set(SilentRiotLookAndFeel::kPointerKnobProperty, true);
-        k->getSlider().getProperties().set(SilentRiotLookAndFeel::kKnobWearProperty, wearSeed++);
+        styleKnob(*k, wearSeed++);
         addAndMakeVisible(*k);
     }
 
@@ -102,61 +109,43 @@ EffectsPanel::EffectsPanel()
     reverbMix.setValueFormatter(percent);
 }
 
-static juce::Rectangle<int> cardBounds(juce::Rectangle<int> area, int col, int row)
+void EffectsPanel::styleKnob(NotchKnob& k, int wearSeed)
 {
-    const int gridW = kCardW * 2 + kCardGap;
-    const int gridH = kCardH * 2 + kCardGap;
-    const int ox = area.getCentreX() - gridW / 2;
-    const int oy = area.getCentreY() - gridH / 2;
-    return { ox + col * (kCardW + kCardGap),
-             oy + row * (kCardH + kCardGap),
-             kCardW, kCardH };
+    // Same knob as the amp row, smaller, so the panel reads as part of the
+    // same piece of hardware.
+    k.setScale(kKnobScale);
+    k.setLabelOnTop(true);
+    k.setEngravedReadout(true);
+    k.getSlider().getProperties().set(SilentRiotLookAndFeel::kPointerKnobProperty, true);
+    k.getSlider().getProperties().set(SilentRiotLookAndFeel::kKnobWearProperty, wearSeed);
 }
 
-// MOCKUP: one row — BOOST | DELAY | REVERB, widths from their knob counts at 54 px.
-static juce::Rectangle<int> rowCardBounds(juce::Rectangle<int> area, int i)
+// Card i of the row (0 BOOST, 1 DELAY, 2 REVERB), centred in `area`.
+static juce::Rectangle<int> cardBounds(juce::Rectangle<int> area, int i)
 {
-    constexpr int k = 54;
-    const int w[3] = { 20 + 3 * k, 20 + 54 + 4 * k, 20 + 3 * k };
-    const int total = w[0] + w[1] + w[2] + 2 * kCardGap;
-    int x = area.getCentreX() - total / 2;
-    for (int j = 0; j < i; ++j) x += w[j] + kCardGap;
-    return { x, area.getCentreY() - kCardH / 2, w[i], kCardH };
+    int x = area.getCentreX() - kRowW / 2;
+    for (int j = 0; j < i; ++j)
+        x += kCardW[j] + kCardGap;
+    return { x, area.getCentreY() - kCardH / 2, kCardW[i], kCardH };
 }
 
 void EffectsPanel::paint(juce::Graphics& g)
 {
     auto area = getLocalBounds().reduced(10);
-    if (layoutMockup())
+
+    static const char* titles[3] = { "BOOST", "DELAY", "REVERB" };
+    for (int i = 0; i < 3; ++i)
     {
-        static const char* rowTitles[3] = { "BOOST", "DELAY", "REVERB" };
-        for (int i = 0; i < 3; ++i)
-        {
-            auto card = rowCardBounds(area, i);
-            AmpFaceplate::paintPlate(g, card.toFloat().reduced(0.5f), 5.0f);
-            g.setColour(Colours::accent);
-            g.setFont(Fonts::ui(Fonts::Sizes::title, true));
-            g.drawText(rowTitles[i], card.reduced(12, kCardPadY).removeFromTop(kToggleH),
-                       juce::Justification::centredLeft, false);
-        }
-        return;
+        auto card = cardBounds(area, i);
+        AmpFaceplate::paintPlate(g, card.toFloat().reduced(0.5f), 5.0f);
+
+        // Centred on the toggle row, so the title and the jewels share a line
+        g.setColour(Colours::accent);
+        g.setFont(Fonts::ui(Fonts::Sizes::title, true));
+        g.drawText(titles[i],
+                   card.reduced(12, kCardPadY).removeFromTop(kToggleH),
+                   juce::Justification::centredLeft, false);
     }
-
-    static const char* titles[4] = { "UTILITY", "BOOST", "DELAY", "REVERB" };
-    int idx = 0;
-    for (int row = 0; row < 2; ++row)
-        for (int col = 0; col < 2; ++col, ++idx)
-        {
-            auto card = cardBounds(area, col, row);
-            AmpFaceplate::paintPlate(g, card.toFloat().reduced(0.5f), 5.0f);
-
-            // Centred on the toggle row, so the title and the jewels share a line
-            g.setColour(Colours::accent);
-            g.setFont(Fonts::ui(Fonts::Sizes::title, true));
-            g.drawText(titles[idx],
-                       card.reduced(12, kCardPadY).removeFromTop(kToggleH),
-                       juce::Justification::centredLeft, false);
-        }
 }
 
 void EffectsPanel::layoutKnobRow(juce::Rectangle<int> row, std::initializer_list<NotchKnob*> knobs)
@@ -183,7 +172,7 @@ void EffectsPanel::layoutCard(juce::Rectangle<int> card, ToggleSwitch& tgl,
     // Title row at the top; the toggle sits top-right of the card. The jewel
     // paints flush with its component's right edge, so every card's jewel
     // lines up on the same vertical.
-    auto inner = card.reduced(10, kCardPadY);
+    auto inner = card.reduced(kCardPadX, kCardPadY);
     auto titleRow = inner.removeFromTop(kToggleH);
     tgl.setBounds(titleRow.removeFromRight(kToggleW));
 
@@ -194,41 +183,15 @@ void EffectsPanel::layoutCard(juce::Rectangle<int> card, ToggleSwitch& tgl,
 void EffectsPanel::resized()
 {
     auto area = getLocalBounds().reduced(10);
-    if (layoutMockup())
-    {
-        layoutCard(rowCardBounds(area, 0), boostTgl,  { &boostLevel, &boostTight, &boostBright });
-        layoutCard(rowCardBounds(area, 2), reverbTgl, { &reverbMix, &reverbSize, &reverbTone });
-        auto inner = rowCardBounds(area, 1).reduced(10, kCardPadY);
-        delayTgl.setBounds(inner.removeFromTop(kToggleH).removeFromRight(kToggleW));
-        inner.removeFromTop(kRowGap);
-        auto stack = inner.removeFromLeft(kStackW).withSizeKeepingCentre(kStackW, kStackH);
-        delaySyncTgl.setBounds(stack.removeFromTop(kStackH / 2));
-        delayPP.setBounds(stack);
-        inner.removeFromLeft(4);
-        layoutKnobRow(inner, { &delayTime, &delayFb, &delayMix, &delayTone });
-        return;
-    }
 
-    // UTILITY card: no toggle — every knob self-gates or is unity-at-centre
-    // (THRESH 0 = gate off, WIDTH 0 = dry, INPUT/OUTPUT centre = unity).
-    // Four kKnobW knobs fill 280 of the card's 308 px; a fifth would squeeze
-    // them below kKnobW, so check the names still fit if you add one.
-    {
-        auto inner = cardBounds(area, 0, 0).reduced(10, kCardPadY);
-        inner.removeFromTop(kToggleH);  // title row ("UTILITY") — no toggle, but
-                                        // reserve the same height so this card's
-                                        // knobs line up with the others'
-        inner.removeFromTop(kRowGap);
-        layoutKnobRow(inner, { &gateThresh, &width, &inputLevel, &outputLevel });
-    }
-    layoutCard(cardBounds(area, 1, 0), boostTgl,  { &boostLevel, &boostTight, &boostBright });
-    layoutCard(cardBounds(area, 1, 1), reverbTgl, { &reverbMix, &reverbSize, &reverbTone });
+    layoutCard(cardBounds(area, 0), boostTgl,  { &boostLevel, &boostTight, &boostBright });
+    layoutCard(cardBounds(area, 2), reverbTgl, { &reverbMix, &reverbSize, &reverbTone });
 
     // DELAY card: ON in the title row like the others; SYNC over PP as bat
     // toggles down the left, just before TIME (SYNC turns TIME into the
     // division selector). The four knobs share what is left of the row.
-    auto delayCard  = cardBounds(area, 0, 1);
-    auto delayInner = delayCard.reduced(10, kCardPadY);
+    auto delayCard  = cardBounds(area, 1);
+    auto delayInner = delayCard.reduced(kCardPadX, kCardPadY);
     auto titleRow   = delayInner.removeFromTop(kToggleH);
     delayTgl.setBounds(titleRow.removeFromRight(kToggleW));
 
@@ -237,7 +200,7 @@ void EffectsPanel::resized()
                            .withSizeKeepingCentre(kStackW, kStackH);
     delaySyncTgl.setBounds(stack.removeFromTop(kStackH / 2));
     delayPP.setBounds(stack);
-    delayInner.removeFromLeft(4);
+    delayInner.removeFromLeft(kStackGap);
     layoutKnobRow(delayInner, { &delayTime, &delayFb, &delayMix, &delayTone });
 }
 

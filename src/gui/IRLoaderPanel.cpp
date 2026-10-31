@@ -150,10 +150,12 @@ void IRLoaderPanel::setDragOver(bool over)
     repaint();
 }
 
-// The CAB view's click-to-browse chip, left of the view switch
+// The CAB view's click-to-browse chip, at the header's left edge (where a
+// "CABINET" caption used to sit — the cab itself says what the view is), on
+// the view switch's row.
 juce::Rectangle<float> IRLoaderPanel::loadButtonArea() const
 {
-    return viewSwitch.getBounds().toFloat().withWidth(72.0f).translated(-80.0f, 0.0f);
+    return viewSwitch.getBounds().toFloat().withX(8.0f).withWidth(72.0f);
 }
 
 void IRLoaderPanel::openFileBrowser()
@@ -312,11 +314,6 @@ void IRLoaderPanel::paint(juce::Graphics& g)
 
     if (view == View::Cab)
     {
-        g.setFont(Fonts::ui(Fonts::Sizes::micro, true));
-        g.setColour(Colours::dim);
-        g.drawText("CABINET", juce::Rectangle<float>(8.0f, 5.0f, 200.0f, 20.0f),
-                   juce::Justification::centredLeft, false);
-
         const auto load = loadButtonArea();
         g.setColour(dragOver ? Colours::accent.withAlpha(0.2f) : Colours::surface);
         g.fillRoundedRectangle(load, 4.0f);

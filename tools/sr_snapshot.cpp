@@ -86,7 +86,6 @@ int main(int argc, char** argv)
 
     // Dial in representative values so the arcs light up (default is minimum).
     auto set = [](NotchKnob& k, double v) { k.getSlider().setValue(v, juce::dontSendNotification); };
-    set(fx.gateThreshKnob(), 0.35);
     set(fx.boostLevelKnob(), 0.6);  set(fx.boostTightKnob(), 0.4); set(fx.boostBrightKnob(), 0.55);
     set(fx.delayTimeKnob(), 0.34);  set(fx.delayFbKnob(), 0.45);   set(fx.delayMixKnob(), 0.3); set(fx.delayToneKnob(), 0.6);
     set(fx.reverbMixKnob(), 0.4);   set(fx.reverbSizeKnob(), 0.65);set(fx.reverbToneKnob(), 0.5);
