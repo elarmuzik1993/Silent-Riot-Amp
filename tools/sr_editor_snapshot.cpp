@@ -19,7 +19,7 @@
 // section first, on a device manager with no device open (its list is empty).
 // `font=` draws the whole UI in another typeface (Fonts::previewUIFont), to compare
 // candidate fonts before embedding one. `drive=` forces the
-// faceplate's piping glow (AmpFaceplate::setDrive, 0..1 each), set after the
+// lamp bloom and the cab's piping glow (AmpFaceplate/CabinetView::setDrive, 0..1 each), set after the
 // editor settles so its own timer cannot overwrite it before the paint. Panel states go through the same apvts
 // properties the editor restores from, so the panels snap open with no
 // animation. Paints offscreen via paintEntireComponent; on Linux the editor
@@ -29,6 +29,7 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 #include "gui/AmpFaceplate.h"
+#include "gui/CabinetView.h"
 #include "gui/HeaderBar.h"
 #include "gui/SettingsPanel.h"
 #include "gui/FontData.h"
@@ -154,9 +155,12 @@ int main(int argc, char** argv)
             continue;
         const auto spec = arg.fromFirstOccurrenceOf("=", false, false);
         const std::function<void(juce::Component&)> apply = [&](juce::Component& c) {
+            const float level = spec.upToFirstOccurrenceOf(":", false, false).getFloatValue();
+            const float heat = spec.fromFirstOccurrenceOf(":", false, false).getFloatValue();
             if (auto* plate = dynamic_cast<sr::AmpFaceplate*>(&c))
-                plate->setDrive(spec.upToFirstOccurrenceOf(":", false, false).getFloatValue(),
-                                spec.fromFirstOccurrenceOf(":", false, false).getFloatValue());
+                plate->setDrive(level, heat);
+            else if (auto* cab = dynamic_cast<sr::CabinetView*>(&c))
+                cab->setDrive(level, heat);
             for (auto* child : c.getChildren())
                 apply(*child);
         };

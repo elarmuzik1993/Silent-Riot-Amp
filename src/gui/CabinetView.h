@@ -27,6 +27,17 @@ public:
     void setSelection(const juce::String& name, const juce::String& detail, bool canStep);
     void setDragOver(bool over);
 
+    // Output level and compression heat, 0..1 each (sanitised): lights the
+    // cab's orange piping bead with glowBeadColour(), the same live signal
+    // state the amp plate used to carry: a soft blurred halo (dark palette)
+    // plus a lit core, or a tinted bead (light palette). Repaints only on a
+    // visible move, or to/from exactly 0, so a silent amp stays idle. Drawn
+    // over the cached cab front from a cached halo mask, so a 30 Hz update
+    // re-renders neither.
+    void setDrive(float level, float heat);
+    float getDriveLevel() const noexcept { return driveLevel; }
+    float getDriveHeat() const noexcept { return driveHeat; }
+
     std::function<void(int)> onStep;   // -1 previous, +1 next
 
     // The cabinet front alone, filling `bounds`. The trim (frame, corners,
@@ -54,6 +65,7 @@ private:
     bool canStep = false;
     bool dragOver = false;
     int hoverArrow = 0;
+    float driveLevel = 0.0f, driveHeat = 0.0f;
 
     // The cab front rendered once, like AmpFaceplate's plate: keyed on size,
     // physical pixel scale and a theme token (applySettings() swaps the
@@ -61,6 +73,13 @@ private:
     juce::Image cabCache;
     float cabCacheScale = 0.0f;
     juce::uint32 cabCacheTheme = 0;
+
+    // The glow's halo: the piping's stroke blurred once into an alpha mask,
+    // keyed on the cab's size and the physical pixel scale. paint() tints it
+    // with the drive colour, so a 30 Hz drive update never re-blurs.
+    juce::Image glowMask;
+    float glowMaskScale = 0.0f;
+    juce::Rectangle<float> glowMaskCab;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(CabinetView)
 };

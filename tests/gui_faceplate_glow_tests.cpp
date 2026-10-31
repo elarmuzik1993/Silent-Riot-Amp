@@ -55,26 +55,43 @@ TEST_CASE("Glow follower: silence is dark and cool", "[gui][glow]")
     CHECK(d.heat == 0.0f);
 }
 
-TEST_CASE("Glow follower: level maps the output peak in dB and rises at once", "[gui][glow]")
+TEST_CASE("Glow follower: level maps the output peak in dB", "[gui][glow]")
 {
     GlowDriveFollower f;
     CHECK(f.update(dB(sr::kGlowLevelFloorDb - 6.0), 0.0f, 0.0f, kFrame, kSig).level == 0.0f);
-    // One frame, straight to the value: no attack smoothing on a rise
-    CHECK_THAT(f.update(dB(-27.0), 0.0f, 0.0f, kFrame, kSig).level,
-               Catch::Matchers::WithinAbs(0.5, 1e-3));
-    CHECK(f.update(dB(sr::kGlowLevelCeilDb), 0.0f, 0.0f, kFrame, kSig).level == 1.0f);
-    CHECK(f.update(1.0f, 0.0f, 0.0f, kFrame, kSig).level == 1.0f);   // clamps above the ceiling
+    CHECK_THAT(hold(f, 1.0, dB(-27.0), 0.0f, 0.0f).level, Catch::Matchers::WithinAbs(0.5, 1e-3));
+    CHECK_THAT(hold(f, 1.0, dB(sr::kGlowLevelCeilDb), 0.0f, 0.0f).level,
+               Catch::Matchers::WithinAbs(1.0, 1e-3));
+    CHECK(hold(f, 1.0, 1.0f, 0.0f, 0.0f).level <= 1.0f);   // clamps above the ceiling
+}
+
+TEST_CASE("Glow follower: level eases in quickly, without a one-frame jump", "[gui][glow]")
+{
+    GlowDriveFollower f;
+    const float first = f.update(dB(-27.0), 0.0f, 0.0f, kFrame, kSig).level;
+    CHECK(first > 0.15f);   // a pick attack shows on the first frame...
+    CHECK(first < 0.45f);   // ...but does not flash straight to its peak
+    CHECK(hold(f, 0.2, dB(-27.0), 0.0f, 0.0f).level > 0.48f);   // there within ~200 ms
+
+    // Rate-independent, like heat
+    const auto at = [](double dt) {
+        GlowDriveFollower g;
+        return hold(g, 0.1, dB(-27.0), 0.0f, 0.0f, dt).level;
+    };
+    CHECK_THAT(at(1.0 / 60.0), Catch::Matchers::WithinAbs(at(1.0 / 30.0), 0.01));
 }
 
 TEST_CASE("Glow follower: level falls as the processor's peak releases", "[gui][glow]")
 {
     GlowDriveFollower f;
-    const float loud = f.update(dB(-10.0), dB(-18.0), dB(-24.0), kFrame, kSig).level;
+    const float loud = hold(f, 0.5, dB(-10.0), dB(-18.0), dB(-24.0)).level;
     REQUIRE(loud > 0.8f);
-    // The audio side decays the held peak; the follower tracks it down
+    // The audio side decays the held peak; the follower tracks it down, eased
     const float lower = f.update(dB(-30.0), 0.0f, 0.0f, kFrame, kSig).level;
     CHECK(lower < loud);
-    CHECK(f.update(0.0f, 0.0f, 0.0f, kFrame, kSig).level == 0.0f);
+    CHECK(lower > 0.3f);   // not a one-frame drop
+    // and silence ends fully dark, not on a residue
+    CHECK(hold(f, 1.0, 0.0f, 0.0f, 0.0f).level == 0.0f);
 }
 
 TEST_CASE("Glow follower: clean playing at a steady ratio stays cool", "[gui][glow]")

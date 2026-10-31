@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Boris Miscenco
 #include "CabinetView.h"
+#include "AmpFaceplate.h"
 #include "ColourPalette.h"
 #include "FontData.h"
 #include "ProceduralTexture.h"
@@ -8,6 +9,134 @@
 #include <vector>
 
 namespace sr {
+
+namespace {
+
+constexpr float kDriveEpsilon = 0.004f;   // ~1/255: smaller moves are not visible
+
+// The cab's glow: a soft halo plus a lit core on the bead. The halo is the
+// bead's stroke blurred once into a cached mask (CabinetView::glowMask), so it
+// falls off continuously instead of in the visible bands that stacked strokes
+// leave, and a 30 Hz update only tints and blits it.
+constexpr float kCabHaloSigma  = 3.0f;    // logical px: the halo's Gaussian falloff
+constexpr float kCabHaloReach  = 3.0f * kCabHaloSigma;   // where it has faded out
+constexpr float kCabHaloSource = 2.0f;    // logical px: the stroke that gets blurred
+constexpr float kCabHaloAlpha  = 0.5f;    // the halo's peak, at full level
+constexpr float kCabCoreAlpha  = 0.55f;   // the lit bead over the drawn piping
+constexpr float kCabCoreWidth  = 1.5f;    // the drawn piping's own width
+constexpr float kCabCoreWhite  = 0.3f;    // a lit bead runs paler than its halo
+constexpr float kCabBeadWidth  = 2.0f;    // light theme: no halo, a tinted bead
+// Brightness against level: a little lift so quiet playing shows, without
+// sqrt's jump at the bottom that made every small peak flash.
+constexpr float kCabLevelCurve = 0.75f;
+
+float sanitiseUnit(float v)
+{
+    return std::isfinite(v) ? juce::jlimit(0.0f, 1.0f, v) : 0.0f;
+}
+
+// Three box blurs in place, rows then columns: close to a Gaussian of `sigma`
+// pixels, at a cost that does not grow with the radius.
+void boxBlur3(std::vector<float>& px, int w, int h, float sigma)
+{
+    const int r = juce::jmax(1, juce::roundToInt((std::sqrt(4.0f * sigma * sigma + 1.0f) - 1.0f) * 0.5f));
+    std::vector<float> line(static_cast<size_t>(juce::jmax(w, h)));
+    const auto pass = [&](int count, int len, auto at) {
+        const float norm = 1.0f / static_cast<float>(2 * r + 1);
+        for (int c = 0; c < count; ++c)
+        {
+            for (int i = 0; i < len; ++i)
+                line[static_cast<size_t>(i)] = at(c, i);
+            float sum = 0.0f;
+            for (int i = -r; i <= r; ++i)
+                sum += (i >= 0 && i < len) ? line[static_cast<size_t>(i)] : 0.0f;
+            for (int i = 0; i < len; ++i)
+            {
+                at(c, i) = sum * norm;
+                const int out = i - r, in = i + r + 1;
+                if (out >= 0)  sum -= line[static_cast<size_t>(out)];
+                if (in < len)  sum += line[static_cast<size_t>(in)];
+            }
+        }
+    };
+    for (int k = 0; k < 3; ++k)
+    {
+        pass(h, w, [&](int y, int x) -> float& { return px[static_cast<size_t>(y * w + x)]; });
+        pass(w, h, [&](int x, int y) -> float& { return px[static_cast<size_t>(y * w + x)]; });
+    }
+}
+
+// The orange piping bead around the grille, as paintCabinet() lays it out, and
+// the stretch of its bottom run that has torn out of the channel (no glow there).
+struct Piping { juce::Rectangle<float> bead; float radius; juce::Rectangle<float> gap; };
+
+Piping pipingFor(juce::Rectangle<float> cab)
+{
+    const float side = juce::jmin(cab.getWidth(), cab.getHeight());
+    const float gr = side * 0.035f * 0.5f;
+    const auto grille = cab.reduced(side * 0.095f);
+    const auto bead = grille.expanded(1.2f);
+    const float gapX = grille.getX() + grille.getWidth() * 0.38f, gapW = side * 0.07f;
+    return { bead, gr + 1.2f, { gapX, bead.getBottom() - 3.0f, gapW, 6.0f } };
+}
+
+// The area the halo can light around the piping.
+juce::Rectangle<float> glowArea(const Piping& p)
+{
+    return p.bead.expanded(kCabHaloReach + 1.0f);
+}
+
+// The halo as an alpha mask over glowArea(p), `scale` pixels per logical
+// pixel, peaking at 1 on the bead. The torn-out stretch is cut from the stroke
+// *before* the blur, so the glow tapers into the gap instead of stopping on a
+// hard edge.
+juce::Image renderGlowMask(const Piping& p, float scale)
+{
+    const auto area = glowArea(p);
+    const int w = juce::jmax(1, juce::roundToInt(area.getWidth() * scale));
+    const int h = juce::jmax(1, juce::roundToInt(area.getHeight() * scale));
+    const auto toMask = juce::AffineTransform::translation(-area.getX(), -area.getY())
+                            .scaled(static_cast<float>(w) / area.getWidth(),
+                                    static_cast<float>(h) / area.getHeight());
+
+    juce::Image src(juce::Image::SingleChannel, w, h, true);
+    {
+        juce::Graphics g(src);
+        juce::Path bead, stroke, gap;
+        bead.addRoundedRectangle(p.bead, p.radius);
+        juce::PathStrokeType(kCabHaloSource).createStrokedPath(stroke, bead);
+        gap.addRectangle(p.gap);
+        g.excludeClipRegion(gap.getBoundsTransformed(toMask).getSmallestIntegerContainer());
+        g.setColour(juce::Colours::white);
+        g.fillPath(stroke, toMask);
+    }
+
+    std::vector<float> px(static_cast<size_t>(w * h));
+    {
+        const juce::Image::BitmapData in(src, juce::Image::BitmapData::readOnly);
+        for (int y = 0; y < h; ++y)
+            for (int x = 0; x < w; ++x)
+                px[static_cast<size_t>(y * w + x)] = in.getLinePointer(y)[x * in.pixelStride] / 255.0f;
+    }
+    boxBlur3(px, w, h, kCabHaloSigma * scale);
+
+    float peak = 0.0f;
+    for (float v : px)
+        peak = juce::jmax(peak, v);
+    const float norm = peak > 0.0f ? 1.0f / peak : 0.0f;
+
+    juce::Image mask(juce::Image::SingleChannel, w, h, true);
+    {
+        const juce::Image::BitmapData out(mask, juce::Image::BitmapData::writeOnly);
+        for (int y = 0; y < h; ++y)
+            for (int x = 0; x < w; ++x)
+                out.getLinePointer(y)[x * out.pixelStride] = static_cast<juce::uint8>(
+                    juce::jlimit(0, 255, juce::roundToInt(px[static_cast<size_t>(y * w + x)] * norm * 255.0f)));
+    }
+    return mask;
+}
+
+} // namespace
 
 CabinetView::CabinetView()
 {
@@ -23,6 +152,19 @@ void CabinetView::setSelection(const juce::String& newName, const juce::String& 
     canStep = step;
     setDescription(name);   // read out by screen readers
     repaint();
+}
+
+void CabinetView::setDrive(float level, float heat)
+{
+    const float lv = sanitiseUnit(level), ht = sanitiseUnit(heat);
+    const auto moved = [](float now, float was) {
+        return std::abs(now - was) > kDriveEpsilon || ((now == 0.0f) != (was == 0.0f));
+    };
+    if (!moved(lv, driveLevel) && !moved(ht, driveHeat))
+        return;
+    driveLevel = lv;
+    driveHeat = ht;
+    repaint(glowArea(pipingFor(cabBounds())).getSmallestIntegerContainer());
 }
 
 void CabinetView::setDragOver(bool over)
@@ -554,6 +696,41 @@ void CabinetView::paint(juce::Graphics& g)
             paintCabinet(cg, cab.withPosition(kCacheMargin, kCacheMargin), scale);
         }
         g.drawImage(cabCache, area);
+    }
+
+    if (driveLevel > 0.0f)
+    {
+        // Piping glow over the cached cab front; the torn-out stretch stays dark.
+        // Hue from the shared ramp (heat), brightness from level.
+        const auto p = pipingFor(cab);
+        const float lit = std::pow(driveLevel, kCabLevelCurve);
+        const juce::Colour hue = glowBeadColour(1.0f, driveHeat).withAlpha(1.0f);
+        if (glowUsesHalo())
+        {
+            const float scale = juce::jmax(0.01f, g.getInternalContext().getPhysicalPixelScaleFactor());
+            if (glowMask.isNull() || glowMaskScale != scale || glowMaskCab != cab.withZeroOrigin())
+            {
+                glowMask = renderGlowMask(p, scale);   // depends on the cab's size, not its place
+                glowMaskScale = scale;
+                glowMaskCab = cab.withZeroOrigin();
+            }
+            g.setColour(hue.withAlpha(kCabHaloAlpha * lit));
+            g.drawImage(glowMask, glowArea(p), juce::RectanglePlacement::stretchToFit, true);
+
+            juce::Graphics::ScopedSaveState save(g);
+            g.excludeClipRegion(p.gap.toNearestInt());
+            g.setColour(hue.interpolatedWith(juce::Colours::white, kCabCoreWhite)
+                           .withAlpha(kCabCoreAlpha * lit));
+            g.drawRoundedRectangle(p.bead, p.radius, kCabCoreWidth);
+        }
+        else
+        {
+            // A bloom on a light tolex reads as a smudge: tint the bead only
+            juce::Graphics::ScopedSaveState save(g);
+            g.excludeClipRegion(p.gap.toNearestInt());
+            g.setColour(hue.withAlpha(kGlowAlphaMaxBead * lit));
+            g.drawRoundedRectangle(p.bead, p.radius, kCabBeadWidth);
+        }
     }
 
     if (dragOver)
