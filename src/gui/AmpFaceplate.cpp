@@ -314,7 +314,11 @@ void AmpFaceplate::paintLamp(juce::Graphics& g, juce::Point<float> c, float r,
     fillTiltedEllipse(-0.4f, -0.56f, 0.11f, 0.0605f, -30.0f);
 }
 
-void AmpFaceplate::paintPlate(juce::Graphics& g, juce::Rectangle<float> b, float radius)
+// The plate itself: raised gradient, optional grille-cloth weave, piping. The
+// EFFECTS cards take it with the weave (paintPlate); the amp plate takes it
+// without, because its worn powder coat (paintGrunge) is its surface and a
+// weave under it read as a second, competing pattern.
+static void paintPlateFace(juce::Graphics& g, juce::Rectangle<float> b, float radius, bool weave)
 {
     // Raised panel
     g.setGradientFill(juce::ColourGradient(Colours::panelLight, 0.0f, b.getY(),
@@ -322,6 +326,7 @@ void AmpFaceplate::paintPlate(juce::Graphics& g, juce::Rectangle<float> b, float
     g.fillRoundedRectangle(b, radius);
 
     // Grille-cloth weave: two sets of fine diagonals, clipped to the panel
+    if (weave)
     {
         juce::Graphics::ScopedSaveState save(g);
         juce::Path clip;
@@ -341,6 +346,11 @@ void AmpFaceplate::paintPlate(juce::Graphics& g, juce::Rectangle<float> b, float
     g.drawRoundedRectangle(b, radius, 1.0f);
     g.setColour(Colours::bg.withAlpha(0.8f));
     g.drawRoundedRectangle(b.reduced(2.0f), radius - 1.5f, 1.0f);
+}
+
+void AmpFaceplate::paintPlate(juce::Graphics& g, juce::Rectangle<float> b, float radius)
+{
+    paintPlateFace(g, b, radius, true);
 }
 
 // Worn powder-coat finish over the amp plate.
@@ -515,8 +525,8 @@ void AmpFaceplate::renderPlateCache(float scale)
     g.addTransform(juce::AffineTransform::scale(static_cast<float>(w) / static_cast<float>(getWidth()),
                                                 static_cast<float>(h) / static_cast<float>(getHeight())));
     const auto b = plateBounds(*this);
-    paintPlate(g, b, kPlateRadius);
-    paintGrunge(g, b, kPlateRadius, scale); // amp plate only: the EFFECTS cards share paintPlate, not this
+    paintPlateFace(g, b, kPlateRadius, false); // no weave: the powder coat is the surface
+    paintGrunge(g, b, kPlateRadius, scale);    // amp plate only: the EFFECTS cards share paintPlate, not this
 
     // Corner screws
     const float inset = 10.0f;

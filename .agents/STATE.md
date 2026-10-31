@@ -44,7 +44,7 @@ _Updated 2026-10-31 (worn textures: amp plate, knobs, cab)_
    branches (keep `main`, `feat/neural-hybrid-blend-sketch`). Then make the repo public.
 3. Owner picks a donation platform → step 9 of `docs/plans/2026-10-28-open-source-docs-prep.md`.
 4. Owner: delay FEEDBACK default decays 9 dB/repeat — keep or remap? GRID I reads 0 — keep, or read PI?
-   Faceplate: lamp colour, weave strength, keep the "POWER" label, jewel size/colour?
+   Faceplate: lamp colour, the cards' weave strength (gone from the amp plate), keep the "POWER" label, jewel size/colour?
 5. E3 (the one tone change still allowed): repoint the gate to `tests/fixtures/ir/bright.wav`, fix
    the engine aliasing, owner A/Bs it, then new references + `tone-v2` (`docs/dev/tone-lock.md`).
 6. GitHub Actions has failed every run since 2026-10-09; recheck once public (free runners). The
