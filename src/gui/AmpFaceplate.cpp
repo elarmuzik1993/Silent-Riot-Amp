@@ -3,10 +3,13 @@
 #include "AmpFaceplate.h"
 #include "ColourPalette.h"
 #include "FontData.h"
+#include "ProceduralTexture.h"
 #include <cmath>
+#include <cstdint>
 #include <initializer_list>
 #include <iterator>
 #include <utility>
+#include <vector>
 
 namespace sr {
 
@@ -340,6 +343,166 @@ void AmpFaceplate::paintPlate(juce::Graphics& g, juce::Rectangle<float> b, float
     g.drawRoundedRectangle(b.reduced(2.0f), radius - 1.5f, 1.0f);
 }
 
+// Worn powder-coat finish over the amp plate.
+//
+// The surface is a height field, shaded with the same top light as the plate's
+// gradient, so the fine orange-peel stipple reads as relief rather than as
+// printed noise. Wear is layered on that physically:
+//   - grime settles into the stipple's low spots and in soft, uneven patches,
+//   - handled areas are polished: flatter relief with a faint sheen,
+//   - dirt collects toward the rim, where the coat is chipped to bare steel,
+//   - a few fine hairline scratches catch the light.
+// Every layer blends through smoothstep, never a hard threshold, and the noise
+// (ProceduralTexture.h) is rotated gradient noise, so nothing lines up with
+// the pixel grid. Rendered once into the plate cache at the physical pixel scale
+// from fixed seeds, so the finish is identical on every repaint and launch.
+static void paintGrunge(juce::Graphics& g, juce::Rectangle<float> b, float radius, float scale)
+{
+    using namespace texture;
+    const bool darkPanel = Colours::panel.getPerceivedBrightness() < 0.5f;
+    // Dark marks on a white plate read far heavier than the same marks on a
+    // black one, so a light palette gets the shading, grime and scratches
+    // at under half strength
+    const float ink = darkPanel ? 1.0f : 0.4f;
+    const juce::Colour light = juce::Colour(0xffe6e9f0);
+    const juce::Colour shade = juce::Colour(0xff000000);
+    const juce::Colour dirt  = darkPanel ? juce::Colour(0xff050403) : juce::Colour(0xff3b2f1e);
+    const juce::Colour steel = juce::Colour(0xff8b8e95);
+
+    const int pw = juce::jmax(1, juce::roundToInt(b.getWidth() * scale));
+    const int ph = juce::jmax(1, juce::roundToInt(b.getHeight() * scale));
+    const float inv = 1.0f / scale; // physical px -> logical px
+    const auto idx = [pw](int x, int y) {
+        return static_cast<size_t>(y) * static_cast<size_t>(pw) + static_cast<size_t>(x);
+    };
+
+    // ── Height field: fine orange-peel stipple over a slow undulation ──
+    std::vector<float> height(static_cast<size_t>(pw) * static_cast<size_t>(ph));
+    std::vector<float> stipple(height.size());
+    for (int y = 0; y < ph; ++y)
+        for (int x = 0; x < pw; ++x)
+        {
+            const float u = static_cast<float>(x) * inv, v = static_cast<float>(y) * inv;
+            const float fine = fbm(u / 3.2f, v / 3.2f, 7, 3);
+            const float slow = fbm(u / 26.0f, v / 26.0f, 19, 2);
+            stipple[idx(x, y)] = fine;
+            height[idx(x, y)] = fine * 0.75f + slow * 0.6f;
+        }
+
+    // Light from above, slightly left: matches the plate's top-lit gradient
+    const float lx = -0.28f, ly = -0.62f, lz = 0.73f;
+
+    juce::Image tex(juce::Image::ARGB, pw, ph, true);
+    {
+        juce::Image::BitmapData out(tex, juce::Image::BitmapData::writeOnly);
+        for (int y = 0; y < ph; ++y)
+        {
+            const int y0 = juce::jmax(0, y - 1), y1 = juce::jmin(ph - 1, y + 1);
+            for (int x = 0; x < pw; ++x)
+            {
+                const int x0 = juce::jmax(0, x - 1), x1 = juce::jmin(pw - 1, x + 1);
+                const float u = static_cast<float>(x) * inv, v = static_cast<float>(y) * inv;
+
+                // Distance in from the visible (clipped) edge, logical px
+                const float edge = juce::jmin(juce::jmin(u, b.getWidth() - u),
+                                              juce::jmin(v, b.getHeight() - v)) - 3.0f;
+
+                // Polish: soft patches where the coat has been rubbed smooth
+                const float polish = smoothstep(0.56f, 0.74f, fbm(u / 110.0f, v / 80.0f, 53, 3));
+
+                // Slope in logical units; relief flattens where polished
+                const float relief = 0.55f * (1.0f - 0.65f * polish);
+                const float dhdx = (height[idx(x1, y)] - height[idx(x0, y)])
+                                 / (static_cast<float>(x1 - x0) * inv) * relief;
+                const float dhdy = (height[idx(x, y1)] - height[idx(x, y0)])
+                                 / (static_cast<float>(y1 - y0) * inv) * relief;
+                const float nlen = std::sqrt(dhdx * dhdx + dhdy * dhdy + 1.0f);
+                const float lit = (-dhdx * lx - dhdy * ly + lz) / nlen - lz; // vs a flat surface
+
+                Px p;
+                if (lit > 0.0f)
+                    p.over(light, lit * 0.55f);
+                else
+                    p.over(shade, -lit * 0.95f * ink);
+
+                // Polished sheen
+                p.over(light, polish * 0.035f);
+
+                // Grime: uneven patches, deepest in the stipple's pores
+                const float cavity = smoothstep(0.62f, 0.30f, stipple[idx(x, y)]);
+                const float patches = smoothstep(0.40f, 0.78f, fbm(u / 64.0f, v / 46.0f, 31, 4));
+                const float rimDirt = std::exp(-juce::jmax(0.0f, edge) / 14.0f)
+                                    * (0.55f + 0.9f * fbm(u / 18.0f, v / 18.0f, 67, 3));
+                const float grime = (patches * 0.20f + rimDirt * 0.30f) * (0.55f + 0.9f * cavity)
+                                  * (1.0f - 0.5f * polish);
+                p.over(dirt, grime * ink);
+
+                // Chipped coat at the rim: soft-edged islands of bare steel, only
+                // along the stretches that got knocked, and most at the corners
+                const float cornerDist = std::hypot(juce::jmin(u, b.getWidth() - u),
+                                                    juce::jmin(v, b.getHeight() - v));
+                const float knocked = juce::jmax(smoothstep(0.52f, 0.70f, fbm(u / 70.0f, v / 70.0f, 97, 2)),
+                                                 smoothstep(40.0f, 12.0f, cornerDist));
+                const float rimBias = 0.20f * smoothstep(7.0f, 0.0f, edge) * knocked - 0.06f * (1.0f - knocked);
+                const float chipField = fbm(u / 5.5f, v / 5.5f, 89, 3) + rimBias;
+                const float chip = smoothstep(0.69f, 0.73f, chipField) * smoothstep(8.0f, 2.0f, edge);
+                if (chip > 0.0f)
+                {
+                    p.over(steel, chip * 0.62f);
+                    // The chip's lower lip catches the light; its upper wall is in shadow
+                    const float wall = chipField - (fbm(u / 5.5f, (v - 1.0f) / 5.5f, 89, 3) + rimBias);
+                    p.over(wall > 0.0f ? light : shade,
+                           chip * juce::jmin(1.0f, std::abs(wall) * 10.0f) * 0.25f);
+                }
+
+                out.setPixelColour(x, y, p.colour());
+            }
+        }
+    }
+
+    juce::Graphics::ScopedSaveState save(g);
+    juce::Path clip;
+    clip.addRoundedRectangle(b.reduced(3.0f), radius - 2.0f);
+    g.reduceClipRegion(clip);
+    g.drawImage(tex, b);
+
+    // Hairline scratches: a few clusters of fine, slightly curved, near-parallel
+    // lines: a groove in shadow with a lit lip beneath it, fading at both ends
+    juce::Random rng(0x5112107);
+    const auto rx = [&](float lo, float hi) { return lo + rng.nextFloat() * (hi - lo); };
+    for (int cluster = 0; cluster < 4; ++cluster)
+    {
+        const float cx = rx(b.getX() + 40.0f, b.getRight() - 40.0f);
+        const float cy = rx(b.getY() + 30.0f, b.getBottom() - 30.0f);
+        const float dir = rx(-0.3f, 0.3f);
+        const int n = 2 + rng.nextInt(4);
+        for (int i = 0; i < n; ++i)
+        {
+            const float sx = cx + rx(-30.0f, 30.0f), sy = cy + rx(-10.0f, 10.0f);
+            const float len = rx(25.0f, 110.0f), ang = dir + rx(-0.04f, 0.04f);
+            const float ex = sx + std::cos(ang) * len, ey = sy + std::sin(ang) * len;
+            const float bend = rx(-3.0f, 3.0f);
+            const float strength = rx(0.4f, 1.0f);
+            const auto pt = [&](float t) {
+                const float bx = sx + (ex - sx) * t, by = sy + (ey - sy) * t;
+                const float off = bend * 4.0f * t * (1.0f - t);
+                return juce::Point<float>(bx - std::sin(ang) * off, by + std::cos(ang) * off);
+            };
+            constexpr int segs = 12; // drawn in segments so the alpha can taper
+            for (int k = 0; k < segs; ++k)
+            {
+                const float t0 = static_cast<float>(k) / segs, t1 = static_cast<float>(k + 1) / segs;
+                const float taper = std::sin(juce::MathConstants<float>::pi * (t0 + t1) * 0.5f);
+                const auto p0 = pt(t0), p1 = pt(t1);
+                g.setColour(shade.withAlpha(0.22f * taper * strength * ink));
+                g.drawLine({ p0, p1 }, 0.6f);
+                g.setColour(light.withAlpha(0.10f * taper * strength));
+                g.drawLine({ p0.translated(0.0f, 0.55f), p1.translated(0.0f, 0.55f) }, 0.45f);
+            }
+        }
+    }
+}
+
 void AmpFaceplate::renderPlateCache(float scale)
 {
     const int w = juce::jmax(1, juce::roundToInt(static_cast<float>(getWidth()) * scale));
@@ -353,6 +516,7 @@ void AmpFaceplate::renderPlateCache(float scale)
                                                 static_cast<float>(h) / static_cast<float>(getHeight())));
     const auto b = plateBounds(*this);
     paintPlate(g, b, kPlateRadius);
+    paintGrunge(g, b, kPlateRadius, scale); // amp plate only: the EFFECTS cards share paintPlate, not this
 
     // Corner screws
     const float inset = 10.0f;

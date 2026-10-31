@@ -49,7 +49,7 @@ namespace {
 // cream line along the bar. Drawn in a 76 px design square scaled to d; the
 // bar is rotated point by point so the light (upper left) stays fixed, and
 // each chamfer facet is shaded by how its outward normal faces that light.
-void drawPointerKnob(juce::Graphics& g, juce::Point<float> c, float d, float angle)
+void drawPointerKnob(juce::Graphics& g, juce::Point<float> c, float d, float angle, int wearSeed)
 {
     using juce::Colours::black;
     using juce::Colours::white;
@@ -99,6 +99,69 @@ void drawPointerKnob(juce::Graphics& g, juce::Point<float> c, float d, float ang
         g.setColour(white.withAlpha(0.16f));
         g.strokePath(rim, juce::PathStrokeType(0.55f * k, juce::PathStrokeType::curved,
                                                juce::PathStrokeType::rounded));
+    }
+
+    // ── Wear, part 1: the skirt ──
+    // Every mark is placed in the knob's own frame (turned with it); only its
+    // shading looks at the fixed upper-left light. One seeded generator per
+    // paint, so a knob wears the same on every repaint.
+    juce::Random rng(wearSeed * 7919 + 13);
+    const auto rf = [&rng](float lo, float hi) { return lo + rng.nextFloat() * (hi - lo); };
+    const float lightX = -0.7071f, lightY = -0.7071f; // screen direction toward the light
+    const auto facingLight = [&](float dx, float dy) { // design-frame direction -> n·L on screen
+        return (dx * cs - dy * sn) * lightX + (dx * sn + dy * cs) * lightY;
+    };
+    const auto turnedEllipse = [&](float x, float y, float rx, float ry, float rot) {
+        juce::Path e;
+        e.addEllipse(-rx * k, -ry * k, rx * 2.0f * k, ry * 2.0f * k);
+        e.applyTransform(juce::AffineTransform::rotation(rot + angle).translated(turned(x, y)));
+        return e;
+    };
+    if (wearSeed != 0)
+    {
+        // Satin rubbed toward gloss where fingers turn the skirt: a soft band
+        // on the lit side, just inside the rim
+        // (screen-fixed, like the light; faded per segment, so no hard edge)
+        constexpr int sheenSegs = 36;
+        const float bandR = (skirtR - 2.4f) * k;
+        for (int i = 0; i < sheenSegs; ++i)
+        {
+            const float a0 = juce::MathConstants<float>::twoPi * static_cast<float>(i) / sheenSegs;
+            const float a1 = juce::MathConstants<float>::twoPi * static_cast<float>(i + 1) / sheenSegs;
+            const float mid = (a0 + a1) * 0.5f; // JUCE arc angle: clockwise from 12 o'clock
+            const float lit = juce::jmax(0.0f, std::sin(mid) * lightX - std::cos(mid) * lightY);
+            if (lit <= 0.0f)
+                continue;
+            juce::Path seg;
+            seg.addCentredArc(c.x, c.y, bandR, bandR, 0.0f, a0, a1 + 0.01f, true);
+            g.setColour(white.withAlpha(0.05f * lit * lit));
+            g.strokePath(seg, juce::PathStrokeType(2.6f * k, juce::PathStrokeType::curved,
+                                                   juce::PathStrokeType::butt));
+        }
+
+        // Hairline scratches across the skirt top
+        for (int i = 0, n = 2 + rng.nextInt(2); i < n; ++i)
+        {
+            const float a0 = rf(0.0f, juce::MathConstants<float>::twoPi), r0 = rf(9.5f, 15.5f);
+            const float len = rf(3.0f, 7.0f), dir = a0 + juce::MathConstants<float>::halfPi + rf(-0.4f, 0.4f);
+            const float x0 = r0 * std::cos(a0), y0 = r0 * std::sin(a0);
+            g.setColour(white.withAlpha(rf(0.05f, 0.10f)));
+            g.drawLine({ turned(x0, y0), turned(x0 + len * std::cos(dir), y0 + len * std::sin(dir)) }, 0.3f * k);
+        }
+
+        // Nicks in the rim: the black coat knocked off to grey, the far wall lit
+        for (int i = 0, n = 3 + rng.nextInt(3); i < n; ++i)
+        {
+            const float a = rf(0.0f, juce::MathConstants<float>::twoPi), r = skirtR - rf(0.4f, 1.1f);
+            const float ox = std::cos(a), oy = std::sin(a);
+            const float len = rf(1.0f, 2.3f), wid = rf(0.5f, 0.95f);
+            g.setColour(rgb(0xFF686A72).withAlpha(rf(0.45f, 0.75f)));
+            g.fillPath(turnedEllipse(r * ox, r * oy, len, wid, a + juce::MathConstants<float>::halfPi));
+            const float lit = juce::jmax(0.0f, -facingLight(ox, oy)); // inner wall faces inward
+            g.setColour(white.withAlpha(0.35f * lit));
+            g.fillPath(turnedEllipse((r - wid * 0.4f) * ox, (r - wid * 0.4f) * oy, len * 0.7f, wid * 0.3f,
+                                     a + juce::MathConstants<float>::halfPi));
+        }
     }
 
     // Bar outline in design units, pointing to -y: a square front and a
@@ -160,18 +223,98 @@ void drawPointerKnob(juce::Graphics& g, juce::Point<float> c, float d, float ang
     g.setColour(black.withAlpha(0.6f));
     g.strokePath(polygon(outer, 0.0f, 0.0f), juce::PathStrokeType(0.3f * k, juce::PathStrokeType::curved));
 
+    // ── Wear, part 2: the bar ──
+    if (wearSeed != 0)
+    {
+        // Grip polish: the outer edges catch more light, unevenly, most where
+        // they face the light; the two front corners are rubbed round and bright
+        for (size_t i = 0; i < outer.size(); ++i)
+        {
+            const size_t j = (i + 1) % outer.size();
+            const float nx = outer[j].y - outer[i].y, ny = -(outer[j].x - outer[i].x);
+            const float nl = std::sqrt(nx * nx + ny * ny);
+            const float lit = juce::jmax(0.0f, facingLight(nx / nl, ny / nl));
+            const float rub = rf(0.25f, 1.0f);
+            g.setColour(white.withAlpha((0.03f + 0.17f * lit) * rub));
+            g.drawLine({ turned(outer[i].x, outer[i].y), turned(outer[j].x, outer[j].y) }, 0.45f * k);
+        }
+        for (const float side : { -1.0f, 1.0f })
+        {
+            const float lit = juce::jmax(0.0f, facingLight(side * 0.7071f, -0.7071f));
+            g.setColour(white.withAlpha(0.08f + 0.3f * lit));
+            g.fillPath(turnedEllipse(side * 6.5f, -17.5f, 0.75f, 0.55f, 0.0f));
+        }
+
+        // Fine scuffs along the top face
+        for (int i = 0, n = 1 + rng.nextInt(3); i < n; ++i)
+        {
+            const float x0 = rf(-4.2f, 4.2f), y0 = rf(-14.0f, 4.0f);
+            const float len = rf(2.0f, 5.0f), tilt = rf(-0.5f, 0.5f);
+            g.setColour(white.withAlpha(rf(0.04f, 0.08f)));
+            g.drawLine({ turned(x0, y0), turned(x0 + len * std::sin(tilt), y0 - len * std::cos(tilt)) }, 0.28f * k);
+        }
+
+        // Dust settled in the crevice where the bar meets the skirt
+        for (int i = 0; i < 16; ++i)
+        {
+            const size_t s = static_cast<size_t>(rng.nextInt(static_cast<int>(outer.size())));
+            const size_t t = (s + 1) % outer.size();
+            const float f = rf(0.0f, 1.0f);
+            const float px = outer[s].x + (outer[t].x - outer[s].x) * f;
+            const float py = outer[s].y + (outer[t].y - outer[s].y) * f;
+            float nx = outer[t].y - outer[s].y, ny = -(outer[t].x - outer[s].x);
+            const float nl = std::sqrt(nx * nx + ny * ny);
+            nx /= nl; ny /= nl;
+            const float off = rf(0.5f, 1.4f), r = rf(0.22f, 0.5f);
+            if (std::hypot(px + nx * off, py + ny * off) > skirtR - 2.0f)
+                continue; // dust sits on the skirt top, not over its rim
+            g.setColour(rgb(0xFF8C8A84).withAlpha(rf(0.10f, 0.22f)));
+            g.fillEllipse(circle(0.0f, 0.0f, r).withCentre(turned(px + nx * off, py + ny * off)));
+        }
+    }
+
     // Pointer line: down the front chamfer, then along the top
     const juce::Colour lineCol = rgb(0xFFF2F1EC);
     const juce::PathStrokeType lineStroke(1.35f * k, juce::PathStrokeType::curved, juce::PathStrokeType::butt);
-    juce::Path front, top;
-    front.startNewSubPath(turned(0.0f, -18.0f));
-    front.lineTo(turned(0.0f, -16.6f));
-    top.startNewSubPath(turned(0.0f, -16.6f));
-    top.lineTo(turned(0.0f, -5.5f));
-    g.setColour(lineCol.interpolatedWith(black, 0.35f));
-    g.strokePath(front, lineStroke);
-    g.setColour(lineCol);
-    g.strokePath(top, lineStroke);
+    if (wearSeed == 0)
+    {
+        juce::Path front, top;
+        front.startNewSubPath(turned(0.0f, -18.0f));
+        front.lineTo(turned(0.0f, -16.6f));
+        top.startNewSubPath(turned(0.0f, -16.6f));
+        top.lineTo(turned(0.0f, -5.5f));
+        g.setColour(lineCol.interpolatedWith(black, 0.35f));
+        g.strokePath(front, lineStroke);
+        g.setColour(lineCol);
+        g.strokePath(top, lineStroke);
+        return;
+    }
+
+    // Worn: the paint has aged toward ivory and thinned unevenly, most at the
+    // tip where the thumb pushes. One stroke, its opacity a gradient through a
+    // few random stops, so it fades smoothly with no seams.
+    const juce::Colour aged = lineCol.interpolatedWith(rgb(0xFFD8CCA8), 0.3f);
+    {
+        juce::Path front;
+        front.startNewSubPath(turned(0.0f, -18.0f));
+        front.lineTo(turned(0.0f, -16.6f));
+        g.setColour(aged.interpolatedWith(black, 0.35f).withAlpha(rf(0.35f, 0.6f)));
+        g.strokePath(front, lineStroke);
+    }
+    {
+        constexpr int stops = 5; // stop 0 = the tip
+        juce::ColourGradient fade(aged.withAlpha(rf(0.55f, 0.75f)), turned(0.0f, -16.6f),
+                                  aged.withAlpha(rf(0.85f, 1.0f)), turned(0.0f, -5.5f), false);
+        for (int i = 1; i < stops - 1; ++i)
+            fade.addColour(static_cast<double>(i) / (stops - 1), aged.withAlpha(rf(0.78f, 1.0f)));
+        juce::Path top;
+        top.startNewSubPath(turned(0.0f, -16.6f));
+        top.lineTo(turned(0.0f, -5.5f));
+        g.setGradientFill(fade);
+        g.strokePath(top, lineStroke);
+    }
+    // No chips in the line: at real knob sizes (~40-60 px) they land under a
+    // pixel and read as a dashed line, not as wear.
 }
 
 } // namespace
@@ -233,7 +376,7 @@ void SilentRiotLookAndFeel::drawRotarySlider(juce::Graphics& g, int x, int y, in
 
     if (slider.getProperties()[kPointerKnobProperty])
     {
-        drawPointerKnob(g, centre, d, angle);
+        drawPointerKnob(g, centre, d, angle, static_cast<int>(slider.getProperties()[kKnobWearProperty]));
         return;
     }
 

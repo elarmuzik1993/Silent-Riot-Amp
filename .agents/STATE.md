@@ -1,6 +1,6 @@
 # State
 
-_Updated 2026-10-30 (Settings redesign, Oxanium font)_
+_Updated 2026-10-31 (worn textures: amp plate, knobs, cab)_
 
 ## Now
 - **Tone frozen at `tone-v1`** (059b209): `tests/tone_lock_tests.cpp` guards it (`docs/dev/tone-lock.md`).
@@ -15,6 +15,10 @@ _Updated 2026-10-30 (Settings redesign, Oxanium font)_
   toggles stacked left of TIME, and SYNC turns TIME into the division knob (`DelayTimeAttachment`).
 - IR LOADER (under the amp, above EFFECTS) opens on a drawn 2x12 cab (`src/gui/CabinetView.*`) whose
   arrows cycle the built-in cab + every IR; CAB | LIBRARY brings back the list (`irView`).
+- **Worn look** (feat/worn-textures): the amp plate has a worn powder coat (`paintGrunge()`), the 17
+  pointer knobs per-knob handling wear (`kKnobWearProperty`), the cab pebbled tolex with tears to
+  plywood, dents, rubbed-through edges, torn piping and grille dust/rust; the cab front is now cached.
+  All procedural (`src/gui/ProceduralTexture.h`), fixed seeds, rendered once; light theme checked.
 - Standalone: Settings (gear) has an AUDIO INPUT list (`src/gui/InputSelector.*`) that opens the
   interface with one input active, so Input 2 of a pair plays (the amp reads channel 0 only).
   Saved with the device setup, not presets; hidden in VST3. Confirmed on a KA6.
@@ -46,6 +50,7 @@ _Updated 2026-10-30 (Settings redesign, Oxanium font)_
    tone lock fails on Linux/GCC (references are from MSVC; see Now): owner decides between a
    per-platform reference set or a noise floor below which bands are not compared.
 7. Owner, cab view: light theme keeps white tolex around the black grille — OK? Dim the cab when CAB is off?
+   Worn look: wear on the EFFECTS knobs too, or the amp row only? How much damage on the cab?
 8. Owner: review Settings redesign + Oxanium on the docs/settings-panel-plan branch, then its PR.
    Re-shoot the manual's `resources/images/` (still Space Mono) with `sr_editor_snapshot`.
 

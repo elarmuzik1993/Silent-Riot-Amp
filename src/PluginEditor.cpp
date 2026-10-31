@@ -135,11 +135,13 @@ SilentRiotEditor::SilentRiotEditor(SilentRiotProcessor& p)
     contentArea.addAndMakeVisible(gainKnob);
     contentArea.addAndMakeVisible(toneKnob);
     contentArea.addAndMakeVisible(volumeKnob);
+    int wearSeed = 1; // each knob wears differently (see kKnobWearProperty)
     for (auto* k : { &gainKnob, &toneKnob, &volumeKnob })
     {
         k->setLabelOnTop(true);
         k->setEngravedReadout(true);
         k->getSlider().getProperties().set(sr::SilentRiotLookAndFeel::kPointerKnobProperty, true);
+        k->getSlider().getProperties().set(sr::SilentRiotLookAndFeel::kKnobWearProperty, wearSeed++);
     }
     contentArea.addAndMakeVisible(halfPowerToggle);
     contentArea.addAndMakeVisible(cabSimToggle);
