@@ -9,7 +9,10 @@ class VUMeter : public juce::Component, private juce::Timer {
 public:
     explicit VUMeter(const juce::String& label);
     void paint(juce::Graphics&) override;
-    void setLevel(float newLevel); // 0.0–1.0
+    // Linear amplitude (RMS, 1.0 = 0 dBFS), shown on a dB scale: kFloorDb..0 dBFS spans the bar.
+    void setLevel(float amplitude);
+    static float barPositionFromAmplitude(float amplitude); // 0..1, the bar's fill for a level
+    static constexpr float kFloorDb = -60.0f;
 
     void setBallistics(int mode);  // 0=Fast, 1=Medium, 2=Slow
     void setPeakHold(bool shouldHold);

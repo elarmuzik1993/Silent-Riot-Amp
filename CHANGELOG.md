@@ -70,6 +70,8 @@ tagged release will collect everything below.
 
 ### Fixed
 
+- The INPUT and OUTPUT meters read almost nothing: they filled the bar in proportion to linear
+  level, so a normal guitar signal (−18 dBFS) lit 3 of 24 segments. The bar now spans −60…0 dBFS. [#62]
 - A single NaN or infinite input sample (from a misbehaving plugin upstream, say) no longer
   silences the amp for the rest of the session; bad samples are replaced with silence on
   the way in, in bypass too. [#57]
