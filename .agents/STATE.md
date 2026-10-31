@@ -5,8 +5,9 @@ _Updated 2026-10-31 (worn textures: amp plate, knobs, cab)_
 ## Now
 - **Tone frozen at `tone-v1`** (059b209): `tests/tone_lock_tests.cpp` guards it (`docs/dev/tone-lock.md`).
 - Silent Riot v0.3.4 (JUCE 7 VST3/Standalone), GPL-3.0-or-later, free + optional donations. No tagged
-  release. ctest 450 (312 pure C++ / 81 JUCE / 57 processor). On Linux/GCC 445 pass and the 5 tone-lock
-  cases fail, also at 857023b (before any GUI change): band deltas at −84…−100 dB, RMS ≤ 0.0002 dB.
+  release. ctest 501 (312 pure C++ / 81 JUCE / 108 processor), all passing on Windows/MSVC 2026-10-31.
+  On Linux/GCC the 5 tone-lock cases fail, also at 857023b (before any GUI change): band deltas at
+  −84…−100 dB, RMS ≤ 0.0002 dB (last checked before the texture tests were added).
 - Docs open-source ready (`docs/README.md` index; `design/`+`records/` frozen; `AI_USAGE.md` kept true).
   `verify.sh --quick` checks SPDX, links, tool lists, UI text.
 - UI font is **Oxanium** (Regular + Bold, OFL) via `Fonts::ui()`; replaced Space Mono + unused DM Sans.
@@ -15,7 +16,7 @@ _Updated 2026-10-31 (worn textures: amp plate, knobs, cab)_
   toggles stacked left of TIME, and SYNC turns TIME into the division knob (`DelayTimeAttachment`).
 - IR LOADER (under the amp, above EFFECTS) opens on a drawn 2x12 cab (`src/gui/CabinetView.*`) whose
   arrows cycle the built-in cab + every IR; CAB | LIBRARY brings back the list (`irView`).
-- **Worn look** (feat/worn-textures): the amp plate has a worn powder coat (`paintGrunge()`), the 17
+- **Worn look**: the amp plate has a worn powder coat (`paintGrunge()`), the 17
   pointer knobs per-knob handling wear (`kKnobWearProperty`), the cab pebbled tolex with tears to
   plywood, dents, rubbed-through edges, torn piping and grille dust/rust; the cab front is now cached.
   All procedural (`src/gui/ProceduralTexture.h`), fixed seeds, rendered once; light theme checked.
@@ -53,6 +54,8 @@ _Updated 2026-10-31 (worn textures: amp plate, knobs, cab)_
    Worn look: wear on the EFFECTS knobs too, or the amp row only? How much damage on the cab?
 8. Owner: review Settings redesign + Oxanium on the docs/settings-panel-plan branch, then its PR.
    Re-shoot the manual's `resources/images/` (still Space Mono) with `sr_editor_snapshot`.
+9. Make `tests/rt_stress.cpp` build on MSVC (`_aligned_malloc`/`_aligned_free` there, `posix_memalign`
+   elsewhere), so the full `verify.sh` runs on Windows (see Known issues).
 
 ## Decisions
 - Tone frozen at `tone-v1` (amp + cab + effects, steady state). Re-calibration (power Tasks 2–5,
@@ -64,6 +67,8 @@ _Updated 2026-10-31 (worn textures: amp plate, knobs, cab)_
 - Latency is an exact integer, constant across cab modes.
 
 ## Known issues
+- Full `bash scripts/verify.sh` does not build on Windows: `tests/rt_stress.cpp` calls `posix_memalign`
+  (MSVC C3861). There, run `verify.sh --quick` + build the three ctest targets in `build-verify` + ctest.
 - `signoff.py` (44.1k/4×): A1 −31.6 LUFS and B1 0.99% fail but are accepted (frozen); E3 −37.9 dBc open.
 - Sag idles warm (B2), never goes cold; a live 15W↔7W switch settles audibly.
 - **Projects that use an IR play louder** (+5.4…+13.1 dB) since the IR level match; in CHANGELOG.
