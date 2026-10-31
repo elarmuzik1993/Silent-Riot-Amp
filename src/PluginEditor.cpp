@@ -150,6 +150,10 @@ SilentRiotEditor::SilentRiotEditor(SilentRiotProcessor& p)
     // Section bars
     contentArea.addAndMakeVisible(fxSectionBar);
     contentArea.addAndMakeVisible(effectsPanel);
+    if (sr::layoutMockup())   // MOCKUP: the four UTILITY knobs move beside/under the meters
+        for (auto* k : { &effectsPanel.inputLevelKnob(), &effectsPanel.gateThreshKnob(),
+                         &effectsPanel.outputLevelKnob(), &effectsPanel.widthKnob() })
+            contentArea.addAndMakeVisible(*k);
     effectsPanel.setVisible(false);
 
     contentArea.addAndMakeVisible(irSectionBar);
@@ -443,7 +447,7 @@ void SilentRiotEditor::loadUIState()
     // Snap panel heights on restore (no animation)
     if (state.hasProperty("fxPanelOpen") && static_cast<bool>(state.getProperty("fxPanelOpen")))
     {
-        fxPanelAnimH = static_cast<float>(sr::EffectsPanel::panelHeight);
+        fxPanelAnimH = static_cast<float>(sr::EffectsPanel::height());
         fxSectionBar.setOpen(true);
     }
     if (state.hasProperty("irPanelOpen") && static_cast<bool>(state.getProperty("irPanelOpen")))
@@ -664,7 +668,7 @@ void SilentRiotEditor::timerCallback()
     // Animate collapsible sections within current window bounds
     {
         constexpr float kStep = 28.0f;
-        float fxTarget  = fxPanelOpen  ? static_cast<float>(sr::EffectsPanel::panelHeight)  : 0.0f;
+        float fxTarget  = fxPanelOpen  ? static_cast<float>(sr::EffectsPanel::height())  : 0.0f;
         float irTarget  = irPanelOpen  ? static_cast<float>(sr::IRLoaderPanel::panelHeight)  : 0.0f;
         float advTarget = advPanelOpen ? static_cast<float>(sr::AdvancedPanel::panelHeight) : 0.0f;
         bool animating = false;
@@ -778,7 +782,7 @@ void SilentRiotEditor::timerCallback()
 void SilentRiotEditor::paint(juce::Graphics& g)
 {
     // Fixed gradient endpoint avoids background colour shifting during animation
-    float maxH = static_cast<float>(kBaseH + sr::EffectsPanel::panelHeight
+    float maxH = static_cast<float>(kBaseH + sr::EffectsPanel::height()
                                     + sr::IRLoaderPanel::panelHeight
                                     + sr::AdvancedPanel::panelHeight) * currentScale;
     g.setGradientFill(juce::ColourGradient(
@@ -798,7 +802,7 @@ void SilentRiotEditor::paint(juce::Graphics& g)
 
 void SilentRiotEditor::resized()
 {
-    static const int maxH = kBaseH + sr::EffectsPanel::panelHeight + sr::IRLoaderPanel::panelHeight + sr::AdvancedPanel::panelHeight;
+    static const int maxH = kBaseH + sr::EffectsPanel::height() + sr::IRLoaderPanel::panelHeight + sr::AdvancedPanel::panelHeight;
     contentArea.setBounds(0, 0, kWindowW, maxH);
     layoutContent();
 }
@@ -812,16 +816,49 @@ void SilentRiotEditor::layoutContent()
 
     auto body = area.removeFromTop(kBodyH);
     int vuW = 40;
+    const int mockup = sr::layoutMockup();
 
-    vuIn.setBounds(body.removeFromLeft(vuW).reduced(8, 20));
-    vuOut.setBounds(body.removeFromRight(vuW).reduced(8, 20));
+    if (mockup == 1)
+    {
+        // A: meter on the outer edge, two knobs stacked beside it (inner side).
+        auto left = body.removeFromLeft(104).reduced(0, 2);
+        auto right = body.removeFromRight(104).reduced(0, 2);
+        vuIn.setBounds(left.removeFromLeft(vuW).reduced(8, 18));
+        vuOut.setBounds(right.removeFromRight(vuW).reduced(8, 18));
+        const int kh = left.getHeight() / 2;
+        effectsPanel.inputLevelKnob().setBounds(left.removeFromTop(kh));
+        effectsPanel.gateThreshKnob().setBounds(left);
+        effectsPanel.outputLevelKnob().setBounds(right.removeFromTop(kh));
+        effectsPanel.widthKnob().setBounds(right);
+    }
+    else if (mockup == 2)
+    {
+        // B: meter shortened, its two knobs side by side under it.
+        auto left = body.removeFromLeft(124).reduced(4, 8);
+        auto right = body.removeFromRight(124).reduced(4, 8);
+        auto knobsL = left.removeFromBottom(84);
+        auto knobsR = right.removeFromBottom(84);
+        vuIn.setBounds(left.withSizeKeepingCentre(24, left.getHeight() - 8));
+        vuOut.setBounds(right.withSizeKeepingCentre(24, right.getHeight() - 8));
+        const int kw = knobsL.getWidth() / 2;
+        effectsPanel.inputLevelKnob().setBounds(knobsL.removeFromLeft(kw));
+        effectsPanel.gateThreshKnob().setBounds(knobsL);
+        effectsPanel.widthKnob().setBounds(knobsR.removeFromLeft(kw));
+        effectsPanel.outputLevelKnob().setBounds(knobsR);
+    }
+    else
+    {
+        vuIn.setBounds(body.removeFromLeft(vuW).reduced(8, 20));
+        vuOut.setBounds(body.removeFromRight(vuW).reduced(8, 20));
+    }
     const auto plate = body.reduced(8, 8);
     faceplate.setBounds(plate);
 
     // SHAPE sits dead centre on the faceplate with GAIN and VOLUME a fixed pitch
     // either side. The toggles stay a tight group under SHAPE, so they read as
     // secondary to the knobs.
-    constexpr int dialW = 80, knobPitch = 155;
+    constexpr int dialW = 80;
+    const int knobPitch = mockup == 2 ? 138 : mockup == 1 ? 148 : 155;
     const float plateCentreX = static_cast<float>(plate.getX()) + plate.getWidth() * 0.5f;
     const auto columnX = [&](int i) {
         return plateCentreX + static_cast<float>(knobPitch * (i - 1));

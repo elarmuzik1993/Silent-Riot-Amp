@@ -113,9 +113,34 @@ static juce::Rectangle<int> cardBounds(juce::Rectangle<int> area, int col, int r
              kCardW, kCardH };
 }
 
+// MOCKUP: one row — BOOST | DELAY | REVERB, widths from their knob counts at 54 px.
+static juce::Rectangle<int> rowCardBounds(juce::Rectangle<int> area, int i)
+{
+    constexpr int k = 54;
+    const int w[3] = { 20 + 3 * k, 20 + 54 + 4 * k, 20 + 3 * k };
+    const int total = w[0] + w[1] + w[2] + 2 * kCardGap;
+    int x = area.getCentreX() - total / 2;
+    for (int j = 0; j < i; ++j) x += w[j] + kCardGap;
+    return { x, area.getCentreY() - kCardH / 2, w[i], kCardH };
+}
+
 void EffectsPanel::paint(juce::Graphics& g)
 {
     auto area = getLocalBounds().reduced(10);
+    if (layoutMockup())
+    {
+        static const char* rowTitles[3] = { "BOOST", "DELAY", "REVERB" };
+        for (int i = 0; i < 3; ++i)
+        {
+            auto card = rowCardBounds(area, i);
+            AmpFaceplate::paintPlate(g, card.toFloat().reduced(0.5f), 5.0f);
+            g.setColour(Colours::accent);
+            g.setFont(Fonts::ui(Fonts::Sizes::title, true));
+            g.drawText(rowTitles[i], card.reduced(12, kCardPadY).removeFromTop(kToggleH),
+                       juce::Justification::centredLeft, false);
+        }
+        return;
+    }
 
     static const char* titles[4] = { "UTILITY", "BOOST", "DELAY", "REVERB" };
     int idx = 0;
@@ -169,6 +194,20 @@ void EffectsPanel::layoutCard(juce::Rectangle<int> card, ToggleSwitch& tgl,
 void EffectsPanel::resized()
 {
     auto area = getLocalBounds().reduced(10);
+    if (layoutMockup())
+    {
+        layoutCard(rowCardBounds(area, 0), boostTgl,  { &boostLevel, &boostTight, &boostBright });
+        layoutCard(rowCardBounds(area, 2), reverbTgl, { &reverbMix, &reverbSize, &reverbTone });
+        auto inner = rowCardBounds(area, 1).reduced(10, kCardPadY);
+        delayTgl.setBounds(inner.removeFromTop(kToggleH).removeFromRight(kToggleW));
+        inner.removeFromTop(kRowGap);
+        auto stack = inner.removeFromLeft(kStackW).withSizeKeepingCentre(kStackW, kStackH);
+        delaySyncTgl.setBounds(stack.removeFromTop(kStackH / 2));
+        delayPP.setBounds(stack);
+        inner.removeFromLeft(4);
+        layoutKnobRow(inner, { &delayTime, &delayFb, &delayMix, &delayTone });
+        return;
+    }
 
     // UTILITY card: no toggle — every knob self-gates or is unity-at-centre
     // (THRESH 0 = gate off, WIDTH 0 = dry, INPUT/OUTPUT centre = unity).

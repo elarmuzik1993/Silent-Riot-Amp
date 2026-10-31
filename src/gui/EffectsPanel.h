@@ -5,7 +5,20 @@
 #include "NotchKnob.h"
 #include "ToggleSwitch.h"
 
+#include <cstdlib>
+
 namespace sr {
+
+// MOCKUP ONLY (not for merge): SR_MOCKUP=A|B renders candidate layouts.
+//   0 = today; A = trims+gate/width beside the meters; B = under the meters.
+inline int layoutMockup()
+{
+    static const int m = [] {
+        const char* e = std::getenv("SR_MOCKUP");
+        return e == nullptr ? 0 : (e[0] == 'A' ? 1 : e[0] == 'B' ? 2 : 0);
+    }();
+    return m;
+}
 
 // Collapsible EFFECTS panel — 2×2 grid of effect "cards":
 //   [ UTILITY ] [ BOOST ]    UTILITY = noise gate + stereo width, both
@@ -25,6 +38,8 @@ public:
     // too-short panel shows up as knob values drawn past the bottom edge and
     // silently clipped.
     static constexpr int panelHeight = 304;
+    static constexpr int rowPanelHeight = 156;   // mockup: one row of three cards
+    static int height() { return layoutMockup() ? rowPanelHeight : panelHeight; }
 
     // Toggles (the UTILITY card's gate/width knobs self-gate — no toggle)
     ToggleSwitch& boostToggle()  { return boostTgl; }
