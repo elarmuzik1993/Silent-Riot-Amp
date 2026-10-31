@@ -131,7 +131,7 @@ cmake -B build -DSR_BUILD_TESTS=ON # Build with tests
 - **HeaderBar.h/.cpp** — Brand + PresetSelector + gear icon
 - **TunerBar.h/.cpp** — Always-visible live tuner strip (note name + octave, cents meter, freq readout). Owns a `PitchDetector`, pulls DI windows from the processor's capture ring on the shared 30Hz timer
 - **FooterBar.h/.cpp** — OS factor, latency, sample rate, bit depth
-- **SectionBar.h/.cpp** — Clickable expand/collapse bar with chevron + hint text
+- **SectionBar.h/.cpp** — Clickable expand/collapse bar with chevron + hint text (the editor gives each `kSectionH`, 20px; was 26 until 2026-10-31)
 - **AdvancedPanel.h/.cpp** — PSU supply rails (teal gradient bars) + engine state readout
 - **PresetSelector.h/.cpp** — `[◂ | name | ▸]` cyclic preset browser
 - **SegmentedSelector.h/.cpp** — Row of mutually-exclusive buttons

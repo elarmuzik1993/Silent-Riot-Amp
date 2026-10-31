@@ -1,6 +1,6 @@
 # State
 
-_Updated 2026-10-31 (UTILITY knobs beside the meters)_
+_Updated 2026-10-31 (UTILITY knobs beside the meters, slimmer section bars)_
 
 ## Now
 - Silent Riot v0.3.4 (JUCE 7 VST3/Standalone), GPL-3.0-or-later, free + optional donations; no tagged
@@ -45,5 +45,5 @@ _Updated 2026-10-31 (UTILITY knobs beside the meters)_
 - GitHub Actions jobs fail in seconds with no steps run (minutes block) since 2026-10-09.
 - `signoff.py`: A1/B1 fail but accepted (frozen); E3 −37.9 dBc open. Sag idles warm; 15W↔7W settles audibly.
 - Projects using an IR play louder (+5.4…+13.1 dB) since the IR level match; in CHANGELOG.
-- GUI: small low-contrast text; EFFECTS + IR LOADER open = 774 px (was 922), no screen clamp.
+- GUI: small low-contrast text; EFFECTS + IR LOADER open = 756 px (was 922), no screen clamp.
 - Some commits on `main` carry a non-noreply email, including GitHub web merges (account default email).

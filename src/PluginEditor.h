@@ -172,7 +172,7 @@ private:
                   "the meter-column knobs are too short for their name, dial and value");
     static_assert(2 * kSideKnobH + kSideKnobGap <= kBodyH - 4,
                   "the meter-column knob stack no longer fits the amp row");
-    static constexpr int kSectionH  = 26;
+    static constexpr int kSectionH  = 20;   // IR LOADER, EFFECTS, ADVANCED bars (was 26)
     static constexpr int kFooterH   = 30;
     // 3 section bars: EFFECTS, IR LOADER, ADVANCED
     static constexpr int kBaseH     = kHeaderH + kTunerH + kBodyH + kSectionH * 3 + kFooterH;

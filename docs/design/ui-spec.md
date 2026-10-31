@@ -192,15 +192,15 @@ The plugin is a vertical stack of sections. Each section is full-width.
 │         │      [7W]  [CAB]  [PWR]           │           │
 │         │                                   │           │
 ├─────────┴───────────────────────────────────┴───────────┤
-│  EFFECTS SECTION BAR                         h=~26px    │
+│  EFFECTS SECTION BAR                         h=20px     │
 ├─────────────────────────────────────────────────────────┤
 │  EFFECTS PANEL (collapsible)                 h=0–156px  │
 ├─────────────────────────────────────────────────────────┤
-│  IR LOADER SECTION BAR                       h=~26px    │
+│  IR LOADER SECTION BAR                       h=20px     │
 ├─────────────────────────────────────────────────────────┤
 │  IR LOADER PANEL (collapsible)               h=0–400px  │
 ├─────────────────────────────────────────────────────────┤
-│  ADVANCED SECTION BAR                        h=~26px    │
+│  ADVANCED SECTION BAR                        h=20px     │
 ├─────────────────────────────────────────────────────────┤
 │  ADVANCED PANEL (collapsible)                h=0–180px  │
 ├─────────────────────────────────────────────────────────┤
@@ -253,7 +253,7 @@ EFFECTS panel's UTILITY card until 2026-10-31, which made that panel two rows ta
 
 ### 4.3 Section Bars (EFFECTS, IR LOADER, ADVANCED)
 
-- **Height**: ~26px (6px vertical padding + text)
+- **Height**: 20px (was 26 until 2026-10-31; label and chevron centred)
 - **Background**: `panel` (closed) / `panelLight` (open)
 - **Border**: top 1px `border`
 - **Cursor**: pointer
