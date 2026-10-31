@@ -3,10 +3,83 @@
 #include "IRLoaderPanel.h"
 #include "ColourPalette.h"
 #include "FontData.h"
+#include "ProceduralTexture.h"
+#include "BinaryData.h"
 
 #include <algorithm>
+#include <cmath>
 
 namespace sr {
+
+// ── The CAB view's backdrop: a brick wall ──
+//
+// A photo of an old wall supplied by the owner (`resources/textures/brick-wall.jpg`,
+// embedded via BinaryData; source to confirm and credit in CREDITS.md before
+// the repo goes public), scaled to cover the panel and centred. A dark
+// palette gets it dimmed to half with a vignette, so the cab, arrows and text
+// stay the brightest things in the section; a light palette gets it washed
+// pale. Either way it is quietened under the header and the cab's name lines,
+// so small type stays legible.
+namespace {
+
+const juce::Image& wallPhoto()
+{
+    static const juce::Image photo = juce::ImageCache::getFromMemory(BinaryData::brickwall_jpg,
+                                                                     BinaryData::brickwall_jpgSize);
+    return photo;
+}
+
+// `calm` is where text sits on the wall (the cab's name lines)
+juce::Image renderBrickWall(float w, float h, float headerH, juce::Rectangle<float> calm, float scale)
+{
+    using texture::smoothstep;
+    const bool dark = Colours::panel.getPerceivedBrightness() < 0.5f;
+    const int pw = juce::jmax(1, juce::roundToInt(w * scale));
+    const int ph = juce::jmax(1, juce::roundToInt(h * scale));
+    const float inv = 1.0f / scale;
+
+    juce::Image img(juce::Image::RGB, pw, ph, true);
+    {
+        juce::Graphics g(img);
+        g.setImageResamplingQuality(juce::Graphics::highResamplingQuality);
+        g.drawImage(wallPhoto(), juce::Rectangle<float>(0.0f, 0.0f, static_cast<float>(pw), static_cast<float>(ph)),
+                    juce::RectanglePlacement(juce::RectanglePlacement::centred | juce::RectanglePlacement::fillDestination));
+    }
+
+    const juce::Colour wash { 0xFFE6E2DC };
+    {   // the pixel access is released before the image is returned
+        juce::Image::BitmapData px(img, juce::Image::BitmapData::readWrite);
+        for (int y = 0; y < ph; ++y)
+            for (int x = 0; x < pw; ++x)
+            {
+                const float u = static_cast<float>(x) * inv, v = static_cast<float>(y) * inv;
+
+                // Quiet zones: a wide oval round the text (a box shows as a box),
+                // and the header strip
+                const float qx = (u - calm.getCentreX()) / (calm.getWidth() * 0.5f + 40.0f);
+                const float qy = (v - calm.getCentreY()) / (calm.getHeight() * 0.5f + 16.0f);
+                const float quiet = juce::jmax(smoothstep(1.0f, 0.45f, std::sqrt(qx * qx + qy * qy)),
+                                               smoothstep(headerH + 4.0f, headerH - 6.0f, v));
+                const float ex = (u - w * 0.5f) / (w * 0.5f), ey = (v - h * 0.55f) / (h * 0.55f);
+                const float edge = smoothstep(0.35f, 1.25f, std::sqrt(ex * ex + ey * ey));
+
+                juce::Colour c = px.getPixelColour(x, y);
+                if (dark) // dimmed to half and vignetted, darkest under the text
+                {
+                    c = c.withMultipliedBrightness(0.50f * (1.0f - 0.55f * edge) * (1.0f - 0.5f * quiet));
+                }
+                else // washed pale, flattened toward the panel under the text
+                {
+                    c = c.interpolatedWith(wash, 0.62f + 0.08f * edge);
+                    c = c.interpolatedWith(Colours::panelLight, 0.78f * quiet);
+                }
+                px.setPixelColour(x, y, c);
+            }
+    }
+    return img;
+}
+
+} // namespace
 
 IRLoaderPanel::IRLoaderPanel()
 {
@@ -210,8 +283,32 @@ void IRLoaderPanel::paint(juce::Graphics& g)
     auto bounds = getLocalBounds().toFloat();
     if (bounds.getHeight() < 20.0f) return;
 
-    g.setColour(Colours::panelLight);
-    g.fillRect(bounds);
+    if (view == View::Cab)
+    {
+        // Rendered at the full panel height and drawn from the top, so the
+        // open/close animation (which resizes this panel every frame) only blits it
+        const float scale = juce::jmax(0.01f, g.getInternalContext().getPhysicalPixelScaleFactor());
+        const float fullH = static_cast<float>(panelHeight);
+        const int w = juce::jmax(1, juce::roundToInt(bounds.getWidth() * scale));
+        const int h = juce::jmax(1, juce::roundToInt(fullH * scale));
+        const juce::uint32 theme = Colours::panel.getARGB() ^ (Colours::panelLight.getARGB() * 31u);
+        if (wallCache.isNull() || wallCacheScale != scale || wallCacheTheme != theme
+            || wallCache.getWidth() != w || wallCache.getHeight() != h)
+        {
+            // The cab's name lines: centred in the bottom kNameH of the panel
+            const auto calm = juce::Rectangle<float>(bounds.getCentreX() - 190.0f, fullH - CabinetView::kNameH + 2.0f,
+                                                     380.0f, CabinetView::kNameH - 4.0f);
+            wallCache = renderBrickWall(bounds.getWidth(), fullH, static_cast<float>(headerH), calm, scale);
+            wallCacheScale = scale;
+            wallCacheTheme = theme;
+        }
+        g.drawImage(wallCache, juce::Rectangle<float>(0.0f, 0.0f, bounds.getWidth(), fullH));
+    }
+    else
+    {
+        g.setColour(Colours::panelLight);
+        g.fillRect(bounds);
+    }
 
     if (view == View::Cab)
     {

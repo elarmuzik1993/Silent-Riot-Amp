@@ -77,6 +77,7 @@ EffectsPanel::EffectsPanel()
     for (auto* t : { &delaySyncTgl, &delayPP })
         t->setStyle(kStackStyle);
 
+    int wearSeed = 100; // each knob wears differently (see kKnobWearProperty)
     for (auto* k : { &gateThresh, &width, &inputLevel, &outputLevel,
                      &boostLevel, &boostTight, &boostBright,
                      &delayTime, &delayFb, &delayMix, &delayTone,
@@ -88,6 +89,7 @@ EffectsPanel::EffectsPanel()
         k->setLabelOnTop(true);
         k->setEngravedReadout(true);
         k->getSlider().getProperties().set(SilentRiotLookAndFeel::kPointerKnobProperty, true);
+        k->getSlider().getProperties().set(SilentRiotLookAndFeel::kKnobWearProperty, wearSeed++);
         addAndMakeVisible(*k);
     }
 

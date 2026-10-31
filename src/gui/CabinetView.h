@@ -31,8 +31,14 @@ public:
 
     // The cabinet front alone, filling `bounds`. The trim (frame, corners,
     // speakers) scales with the shorter side, so any width at least as wide
-    // as it is tall reads as the same 2x12.
-    static void paintCabinet(juce::Graphics&, juce::Rectangle<float> bounds);
+    // as it is tall reads as the same 2x12. `scale` is the physical pixels per
+    // logical pixel the per-pixel textures (tolex grain, grille dust) are
+    // rendered at. Costly — paint() calls it only to rebuild its cache.
+    static void paintCabinet(juce::Graphics&, juce::Rectangle<float> bounds, float scale = 1.0f);
+
+    // Room paintCabinet() draws outside `bounds`: the drop shadow and the
+    // corner caps' overhang. The cache covers the cab expanded by this.
+    static constexpr float kCacheMargin = 5.0f;
 
     static constexpr float kCabAspect = 2.0f;    // a little wider than a real 2x12's 3:2
     static constexpr float kArrowR    = 15.0f;   // arrow button radius
@@ -48,6 +54,13 @@ private:
     bool canStep = false;
     bool dragOver = false;
     int hoverArrow = 0;
+
+    // The cab front rendered once, like AmpFaceplate's plate: keyed on size,
+    // physical pixel scale and a theme token (applySettings() swaps the
+    // palette with no per-component notice). Hovering an arrow only blits it.
+    juce::Image cabCache;
+    float cabCacheScale = 0.0f;
+    juce::uint32 cabCacheTheme = 0;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(CabinetView)
 };

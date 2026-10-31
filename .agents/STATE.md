@@ -1,12 +1,13 @@
 # State
 
-_Updated 2026-10-30 (Settings redesign, Oxanium font)_
+_Updated 2026-10-31 (worn textures: amp plate, knobs, cab; brick-wall and steel photos)_
 
 ## Now
 - **Tone frozen at `tone-v1`** (059b209): `tests/tone_lock_tests.cpp` guards it (`docs/dev/tone-lock.md`).
 - Silent Riot v0.3.4 (JUCE 7 VST3/Standalone), GPL-3.0-or-later, free + optional donations. No tagged
-  release. ctest 450 (312 pure C++ / 81 JUCE / 57 processor). On Linux/GCC 445 pass and the 5 tone-lock
-  cases fail, also at 857023b (before any GUI change): band deltas at −84…−100 dB, RMS ≤ 0.0002 dB.
+  release. ctest 504 (312 pure C++ / 81 JUCE / 111 processor), all passing on Windows/MSVC 2026-10-31.
+  On Linux/GCC the 5 tone-lock cases fail, also at 857023b (before any GUI change): band deltas at
+  −84…−100 dB, RMS ≤ 0.0002 dB (last checked before the texture tests were added).
 - Docs open-source ready (`docs/README.md` index; `design/`+`records/` frozen; `AI_USAGE.md` kept true).
   `verify.sh --quick` checks SPDX, links, tool lists, UI text.
 - UI font is **Oxanium** (Regular + Bold, OFL) via `Fonts::ui()`; replaced Space Mono + unused DM Sans.
@@ -15,6 +16,12 @@ _Updated 2026-10-30 (Settings redesign, Oxanium font)_
   toggles stacked left of TIME, and SYNC turns TIME into the division knob (`DelayTimeAttachment`).
 - IR LOADER (under the amp, above EFFECTS) opens on a drawn 2x12 cab (`src/gui/CabinetView.*`) whose
   arrows cycle the built-in cab + every IR; CAB | LIBRARY brings back the list (`irView`).
+- **Worn look**: the amp plate has a worn powder coat (`paintGrunge()`), the 17
+  pointer knobs per-knob handling wear (`kKnobWearProperty`), the cab pebbled tolex with tears to
+  plywood, dents, rubbed-through edges, torn piping and grille dust/rust; the cab front is now cached.
+  The procedural parts share `src/gui/ProceduralTexture.h` (fixed seeds, rendered once). Two photos the
+  owner supplied are embedded (`resources/textures/`): a brick wall behind the CAB view, dimmed to half,
+  and scratched steel layered over the amp plate's coat at 20% (14% light). Light theme checked.
 - Standalone: Settings (gear) has an AUDIO INPUT list (`src/gui/InputSelector.*`) that opens the
   interface with one input active, so Input 2 of a pair plays (the amp reads channel 0 only).
   Saved with the device setup, not presets; hidden in VST3. Confirmed on a KA6.
@@ -39,15 +46,23 @@ _Updated 2026-10-30 (Settings redesign, Oxanium font)_
    branches (keep `main`, `feat/neural-hybrid-blend-sketch`). Then make the repo public.
 3. Owner picks a donation platform → step 9 of `docs/plans/2026-10-28-open-source-docs-prep.md`.
 4. Owner: delay FEEDBACK default decays 9 dB/repeat — keep or remap? GRID I reads 0 — keep, or read PI?
-   Faceplate: lamp colour, weave strength, keep the "POWER" label, jewel size/colour?
+   Faceplate: lamp colour, the cards' weave strength (gone from the amp plate), keep the "POWER" label, jewel size/colour?
 5. E3 (the one tone change still allowed): repoint the gate to `tests/fixtures/ir/bright.wav`, fix
    the engine aliasing, owner A/Bs it, then new references + `tone-v2` (`docs/dev/tone-lock.md`).
 6. GitHub Actions has failed every run since 2026-10-09; recheck once public (free runners). The
    tone lock fails on Linux/GCC (references are from MSVC; see Now): owner decides between a
    per-platform reference set or a noise floor below which bands are not compared.
 7. Owner, cab view: light theme keeps white tolex around the black grille — OK? Dim the cab when CAB is off?
+   Worn look: wear on the EFFECTS knobs too, or the amp row only? How much damage on the cab? Wall brightness,
+   steel-layer opacity (`kSteelOpacityDark`)?
 8. Owner: review Settings redesign + Oxanium on the docs/settings-panel-plan branch, then its PR.
    Re-shoot the manual's `resources/images/` (still Space Mono) with `sr_editor_snapshot`.
+9. Make `tests/rt_stress.cpp` build on MSVC (`_aligned_malloc`/`_aligned_free` there, `posix_memalign`
+   elsewhere), so the full `verify.sh` runs on Windows (see Known issues).
+10. **Before the repo goes public:** owner confirms where `resources/textures/brick-wall.jpg` and
+   `faceplate-steel.jpg` come from (own photos, or a source whose licence allows redistribution under
+   GPL) and credits both in CREDITS.md. Merged in PR #64 at the owner's call with the source still
+   unconfirmed. Wider originals would also keep them sharp at UI scale 1.5 / HiDPI.
 
 ## Decisions
 - Tone frozen at `tone-v1` (amp + cab + effects, steady state). Re-calibration (power Tasks 2–5,
@@ -59,6 +74,8 @@ _Updated 2026-10-30 (Settings redesign, Oxanium font)_
 - Latency is an exact integer, constant across cab modes.
 
 ## Known issues
+- Full `bash scripts/verify.sh` does not build on Windows: `tests/rt_stress.cpp` calls `posix_memalign`
+  (MSVC C3861). There, run `verify.sh --quick` + build the three ctest targets in `build-verify` + ctest.
 - `signoff.py` (44.1k/4×): A1 −31.6 LUFS and B1 0.99% fail but are accepted (frozen); E3 −37.9 dBc open.
 - Sag idles warm (B2), never goes cold; a live 15W↔7W switch settles audibly.
 - **Projects that use an IR play louder** (+5.4…+13.1 dB) since the IR level match; in CHANGELOG.

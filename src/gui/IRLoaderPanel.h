@@ -76,6 +76,13 @@ private:
     int scrollOffset = 0;
     bool dragOver = false;
 
+    // CAB view's backdrop: the brick-wall photo, dimmed (washed pale on a light palette),
+    // rendered once like the cab front and keyed on size, physical pixel scale
+    // and a theme token. LIBRARY view keeps the plain panel, for its list text.
+    juce::Image wallCache;
+    float wallCacheScale = 0.0f;
+    juce::uint32 wallCacheTheme = 0;
+
     static constexpr int headerH = 28;   // title + view switch row, both views
     static constexpr int listRowH = 20;
     static constexpr int listVisibleRows = 8;
