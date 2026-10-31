@@ -59,9 +59,10 @@ _Updated 2026-10-31 (worn textures: amp plate, knobs, cab; brick-wall and steel 
    Re-shoot the manual's `resources/images/` (still Space Mono) with `sr_editor_snapshot`.
 9. Make `tests/rt_stress.cpp` build on MSVC (`_aligned_malloc`/`_aligned_free` there, `posix_memalign`
    elsewhere), so the full `verify.sh` runs on Windows (see Known issues).
-10. **Blocks merging PR #64:** owner confirms where `resources/textures/brick-wall.jpg` and
+10. **Before the repo goes public:** owner confirms where `resources/textures/brick-wall.jpg` and
    `faceplate-steel.jpg` come from (own photos, or a source whose licence allows redistribution under
-   GPL); credit both in CREDITS.md. Wider originals would also keep them sharp at UI scale 1.5 / HiDPI.
+   GPL) and credits both in CREDITS.md. Merged in PR #64 at the owner's call with the source still
+   unconfirmed. Wider originals would also keep them sharp at UI scale 1.5 / HiDPI.
 
 ## Decisions
 - Tone frozen at `tone-v1` (amp + cab + effects, steady state). Re-calibration (power Tasks 2–5,
