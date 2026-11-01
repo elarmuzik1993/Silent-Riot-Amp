@@ -97,6 +97,7 @@ EffectsPanel::EffectsPanel()
                      &reverbMix, &reverbSize, &reverbTone })
     {
         styleKnob(*k, wearSeed++);
+        if (fxMockup()) k->setTightDial(true);
         addAndMakeVisible(*k);
     }
 
@@ -135,7 +136,7 @@ static juce::Rectangle<int> mockCard(int i)
     const int w[3] = { 2 * kCardPadX + 3 * kKnobW, 2 * kCardPadX + 4 * kKnobW + 20, 2 * kCardPadX + 3 * kKnobW };
     const int total = w[0] + w[1] + w[2] + 2 * kCardGap;
     // 1: header 24 + knobs 80 + pads -> 116 tall; 2: legend overhang 12 + 12 + 80 + 6 -> 110
-    const int h = fxMockup() == 1 ? 116 : 110;
+    const int h = fxMockup() == 1 ? 100 : 98;
     int x = 350 - total / 2;
     for (int j = 0; j < i; ++j) x += w[j] + kCardGap;
     return { x, 10, w[i], h };
@@ -245,8 +246,10 @@ void EffectsPanel::resized()
                 delaySyncTgl.setBounds(header.removeFromRight(56));
             }
             inner.removeFromTop(fxMockup() == 1 ? 0 : 0);
-            auto row = inner.withTrimmedBottom(kCardPadY).withSizeKeepingCentre(inner.getWidth(), kKnobH)
-                            .withY(inner.getBottom() - kCardPadY - kKnobH);
+            constexpr int kTightKnobH = 66;   // strip 26.8 + tightDialHeight(54) 37.8
+            static_assert(kTightKnobH >= NotchKnob::stripHeight(kKnobScale, true)
+                                         + NotchKnob::tightDialHeight(kKnobW), "tight knob too short");
+            auto row = inner.withHeight(kTightKnobH).withY(inner.getBottom() - kCardPadY - kTightKnobH);
             if (i == 0) layoutKnobRow(row, { &boostLevel, &boostTight, &boostBright });
             if (i == 1) layoutKnobRow(row, { &delayTime, &delayFb, &delayMix, &delayTone });
             if (i == 2) layoutKnobRow(row, { &reverbMix, &reverbSize, &reverbTone });

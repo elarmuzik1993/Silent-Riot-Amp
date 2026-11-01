@@ -38,7 +38,7 @@ public:
     // too-short panel shows up as knob values drawn past the bottom edge and
     // silently clipped.
     static constexpr int panelHeight = 156;
-    static int height() { return fxMockup() == 1 ? 136 : fxMockup() == 2 ? 128 : panelHeight; }
+    static int height() { return fxMockup() == 1 ? 120 : fxMockup() == 2 ? 116 : panelHeight; }
 
     // Styles a knob as an EFFECTS knob: the amp row's satin pointer knob at
     // the cards' scale, name on top, engraved value, handling wear from

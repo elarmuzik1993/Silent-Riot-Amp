@@ -54,6 +54,22 @@ public:
     void setEngravedReadout(bool engraved);
     static constexpr int kEngravedSaving = 4;
 
+    // Let the dial's empty margins overlap the text strip. drawRotarySlider
+    // paints nothing in the top kDialTopReach..0.5 or the bottom
+    // kDialBottomReach..0.5 of its square (the ticks reach 0.39 of it above the
+    // centre; below, the 270° sweep is open and the skirt and its shadow end
+    // ~0.31 down), so with this on the square is sized and placed by its painted
+    // extent: the name sits just above the ticks and the value just below the
+    // skirt. Same dial in less height.
+    void setTightDial(bool tight);
+    static constexpr float kDialTopReach    = 0.39f;
+    static constexpr float kDialBottomReach = 0.31f;
+    // Height of the painted part of a dial `side` px square, with tight dials.
+    static constexpr float tightDialHeight(float side)
+    {
+        return side * (kDialTopReach + kDialBottomReach);
+    }
+
     // Vertical room a knob needs to render in full *at scale 1.0*: the square
     // knob plus the readout + label strip. Lay one out shorter and the name is
     // drawn past the bottom edge and silently clipped — which is exactly what
@@ -128,6 +144,7 @@ private:
     float labelH      = kLabelHBase;
     float readoutMinW = kReadoutMinWBase;
     bool labelOnTop   = false;
+    bool tightDial    = false;
     bool engravedReadout = false;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(NotchKnob)
