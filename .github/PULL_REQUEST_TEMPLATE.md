@@ -18,4 +18,3 @@ Closes #
 - [ ] New plugin parameters, if any, are **appended** to `createParameterLayout()`
 - [ ] New source files carry the SPDX licence header
 - [ ] Docs updated where this change makes them stale (`docs/dev/`, `docs/manual/`, `CLAUDE.md`)
-- [ ] No AI or bot attribution in commits or this PR (`CONTRIBUTING.md`); if you used AI tools, you have the right to license the result under GPL-3.0-or-later (`attribution/AI_USAGE.md`)
