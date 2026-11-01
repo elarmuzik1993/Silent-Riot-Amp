@@ -177,6 +177,12 @@ no rough edges; level-matchable output.
 - [ ] **[L] Post-launch backlog** (only after 1.0 finds players): revisit the parked **neural
   capture** (now trainable against the frozen DSP), then **AU/macOS** if Mac demand
   shows up. These are growth bets, not launch blockers.
+- [ ] **[L] Idea: cab-only mode** — play the input through the IR loader with the amp off, as a
+  separate CAB ONLY toggle (PWR off stays silent for existing sessions). Needs: skip the amp loop and
+  feed the trimmed input to `cabSim` (no change when the amp is on, so the tone lock is unaffected);
+  a make-up gain, since IRs are level-matched to the amp's output; a delay to hold the reported
+  latency; clean convolution/limiter resets on toggle; live meters. A new parameter is appended last.
+  Not planned by the maintainer; **open for contributions**.
 
 ---
 
