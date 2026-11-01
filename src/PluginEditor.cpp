@@ -463,7 +463,7 @@ void SilentRiotEditor::loadUIState()
     // Snap panel heights on restore (no animation)
     if (state.hasProperty("fxPanelOpen") && static_cast<bool>(state.getProperty("fxPanelOpen")))
     {
-        fxPanelAnimH = static_cast<float>(sr::EffectsPanel::panelHeight);
+        fxPanelAnimH = static_cast<float>(sr::EffectsPanel::height());
         fxSectionBar.setOpen(true);
     }
     if (state.hasProperty("irPanelOpen") && static_cast<bool>(state.getProperty("irPanelOpen")))
@@ -684,7 +684,7 @@ void SilentRiotEditor::timerCallback()
     // Animate collapsible sections within current window bounds
     {
         constexpr float kStep = 28.0f;
-        float fxTarget  = fxPanelOpen  ? static_cast<float>(sr::EffectsPanel::panelHeight)  : 0.0f;
+        float fxTarget  = fxPanelOpen  ? static_cast<float>(sr::EffectsPanel::height())  : 0.0f;
         float irTarget  = irPanelOpen  ? static_cast<float>(sr::IRLoaderPanel::panelHeight)  : 0.0f;
         float advTarget = advPanelOpen ? static_cast<float>(sr::AdvancedPanel::panelHeight) : 0.0f;
         bool animating = false;
@@ -798,7 +798,7 @@ void SilentRiotEditor::timerCallback()
 void SilentRiotEditor::paint(juce::Graphics& g)
 {
     // Fixed gradient endpoint avoids background colour shifting during animation
-    float maxH = static_cast<float>(kBaseH + sr::EffectsPanel::panelHeight
+    float maxH = static_cast<float>(kBaseH + sr::EffectsPanel::height()
                                     + sr::IRLoaderPanel::panelHeight
                                     + sr::AdvancedPanel::panelHeight) * currentScale;
     g.setGradientFill(juce::ColourGradient(
@@ -818,7 +818,7 @@ void SilentRiotEditor::paint(juce::Graphics& g)
 
 void SilentRiotEditor::resized()
 {
-    static const int maxH = kBaseH + sr::EffectsPanel::panelHeight + sr::IRLoaderPanel::panelHeight + sr::AdvancedPanel::panelHeight;
+    static const int maxH = kBaseH + sr::EffectsPanel::height() + sr::IRLoaderPanel::panelHeight + sr::AdvancedPanel::panelHeight;
     contentArea.setBounds(0, 0, kWindowW, maxH);
     layoutContent();
 }

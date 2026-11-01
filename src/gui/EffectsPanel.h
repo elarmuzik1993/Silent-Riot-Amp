@@ -5,7 +5,19 @@
 #include "NotchKnob.h"
 #include "ToggleSwitch.h"
 
+#include <cstdlib>
+
 namespace sr {
+
+// MOCKUP ONLY (not for merge): SR_MOCKUP=1 compact header, 2 legend on the border.
+inline int fxMockup()
+{
+    static const int m = [] {
+        const char* e = std::getenv("SR_MOCKUP");
+        return e == nullptr ? 0 : (e[0] == '1' ? 1 : e[0] == '2' ? 2 : 0);
+    }();
+    return m;
+}
 
 // Collapsible EFFECTS panel — one row of effect "cards":
 //   [ BOOST ] [ DELAY ] [ REVERB ]
@@ -26,6 +38,7 @@ public:
     // too-short panel shows up as knob values drawn past the bottom edge and
     // silently clipped.
     static constexpr int panelHeight = 156;
+    static int height() { return fxMockup() == 1 ? 136 : fxMockup() == 2 ? 128 : panelHeight; }
 
     // Styles a knob as an EFFECTS knob: the amp row's satin pointer knob at
     // the cards' scale, name on top, engraved value, handling wear from

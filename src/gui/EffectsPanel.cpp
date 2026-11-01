@@ -86,7 +86,7 @@ EffectsPanel::EffectsPanel()
     for (auto* t : { &boostTgl, &delayTgl, &reverbTgl })
         t->setStyle(kCardToggleStyle);
     for (auto* t : { &delaySyncTgl, &delayPP })
-        t->setStyle(kStackStyle);
+        t->setStyle(fxMockup() ? kCardToggleStyle : kStackStyle);
 
     // Each knob wears differently (see kKnobWearProperty). Seeds 100..103
     // went to the gate/width/trim knobs, which the editor now owns and seeds
@@ -129,9 +129,52 @@ static juce::Rectangle<int> cardBounds(juce::Rectangle<int> area, int i)
     return { x, area.getCentreY() - kCardH / 2, kCardW[i], kCardH };
 }
 
+// MOCKUP: cards sized to their knobs (DELAY's stack column gone).
+static juce::Rectangle<int> mockCard(int i)
+{
+    const int w[3] = { 2 * kCardPadX + 3 * kKnobW, 2 * kCardPadX + 4 * kKnobW + 20, 2 * kCardPadX + 3 * kKnobW };
+    const int total = w[0] + w[1] + w[2] + 2 * kCardGap;
+    // 1: header 24 + knobs 80 + pads -> 116 tall; 2: legend overhang 12 + 12 + 80 + 6 -> 110
+    const int h = fxMockup() == 1 ? 116 : 110;
+    int x = 350 - total / 2;
+    for (int j = 0; j < i; ++j) x += w[j] + kCardGap;
+    return { x, 10, w[i], h };
+}
+
 void EffectsPanel::paint(juce::Graphics& g)
 {
     auto area = getLocalBounds().reduced(10);
+    if (fxMockup())
+    {
+        static const char* titles[3] = { "BOOST", "DELAY", "REVERB" };
+        for (int i = 0; i < 3; ++i)
+        {
+            auto card = mockCard(i);
+            if (fxMockup() == 1)
+            {
+                AmpFaceplate::paintPlate(g, card.toFloat().reduced(0.5f), 5.0f);
+                g.setColour(Colours::accent);
+                g.setFont(Fonts::ui(Fonts::Sizes::small, true));
+                g.drawText(titles[i], card.reduced(12, 2).removeFromTop(kToggleH),
+                           juce::Justification::centredLeft, false);
+            }
+            else
+            {
+                // Legend: the plate starts half a header below the card top, and the
+                // title sits on its top edge on a patch of panel background.
+                auto plate = card.withTrimmedTop(kToggleH / 2);
+                AmpFaceplate::paintPlate(g, plate.toFloat().reduced(0.5f), 5.0f);
+                g.setFont(Fonts::ui(Fonts::Sizes::small, true));
+                const int tw = juce::roundToInt(g.getCurrentFont().getStringWidthFloat(titles[i])) + 10;
+                auto legend = juce::Rectangle<int>(card.getX() + 10, card.getY() + 4, tw, kToggleH - 8);
+                g.setColour(Colours::panel);
+                g.fillRoundedRectangle(legend.toFloat(), 3.0f);
+                g.setColour(Colours::accent);
+                g.drawText(titles[i], legend, juce::Justification::centred, false);
+            }
+        }
+        return;
+    }
 
     static const char* titles[3] = { "BOOST", "DELAY", "REVERB" };
     for (int i = 0; i < 3; ++i)
@@ -183,6 +226,33 @@ void EffectsPanel::layoutCard(juce::Rectangle<int> card, ToggleSwitch& tgl,
 void EffectsPanel::resized()
 {
     auto area = getLocalBounds().reduced(10);
+    if (fxMockup())
+    {
+        // SYNC and PP become jewels in DELAY's header, beside ON; every card is
+        // then knob-high.
+        const int headerTop = fxMockup() == 1 ? 2 : 0;
+        for (int i = 0; i < 3; ++i)
+        {
+            auto inner = mockCard(i).reduced(kCardPadX, 0);
+            auto header = inner.removeFromTop(kToggleH).translated(0, headerTop);
+            ToggleSwitch* tgl = i == 0 ? &boostTgl : i == 1 ? &delayTgl : &reverbTgl;
+            if (fxMockup() == 2)   // legend line: jewels on the border, background behind
+                header = header.reduced(0, 0);
+            tgl->setBounds(header.removeFromRight(kToggleW));
+            if (i == 1)
+            {
+                delayPP.setBounds(header.removeFromRight(kToggleW));
+                delaySyncTgl.setBounds(header.removeFromRight(56));
+            }
+            inner.removeFromTop(fxMockup() == 1 ? 0 : 0);
+            auto row = inner.withTrimmedBottom(kCardPadY).withSizeKeepingCentre(inner.getWidth(), kKnobH)
+                            .withY(inner.getBottom() - kCardPadY - kKnobH);
+            if (i == 0) layoutKnobRow(row, { &boostLevel, &boostTight, &boostBright });
+            if (i == 1) layoutKnobRow(row, { &delayTime, &delayFb, &delayMix, &delayTone });
+            if (i == 2) layoutKnobRow(row, { &reverbMix, &reverbSize, &reverbTone });
+        }
+        return;
+    }
 
     layoutCard(cardBounds(area, 0), boostTgl,  { &boostLevel, &boostTight, &boostBright });
     layoutCard(cardBounds(area, 2), reverbTgl, { &reverbMix, &reverbSize, &reverbTone });
