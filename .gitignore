@@ -23,3 +23,6 @@ __pycache__/
 # Drop it here (or set SR_ASIO_SDK_DIR) to enable ASIO; see CMakeLists.txt.
 external/asiosdk/
 external/asiosdk*/
+
+# Local drafts and scratch notes (not part of the repo)
+.scratch/

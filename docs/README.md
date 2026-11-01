@@ -8,7 +8,11 @@ Start here to find the right document, and to know whether you can trust it.
   it is. If one disagrees with the code, the doc is wrong; fix it in the same PR.
 - **`design/`** and **`records/`** are **dated and frozen**. They record what was
   designed or measured at the time, and are not updated as the code moves on.
-- **`plans/`** are working plans; each carries its own status.
+- **`plans/`** are working plans; each carries its own status. A plan whose work has shipped
+  and that nothing cites is deleted (git history keeps it). The ones kept are still cited
+  from code or docs. New scratch drafts go in `.scratch/`, which is git-ignored.
+- **`records/`** is kept on purpose: the handoffs and reviews hold the measurements behind the
+  tone constants, and the code cites them.
 
 When two sources disagree, trust them in this order: **the code** > `CLAUDE.md` >
 `records/handoffs/` > `design/`. Never change code to match a design spec.
