@@ -7,7 +7,7 @@ Closes #
 ## Testing
 
 <!-- OS and compiler you built on, and what you ran. For GUI changes, attach a screenshot
-     (`tools/sr_editor_snapshot`, see tools/README.md). -->
+     (made with `sr_editor_snapshot`, see `tools/README.md`). -->
 
 ## Checklist
 
