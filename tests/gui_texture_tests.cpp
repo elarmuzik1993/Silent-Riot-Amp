@@ -22,6 +22,7 @@
 #include <juce_events/juce_events.h>
 
 #include <algorithm>
+#include <cmath>
 #include <cstdlib>
 
 namespace {
@@ -265,6 +266,80 @@ TEST_CASE("Steel layer: the photo's rust streak shows on the amp plate", "[gui][
     INFO("rust " << rust << " plain " << plain);
     // Almost transparent by design: +0.0098 with the layer, -0.0001 without (measured)
     CHECK(rust > plain + 0.005);
+}
+
+TEST_CASE("Corner screws: polished heads stand out, two are rusted", "[gui][texture]")
+{
+    juce::ScopedJuceInitialiser_GUI juceInit;
+    const auto render = [](int theme) {
+        ThemeGuard guard(theme);
+        sr::AmpFaceplate plate;
+        plate.setSize(604, 180);
+        plate.setLampCentre({ 300.0f, 90.0f }); // its bloom off the corners (the editor sets it)
+        return plate.createComponentSnapshot(plate.getLocalBounds(), true, 1.0f);
+    };
+
+    for (const int theme : { sr::Colours::Dark, sr::Colours::Light })
+    {
+        const auto img = render(theme);
+        // Mean over a 5 x 5 box: brightness, and warmth (red minus blue)
+        const auto mean = [&img](int cx, int cy, bool warm) {
+            double sum = 0.0;
+            for (int y = cy - 2; y <= cy + 2; ++y)
+                for (int x = cx - 2; x <= cx + 2; ++x)
+                {
+                    const auto c = img.getPixelAt(x, y);
+                    sum += warm ? c.getFloatRed() - c.getFloatBlue() : c.getPerceivedBrightness();
+                }
+            return sum / 25.0;
+        };
+        // Screw centres sit 10 px in from the plate outline (0.5 px in from the edge)
+        const int left = 11, right = 593, top = 11, bottom = 169;
+        INFO("theme " << theme);
+
+        // Brightest pixel in the dome's upper-left quarter, where its highlight sits
+        // (the cross recess darkens the centre, so a mean there reads the cut)
+        const auto highlight = [&img](int cx, int cy) {
+            float best = 0.0f;
+            for (int y = cy - 3; y <= cy; ++y)
+                for (int x = cx - 3; x <= cx; ++x)
+                    best = juce::jmax(best, img.getPixelAt(x, y).getPerceivedBrightness());
+            return best;
+        };
+
+        // Polished (top left, bottom right): a bright, neutral head, plainly
+        // lighter than the coat beside it in the dark theme
+        INFO("highlight TL " << highlight(left, top) << " BR " << highlight(right, bottom));
+        CHECK(highlight(left, top) > 0.75f);
+        CHECK(highlight(right, bottom) > 0.75f);
+        CHECK(std::abs(mean(left, top, true)) < 0.05);
+        if (theme == sr::Colours::Dark)
+            CHECK(mean(left, top, false) > mean(left + 30, top + 20, false) + 0.1); // gunmetal: +0.16 measured
+
+        // Rust (top right more, bottom left only flecks): warmer than the polished ones
+        const double polishedWarmth = mean(left, top, true);
+        INFO("rust TR " << mean(right, top, true) << " BL " << mean(left, bottom, true)
+                        << " polished " << polishedWarmth);
+        CHECK(mean(right, top, true) > polishedWarmth + 0.05);
+        CHECK(mean(left, bottom, true) > polishedWarmth + 0.025);
+        CHECK(mean(right, top, true) > mean(left, bottom, true));
+
+        // The stain below the top-right screw, where the drip starts. Thin, so
+        // look for the warmest pixel rather than averaging it away
+        const auto warmest = [&img](int cx, int cy) {
+            float best = -1.0f;
+            for (int y = cy - 2; y <= cy + 2; ++y)
+                for (int x = cx - 3; x <= cx + 3; ++x)
+                    best = juce::jmax(best, img.getPixelAt(x, y).getFloatRed()
+                                                - img.getPixelAt(x, y).getFloatBlue());
+            return best;
+        };
+        INFO("drip " << warmest(right, top + 7) << " coat " << warmest(right - 40, top + 7));
+        CHECK(warmest(right, top + 7) > warmest(right - 40, top + 7) + 0.04);
+    }
+
+    // Deterministic: the rust is seeded noise, so two renders match exactly
+    CHECK(sameImage(render(sr::Colours::Dark), render(sr::Colours::Dark)));
 }
 
 // ── Knob wear ──────────────────────────────────────────────────────
