@@ -3,7 +3,7 @@
 **Silent Riot — Amp Simulator Plugin.** Copyright © 2026 Boris Miscenco (Monolit Beatz).
 
 This addendum says how AI tools were used to build Silent Riot, what the human author did, and
-who owns the result. It supplements [`LICENSE`](LICENSE) and [`CREDITS.md`](CREDITS.md). It
+who owns the result. It supplements [`LICENSE`](../LICENSE) and [`CREDITS.md`](CREDITS.md). It
 does not change the licence: Silent Riot is licensed under the GNU General Public License v3.0
 or later, and where this document and the licence disagree, the licence wins.
 
@@ -38,20 +38,20 @@ AI tools were **not** used to:
 Every change, whoever or whatever typed it, goes through the same steps:
 
 1. **The author sets the task.** Each piece of work starts from the author's request, a written
-   plan in [`docs/plans/`](docs/plans/), or a defect the author reported.
+   plan in [`docs/plans/`](../docs/plans/), or a defect the author reported.
 2. **The AI drafts it** inside the rules the author wrote for the project:
-   [`AGENTS.md`](AGENTS.md), [`CLAUDE.md`](CLAUDE.md) and the current-state note
-   [`.agents/STATE.md`](.agents/STATE.md). These record the project's conventions, its known
+   [`../AGENTS.md`](../AGENTS.md), [`../CLAUDE.md`](../CLAUDE.md) and the current-state note
+   [`.agents/STATE.md`](../.agents/STATE.md). These record the project's conventions, its known
    pitfalls and the decisions the author has made, so the tools work to them instead of
    improvising.
 3. **It has to pass the checks.** Nothing is done until `bash scripts/verify.sh` passes: the
    build, about 450 automated tests, and static checks on licences, links and UI text. Fixes and
    features come with tests.
 4. **The sound is checked by measurement and by ear.** Tone changes are judged against the
-   sign-off gates ([`docs/dev/tone-signoff.md`](docs/dev/tone-signoff.md)) and by the author
+   sign-off gates ([`docs/dev/tone-signoff.md`](../docs/dev/tone-signoff.md)) and by the author
    listening. The sound is frozen at `tone-v1` by the author's ear sign-off; an automated test
    fails on any change to it, and the references move only after the author approves an A/B
-   comparison ([`docs/dev/tone-lock.md`](docs/dev/tone-lock.md)).
+   comparison ([`docs/dev/tone-lock.md`](../docs/dev/tone-lock.md)).
 5. **The author reviews and merges.** Changes arrive as pull requests, and every one was
    reviewed manually by the author before it was merged. The author decides what is merged,
    sent back or dropped, and tests the plugin on real hardware.
@@ -66,8 +66,8 @@ how the whole project is built, and this document discloses it once, for all of 
 
 **The author's development system.** Silent Riot was built with a workflow the author
 designed for directing AI across machines and sessions, local and cloud. Project rules and
-decisions live in [`AGENTS.md`](AGENTS.md) and [`CLAUDE.md`](CLAUDE.md), a hand-off note
-([`.agents/STATE.md`](.agents/STATE.md)) lets every session resume from the repository alone,
+decisions live in [`../AGENTS.md`](../AGENTS.md) and [`../CLAUDE.md`](../CLAUDE.md), a hand-off note
+([`.agents/STATE.md`](../.agents/STATE.md)) lets every session resume from the repository alone,
 and the wider project context is kept in an Obsidian vault.
 
 ## 3. Human Authored Content / Substantial Human Input
@@ -112,14 +112,14 @@ The AI tools are not authors of the project.
   GPL-3.0-or-later. That licence is what grants your rights; this addendum does not narrow it.
 - **Contributors.** No copyright assignment is required. You keep the copyright in what you
   write, and contributing it licenses it under GPL-3.0-or-later
-  ([`CONTRIBUTING.md`](CONTRIBUTING.md)). If you use AI tools on a contribution, you confirm
+  ([`../CONTRIBUTING.md`](../CONTRIBUTING.md)). If you use AI tools on a contribution, you confirm
   that you have the right to license the result under those terms and that it does not copy
   third-party code.
 
 ## 5. Non-Infringement Warranty Limitation
 
 Silent Riot is provided **"as is", without warranty of any kind**, as stated in sections 15
-and 16 of the GPL ([`LICENSE`](LICENSE)). In particular, the author gives **no warranty that
+and 16 of the GPL ([`LICENSE`](../LICENSE)). In particular, the author gives **no warranty that
 the software, or any AI-assisted part of it, is free of third-party intellectual property
 claims.**
 

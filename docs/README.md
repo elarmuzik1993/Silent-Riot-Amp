@@ -8,7 +8,11 @@ Start here to find the right document, and to know whether you can trust it.
   it is. If one disagrees with the code, the doc is wrong; fix it in the same PR.
 - **`design/`** and **`records/`** are **dated and frozen**. They record what was
   designed or measured at the time, and are not updated as the code moves on.
-- **`plans/`** are working plans; each carries its own status.
+- **`plans/`** are working plans; each carries its own status. A plan whose work has shipped
+  and that nothing cites is deleted (git history keeps it). The ones kept are still cited
+  from code or docs. New scratch drafts go in `.scratch/`, which is git-ignored.
+- **`records/`** is kept on purpose: the handoffs and reviews hold the measurements behind the
+  tone constants, and the code cites them.
 
 When two sources disagree, trust them in this order: **the code** > `CLAUDE.md` >
 `records/handoffs/` > `design/`. Never change code to match a design spec.
@@ -23,7 +27,7 @@ When two sources disagree, trust them in this order: **the code** > `CLAUDE.md` 
 | [`dev/tone-lock.md`](dev/tone-lock.md) | The frozen sound (`tone-v1`): what the tone lock test guards and how the sound may change | maintained |
 | [`dev/tone-signoff.md`](dev/tone-signoff.md) | The tone sign-off protocol: references, gates, how "tone is frozen" is decided | maintained (2026-06; gates in `tools/signoff_gates.json`) |
 | [`../tools/README.md`](../tools/README.md) | The sign-off render and analysis tools | maintained |
-| [`../AI_USAGE.md`](../AI_USAGE.md) | AI addendum: scope of AI usage, the AI-assisted workflow, human authorship, ownership, warranty | maintained |
+| [`../attribution/AI_USAGE.md`](../attribution/AI_USAGE.md) | AI addendum: scope of AI usage, the AI-assisted workflow, human authorship, ownership, warranty | maintained |
 | [`../CLAUDE.md`](../CLAUDE.md) | Detailed engineering notes and pitfalls (written for coding agents, useful to anyone) | maintained |
 
 ## User manual

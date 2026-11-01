@@ -1,6 +1,6 @@
-# Silent Riot — Competitive Roadmap (to an open-source 1.0)
+# Silent Riot — Roadmap to an open-source 1.0
 
-_Created: 2026-06-24 · Version at planning: v0.3.4 · Branch: `claude/plugin-audit-rating-ngbq53`_
+_Created: 2026-06-24 · Version at planning: v0.3.4_
 
 _Checkboxes last checked against the code: 2026-10-23. `[~]` = partial. This is the live
 plan; `docs/records/roadmap-2026-06-audit.md` is archived._
