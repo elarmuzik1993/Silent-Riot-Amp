@@ -1,6 +1,6 @@
 # State
 
-_Updated 2026-11-01 (faceplate screws)_
+_Updated 2026-11-01 (faceplate screws; release punch list)_
 
 ## Now
 - Silent Riot v0.3.4 (JUCE 7 VST3/Standalone), GPL-3.0-or-later, free + optional donations; no tagged
@@ -23,11 +23,17 @@ _Updated 2026-11-01 (faceplate screws)_
    `faceplate-steel.jpg`, credit them in `attribution/CREDITS.md`; confirm `tests/di_sample_82hz.raw` is
    self-recorded; enable private vulnerability reporting; create the `tone` label; delete stale branches
    (keep `main`, `feat/neural-hybrid-blend-sketch`); turn on "Keep my email addresses private".
-3. Owner picks a donation platform → step 9 of `docs/plans/2026-10-28-open-source-docs-prep.md`.
-4. Make `tests/rt_stress.cpp` build on MSVC (`_aligned_malloc`/`_aligned_free`), so full verify runs on Windows.
+3. First release, in order: (a) item 2; (b) fix #41 (preset name vs knobs, host preset changes), #43 (IR
+   panel stale after automation/state load), #45 (window taller than screen); check and close #38/#40
+   (look fixed in code, unverified); (c) item 5 + README hero (#48); (d) bump `CMakeLists.txt` version
+   (suggested v0.4.0: IR projects get louder), date the CHANGELOG *Unreleased*; (e) go public: standard
+   Actions runners are free on public repos, so the `v*` tag can run `release.yml`; else package locally.
+   Installers (#46/#47), macOS (#69), donations, E3 wait until after.
+4. Owner picks a donation platform → step 9 of `docs/plans/2026-10-28-open-source-docs-prep.md`.
 5. Re-shoot the manual's `resources/images/` (still Space Mono) with `sr_editor_snapshot`.
-6. E3: repoint the gate to `tests/fixtures/ir/bright.wav`, fix engine aliasing, owner A/B, `tone-v2`.
-7. Owner questions: delay FEEDBACK default? GRID I reads 0 — keep or read PI? Lamp colour, card weave,
+6. Make `tests/rt_stress.cpp` build on MSVC (`_aligned_malloc`/`_aligned_free`), so full verify runs on Windows.
+7. E3: repoint the gate to `tests/fixtures/ir/bright.wav`, fix engine aliasing, owner A/B, `tone-v2`.
+8. Owner questions: delay FEEDBACK default? GRID I reads 0 — keep or read PI? Lamp colour, card weave,
    jewel size? Cab: light-theme tolex, dim when CAB off, damage amount? Wear on EFFECTS knobs? Wall
    brightness, `kSteelOpacityDark`? Tone lock on Linux: per-platform refs or a noise floor?
 
