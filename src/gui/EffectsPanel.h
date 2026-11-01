@@ -5,19 +5,7 @@
 #include "NotchKnob.h"
 #include "ToggleSwitch.h"
 
-#include <cstdlib>
-
 namespace sr {
-
-// MOCKUP ONLY (not for merge): SR_MOCKUP=1 compact header, 2 legend on the border.
-inline int fxMockup()
-{
-    static const int m = [] {
-        const char* e = std::getenv("SR_MOCKUP");
-        return e == nullptr ? 0 : (e[0] == '1' ? 1 : e[0] == '2' ? 2 : 0);
-    }();
-    return m;
-}
 
 // Collapsible EFFECTS panel — one row of effect "cards":
 //   [ BOOST ] [ DELAY ] [ REVERB ]
@@ -31,14 +19,12 @@ public:
     void paint(juce::Graphics&) override;
     void resized() override;
 
-    // One card row: a jewel-toggle title row over the tallest thing a card
-    // holds — DELAY's SYNC/PP bat-toggle stack, which out-measures the scaled
-    // pointer knobs (kKnobH): kCardH + the 10 px margin either side. Kept in sync with
+    // One card row: a title line on each card's top edge (the jewels sit on
+    // it) over one row of tight-dial knobs, plus the panel's margins. Kept in sync with
     // the card metrics in EffectsPanel.cpp, which static_assert it — a
     // too-short panel shows up as knob values drawn past the bottom edge and
     // silently clipped.
-    static constexpr int panelHeight = 156;
-    static int height() { return fxMockup() == 1 ? 120 : fxMockup() == 2 ? 116 : panelHeight; }
+    static constexpr int panelHeight = 116;
 
     // Styles a knob as an EFFECTS knob: the amp row's satin pointer knob at
     // the cards' scale, name on top, engraved value, handling wear from
@@ -72,8 +58,8 @@ public:
 private:
     // Lay out N knobs centred in a horizontal row inside `row`.
     void layoutKnobRow(juce::Rectangle<int> row, std::initializer_list<NotchKnob*> knobs);
-    // Lay out one card's title toggle + knob row inside `card`.
-    void layoutCard(juce::Rectangle<int> card, ToggleSwitch& tgl,
+    // Lay out one card: its jewels on the title line (right to left), then its knob row.
+    void layoutCard(juce::Rectangle<int> card, std::initializer_list<ToggleSwitch*> toggles,
                     std::initializer_list<NotchKnob*> knobs);
 
     ToggleSwitch boostTgl  { "ON" };

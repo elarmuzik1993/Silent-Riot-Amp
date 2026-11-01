@@ -1,15 +1,16 @@
 # State
 
-_Updated 2026-10-31 (UTILITY knobs beside the meters, slimmer section bars)_
+_Updated 2026-11-01 (compact GUI: UTILITY knobs beside the meters, slim bars, one-row EFFECTS)_
 
 ## Now
 - Silent Riot v0.3.4 (JUCE 7 VST3/Standalone), GPL-3.0-or-later, free + optional donations; no tagged
   release. **Tone frozen at `tone-v1`** (059b209), guarded by `tests/tone_lock_tests.cpp`.
-- ctest 511 (312 pure C++ / 81 JUCE / 118 processor). Windows/MSVC: all passed at 508 (before the
-  3 layout tests). Linux/GCC (2026-10-31): all pass but the 5 tone-lock cases (band deltas at ~−88 dB).
+- ctest 512 (312 pure C++ / 81 JUCE / 119 processor). Windows/MSVC: all passed at 508 (before the
+  4 layout tests). Linux/GCC (2026-11-01): all pass but the 5 tone-lock cases (band deltas at ~−88 dB).
 - GUI: Oxanium font; amp faceplate with satin pointer knobs, bat toggles, worn powder coat + steel photo
   layer; INPUT/THRESH beside the IN meter and OUTPUT/WIDTH beside the OUT meter (were the UTILITY
-  card); EFFECTS is one row, BOOST | DELAY | REVERB, in the same style (SYNC turns DELAY TIME into the division knob); Settings overlay
+  card); EFFECTS is one row, BOOST | DELAY | REVERB, titles on the cards' top edges with the ON/SYNC/PP jewels,
+  tight-dial knobs (SYNC turns DELAY TIME into the division knob); 20 px section bars; Settings overlay
   (two columns, standalone AUDIO INPUT list); IR LOADER opens on a drawn, worn 2x12 cab over a brick wall, LOAD IR at its top left.
 - **Reactive glow**: the cab's piping lights with the output peak (eased 60 ms up / 120 ms down) and
   reddens with compression; the amp lamp's bloom breathes. Soft halo from a cached blurred mask
@@ -45,5 +46,5 @@ _Updated 2026-10-31 (UTILITY knobs beside the meters, slimmer section bars)_
 - GitHub Actions jobs fail in seconds with no steps run (minutes block) since 2026-10-09.
 - `signoff.py`: A1/B1 fail but accepted (frozen); E3 −37.9 dBc open. Sag idles warm; 15W↔7W settles audibly.
 - Projects using an IR play louder (+5.4…+13.1 dB) since the IR level match; in CHANGELOG.
-- GUI: small low-contrast text; EFFECTS + IR LOADER open = 756 px (was 922), no screen clamp.
+- GUI: small low-contrast text; EFFECTS + IR LOADER open = 716 px (was 922), no screen clamp.
 - Some commits on `main` carry a non-noreply email, including GitHub web merges (account default email).

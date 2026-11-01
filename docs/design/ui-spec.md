@@ -194,7 +194,7 @@ The plugin is a vertical stack of sections. Each section is full-width.
 ├─────────┴───────────────────────────────────┴───────────┤
 │  EFFECTS SECTION BAR                         h=20px     │
 ├─────────────────────────────────────────────────────────┤
-│  EFFECTS PANEL (collapsible)                 h=0–156px  │
+│  EFFECTS PANEL (collapsible)                 h=0–116px  │
 ├─────────────────────────────────────────────────────────┤
 │  IR LOADER SECTION BAR                       h=20px     │
 ├─────────────────────────────────────────────────────────┤
@@ -625,19 +625,20 @@ saved state — a session saved with it engaged would reopen silent.
 ### 5.10 Effects Panel
 
 Collapsible row of three effect "cards" (`EffectsPanel.h/.cpp`), `panelHeight`
-156px:
+116px:
 
 ```
-┌ BOOST ─────── ON ┐ ┌ DELAY ─────────────── ON ┐ ┌ REVERB ────── ON ┐
-│ LEVEL TIGHT BRIGHT│ │ SYNC                     │ │ MIX  SIZE  TONE  │
-│                   │ │ PP   TIME FBK  MIX  TONE │ │                  │
-└───────────────────┘ └──────────────────────────┘ └──────────────────┘
+╭[BOOST]─────── ON◉╮ ╭[DELAY]──── SYNC◉ PP◉ ON◉╮ ╭[REVERB]────── ON◉╮
+│ LEVEL TIGHT BRIGHT│ │ TIME  FBK  MIX  TONE     │ │ MIX  SIZE  TONE  │
+╰───────────────────╯ ╰──────────────────────────╯ ╰──────────────────╯
 ```
 
+- The title line sits on the card's top edge, like a legend: the title (`small`
+  bold, accent) on a chip of panel background, the jewel toggles on the same line.
 - Cards hug their contents (54px per knob) and the row is centred; 12px gap.
-- **DELAY** is bespoke: SYNC over PP as bat toggles before TIME; SYNC turns TIME
-  into the division selector.
-- BOOST and REVERB use the standard title-strip-plus-ON-toggle card.
+- Knobs use tight dials: the name sits on the ticks and the value under the knob.
+- **DELAY**: SYNC and PP are jewels beside ON; SYNC turns TIME into the division
+  selector.
 - The gate, width and INPUT/OUTPUT trims sit beside the meters (§4.2), not here.
 
 ---

@@ -9,7 +9,8 @@
 //     panel, sit between their meter and the faceplate, don't overlap, and
 //     still drive their parameters.
 //   - Every EFFECTS control lies inside the panel and no two overlap, so the
-//     one-row cards clip nothing.
+//     one-row cards clip nothing; SYNC and PP are jewels on DELAY's title line.
+//   - A tight dial (NotchKnob::setTightDial) keeps its size in less height.
 // ═══════════════════════════════════════════════════════════════
 
 #include "processor_harness.h"
@@ -177,4 +178,36 @@ TEST_CASE("Layout: EFFECTS holds one row of controls, all inside it, none overla
     const auto knobs = findAll<sr::NotchKnob>(fx);
     for (auto* k : knobs)
         CHECK(k->getBottom() == knobs.front()->getBottom());
+
+    // Every toggle is a jewel on a card's title line, above the knobs.
+    for (auto* t : findAll<sr::ToggleSwitch>(fx))
+    {
+        CHECK(t->getHeight() >= sr::ToggleSwitch::minHeight(sr::ToggleSwitch::Style::Jewel));
+        CHECK(t->getBottom() <= knobs.front()->getY());
+    }
+}
+
+TEST_CASE("Layout: a tight dial keeps its size and sits between its name and value", "[gui][layout]")
+{
+    juce::ScopedJuceInitialiser_GUI juceInit;
+    sr::NotchKnob plain{ "LEVEL", 0.5f }, tight{ "LEVEL", 0.5f };
+    for (auto* k : { &plain, &tight })
+        sr::EffectsPanel::styleKnob(*k, 1);
+    plain.setSize(54, 80);   // the EFFECTS knob before tight dials
+    tight.setTightDial(true);
+    tight.setSize(54, 66);   // and after: 14 px shorter
+
+    // No smaller a dial in less height
+    CHECK(tight.getSlider().getWidth() >= plain.getSlider().getWidth());
+
+    // What drawRotarySlider paints (ticks to skirt) clears the name above it
+    // and the engraved value below it.
+    const auto side = static_cast<float>(tight.getSlider().getWidth());
+    const float paintedTop = tight.getSlider().getY() + side * (0.5f - sr::NotchKnob::kDialTopReach);
+    const float paintedBottom = paintedTop + sr::NotchKnob::tightDialHeight(side);
+    const float scale = sr::EffectsPanel::knobScale;
+    const float nameH  = juce::jmax(14.0f, 14.0f * scale);                          // labelHFor
+    const float valueH = juce::jmax(14.0f, 16.0f * scale) - sr::NotchKnob::kEngravedSaving;  // engraved row
+    CHECK(paintedTop >= nameH);
+    CHECK(paintedBottom <= static_cast<float>(tight.getHeight()) - valueH + 0.5f);
 }
