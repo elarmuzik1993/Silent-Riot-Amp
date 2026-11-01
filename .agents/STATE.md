@@ -9,7 +9,7 @@ _Updated 2026-11-01 (compact GUI: UTILITY knobs beside the meters, slim bars, on
   4 layout tests). Linux/GCC (2026-11-01): all pass but the 5 tone-lock cases (band deltas at ~−88 dB).
 - GUI: Oxanium font; amp faceplate with satin pointer knobs, bat toggles, worn powder coat + steel photo
   layer; INPUT/THRESH beside the IN meter and OUTPUT/WIDTH beside the OUT meter (were the UTILITY
-  card); EFFECTS is one row, BOOST | DELAY | REVERB, titles on the cards' top edges with the ON/SYNC/PP jewels,
+  card); EFFECTS is one row, BOOST | DELAY | REVERB, titles and the ON/SYNC/PP jewels on a line inside each plate,
   tight-dial knobs (SYNC turns DELAY TIME into the division knob); 20 px section bars; Settings overlay
   (two columns, standalone AUDIO INPUT list); IR LOADER opens on a drawn, worn 2x12 cab over a brick wall, LOAD IR at its top left.
 - **Reactive glow**: the cab's piping lights with the output peak (eased 60 ms up / 120 ms down) and
