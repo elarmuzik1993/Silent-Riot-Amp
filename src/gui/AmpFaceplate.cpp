@@ -504,7 +504,7 @@ static void paintGrunge(juce::Graphics& g, juce::Rectangle<float> b, float radiu
 
 // A photo of scratched, rust-streaked steel supplied by the owner
 // (`resources/textures/faceplate-steel.jpg`; source to confirm and credit in
-// CREDITS.md before the repo goes public), laid over the powder coat as a
+// attribution/CREDITS.md before the repo goes public), laid over the powder coat as a
 // layer. Not pasted opaque, which would turn the plate silver: each pixel's
 // opacity follows how far it stands out from its surroundings, so the flat
 // steel only tints the coat a little while the scratches, the rust streak and

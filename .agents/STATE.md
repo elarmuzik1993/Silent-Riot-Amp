@@ -21,7 +21,7 @@ _Updated 2026-10-31 (soft cab glow)_
 ## Next
 1. Owner: tag the tone-lock merge commit `tone-v1` and push the tag (`docs/dev/tone-lock.md`).
 2. Owner, before going public: confirm the source/licence of `resources/textures/brick-wall.jpg` and
-   `faceplate-steel.jpg` and credit them in CREDITS.md; confirm `tests/di_sample_82hz.raw` is
+   `faceplate-steel.jpg` and credit them in attribution/CREDITS.md; confirm `tests/di_sample_82hz.raw` is
    self-recorded; enable private vulnerability reporting; create the `tone` label; delete stale branches
    (keep `main`, `feat/neural-hybrid-blend-sketch`); turn on GitHub "Keep my email addresses private".
 3. Owner picks a donation platform → step 9 of `docs/plans/2026-10-28-open-source-docs-prep.md`.

@@ -11,7 +11,7 @@
 - **DSP Spec**: `docs/design/dsp-model-spec-v2.13.md` — the original design rationale (circuit, voltage domain, numerical hygiene, why tube feel works). **Not authoritative**: unmaintained since 2026-03, and its constants and several core designs (LTP solver, gain taper, grid conduction, sag, tone stack) are superseded. Where it disagrees with the code, the code, this file and `docs/records/handoffs/handoff-*.md` win. Never "fix" code to match it
 - **UI Spec**: `docs/design/ui-spec.md` — layout, components, colours, typography, JUCE painting strategy
 - **UI Prototype**: `docs/design/ui-prototype.jsx` — early React visual reference, frozen since 2026-06. **Out of date**: still shows the old notch-pointer knob and has no tuner, EFFECTS panel or level trims. For anything it disagrees on, `src/gui/` and the UI spec win
-- **Credits**: `CREDITS.md` — originality statement, Koren equation sourcing, third-party library licenses; confirms no code copied from Guitarix/SwankyAmp/ChowDSP/NAM
+- **Credits**: `attribution/CREDITS.md` — originality statement, Koren equation sourcing, third-party library licenses; confirms no code copied from Guitarix/SwankyAmp/ChowDSP/NAM
 
 ## Architecture
 

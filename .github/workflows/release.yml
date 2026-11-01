@@ -54,7 +54,7 @@ jobs:
           cp -r "build/SilentRiot_artefacts/Release/Standalone/." "$STAGE/"
           cp README.md LICENSE "$STAGE/" 2>/dev/null || true
           # The fonts are embedded in the binary; OFL 1.1 needs their licences to travel with it.
-          cp CREDITS.md resources/fonts/OFL-*.txt "$STAGE/"
+          cp attribution/CREDITS.md resources/fonts/OFL-*.txt "$STAGE/"
           tar -czf "${STAGE}.tar.gz" "$STAGE"
           sha256sum "${STAGE}.tar.gz" > "${STAGE}.tar.gz.sha256"
       # - name: Sign (placeholder — requires GPG secret) ...
@@ -92,7 +92,7 @@ jobs:
           Copy-Item -Recurse "build\SilentRiot_artefacts\Release\Standalone\*" $stage
           Copy-Item README.md, LICENSE $stage -ErrorAction SilentlyContinue
           # The fonts are embedded in the binary; OFL 1.1 needs their licences to travel with it.
-          Copy-Item CREDITS.md, resources\fonts\OFL-*.txt $stage -ErrorAction Stop
+          Copy-Item attribution\CREDITS.md, resources\fonts\OFL-*.txt $stage -ErrorAction Stop
           Compress-Archive -Path "$stage\*" -DestinationPath "$stage.zip" -Force
           (Get-FileHash "$stage.zip" -Algorithm SHA256).Hash | Out-File "$stage.zip.sha256"
       - name: Upload package
