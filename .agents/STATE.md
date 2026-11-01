@@ -1,12 +1,12 @@
 # State
 
-_Updated 2026-11-01 (compact GUI layout; faceplate screws; release punch list)_
+_Updated 2026-11-01 (compact GUI layout merged; faceplate screws; release punch list)_
 
 ## Now
 - Silent Riot v0.3.4 (JUCE 7 VST3/Standalone), GPL-3.0-or-later, free + optional donations; no tagged
   release. **Tone frozen at `tone-v1`** (059b209), guarded by `tests/tone_lock_tests.cpp`.
-- ctest 509/509 on Windows/MSVC (2026-11-01). On Linux/GCC the 5 tone-lock cases fail (band deltas
-  −84…−100 dB; last checked before the texture tests).
+- ctest 513/513 on Windows/MSVC (2026-11-01, after the compact layout). On Linux/GCC the 5 tone-lock
+  cases fail (band deltas ~−88 dB, per PR #66; unverified here).
 - GUI: Oxanium font; amp faceplate with satin pointer knobs, bat toggles, worn powder coat + steel photo
   layer, polished dark-gunmetal Phillips corner screws (top right lightly rusted with a short drip, bottom
   left flecked); INPUT/THRESH beside the IN meter, OUTPUT/WIDTH beside the OUT meter (were the UTILITY card);
@@ -57,4 +57,5 @@ _Updated 2026-11-01 (compact GUI layout; faceplate screws; release punch list)_
 - Projects using an IR play louder (+5.4…+13.1 dB) since the IR level match; in CHANGELOG.
 - GUI: small low-contrast text; EFFECTS + IR LOADER open = 716 px (was 922), no screen clamp.
 - `sr_editor_snapshot scale=` takes the UI-scale *index* (3 = 1.5×), not a factor.
-- Some commits on `main` carry a non-noreply email, including GitHub web merges (account default email).
+- Some commits on `main` carry a non-noreply email, including GitHub web merges (account default email;
+  `gh pr merge --author-email` rejects the noreply address). Fix: owner turns on email privacy.
