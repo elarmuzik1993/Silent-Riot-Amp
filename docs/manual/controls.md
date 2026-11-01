@@ -43,7 +43,7 @@ EL84 amp:
   drops as you play hard and recovers when you let a chord ring), more give and
   bloom on the attack.
 
-VOLUME does change loudness, but use the **OUTPUT** trim (EFFECTS → UTILITY) or
+VOLUME does change loudness, but use the **OUTPUT** trim (beside the OUT meter) or
 your host fader to set the final level, and VOLUME to set how much the power
 section works.
 
@@ -76,7 +76,9 @@ reverb tails, so nothing from before power-off replays.
 ## Meters
 
 The **IN** meter (left) shows the input after the INPUT trim; the **OUT** meter
-(right) shows the final output after the OUTPUT trim. Both read RMS level on a dB
+(right) shows the final output after the OUTPUT trim. Each has two knobs beside
+it — INPUT and the noise gate's THRESH on the left, OUTPUT and the stereo WIDTH
+on the right ([Effects](effects.md#beside-the-meters)). Both read RMS level on a dB
 scale, −60 to 0 dBFS from bottom to top: green to −18, yellow to −9, red above. Ballistics
 and peak hold are set in [Settings](presets-and-settings.md#settings).
 

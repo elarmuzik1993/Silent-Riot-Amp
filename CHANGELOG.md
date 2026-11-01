@@ -18,6 +18,11 @@ tagged release will collect everything below.
 - CREDITS and AI_USAGE moved into `attribution/` (`attribution/CREDITS.md`, `attribution/AI_USAGE.md`). Release bundles still ship CREDITS.md at their top level.
 - The IR LOADER now sits directly under the amp, above EFFECTS, so the head and its cab read
   as one rig; Tab reaches the IR LOADER bar before the EFFECTS controls.
+- A more compact window: 716 px instead of 922 with IR LOADER and EFFECTS open. The UTILITY card
+  is gone: INPUT and THRESH sit beside the IN meter, OUTPUT and WIDTH beside the OUT meter. EFFECTS
+  is one row (BOOST | DELAY | REVERB), DELAY's SYNC and PP are jewels beside its ON, the section
+  bars are slimmer, and LOAD IR moves to the IR LOADER's top left. Layout only: no parameter,
+  saved-session or sound change [#66].
 - DELAY: the row of sync-division buttons is gone. A **SYNC** bat toggle, stacked over PP
   on the card's left like the amp's 7W/CAB/PWR switches, turns the TIME knob into the
   division selector (1/16 to 1/2, one click per division); with SYNC off it sets

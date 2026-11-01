@@ -70,8 +70,24 @@ void NotchKnob::resized()
     {
         area.removeFromBottom(juce::roundToInt(stripH()));
     }
+    if (tightDial)
+    {
+        // Size the square by its painted extent and hang it from the area's
+        // top: its blank margins spill into the strips, which hold only text.
+        const int side = juce::jmin(area.getWidth(),
+                                    static_cast<int>(area.getHeight() / tightDialHeight(1.0f)));
+        const int top  = area.getY() - juce::roundToInt(side * (0.5f - kDialTopReach));
+        slider.setBounds(area.getCentreX() - side / 2, top, side, side);
+        return;
+    }
     const int side = juce::jmin(area.getWidth(), area.getHeight());
     slider.setBounds(area.withSizeKeepingCentre(side, side));
+}
+
+void NotchKnob::setTightDial(bool tight)
+{
+    tightDial = tight;
+    resized();
 }
 
 void NotchKnob::paint(juce::Graphics& g)

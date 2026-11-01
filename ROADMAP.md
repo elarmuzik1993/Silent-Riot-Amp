@@ -148,7 +148,7 @@ The finishing layer that separates "works" from "feels premium."
   presets are "starter values" (ROADMAP P2). For a boutique amp, presets are the
   first impression — they demo the sound instantly. Name them by use-case/feel.
 - [x] **[M] Front-of-amp essentials** (kept minimal, per depth-over-breadth):
-  - [x] **Noise gate** _(done: `NoiseGate.h`, UTILITY card)_ — near-essential for high-gain guitar; its absence is conspicuous.
+  - [x] **Noise gate** _(done: `NoiseGate.h`, THRESH beside the IN meter)_ — near-essential for high-gain guitar; its absence is conspicuous.
   - [x] **Boost / tight EQ** _(done: `Boost.h`, level/tight/bright)_ in front — very on-brand for an EL84 amp (everyone runs a
     Tubescreamer into a Vox/Orange). High value, low scope. _Optional but recommended._
 - [ ] **[M] GUI finish.** Fine-tune the light theme (functional but not polished),
@@ -156,8 +156,8 @@ The finishing layer that separates "works" from "feels premium."
   Settings close-X), and clean up the remaining layout magic-number ladders
   (`PluginEditor.cpp` paint/resized).
 - [x] **[M] Global output trim + clear metering** so users can level-match the plugin in
-  a mix (done, USE-59) — INPUT (±12dB) and OUTPUT (silence..+12dB) gain-staging trims in
-  the UTILITY card; input/output level meters read post-trim.
+  a mix (done, USE-59) — INPUT (±12dB) and OUTPUT (silence..+12dB) gain-staging trims beside
+  the meters (the UTILITY card until 2026-10-31); input/output level meters read post-trim.
 
 **Exit criteria:** presets that sell the sound; a gate (and ideally a boost); a GUI with
 no rough edges; level-matchable output.

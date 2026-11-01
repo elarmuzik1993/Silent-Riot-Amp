@@ -1,7 +1,9 @@
 # Effects
 
-Open the **EFFECTS** bar under the amp to show four cards. Everything here is
-off or neutral by default, and an effect that is off is skipped completely —
+Open the **EFFECTS** bar under the amp to show three cards: BOOST, DELAY and
+REVERB. The noise gate, the stereo widener and the INPUT/OUTPUT trims are not in
+the panel: they sit beside the level meters, either side of the amp. Everything
+here is off or neutral by default, and an effect that is off is skipped completely —
 it costs nothing and does not touch the sound.
 
 ![Effects panel](../../resources/images/effects-panel.png)
@@ -15,9 +17,11 @@ INPUT trim → Gate → Boost → [ amp + cab ] → Delay → Reverb → Width �
 The gate and boost are in front of the amp, like pedals on the floor; delay and
 reverb come after the cabinet, like a studio effects send.
 
-## UTILITY
+## Beside the meters
 
-Four knobs with no on/off switch: each is neutral at its default.
+Four knobs with no on/off switch, each neutral at its default: **INPUT** over
+**THRESH** next to the IN meter (left), **OUTPUT** over **WIDTH** next to the
+OUT meter (right).
 
 ### THRESH — noise gate
 

@@ -106,6 +106,12 @@ private:
     sr::NotchKnob gainKnob{"GAIN", 0.6f};
     sr::NotchKnob toneKnob{"SHAPE", 0.5f};
     sr::NotchKnob volumeKnob{"VOLUME", 0.5f};
+    // Beside the meters (were the EFFECTS panel's UTILITY card); all four are
+    // autonomous: the gate and width self-gate at 0, the trims are unity at centre.
+    sr::NotchKnob inputTrimKnob {"INPUT",  0.5f};   // centre = unity, ±12 dB
+    sr::NotchKnob gateKnob      {"THRESH", 0.0f};
+    sr::NotchKnob outputTrimKnob{"OUTPUT", 0.5f};   // centre = unity, silence..+12 dB
+    sr::NotchKnob widthKnob     {"WIDTH",  0.0f};   // 0 = off (dry), 10 = wide
 
     // Toggles
     sr::ToggleSwitch halfPowerToggle{"7W"};
@@ -156,7 +162,17 @@ private:
     static constexpr int kHeaderH   = 38;
     static constexpr int kTunerH    = sr::TunerBar::barHeight;  // always-visible live tuner
     static constexpr int kBodyH     = 198;
-    static constexpr int kSectionH  = 26;
+    // The meter columns either side of the faceplate: the meter plus a stack
+    // of two knobs (see layoutContent). Each knob must hold its name, a dial
+    // big enough for the pointer bar and its value; the pair must fit the body.
+    static constexpr int kSideColW    = 104;
+    static constexpr int kSideKnobH   = 84;
+    static constexpr int kSideKnobGap = 10;
+    static_assert(kSideKnobH >= sr::NotchKnob::stripHeight(sr::EffectsPanel::knobScale, true) + 52,
+                  "the meter-column knobs are too short for their name, dial and value");
+    static_assert(2 * kSideKnobH + kSideKnobGap <= kBodyH - 4,
+                  "the meter-column knob stack no longer fits the amp row");
+    static constexpr int kSectionH  = 20;   // IR LOADER, EFFECTS, ADVANCED bars (was 26)
     static constexpr int kFooterH   = 30;
     // 3 section bars: EFFECTS, IR LOADER, ADVANCED
     static constexpr int kBaseH     = kHeaderH + kTunerH + kBodyH + kSectionH * 3 + kFooterH;

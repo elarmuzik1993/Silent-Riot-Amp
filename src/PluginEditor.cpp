@@ -143,6 +143,16 @@ SilentRiotEditor::SilentRiotEditor(SilentRiotProcessor& p)
         k->getSlider().getProperties().set(sr::SilentRiotLookAndFeel::kPointerKnobProperty, true);
         k->getSlider().getProperties().set(sr::SilentRiotLookAndFeel::kKnobWearProperty, wearSeed++);
     }
+    // Gate and INPUT trim beside the input meter, width and OUTPUT trim beside
+    // the output meter: the input-side and output-side controls sit at their
+    // end of the signal, outside the amp. Styled as the EFFECTS knobs (they
+    // lived in its UTILITY card), with the wear seeds they had there.
+    sr::EffectsPanel::styleKnob(gateKnob,       100);
+    sr::EffectsPanel::styleKnob(widthKnob,      101);
+    sr::EffectsPanel::styleKnob(inputTrimKnob,  102);
+    sr::EffectsPanel::styleKnob(outputTrimKnob, 103);
+    for (auto* k : { &inputTrimKnob, &gateKnob, &outputTrimKnob, &widthKnob })
+        contentArea.addAndMakeVisible(*k);
     contentArea.addAndMakeVisible(halfPowerToggle);
     contentArea.addAndMakeVisible(cabSimToggle);
     contentArea.addAndMakeVisible(powerToggle);
@@ -280,7 +290,7 @@ SilentRiotEditor::SilentRiotEditor(SilentRiotProcessor& p)
     tunerMuteA = std::make_unique<ButtonA>(proc.apvts, IDs::TUNER_MUTE, tuner.getMuteButton());
 
     // Effects module attachments
-    gateThreshA  = std::make_unique<SliderA>(proc.apvts, IDs::GATE_THRESHOLD, effectsPanel.gateThreshKnob().getSlider());
+    gateThreshA  = std::make_unique<SliderA>(proc.apvts, IDs::GATE_THRESHOLD, gateKnob.getSlider());
     boostOnA     = std::make_unique<ButtonA>(proc.apvts, IDs::BOOST_ON,       effectsPanel.boostToggle().getButton());
     boostLevelA  = std::make_unique<SliderA>(proc.apvts, IDs::BOOST_LEVEL,    effectsPanel.boostLevelKnob().getSlider());
     boostTightA  = std::make_unique<SliderA>(proc.apvts, IDs::BOOST_TIGHT,    effectsPanel.boostTightKnob().getSlider());
@@ -296,11 +306,9 @@ SilentRiotEditor::SilentRiotEditor(SilentRiotProcessor& p)
     reverbMixA   = std::make_unique<SliderA>(proc.apvts, IDs::REVERB_MIX,     effectsPanel.reverbMixKnob().getSlider());
     reverbSizeA  = std::make_unique<SliderA>(proc.apvts, IDs::REVERB_SIZE,    effectsPanel.reverbSizeKnob().getSlider());
     reverbToneA  = std::make_unique<SliderA>(proc.apvts, IDs::REVERB_TONE,    effectsPanel.reverbToneKnob().getSlider());
-    widthA       = std::make_unique<SliderA>(proc.apvts, IDs::WIDTH,          effectsPanel.widthKnob().getSlider());
-    inputLevelA  = std::make_unique<SliderA>(proc.apvts, IDs::INPUT_LEVEL,
-                                             effectsPanel.inputLevelKnob().getSlider());
-    outputLevelA = std::make_unique<SliderA>(proc.apvts, IDs::OUTPUT_LEVEL,
-                                             effectsPanel.outputLevelKnob().getSlider());
+    widthA       = std::make_unique<SliderA>(proc.apvts, IDs::WIDTH,          widthKnob.getSlider());
+    inputLevelA  = std::make_unique<SliderA>(proc.apvts, IDs::INPUT_LEVEL,    inputTrimKnob.getSlider());
+    outputLevelA = std::make_unique<SliderA>(proc.apvts, IDs::OUTPUT_LEVEL,   outputTrimKnob.getSlider());
 
     // Keyboard focus and accessibility.
     // Knobs: the (invisible) slider is the focusable leaf. Toggles: the
@@ -324,29 +332,41 @@ SilentRiotEditor::SilentRiotEditor(SilentRiotProcessor& p)
     cabSimToggle.setTooltip("Cabinet simulation on/off");
     powerToggle.setTooltip("Amp power on/off");
 
-    // Tab order: preset → knobs → toggles → section bars (gear & panels follow)
+    // Tab order: preset → the amp row left to right (input column, the amp
+    // knobs, output column) → toggles → section bars (gear & panels follow)
     header.getPresetSelector().setExplicitFocusOrder(1);
-    gs.setExplicitFocusOrder(2);
-    ts.setExplicitFocusOrder(3);
-    vs.setExplicitFocusOrder(4);
-    halfPowerToggle.setExplicitFocusOrder(5);
-    cabSimToggle.setExplicitFocusOrder(6);
-    powerToggle.setExplicitFocusOrder(7);
+    {
+        struct SideKnob { sr::NotchKnob* knob; int order; const char* title; const char* description; };
+        for (auto [k, order, title, description] : {
+                 SideKnob{ &inputTrimKnob,  2, "Input trim",     "Input gain trim, unity at centre" },
+                 SideKnob{ &gateKnob,       3, "Gate threshold", "Noise gate threshold, 0 off to 10" },
+                 SideKnob{ &outputTrimKnob, 7, "Output trim",    "Output gain trim, unity at centre" },
+                 SideKnob{ &widthKnob,      8, "Stereo width",   "Stereo width, 0 off to 10 wide" } })
+        {
+            auto& s = k->getSlider();
+            s.setWantsKeyboardFocus(true);
+            s.setExplicitFocusOrder(order);
+            s.setTitle(title);
+            s.setDescription(description);
+        }
+    }
+    gs.setExplicitFocusOrder(4);
+    ts.setExplicitFocusOrder(5);
+    vs.setExplicitFocusOrder(6);
+    halfPowerToggle.setExplicitFocusOrder(9);
+    cabSimToggle.setExplicitFocusOrder(10);
+    powerToggle.setExplicitFocusOrder(11);
     // The IR LOADER sits directly under the amp, so its bar comes next; then
     // the EFFECTS section and its controls
-    irSectionBar.setExplicitFocusOrder(8);
-    fxSectionBar.setExplicitFocusOrder(9);
+    irSectionBar.setExplicitFocusOrder(12);
+    fxSectionBar.setExplicitFocusOrder(13);
     {
-        int order = 10;
+        int order = 14;
         // Titles are qualified by effect — several cards share a knob name
         // (MIX, TONE), and the visible label is a sibling of the slider, so a
         // screen reader has nothing else to disambiguate them with.
         struct FxKnob { sr::NotchKnob* knob; const char* title; const char* description; };
         for (auto [k, title, description] : {
-                 FxKnob{ &effectsPanel.gateThreshKnob(),  "Gate threshold",  "Noise gate threshold, 0 off to 10" },
-                 FxKnob{ &effectsPanel.widthKnob(),       "Stereo width",    "Stereo width, 0 off to 10 wide" },
-                 FxKnob{ &effectsPanel.inputLevelKnob(),  "Input trim",      "Input gain trim, unity at centre" },
-                 FxKnob{ &effectsPanel.outputLevelKnob(), "Output trim",     "Output gain trim, unity at centre" },
                  FxKnob{ &effectsPanel.boostLevelKnob(),  "Boost level",     "Boost level, 0 to 10" },
                  FxKnob{ &effectsPanel.boostTightKnob(),  "Boost tight",     "Boost low cut, 0 to 10" },
                  FxKnob{ &effectsPanel.boostBrightKnob(), "Boost bright",    "Boost high boost, 0 to 10" },
@@ -374,7 +394,7 @@ SilentRiotEditor::SilentRiotEditor(SilentRiotProcessor& p)
 
     // This literal is NOT derived from the `order` variable above (which goes
     // out of scope at the closing brace of that block) — it is hand-set to
-    // continue the sequence it produces (10 + 14 knobs + 5 toggles = 29).
+    // continue the sequence it produces (14 + 10 knobs + 5 toggles = 29).
     // Adding a control to the list above shifts it, so it must shift too.
     advSectionBar.setExplicitFocusOrder(29);
 
@@ -812,16 +832,28 @@ void SilentRiotEditor::layoutContent()
 
     auto body = area.removeFromTop(kBodyH);
     int vuW = 40;
-
-    vuIn.setBounds(body.removeFromLeft(vuW).reduced(8, 20));
-    vuOut.setBounds(body.removeFromRight(vuW).reduced(8, 20));
+    // Input column left, output column right: the meter on the outer edge, its
+    // two knobs stacked beside it (INPUT over the gate, OUTPUT over WIDTH).
+    auto inCol  = body.removeFromLeft(kSideColW).reduced(0, 2);
+    auto outCol = body.removeFromRight(kSideColW).reduced(0, 2);
+    vuIn.setBounds(inCol.removeFromLeft(vuW).reduced(8, 18));
+    vuOut.setBounds(outCol.removeFromRight(vuW).reduced(8, 18));
+    const auto stackKnobs = [](juce::Rectangle<int> col, sr::NotchKnob& top, sr::NotchKnob& bottom) {
+        // Each knob gets kSideKnobH, the pair centred top to bottom, so the
+        // first knob's value and the second's name keep a clear gap.
+        col = col.withSizeKeepingCentre(col.getWidth(), 2 * kSideKnobH + kSideKnobGap);
+        top.setBounds(col.removeFromTop(kSideKnobH));
+        bottom.setBounds(col.removeFromBottom(kSideKnobH));
+    };
+    stackKnobs(inCol, inputTrimKnob, gateKnob);
+    stackKnobs(outCol, outputTrimKnob, widthKnob);
     const auto plate = body.reduced(8, 8);
     faceplate.setBounds(plate);
 
     // SHAPE sits dead centre on the faceplate with GAIN and VOLUME a fixed pitch
     // either side. The toggles stay a tight group under SHAPE, so they read as
     // secondary to the knobs.
-    constexpr int dialW = 80, knobPitch = 155;
+    constexpr int dialW = 80, knobPitch = 148;
     const float plateCentreX = static_cast<float>(plate.getX()) + plate.getWidth() * 0.5f;
     const auto columnX = [&](int i) {
         return plateCentreX + static_cast<float>(knobPitch * (i - 1));
