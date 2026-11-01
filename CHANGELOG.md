@@ -15,6 +15,7 @@ tagged release will collect everything below.
 
 ### Changed
 
+- CREDITS and AI_USAGE moved into `attribution/` (`attribution/CREDITS.md`, `attribution/AI_USAGE.md`). Release bundles still ship CREDITS.md at their top level.
 - The IR LOADER now sits directly under the amp, above EFFECTS, so the head and its cab read
   as one rig; Tab reaches the IR LOADER bar before the EFFECTS controls.
 - DELAY: the row of sync-division buttons is gone. A **SYNC** bat toggle, stacked over PP
@@ -49,9 +50,9 @@ tagged release will collect everything below.
 - The amp's faceplate now reacts to playing: its orange piping glows with the output level and
   shifts toward red as the amp compresses, and the pilot lamp's glow breathes with it. Visual
   only: nothing about the sound, presets or saved sessions changes, and the window does not grow.
-- `AI_USAGE.md`, an AI addendum: the scope of AI usage, the AI-assisted workflow, the
+- `attribution/AI_USAGE.md`, an AI addendum: the scope of AI usage, the AI-assisted workflow, the
   author's contributions, ownership of the work and the non-infringement warranty limitation.
-  `CREDITS.md` now says the implementation is AI-assisted.
+  `attribution/CREDITS.md` now says the implementation is AI-assisted.
 - **EFFECTS panel** [#13, #18]:
   - UTILITY card: noise gate, a stereo widener (stereo tracks), and INPUT/OUTPUT level trims [#20].
   - BOOST: LEVEL, TIGHT and BRIGHT.

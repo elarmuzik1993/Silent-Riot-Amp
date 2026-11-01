@@ -5,7 +5,7 @@
 
 Scans:
   * Markdown links [text](path) in tracked *.md files,
-  * backticked repo paths in tracked *.md files (`src/...`, `docs/...`, `CREDITS.md`, ...),
+  * backticked repo paths in tracked *.md files (`src/...`, `docs/...`, `attribution/CREDITS.md`, ...),
   * docs/... paths mentioned in src/, tests/ and tools/.
 
 A `file:line` suffix is stripped. Globs, build directories and URLs are ignored.

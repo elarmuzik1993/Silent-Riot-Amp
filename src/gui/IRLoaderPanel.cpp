@@ -14,7 +14,7 @@ namespace sr {
 // ── The CAB view's backdrop: a brick wall ──
 //
 // A photo of an old wall supplied by the owner (`resources/textures/brick-wall.jpg`,
-// embedded via BinaryData; source to confirm and credit in CREDITS.md before
+// embedded via BinaryData; source to confirm and credit in attribution/CREDITS.md before
 // the repo goes public), scaled to cover the panel and centred. A dark
 // palette gets it dimmed to half with a vignette, so the cab, arrows and text
 // stay the brightest things in the section; a light palette gets it washed
