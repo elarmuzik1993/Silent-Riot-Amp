@@ -162,14 +162,205 @@ void AmpFaceplate::repaintGlow()
                                    bloomR * 2.0f, bloomR * 2.0f).getSmallestIntegerContainer());
 }
 
-static void drawScrew(juce::Graphics& g, float cx, float cy)
+// One corner screw: a polished nickel dome head seated in a countersunk hole,
+// lit from the top left like the plate. `rust` (0..1) eats into the head and
+// bleeds a stain onto the plate around it, with a drip running down from it;
+// 0 is a clean, polished screw. Fixed metal colours in both themes, like the
+// cab's grille: a screw is a real part, not a themed surface. The rust is
+// built per pixel at the physical scale, from noise seeded by `seed`, so it is
+// the same on every launch and sharp at any UI scale.
+struct ScrewLook
 {
-    const float r = 3.5f;
-    g.setGradientFill(juce::ColourGradient(Colours::knobBodyEdge, cx - r, cy - r,
-                                           Colours::knobBody, cx + r, cy + r, false));
-    g.fillEllipse(cx - r, cy - r, r * 2.0f, r * 2.0f);
-    g.setColour(Colours::bg);
-    g.drawLine(cx - r * 0.6f, cy + r * 0.6f, cx + r * 0.6f, cy - r * 0.6f, 1.0f);  // slot
+    float slotAngle;   // radians from horizontal: real screws never line up
+    float rust;        // 0 polished .. 1 badly rusted
+    int seed;
+};
+
+constexpr float kScrewRadius = 4.5f;
+
+static void paintScrewRust(juce::Graphics& g, juce::Point<float> c, const ScrewLook& look,
+                           float scale, juce::Rectangle<float> plate)
+{
+    using namespace texture;
+    const float r = kScrewRadius;
+    const bool darkPanel = Colours::panel.getPerceivedBrightness() < 0.5f;
+    const float stainInk = darkPanel ? 1.0f : 0.55f;  // brown on white reads heavier
+    const juce::Colour deep   = juce::Colour(0xff4a2210);
+    const juce::Colour orange = juce::Colour(0xffa24d1c);
+    const juce::Colour flake  = juce::Colour(0xffc98042);
+    const juce::Colour stain  = juce::Colour(0xff6e3517);
+
+    // Room for the halo around the head and the drip below it
+    const float drip = 6.0f + 9.0f * look.rust;
+    const auto area = juce::Rectangle<float>(c.x - r - 3.0f, c.y - r - 3.0f,
+                                             (r + 3.0f) * 2.0f, (r + 3.0f) * 2.0f + drip);
+    const int pw = juce::jmax(1, juce::roundToInt(area.getWidth() * scale));
+    const int ph = juce::jmax(1, juce::roundToInt(area.getHeight() * scale));
+    const float inv = 1.0f / scale;
+    const float s = static_cast<float>(look.seed);
+
+    juce::Image tex(juce::Image::ARGB, pw, ph, true);
+    {
+        juce::Image::BitmapData out(tex, juce::Image::BitmapData::writeOnly);
+        for (int y = 0; y < ph; ++y)
+            for (int x = 0; x < pw; ++x)
+            {
+                // Offset from the screw's centre, logical px
+                const float dx = area.getX() + (static_cast<float>(x) + 0.5f) * inv - c.x;
+                const float dy = area.getY() + (static_cast<float>(y) + 0.5f) * inv - c.y;
+                const float d = std::sqrt(dx * dx + dy * dy);
+                const float onHead = smoothstep(r + 0.4f, r - 0.4f, d); // antialiased head edge
+
+                const float patch = fbm(dx / 2.4f + s, dy / 2.4f, look.seed, 3);
+                const float grain = fbm(dx / 0.7f, dy / 0.7f + s, look.seed + 7, 2);
+                Px p;
+
+                // On the head: rust takes the rim and the cross recess first, then spreads
+                if (onHead > 0.0f)
+                {
+                    const float u = std::cos(look.slotAngle), v = std::sin(look.slotAngle);
+                    const auto inArm = [&](float au, float av) {
+                        const float across = std::abs(-dx * av + dy * au); // distance from the arm's line
+                        const float along = std::abs(dx * au + dy * av);
+                        return smoothstep(1.4f, 0.4f, across) * smoothstep(r * 0.75f, r * 0.5f, along);
+                    };
+                    const float inSlot = juce::jmax(inArm(u, v), inArm(-v, u));
+                    const float rim = smoothstep(r * 0.55f, r, d);
+                    // At rust 0.5 rim and recess spots; at 0.2 only a few flecks there
+                    const float field = patch + 0.22f * rim + 0.25f * inSlot - 0.86f + 0.45f * look.rust;
+                    const float amount = smoothstep(0.0f, 0.18f, field);
+                    if (amount > 0.0f)
+                    {
+                        p.over(deep, amount * 0.9f);
+                        p.over(orange, amount * smoothstep(0.35f, 0.7f, grain) * 0.8f);
+                        p.over(flake, amount * smoothstep(0.66f, 0.8f, grain) * 0.6f);
+                        // Raised scale: the top-left edge of each crust catches the light
+                        const float lit = grain - fbm((dx + 0.35f) / 0.7f, (dy + 0.35f) / 0.7f + s, look.seed + 7, 2);
+                        p.over(lit < 0.0f ? juce::Colour(0xffe9b07a) : juce::Colour(0xff1a0b04),
+                               amount * juce::jmin(1.0f, std::abs(lit) * 6.0f) * 0.35f);
+                    }
+                    p.a *= onHead;
+                    p.r *= onHead;
+                    p.g *= onHead;
+                    p.b *= onHead;
+                }
+
+                // Off the head: a stain soaked into the coat round the hole, and a
+                // drip that ran down from it, wandering and thinning as it goes
+                if (onHead < 1.0f)
+                {
+                    const float halo = std::exp(-juce::jmax(0.0f, d - r) / 1.6f)
+                                     * (0.45f + 0.9f * patch) * look.rust;
+                    const float wander = (fbm(dy / 5.0f, s, look.seed + 13, 2) - 0.5f) * 2.4f;
+                    const float t = dy / drip;                        // 0 at the centre, 1 at its end
+                    const float width = 1.3f * (1.0f - 0.7f * juce::jlimit(0.0f, 1.0f, t));
+                    const float run = smoothstep(width, 0.0f, std::abs(dx - wander))
+                                    * smoothstep(1.0f, 0.55f, t) * smoothstep(0.0f, 0.4f, dy)
+                                    * (0.6f + 0.6f * grain) * look.rust;
+                    const float soak = juce::jmin(1.0f, halo * 0.75f + run * 0.55f) * stainInk;
+                    if (soak > 0.0f)
+                    {
+                        Px under;
+                        under.over(stain, soak);
+                        under.over(orange, soak * smoothstep(0.55f, 0.8f, grain) * 0.35f);
+                        const float k = 1.0f - onHead;
+                        p.r += under.r * k;
+                        p.g += under.g * k;
+                        p.b += under.b * k;
+                        p.a += under.a * k;
+                    }
+                }
+                out.setPixelColour(x, y, p.colour());
+            }
+    }
+
+    juce::Graphics::ScopedSaveState save(g);
+    juce::Path clip; // keep the stain on the coat, inside the piping
+    clip.addRoundedRectangle(plate.reduced(3.0f), kPlateRadius - 2.0f);
+    g.reduceClipRegion(clip);
+    g.drawImage(tex, area);
+}
+
+static void drawScrew(juce::Graphics& g, juce::Point<float> c, const ScrewLook& look,
+                      float scale, juce::Rectangle<float> plate)
+{
+    using juce::Colours::black;
+    using juce::Colours::white;
+    const float r = kScrewRadius;
+    const auto circle = [c](float rad, float ox = 0.0f, float oy = 0.0f) {
+        return juce::Rectangle<float>(c.x - rad + ox, c.y - rad + oy, rad * 2.0f, rad * 2.0f);
+    };
+    // Dark gunmetal rather than bright nickel (owner: a bit more black), still
+    // polished: the hotspot and rim glint keep the shine
+    const juce::Colour nickelHi  { 0xffb4b8c0 };
+    const juce::Colour nickel    { 0xff555a63 };
+    const juce::Colour nickelLo  { 0xff17181c };
+
+    // The countersunk hole: its upper-left wall in shadow, its lower lip catching light
+    g.setGradientFill(juce::ColourGradient(black.withAlpha(0.75f), c.x - r, c.y - r,
+                                           white.withAlpha(0.18f), c.x + r, c.y + r, false));
+    g.fillEllipse(circle(r + 1.3f));
+
+    // Soft shadow the raised head casts down and to the right
+    g.setColour(black.withAlpha(0.22f));
+    g.fillEllipse(circle(r + 0.9f, 0.9f, 1.7f));
+    g.setColour(black.withAlpha(0.45f));
+    g.fillEllipse(circle(r + 0.2f, 0.5f, 1.0f));
+
+    // Domed head: a radial ramp from a hotspot up and left of centre
+    juce::ColourGradient dome(nickelHi, c.x - r * 0.35f, c.y - r * 0.45f,
+                              nickelLo, c.x + r * 0.9f, c.y + r * 0.9f, true);
+    dome.addColour(0.45, nickel);
+    g.setGradientFill(dome);
+    g.fillEllipse(circle(r));
+
+    // Polished bevel: a dark edge all round, and the plate's light reflected
+    // back into the lower-right rim, the way chrome picks up its surroundings
+    g.setColour(black.withAlpha(0.55f));
+    g.drawEllipse(circle(r - 0.25f), 0.5f);
+    {
+        juce::Path rimGlint;
+        rimGlint.addCentredArc(c.x, c.y, r - 0.85f, r - 0.85f, 0.0f,
+                               juce::degreesToRadians(100.0f), juce::degreesToRadians(190.0f), true);
+        g.setColour(white.withAlpha(0.28f));
+        g.strokePath(rimGlint, juce::PathStrokeType(0.6f, juce::PathStrokeType::curved,
+                                                    juce::PathStrokeType::rounded));
+    }
+
+    // The cross (Phillips) recess: two arms, each with its upper wall in shadow
+    // and the lip below it lit. Both lips go down first, so each arm's dark cut
+    // runs cleanly through the other's lip where they cross.
+    const float u = std::cos(look.slotAngle), v = std::sin(look.slotAngle);
+    const float half = r * 0.62f;
+    const juce::Line<float> arms[2] = {
+        { c.x - u * half, c.y - v * half, c.x + u * half, c.y + v * half },
+        { c.x + v * half, c.y - u * half, c.x - v * half, c.y + u * half },
+    };
+    g.setColour(white.withAlpha(0.45f));
+    for (const auto& arm : arms)
+    {
+        const auto dir = (arm.getEnd() - arm.getStart()) / arm.getLength();
+        juce::Point<float> n(-dir.y, dir.x);       // the arm's normal...
+        if (n.y < 0.0f || (n.y == 0.0f && n.x < 0.0f))
+            n = -n;                                 // ...pointing down the screen
+        g.drawLine({ arm.getStart() + n * 0.8f, arm.getEnd() + n * 0.8f }, 0.45f);
+    }
+    g.setColour(juce::Colour(0xff060607));
+    for (const auto& arm : arms)
+        g.drawLine(arm, 1.15f);
+    // The recess deepens to a point where the arms meet
+    g.setGradientFill(juce::ColourGradient(black.withAlpha(0.8f), c.x, c.y,
+                                           black.withAlpha(0.0f), c.x + 1.3f, c.y, true));
+    g.fillEllipse(c.x - 1.3f, c.y - 1.3f, 2.6f, 2.6f);
+
+    // Specular hotspot on the dome
+    const float hx = c.x - r * 0.38f, hy = c.y - r * 0.45f;
+    g.setGradientFill(juce::ColourGradient(white.withAlpha(0.85f), hx, hy,
+                                           white.withAlpha(0.0f), hx + r * 0.45f, hy, true));
+    g.fillEllipse(hx - r * 0.45f, hy - r * 0.45f, r * 0.9f, r * 0.9f);
+
+    if (look.rust > 0.0f)
+        paintScrewRust(g, c, look, scale, plate);
 }
 
 void AmpFaceplate::paintLamp(juce::Graphics& g, juce::Point<float> c, float r,
@@ -504,7 +695,7 @@ static void paintGrunge(juce::Graphics& g, juce::Rectangle<float> b, float radiu
 
 // A photo of scratched, rust-streaked steel supplied by the owner
 // (`resources/textures/faceplate-steel.jpg`; source to confirm and credit in
-// CREDITS.md before the repo goes public), laid over the powder coat as a
+// attribution/CREDITS.md before the repo goes public), laid over the powder coat as a
 // layer. Not pasted opaque, which would turn the plate silver: each pixel's
 // opacity follows how far it stands out from its surroundings, so the flat
 // steel only tints the coat a little while the scratches, the rust streak and
@@ -593,12 +784,13 @@ void AmpFaceplate::renderPlateCache(float scale)
     paintGrunge(g, b, kPlateRadius, scale);    // amp plate only: the EFFECTS cards share paintPlate, not this
     paintSteelLayer(g, b, kPlateRadius);        // the steel photo over the coat, amp plate only
 
-    // Corner screws
+    // Corner screws: two still polished, two touched by rust (top right more,
+    // with a short drip down the coat; bottom left only flecks)
     const float inset = 10.0f;
-    drawScrew(g, b.getX() + inset, b.getY() + inset);
-    drawScrew(g, b.getRight() - inset, b.getY() + inset);
-    drawScrew(g, b.getX() + inset, b.getBottom() - inset);
-    drawScrew(g, b.getRight() - inset, b.getBottom() - inset);
+    drawScrew(g, { b.getX() + inset, b.getY() + inset },           { 0.62f, 0.0f, 0 }, scale, b);
+    drawScrew(g, { b.getRight() - inset, b.getY() + inset },       { -0.35f, 0.5f, 41 }, scale, b);
+    drawScrew(g, { b.getX() + inset, b.getBottom() - inset },      { 1.18f, 0.22f, 77 }, scale, b);
+    drawScrew(g, { b.getRight() - inset, b.getBottom() - inset },  { 0.12f, 0.0f, 0 }, scale, b);
 }
 
 void AmpFaceplate::paint(juce::Graphics& g)

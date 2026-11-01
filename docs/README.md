@@ -8,7 +8,11 @@ Start here to find the right document, and to know whether you can trust it.
   it is. If one disagrees with the code, the doc is wrong; fix it in the same PR.
 - **`design/`** and **`records/`** are **dated and frozen**. They record what was
   designed or measured at the time, and are not updated as the code moves on.
-- **`plans/`** are working plans; each carries its own status.
+- **`plans/`** are working plans; each carries its own status. A plan whose work has shipped
+  and that nothing cites is deleted (git history keeps it). The ones kept are still cited
+  from code or docs. New scratch drafts go in `.scratch/`, which is git-ignored.
+- **`records/`** is kept on purpose: the handoffs and reviews hold the measurements behind the
+  tone constants, and the code cites them.
 
 When two sources disagree, trust them in this order: **the code** > `CLAUDE.md` >
 `records/handoffs/` > `design/`. Never change code to match a design spec.
@@ -21,9 +25,13 @@ When two sources disagree, trust them in this order: **the code** > `CLAUDE.md` 
 | [`dev/testing.md`](dev/testing.md) | `verify.sh`, the three test targets, the processor test harness | maintained |
 | [`dev/architecture.md`](dev/architecture.md) | Voltage domain, signal chain, source layout, threading, state | maintained |
 | [`dev/tone-lock.md`](dev/tone-lock.md) | The frozen sound (`tone-v1`): what the tone lock test guards and how the sound may change | maintained |
+| [`dev/ir-loader.md`](dev/ir-loader.md) | Cabinet IR loader: threading, level match, cab-mode switcher | maintained |
+| [`dev/gui-architecture.md`](dev/gui-architecture.md) | The 20 GUI components, window strategy, editor timer | maintained |
+| [`dev/dsp-notes.md`](dev/dsp-notes.md) | Tube, LTP, sag, latency and widener implementation; DSP audit; ear-tuning knobs | maintained |
+| [`dev/pitfalls.md`](dev/pitfalls.md) | Every pitfall with the measurements behind it (`CLAUDE.md` has the short rules) | maintained |
 | [`dev/tone-signoff.md`](dev/tone-signoff.md) | The tone sign-off protocol: references, gates, how "tone is frozen" is decided | maintained (2026-06; gates in `tools/signoff_gates.json`) |
 | [`../tools/README.md`](../tools/README.md) | The sign-off render and analysis tools | maintained |
-| [`../AI_USAGE.md`](../AI_USAGE.md) | AI addendum: scope of AI usage, the AI-assisted workflow, human authorship, ownership, warranty | maintained |
+| [`../attribution/AI_USAGE.md`](../attribution/AI_USAGE.md) | AI addendum: scope of AI usage, the AI-assisted workflow, human authorship, ownership, warranty | maintained |
 | [`../CLAUDE.md`](../CLAUDE.md) | Detailed engineering notes and pitfalls (written for coding agents, useful to anyone) | maintained |
 
 ## User manual
@@ -62,6 +70,7 @@ Dated defect investigations and reviews. Each one is a measurement you can re-ru
 | [`records/reviews/review-dsp-2026-10-15-probe.cpp`](records/reviews/review-dsp-2026-10-15-probe.cpp) | The probe program behind that review |
 | [`records/reviews/review-rt-stress-2026-10-29.md`](records/reviews/review-rt-stress-2026-10-29.md) | Real-time stress review, 2026-10-29 (findings RT-1–RT-6): allocations, locks, deadlines, NaN recovery |
 | [`records/roadmap-2026-06-audit.md`](records/roadmap-2026-06-audit.md) | June 2026 engineering audit roadmap (archived; the live plan is [`../ROADMAP.md`](../ROADMAP.md)) |
+| [`records/implementation-history.md`](records/implementation-history.md) | Implementation phases and calibration rounds (moved from `CLAUDE.md`) | frozen |
 
 ## Plans
 

@@ -58,7 +58,7 @@ if command -v python3 >/dev/null; then
         || bad "tools/signoff_gates.json is not valid JSON"
 fi
 
-# 5. Every hand-written source file carries its licence tag (CREDITS.md,
+# 5. Every hand-written source file carries its licence tag (attribution/CREDITS.md,
 #    GPL-3.0-or-later) in its first 3 lines, after any shebang.
 while IFS= read -r f; do
     head -n 3 "$f" | grep -q 'SPDX-License-Identifier: GPL-3.0-or-later' \

@@ -80,7 +80,7 @@ must pass `verify.sh`, and it follows the commit rule above. [`AGENTS.md`](AGENT
 [`CLAUDE.md`](CLAUDE.md) are the project instructions for coding agents, and
 [`.agents/STATE.md`](.agents/STATE.md) is the current-state note they read first. How the
 project itself uses AI, and what you confirm when you contribute AI-assisted work, is in
-[`AI_USAGE.md`](AI_USAGE.md).
+[`attribution/AI_USAGE.md`](attribution/AI_USAGE.md).
 
 ## Releasing
 
