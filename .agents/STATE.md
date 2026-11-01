@@ -5,10 +5,10 @@ _Updated 2026-10-31 (soft cab glow)_
 ## Now
 - Silent Riot v0.3.4 (JUCE 7 VST3/Standalone), GPL-3.0-or-later, free + optional donations; no tagged
   release. **Tone frozen at `tone-v1`** (059b209), guarded by `tests/tone_lock_tests.cpp`.
-- ctest 508 (312 pure C++ / 81 JUCE / 115 processor) all pass on Windows/MSVC (2026-10-31). On
+- ctest 509 (312 pure C++ / 81 JUCE / 116 processor) all pass on Windows/MSVC (2026-11-01). On
   Linux/GCC the 5 tone-lock cases fail (band deltas −84…−100 dB; last checked before the texture tests).
 - GUI: Oxanium font; amp faceplate with satin pointer knobs, bat toggles, worn powder coat + steel photo
-  layer; EFFECTS cards in the same style (SYNC turns DELAY TIME into the division knob); Settings overlay
+  layer, polished dark-gunmetal Phillips corner screws (top right and bottom left lightly rusted); EFFECTS cards in the same style (SYNC turns DELAY TIME into the division knob); Settings overlay
   (two columns, standalone AUDIO INPUT list); IR LOADER opens on a drawn, worn 2x12 cab over a brick wall.
 - **Reactive glow**: the cab's piping lights with the output peak (eased 60 ms up / 120 ms down) and
   reddens with compression; the amp lamp's bloom breathes. Soft halo from a cached blurred mask
