@@ -5,7 +5,7 @@ _Updated 2026-10-31 (soft cab glow)_
 ## Now
 - Silent Riot v0.3.4 (JUCE 7 VST3/Standalone), GPL-3.0-or-later, free + optional donations; no tagged
   release. **Tone frozen at `tone-v1`** (059b209), guarded by `tests/tone_lock_tests.cpp`.
-- ctest 508 (312 pure C++ / 81 JUCE / 115 processor) all pass on Windows/MSVC (2026-10-31). On
+- All three ctest targets pass on Windows/MSVC (2026-10-31). On
   Linux/GCC the 5 tone-lock cases fail (band deltas −84…−100 dB; last checked before the texture tests).
 - GUI: Oxanium font; amp faceplate with satin pointer knobs, bat toggles, worn powder coat + steel photo
   layer; EFFECTS cards in the same style (SYNC turns DELAY TIME into the division knob); Settings overlay
