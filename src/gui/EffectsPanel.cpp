@@ -14,15 +14,16 @@ namespace sr {
 // rather than stretched to fill it — otherwise the knobs float in oversized
 // boxes.
 //
-// The title line sits on the card's top edge, like a legend: the plate starts
-// half a line down, the title is printed on a chip of panel background across
-// its edge, and the jewels sit on the same line. So a card is the title line,
-// one knob row and a bottom pad.
+// The plate covers the whole card: a title line along its top (the title on
+// the left, the jewels right-aligned), one knob row and a bottom pad. Until
+// 2026-11-01 the plate started half a line down, with the title on a chip
+// across its edge like a legend; the owner had the plate extended to hold it.
 namespace {
     constexpr int kCardGap  = 12;
     constexpr int kCardPadX = 10;
     constexpr int kCardPadB = 6;   // under the knob row
-    constexpr int kPanelPadT = 10, kPanelPadB = 8;
+    constexpr int kTitlePadT = 3;  // plate edge to the title line, so the jewels' glow clears it
+    constexpr int kPanelPadT = 10, kPanelPadB = 7;
 
     // The effect knobs are the amp row's satin pointer knobs (name on top, value
     // engraved below) drawn smaller, with tight dials (NotchKnob::setTightDial):
@@ -48,9 +49,9 @@ namespace {
     constexpr int  kToggleH = ToggleSwitch::minHeight(kCardToggleStyle);
     constexpr int  kToggleW = 40;  // a two-letter label + the jewel and its glow
     constexpr int  kSyncW   = 56;  // "SYNC" + the jewel
-    constexpr int  kTitleW  = 64;  // room left for the widest title chip
+    constexpr int  kTitleW  = 64;  // room left for the widest title
 
-    constexpr int kCardH = kToggleH + kKnobH + kCardPadB;
+    constexpr int kCardH = kTitlePadT + kToggleH + kKnobH + kCardPadB;
     static_assert(EffectsPanel::panelHeight >= kPanelPadT + kCardH + kPanelPadB,
                   "panelHeight is shorter than the card row it holds");
 
@@ -132,15 +133,13 @@ void EffectsPanel::paint(juce::Graphics& g)
     for (int i = 0; i < 3; ++i)
     {
         const auto card = cardBounds(getLocalBounds(), i);
-        AmpFaceplate::paintPlate(g, card.withTrimmedTop(kToggleH / 2).toFloat().reduced(0.5f), 5.0f);
+        AmpFaceplate::paintPlate(g, card.toFloat().reduced(0.5f), 5.0f);
 
-        // The title on its top edge, on a chip of panel background
-        const int tw = juce::roundToInt(g.getCurrentFont().getStringWidthFloat(titles[i])) + 10;
-        const juce::Rectangle<int> chip(card.getX() + kCardPadX, card.getY() + 4, tw, kToggleH - 8);
-        g.setColour(Colours::panel);
-        g.fillRoundedRectangle(chip.toFloat(), 3.0f);
+        // The title on the left of the title line, level with the jewels
         g.setColour(Colours::accent);
-        g.drawText(titles[i], chip, juce::Justification::centred, false);
+        g.drawText(titles[i],
+                   card.reduced(kCardPadX + 2, 0).withTrimmedTop(kTitlePadT).removeFromTop(kToggleH),
+                   juce::Justification::centredLeft, false);
     }
 }
 
@@ -160,10 +159,10 @@ void EffectsPanel::layoutKnobRow(juce::Rectangle<int> row, std::initializer_list
 void EffectsPanel::layoutCard(juce::Rectangle<int> card, std::initializer_list<ToggleSwitch*> toggles,
                               std::initializer_list<NotchKnob*> knobs)
 {
-    // The title line on the card's top edge: the jewels right-aligned, listed
+    // The title line along the card's top: the jewels right-aligned, listed
     // right to left (each jewel hugs its component's right edge, so every
     // card's ON lines up on the same vertical); the knob row under it.
-    auto inner = card.reduced(kCardPadX, 0);
+    auto inner = card.reduced(kCardPadX, 0).withTrimmedTop(kTitlePadT);
     auto titleLine = inner.removeFromTop(kToggleH);
     for (auto* t : toggles)
         t->setBounds(titleLine.removeFromRight(t == &delaySyncTgl ? kSyncW : kToggleW));

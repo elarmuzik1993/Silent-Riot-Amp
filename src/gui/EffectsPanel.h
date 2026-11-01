@@ -19,8 +19,8 @@ public:
     void paint(juce::Graphics&) override;
     void resized() override;
 
-    // One card row: a title line on each card's top edge (the jewels sit on
-    // it) over one row of tight-dial knobs, plus the panel's margins. Kept in sync with
+    // One card row: a title line along each card's top (title and jewels)
+    // over one row of tight-dial knobs, plus the panel's margins. Kept in sync with
     // the card metrics in EffectsPanel.cpp, which static_assert it — a
     // too-short panel shows up as knob values drawn past the bottom edge and
     // silently clipped.

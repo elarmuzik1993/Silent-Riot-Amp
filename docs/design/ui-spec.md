@@ -628,13 +628,14 @@ Collapsible row of three effect "cards" (`EffectsPanel.h/.cpp`), `panelHeight`
 116px:
 
 ```
-╭[BOOST]─────── ON◉╮ ╭[DELAY]──── SYNC◉ PP◉ ON◉╮ ╭[REVERB]────── ON◉╮
+╭───────────────────╮ ╭──────────────────────────╮ ╭──────────────────╮
+│ BOOST         ON◉ │ │ DELAY     SYNC◉ PP◉ ON◉  │ │ REVERB       ON◉ │
 │ LEVEL TIGHT BRIGHT│ │ TIME  FBK  MIX  TONE     │ │ MIX  SIZE  TONE  │
 ╰───────────────────╯ ╰──────────────────────────╯ ╰──────────────────╯
 ```
 
-- The title line sits on the card's top edge, like a legend: the title (`small`
-  bold, accent) on a chip of panel background, the jewel toggles on the same line.
+- A title line along the card's top, inside the plate: the title (`small` bold,
+  accent) on the left, the jewel toggles right-aligned.
 - Cards hug their contents (54px per knob) and the row is centred; 12px gap.
 - Knobs use tight dials: the name sits on the ticks and the value under the knob.
 - **DELAY**: SYNC and PP are jewels beside ON; SYNC turns TIME into the division
