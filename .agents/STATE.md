@@ -1,12 +1,12 @@
 # State
 
-_Updated 2026-11-02 (presets removed; save/load/curated presets tracked in #72)_
+_Updated 2026-11-02 (PR #73 merged; #38/#40/#41 closed; #43/#45 ship as known issues)_
 
 ## Now
 - Silent Riot v0.4.0 (JUCE 7 VST3/Standalone), GPL-3.0-or-later, free + optional donations; no tagged
-  release. **Tone frozen at `tone-v1`** (059b209), guarded by `tests/tone_lock_tests.cpp`.
+  release. **Tone frozen at `tone-v1`** (tag on e56ab9f, #55), guarded by `tests/tone_lock_tests.cpp`.
 - ctest 513/513 on Windows/MSVC (2026-11-01, after the compact layout). On Linux/GCC the 5 tone-lock
-  cases fail (band deltas ~−88 dB, per PR #66; unverified here).
+  cases fail: float noise (bands −84…−100 dB, RMS ≤ 2e-4 dB), identical on `main` and PR #73 (2026-11-02).
 - Presets: the 5 factory presets, the header browser and `presetIndex` are gone; the amp opens on its
   defaults. Save/load/curated presets: #72. The 5 old settings live on as test-local data in `tone_lock_tests.cpp`.
 - GUI: Oxanium font; amp faceplate with satin pointer knobs, bat toggles, worn powder coat + steel photo
@@ -15,19 +15,18 @@ _Updated 2026-11-02 (presets removed; save/load/curated presets tracked in #72)_
   EFFECTS one row (BOOST | DELAY | REVERB), titles and ON/SYNC/PP jewels inside each plate, tight-dial knobs;
   20 px section bars; Settings overlay; IR LOADER (LOAD IR at its top left) opens on a drawn, worn 2x12
   cab over a brick wall whose piping glows with the output peak and reddens with compression.
-- Docs: `CLAUDE.md` is rules + a map; detail lives in `docs/dev/`.
-- RT safety: `SilentRiotRTStress` harness (not a ctest). Contributor issues #37–#48 open.
+- RT safety: `SilentRiotRTStress` harness (not a ctest). Open issues: #37, #39, #42–#47, #69, #72.
 - Commit as `Boris Miscenco <219343213+elarmuzik1993@users.noreply.github.com>` via exported
   `GIT_AUTHOR_*`/`GIT_COMMITTER_*` (local git config holds another address).
 
 ## Next
-1. Owner: tag the tone-lock merge commit `tone-v1` and push the tag (`docs/dev/tone-lock.md`).
-2. Owner, before going public: enable private vulnerability reporting; create the `tone` label; delete stale branches
-   (keep `main`, `feat/neural-hybrid-blend-sketch`); turn on "Keep my email addresses private".
-3. First release, in order: (a) item 2; (b) #41 is moot (browser removed; revisit with #72), fix #43 (IR
-   panel stale after automation/state load), #45 (window taller than screen); check and close #38/#40
-   (look fixed in code, unverified); (c) done: images, README hero (#48), version 0.4.0, CHANGELOG
-   dated 2026-11-02 (re-date if the tag slips); (e) go public: standard
+1. Owner, from a local clone (a cloud session can't push tags or create labels): push `tone-v1`
+   (`git tag -a tone-v1 e56ab9f` then `git push origin tone-v1`); create the `tone` label.
+2. Owner, before going public: enable private vulnerability reporting; delete stale branches (keep `main`,
+   `feat/neural-hybrid-blend-sketch`); turn on "Keep my email addresses private" (39 old commits keep the
+   old address either way).
+3. First release: (a) items 1–2; (b) done: #38/#40/#41 closed, #43/#45 deferred (CHANGELOG Known issues),
+   images, README hero (#48), 0.4.0, CHANGELOG dated 2026-11-02 (re-date if the tag slips); (c) go public: standard
    Actions runners are free on public repos, so the `v*` tag can run `release.yml`; else package locally.
    Installers (#46/#47), macOS (#69), donations, E3 wait until after.
 4. Owner picks a donation platform → step 9 of `docs/plans/2026-10-28-open-source-docs-prep.md`.
@@ -54,6 +53,8 @@ _Updated 2026-11-02 (presets removed; save/load/curated presets tracked in #72)_
 - GitHub Actions never runs (minutes block) since 2026-10-09; verify locally. IR projects play louder
   (+5.4…+13.1 dB) since the IR level match (CHANGELOG).
 - `signoff.py`: A1/B1 fail but accepted (frozen); E3 −37.9 dBc open. Sag idles warm; 15W↔7W settles audibly.
-- GUI: small low-contrast text; EFFECTS + IR LOADER open = 716 px, no screen clamp.
+- GUI: small low-contrast text; EFFECTS + IR LOADER open = 716 px.
+- Shipping in 0.4.0 (CHANGELOG Known issues): #43 IR LOADER panel stale after automation/state load;
+  #45 window not clamped to the screen.
 - Some commits on `main` carry a non-noreply email, including GitHub web merges (account default email;
   `gh pr merge --author-email` rejects the noreply address). Fix: owner turns on email privacy.

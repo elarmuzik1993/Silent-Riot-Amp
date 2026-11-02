@@ -127,5 +127,16 @@ play louder** (see Changed).
   knobs at a smaller size, the knob names are larger, the cards sit on the same panel, and
   the ON and PP switches are small glass jewels that light up instead of faint thin bars.
 
+### Known issues
+
+- The IR LOADER panel does not refresh when the IR selection changes from host automation
+  or from loading a project: the sound follows, but the panel's list and highlight keep
+  showing the old IR. [#43]
+- The window grows as you open panels and is not limited to the screen: with every panel
+  open at a large UI scale it can be taller than a small display. Close a panel or pick a
+  smaller UI scale in Settings. [#45]
+
 [Unreleased]: https://github.com/elarmuzik1993/Silent-Riot-Amp/compare/v0.4.0...HEAD
-[0.4.0]: https://github.com/elarmuzik1993/Silent-Riot-Amp/commits/main
+[0.4.0]: https://github.com/elarmuzik1993/Silent-Riot-Amp/releases/tag/v0.4.0
+[#43]: https://github.com/elarmuzik1993/Silent-Riot-Amp/issues/43
+[#45]: https://github.com/elarmuzik1993/Silent-Riot-Amp/issues/45
