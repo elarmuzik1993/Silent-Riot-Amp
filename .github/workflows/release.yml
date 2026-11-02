@@ -1,6 +1,6 @@
 name: Release
 
-# Git-tag-driven release automation (roadmap P3). Pushing a tag like `v0.3.4`
+# Git-tag-driven release automation (roadmap P3). Pushing a tag like `v0.4.0`
 # builds the Release binaries on Linux + Windows, packages them into versioned
 # archives, and publishes a GitHub Release with the artifacts attached.
 #

@@ -32,7 +32,8 @@ you dig in, and gets its feel from the circuit rather than from a fixed curve.
 - **Effects:** noise gate, stereo width, input/output trims, boost, tempo-syncable
   delay and spring reverb.
 - **Always-on tuner** on the DI input. It still works with the amp muted.
-- **Oversampling** at 2×, 4× or 8×, with an exact latency reported to the host.
+- **Oversampling** at 2×, 4× or 8×, with an exact latency reported to the host. For now it is
+  set from the host's parameter list (**Oversample**); an on-screen control is planned.
 
 ![The EFFECTS panel](resources/images/effects-panel.png)
 
@@ -43,7 +44,7 @@ from a future release:
 
 | OS | VST3 goes in | Standalone |
 |---|---|---|
-| Linux | `~/.vst3/` (per user) or `/usr/lib/vst3/` | run the `Silent Riot` binary |
+| Linux | `~/.vst3/` (per user) or `/usr/lib/vst3/` | run `SilentRiot_artefacts/Release/Standalone/Silent Riot` from your build folder ([Building](docs/dev/building.md)) |
 | Windows | `C:\Program Files\Common Files\VST3\` | run `Silent Riot.exe` |
 
 Then insert it on a mono or stereo guitar track. The [manual's quick start](docs/manual/README.md#quick-start)
