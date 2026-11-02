@@ -8,10 +8,10 @@ live tuner sit around it. It runs as a VST3 plugin or as a standalone app.
 
 ![Silent Riot main window](../../resources/images/silent-riot-main.png)
 
-> **Status: pre-1.0.** The tone is still being calibrated, so a sound you save
-> today may change slightly in a later build. The built-in cabinet is a filter
-> model; there are no bundled speaker IRs yet, so load your own for the most
-> realistic cab sound ([Cabinets and IRs](cabinets-and-irs.md)).
+> **Status: pre-1.0.** The tone is frozen for this release series, so a sound you
+> save today sounds the same in later 0.x builds unless a tone update says
+> otherwise. The built-in cabinet is a filter model; there are no bundled speaker
+> IRs yet, so load your own for the most realistic cab sound ([Cabinets and IRs](cabinets-and-irs.md)).
 
 ## Pages
 

@@ -10,13 +10,13 @@ you dig in, and gets its feel from the circuit rather than from a fixed curve.
 ![Silent Riot main window](resources/images/silent-riot-main.png)
 
 > **Status: pre-1.0.**
-> - The tone is still being calibrated, so a sound you save today may change slightly
->   in a later build.
+> - The tone is frozen for this release series (`tone-v1`); a later voicing would ship
+>   as a clearly marked tone update, never silently.
 > - There are no bundled speaker IRs yet. Use the built-in filter cabinet, or load your
 >   own impulse responses.
 > - Windows and Linux, VST3 and Standalone. No macOS or AU yet.
-> - No release has been tagged yet. Releases will appear on the GitHub Releases page;
->   until then, build from source (below).
+> - Builds are not code-signed yet, so Windows may show a SmartScreen warning the first
+>   time. Known issues are listed in the [CHANGELOG](CHANGELOG.md).
 
 ## Features
 
@@ -39,12 +39,13 @@ you dig in, and gets its feel from the circuit rather than from a fixed curve.
 
 ## Install
 
-There are no prebuilt downloads yet (see Status). Once you have a build, from source or
-from a future release:
+Download the archive for your system from the
+[latest release](https://github.com/elarmuzik1993/Silent-Riot-Amp/releases/latest),
+unpack it, and copy the `Silent Riot.vst3` folder into place (or build from source, below):
 
 | OS | VST3 goes in | Standalone |
 |---|---|---|
-| Linux | `~/.vst3/` (per user) or `/usr/lib/vst3/` | run `SilentRiot_artefacts/Release/Standalone/Silent Riot` from your build folder ([Building](docs/dev/building.md)) |
+| Linux | `~/.vst3/` (per user) or `/usr/lib/vst3/` | run `Silent Riot` from the unpacked archive |
 | Windows | `C:\Program Files\Common Files\VST3\` | run `Silent Riot.exe` |
 
 Then insert it on a mono or stereo guitar track. The [manual's quick start](docs/manual/README.md#quick-start)
