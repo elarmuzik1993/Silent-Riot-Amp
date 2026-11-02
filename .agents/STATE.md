@@ -1,6 +1,6 @@
 # State
 
-_Updated 2026-11-02 (PR #73 merged; #38/#40/#41 closed; #43/#45 ship as known issues)_
+_Updated 2026-11-02 (repo public; README ready for v0.4.0; sanitizers job covers the processor tests)_
 
 ## Now
 - Silent Riot v0.4.0 (JUCE 7 VST3/Standalone), GPL-3.0-or-later, free + optional donations; no tagged
@@ -50,8 +50,8 @@ _Updated 2026-11-02 (PR #73 merged; #38/#40/#41 closed; #43/#45 ship as known is
 
 ## Known issues
 - Full `verify.sh` can't build on Windows (`rt_stress.cpp`): use `verify.sh --quick` + the three ctest targets.
-- GitHub Actions never runs (minutes block) since 2026-10-09; verify locally. IR projects play louder
-  (+5.4…+13.1 dB) since the IR level match (CHANGELOG).
+- CI runs again (repo public); red only from the Linux tone lock. Sanitizers skip the tone lock; `ubsan.supp`
+  excuses JUCE's libjpeg only. IR projects play louder (+5.4…+13.1 dB) since the IR level match (CHANGELOG).
 - `signoff.py`: A1/B1 fail but accepted (frozen); E3 −37.9 dBc open. Sag idles warm; 15W↔7W settles audibly.
 - GUI: small low-contrast text; EFFECTS + IR LOADER open = 716 px.
 - Shipping in 0.4.0 (CHANGELOG Known issues): #43 IR LOADER panel stale after automation/state load;

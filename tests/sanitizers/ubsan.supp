@@ -1,0 +1,8 @@
+# UBSan suppressions for the CI sanitizers job (.github/workflows/build.yml).
+# Third-party code only: never suppress a report in src/ or tests/.
+#
+# JUCE's bundled libjpeg left-shifts negative values in its Huffman bit buffer
+# and its inverse DCT (jdhuff.c, jidctint.c): a long-standing libjpeg idiom that
+# every compiler JUCE supports treats as arithmetic. Hit when the faceplate's
+# steel and the cab's brick-wall JPEGs are decoded.
+shift-base:*/jpglib/*
