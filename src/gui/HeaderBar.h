@@ -2,7 +2,6 @@
 // Copyright (C) 2026 Boris Miscenco
 #pragma once
 #include <juce_gui_basics/juce_gui_basics.h>
-#include "PresetSelector.h"
 
 namespace sr {
 
@@ -28,7 +27,6 @@ public:
     void paint(juce::Graphics&) override;
     void resized() override;
 
-    PresetSelector& getPresetSelector() { return presetSelector; }
 
     std::function<void()> onGearClick;
 
@@ -42,7 +40,6 @@ private:
     void paintGearIcon(juce::Graphics& g, juce::Rectangle<float> area) const;
     void activateGear();
 
-    PresetSelector presetSelector;
     GearButton gearButton;
     bool gearActive = false;
     float gearRotation = 0.0f; // 0=inactive, 60=active (animated degrees)

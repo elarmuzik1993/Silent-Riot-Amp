@@ -901,7 +901,7 @@ void scenarioIR(double secs)
 // ── 7. Message thread working while the audio thread runs ───────
 void scenarioThreads(double secs)
 {
-    std::cout << "\n[threads] state save/restore, presets and IR loads during playback\n";
+    std::cout << "\n[threads] state save/restore and IR loads during playback\n";
 
     juce::TemporaryFile t1(".wav");
     const juce::File ir = writeIR(t1, 4096, 48000.0, true);
@@ -979,7 +979,6 @@ void scenarioThreads(double secs)
                             a.proc.setStateInformation(saved.getData(),
                                                        static_cast<int>(saved.getSize()));
                         break;
-                case 2: a.proc.applyPreset(static_cast<int>(rng() % 5)); break;
                 case 3: if (ir.existsAsFile() && a.proc.getNumUserIRs() < 8)
                             a.proc.loadUserIR(ir);
                         break;

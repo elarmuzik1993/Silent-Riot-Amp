@@ -173,9 +173,6 @@ juce::AudioProcessorValueTreeState::ParameterLayout SilentRiotProcessor::createP
         juce::StringArray{ "2x", "4x", "8x" }, 1));
 
     params.push_back(std::make_unique<juce::AudioParameterInt>(
-        juce::ParameterID{ Params::IDs::PRESET_IDX, 1 }, "Preset", 0, 4, 0));
-
-    params.push_back(std::make_unique<juce::AudioParameterInt>(
         juce::ParameterID{ Params::IDs::IR_INDEX, 1 }, "IR Selection",
         0, sr::MAX_USER_IRS, 0));
 
@@ -1315,29 +1312,6 @@ int SilentRiotProcessor::getCurrentProgram() { return 0; }
 void SilentRiotProcessor::setCurrentProgram(int) {}
 const juce::String SilentRiotProcessor::getProgramName(int) { return {}; }
 void SilentRiotProcessor::changeProgramName(int, const juce::String&) {}
-
-// ── Presets ──
-
-void SilentRiotProcessor::applyPreset(int presetIndex)
-{
-    if (presetIndex < 0 || presetIndex >= sr::Presets::count) return;
-    const auto& p = sr::Presets::table[presetIndex];
-
-    auto setNorm = [this](const juce::String& id, float value01) {
-        if (auto* param = apvts.getParameter(id))
-            param->setValueNotifyingHost(juce::jlimit(0.0f, 1.0f, value01));
-    };
-
-    // GAIN/TONE/VOLUME ranges are 0–1, so the normalized value is the value itself.
-    setNorm(Params::IDs::GAIN,   p.gain);
-    setNorm(Params::IDs::TONE,   p.tone);
-    setNorm(Params::IDs::VOLUME, p.volume);
-    setNorm(Params::IDs::HALF_POWER, p.halfPower ? 1.0f : 0.0f);
-    setNorm(Params::IDs::CAB_SIM,    p.cabSim    ? 1.0f : 0.0f);
-
-    if (auto* pi = apvts.getParameter(Params::IDs::PRESET_IDX))
-        pi->setValueNotifyingHost(pi->convertTo0to1(static_cast<float>(presetIndex)));
-}
 
 // ── User IR Management ──
 

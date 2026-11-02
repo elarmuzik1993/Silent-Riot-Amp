@@ -1,27 +1,11 @@
 # Presets and settings
 
-## Factory presets
+## Presets
 
-The header holds the preset browser: **◂ name ▸**. Click the arrows to step
-through the five factory presets; it wraps around at either end.
-
-| Preset | GAIN | SHAPE | VOLUME | Power | CAB |
-|---|---|---|---|---|---|
-| Classic Crunch | 5.5 | 4.5 | 5.5 | 15 W | on |
-| Edge of Breakup | 3.5 | 5.0 | 6.2 | 15 W | on |
-| Full Drive | 8.5 | 6.2 | 5.8 | 15 W | on |
-| Clean Shimmer | 1.8 | 6.0 | 5.0 | 15 W | on |
-| Heavy Sag | 7.0 | 4.5 | 8.2 | 7 W | on |
-
-A preset sets only those five amp controls. Effects, trims, the IR and
-oversampling are left as they are, so you can step through amp voicings with
-your effects and cab in place.
-
-The browser shows the last preset you **chose**. A fresh instance shows
-"Classic Crunch" while the knobs sit at their defaults (GAIN 6, SHAPE 5,
-VOLUME 5), and turning a knob after choosing a preset doesn't change the name.
-There are no user presets yet; use your host's preset or snapshot feature to
-save your own settings.
+There are no factory presets and no preset browser: the amp always opens on its
+default settings (GAIN 6, SHAPE 5, VOLUME 5, 15 W, CAB on). Use your host's
+preset or snapshot feature to save your own settings. Saving and loading
+presets inside the plugin is planned.
 
 ## Settings
 
@@ -71,12 +55,3 @@ session never opens silent ([Tuner](tuner.md)).
 The window is 700 pixels wide (times the UI scale) and grows as you open
 panels. With every panel open at a large UI scale it can be taller than a small
 screen; close a panel or pick a smaller scale.
-
-## Parameters
-
-| ID | Host name | Range | Default |
-|---|---|---|---|
-| `presetIndex` | Preset | 0–4 | 0 |
-
-`presetIndex` records which factory preset was last chosen in the browser.
-Setting it from the host does **not** load the preset.

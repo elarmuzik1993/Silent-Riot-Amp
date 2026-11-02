@@ -13,6 +13,12 @@ pull requests.
 No version has been tagged yet. The build reports **0.3.4** (`CMakeLists.txt`); the first
 tagged release will collect everything below.
 
+### Removed
+
+- The five factory presets and the header preset browser. The amp opens on its default settings
+  only; saving and loading presets is tracked as an open issue. The `presetIndex` parameter is gone;
+  old sessions load fine and ignore it. The sound is unchanged.
+
 ### Changed
 
 - CREDITS and AI_USAGE moved into `attribution/` (`attribution/CREDITS.md`, `attribution/AI_USAGE.md`). Release bundles still ship CREDITS.md at their top level.

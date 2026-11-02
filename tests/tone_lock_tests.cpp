@@ -150,10 +150,28 @@ void lock(const std::vector<Case>& cases)
     }
 }
 
+// The five amp settings that were the factory presets until they were removed
+// from the plugin. They stay here as locked reference settings; the case names
+// (and so the stored references) are unchanged.
+struct LockedSetting {
+    const char* name;
+    float gain, tone, volume;
+    bool  halfPower, cabSim;
+};
+
+constexpr LockedSetting lockedSettings[] = {
+    { "Classic Crunch",   0.55f, 0.45f, 0.55f, false, true },
+    { "Edge of Breakup",  0.35f, 0.50f, 0.62f, false, true },
+    { "Full Drive",       0.85f, 0.62f, 0.58f, false, true },
+    { "Clean Shimmer",    0.18f, 0.60f, 0.50f, false, true },
+    { "Heavy Sag",        0.70f, 0.45f, 0.82f, true,  true },
+};
+constexpr int numLockedSettings = static_cast<int>(sizeof(lockedSettings) / sizeof(lockedSettings[0]));
+
 std::function<void(ProcessorHarness&)> preset(int index)
 {
     return [index](ProcessorHarness& h) {
-        const auto& p = sr::Presets::table[index];
+        const auto& p = lockedSettings[index];
         h.set(IDs::GAIN, p.gain);
         h.set(IDs::TONE, p.tone);
         h.set(IDs::VOLUME, p.volume);
@@ -165,7 +183,7 @@ std::function<void(ProcessorHarness&)> preset(int index)
 juce::String presetName(int index)
 {
     return "preset-" + juce::String(index + 1) + "-"
-         + juce::String(sr::Presets::table[index].name).toLowerCase().replaceCharacter(' ', '-');
+         + juce::String(lockedSettings[index].name).toLowerCase().replaceCharacter(' ', '-');
 }
 
 Case knob(const juce::String& name, const juce::String& id, float value)
@@ -181,7 +199,7 @@ Case knob(const juce::String& name, const juce::String& id, float value)
 TEST_CASE("Tone lock: factory presets", "[tone-lock]")
 {
     std::vector<Case> cases;
-    for (int i = 0; i < sr::Presets::count; ++i)
+    for (int i = 0; i < numLockedSettings; ++i)
     {
         Case c;
         c.name = presetName(i);
@@ -290,7 +308,7 @@ TEST_CASE("Tone lock: small changes do not pass", "[tone-lock]")
     Case shaped = base;   // SHAPE +0.02 over the preset's value
     shaped.setup = [](ProcessorHarness& h) {
         preset(0)(h);
-        h.set(IDs::TONE, sr::Presets::table[0].tone + 0.02f);
+        h.set(IDs::TONE, lockedSettings[0].tone + 0.02f);
     };
     const auto s = compare(*ref, renderCase(shaped));
     INFO("SHAPE +0.02: RMS delta " << s.rmsDeltaDb << " dB, worst band " << s.worstBandDeltaDb << " dB");

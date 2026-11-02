@@ -15,7 +15,7 @@ The **steady-state** output of the amp, the cabinet and the effects:
 
 | Group | Settings rendered |
 |---|---|
-| Presets | the five factory presets |
+| Amp settings | the five former factory presets (kept as test-local settings) |
 | Amp knobs | GAIN 0 and 10, SHAPE 0 and 10, VOLUME 2 and 10 |
 | Switches | 7W, CAB off, a loaded IR (`tests/fixtures/ir/neutral.wav`) |
 | Effects | BOOST, DELAY, REVERB, the noise gate on a quiet DI, WIDTH 10, INPUT up with OUTPUT down |
@@ -25,7 +25,7 @@ Every case plays 3 s of a real guitar DI (`tests/di_sample_82hz.raw`) at 48 kHz,
 E major chord at the other sample rates, with every other parameter at its default.
 
 **Not locked:** the first 0.5 s of each render, where the amp settles from idle, and
-transitions such as switching cab mode, power, oversampling or presets. Fixing a click or
+transitions such as switching cab mode, power or oversampling. Fixing a click or
 a dip there is allowed, as long as the steady sound still matches.
 
 ## How the check works

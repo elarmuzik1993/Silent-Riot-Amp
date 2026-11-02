@@ -103,11 +103,6 @@ public:
     // ── User IR management (message thread only) ──
     using UserIREntry = sr::UserIREntry;  // see dsp/cabinet/UserIRState.h
 
-    // Apply a factory preset (sets gain/tone/volume/7W/cab + preset index).
-    // Called on an explicit user selection (message thread) — NOT on state
-    // restore, so user tweaks saved over a preset are preserved.
-    void applyPreset(int presetIndex);
-
     // Returns false if the file can't be read or the list is already at
     // sr::MAX_USER_IRS — callers must not assume a new entry was appended.
     bool loadUserIR(const juce::File& file);
