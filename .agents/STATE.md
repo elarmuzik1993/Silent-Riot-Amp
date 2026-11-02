@@ -34,7 +34,9 @@ _Updated 2026-11-02 (presets removed; save/load/curated presets tracked in #72)_
 5. (done) manual images re-shot; redo them after any GUI change.
 6. Make `tests/rt_stress.cpp` build on MSVC (`_aligned_malloc`/`_aligned_free`), so full verify runs on Windows.
 7. E3: repoint the gate to `tests/fixtures/ir/bright.wav`, fix engine aliasing, owner A/B, `tone-v2`.
-8. Owner questions: delay FEEDBACK default? GRID I reads 0 — keep or read PI? Lamp colour, card weave,
+8. Owner: later, swap the two Pexels textures for own photos or CC0 (they are not GPL; CREDITS says so),
+   so distro packagers have nothing to question. Not a release blocker.
+9. Owner questions: delay FEEDBACK default? GRID I reads 0 — keep or read PI? Lamp colour, card weave,
    jewel size? Cab: light-theme tolex, dim when CAB off, damage amount? Wear on EFFECTS knobs? Rename
    THRESH to GATE now that it sits outside a card? Wall brightness, `kSteelOpacityDark`? Tone lock on
    Linux: per-platform refs or a noise floor?
