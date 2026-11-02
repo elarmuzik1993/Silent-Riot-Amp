@@ -22,9 +22,9 @@ _Updated 2026-11-02 (presets removed; save/load/curated presets tracked in #72)_
 
 ## Next
 1. Owner: tag the tone-lock merge commit `tone-v1` and push the tag (`docs/dev/tone-lock.md`).
-2. Owner, before going public: confirm source/licence of `resources/textures/brick-wall.jpg` and
-   `faceplate-steel.jpg`, credit them in `attribution/CREDITS.md`; confirm `tests/di_sample_82hz.raw` is
-   self-recorded; enable private vulnerability reporting; create the `tone` label; delete stale branches
+2. Owner, before going public: add each Pexels photo's page URL and photographer to
+   `attribution/CREDITS.md` (textures are Pexels-licensed, not GPL; the DI is self-recorded, credited);
+   enable private vulnerability reporting; create the `tone` label; delete stale branches
    (keep `main`, `feat/neural-hybrid-blend-sketch`); turn on "Keep my email addresses private".
 3. First release, in order: (a) item 2; (b) #41 is moot (browser removed; revisit with #72), fix #43 (IR
    panel stale after automation/state load), #45 (window taller than screen); check and close #38/#40
