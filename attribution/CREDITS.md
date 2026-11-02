@@ -126,7 +126,7 @@ SIL Open Font License 1.1. The licence text ships next to the font files.
 under the [Pexels License](https://www.pexels.com/license/): free to use and modify, with no
 attribution required, but not redistributable on their own as stock photos. They are **not**
 covered by the GPL; they are embedded in the plugin as artwork. The renders in the plugin
-paint over them (tint, wear, glow). The photographer and page URL of each are to be added here.
+paint over them (tint, wear, glow).
 
 ### Test fixtures
 
