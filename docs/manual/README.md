@@ -20,7 +20,7 @@ live tuner sit around it. It runs as a VST3 plugin or as a standalone app.
 | [Controls](controls.md) | GAIN, SHAPE, VOLUME, 7W, CAB, PWR, oversampling, meters |
 | [Effects](effects.md) | Gate, width and input/output trims (beside the meters), BOOST, DELAY, REVERB |
 | [Cabinets and IRs](cabinets-and-irs.md) | The built-in cab, loading impulse responses, their limits |
-| [Presets and settings](presets-and-settings.md) | Factory presets, the settings panel, what is saved with a project |
+| [Presets and settings](presets-and-settings.md) | The default settings, the settings panel, what is saved with a project |
 | [Tuner](tuner.md) | The always-on tuner and its mute |
 
 Each page ends with a table of its **parameters** — the ID and name your host
@@ -46,8 +46,7 @@ shows for automation, the range and the default.
      sag, compression and power-amp breakup ([Controls](controls.md#volume)).
 4. **Set the output level** with the **OUTPUT** trim (beside the OUT meter) or your
    host's fader. OUTPUT is after the amp, so it changes level, never tone.
-5. Want a starting point? Step through the factory presets with the arrows in
-   the header ([Presets](presets-and-settings.md)).
+5. Want to keep your sound? Save it with your host's preset feature ([Presets](presets-and-settings.md)).
 
 ## Keyboard
 

@@ -4,7 +4,7 @@
 
 ## Project Overview
 
-**Silent Riot** (v0.3.4) is a JUCE 7 amp simulator plugin (VST3/Standalone) by Monolit Beatz. Built with C++17, CMake, and Ninja on Ubuntu Linux.
+**Silent Riot** (v0.4.0) is a JUCE 7 amp simulator plugin (VST3/Standalone) by Monolit Beatz. Built with C++17, CMake, and Ninja on Ubuntu Linux.
 
 ## Key Specs
 
@@ -51,7 +51,7 @@ src/
 │   ├── tubes/       TriodeWaveshaper, PentodeWaveshaper, GridConduction
 │   ├── power/       PowerSupplyModel, SagEnvelope, LTPSolver
 │   └── cabinet/     SpeakerCoupling, CabinetSim, IRLibrary, OTSaturation
-├── gui/             20 custom components (see GUI Architecture below)
+├── gui/             19 custom components (see GUI Architecture below)
 ├── PluginProcessor  Full signal chain (§2.5 processBlock)
 └── PluginEditor     GUI shell (window sized to content height)
 ```
@@ -86,7 +86,7 @@ Phases 1–4, the DSP audit, the listening rounds, the power-section calibration
 | Area | Read |
 |---|---|
 | Cabinet IR loader, level match, cab-mode switcher, thread rules | `docs/dev/ir-loader.md` |
-| GUI components (20 in `src/gui/`), window strategy, editor timer, keyboard, state persistence | `docs/dev/gui-architecture.md` |
+| GUI components (19 in `src/gui/`), window strategy, editor timer, keyboard, state persistence | `docs/dev/gui-architecture.md` |
 | Tube/LTP/sag/latency/widener/shape implementation, DSP audit, ear-tuning knobs | `docs/dev/dsp-notes.md` |
 | Every pitfall below, with the measurements behind it | `docs/dev/pitfalls.md` |
 | Tone lock procedure | `docs/dev/tone-lock.md` |

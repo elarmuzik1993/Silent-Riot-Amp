@@ -144,8 +144,8 @@ the README, repo and About panel; a contributor can build from the README alone.
 
 The finishing layer that separates "works" from "feels premium."
 
-- [ ] **[H] Curated factory presets** built on the _frozen_ tone + real cabs. Today's 5
-  presets are "starter values" (ROADMAP P2). For a boutique amp, presets are the
+- [ ] **[H] Curated factory presets** built on the _frozen_ tone + real cabs. The 5
+  starter presets were removed (see Unreleased); tracked in the preset issue. For a boutique amp, presets are the
   first impression — they demo the sound instantly. Name them by use-case/feel.
 - [x] **[M] Front-of-amp essentials** (kept minimal, per depth-over-breadth):
   - [x] **Noise gate** _(done: `NoiseGate.h`, THRESH beside the IN meter)_ — near-essential for high-gain guitar; its absence is conspicuous.

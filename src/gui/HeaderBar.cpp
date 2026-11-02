@@ -38,7 +38,6 @@ std::unique_ptr<juce::AccessibilityHandler> GearButton::createAccessibilityHandl
 
 HeaderBar::HeaderBar()
 {
-    addAndMakeVisible(presetSelector);
     addAndMakeVisible(gearButton);
     gearButton.onActivate = [this] { activateGear(); };
 }
@@ -153,14 +152,6 @@ void HeaderBar::paintGearIcon(juce::Graphics& g, juce::Rectangle<float> area) co
 
 void HeaderBar::resized()
 {
-    // Preset selector centered
-    float selectorW = 220.0f;
-    float selectorH = 26.0f;
-    float sx = (getWidth() - selectorW) * 0.5f;
-    float sy = (getHeight() - selectorH) * 0.5f;
-    presetSelector.setBounds(static_cast<int>(sx), static_cast<int>(sy),
-                             static_cast<int>(selectorW), static_cast<int>(selectorH));
-
     // Gear hit-area overlays the painted icon (see paint())
     gearButton.setBounds(getWidth() - 36, 7, 24, 24);
 }

@@ -416,7 +416,9 @@ Custom component simulating an iOS-style toggle.
 
 **Special behaviour**: Toggling CAB to ON auto-opens the IR Loader section if it's closed.
 
-### 5.4 Preset Selector
+### 5.4 Preset Selector (removed)
+
+_Removed: the plugin ships with the default settings only. The spec below is historical._
 
 **Height**: 26px, border 1px `border`, border-radius 3px, overflow hidden
 

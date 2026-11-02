@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.22)
 
 project(SilentRiot
-    VERSION 0.3.4
+    VERSION 0.4.0
     LANGUAGES CXX
     DESCRIPTION "Monolit Beatz — Silent Riot Amp Sim"
 )
@@ -134,8 +134,6 @@ target_sources(SilentRiot
         src/gui/AdvancedPanel.cpp
         src/gui/AmpFaceplate.cpp
         src/gui/ProceduralTexture.h
-        src/gui/PresetSelector.h
-        src/gui/PresetSelector.cpp
         src/gui/SegmentedSelector.h
         src/gui/SegmentedSelector.cpp
         src/gui/SettingsPanel.h

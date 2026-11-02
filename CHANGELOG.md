@@ -10,8 +10,16 @@ pull requests.
 
 ## [Unreleased]
 
-No version has been tagged yet. The build reports **0.3.4** (`CMakeLists.txt`); the first
-tagged release will collect everything below.
+## [0.4.0] - 2026-11-02
+
+The first tagged release. It collects everything below; **projects that use a cabinet IR
+play louder** (see Changed).
+
+### Removed
+
+- The five factory presets and the header preset browser. The amp opens on its default settings
+  only; saving and loading presets is tracked as an open issue. The `presetIndex` parameter is gone;
+  old sessions load fine and ignore it. The sound is unchanged.
 
 ### Changed
 
@@ -119,4 +127,5 @@ tagged release will collect everything below.
   knobs at a smaller size, the knob names are larger, the cards sit on the same panel, and
   the ON and PP switches are small glass jewels that light up instead of faint thin bars.
 
-[Unreleased]: https://github.com/elarmuzik1993/Silent-Riot-Amp/commits/main
+[Unreleased]: https://github.com/elarmuzik1993/Silent-Riot-Amp/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/elarmuzik1993/Silent-Riot-Amp/commits/main

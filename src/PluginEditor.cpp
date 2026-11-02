@@ -270,15 +270,6 @@ SilentRiotEditor::SilentRiotEditor(SilentRiotProcessor& p)
         saveUIState();
     };
 
-    // Preset selector wiring — applying the preset also stores PRESET_IDX
-    header.getPresetSelector().onPresetChanged = [this](int idx) {
-        proc.applyPreset(idx);
-    };
-
-    // Restore displayed preset from the parameter (does not fire onPresetChanged)
-    header.getPresetSelector().setPresetIndex(
-        static_cast<int>(proc.apvts.getRawParameterValue(sr::Params::IDs::PRESET_IDX)->load()));
-
     // APVTS attachments
     using namespace sr::Params;
     gainA = std::make_unique<SliderA>(proc.apvts, IDs::GAIN,   gainKnob.getSlider());
@@ -332,9 +323,8 @@ SilentRiotEditor::SilentRiotEditor(SilentRiotProcessor& p)
     cabSimToggle.setTooltip("Cabinet simulation on/off");
     powerToggle.setTooltip("Amp power on/off");
 
-    // Tab order: preset → the amp row left to right (input column, the amp
+    // Tab order: the amp row left to right (input column, the amp
     // knobs, output column) → toggles → section bars (gear & panels follow)
-    header.getPresetSelector().setExplicitFocusOrder(1);
     {
         struct SideKnob { sr::NotchKnob* knob; int order; const char* title; const char* description; };
         for (auto [k, order, title, description] : {

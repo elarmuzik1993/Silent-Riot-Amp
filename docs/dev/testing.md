@@ -106,7 +106,7 @@ cmake --build build-verify --target SilentRiotRTStress
 | `hostile` | NaN, Inf, 1e30, denormals, full-scale square and Nyquist input, then whether the amp recovers |
 | `modes` | Power, tuner mute, CAB, 7W, oversample, host bypass and `reset()` churn |
 | `ir` | IR loading and IR_INDEX automation, including indices past the list |
-| `threads` | State save/restore, presets and IR loads on the message thread during playback |
+| `threads` | State save/restore and IR loads on the message thread during playback |
 | `recover` | Whether one non-finite input sample permanently silences the amp |
 | `overhead` | Fixed cost per block before any DSP runs |
 | `mono` | The 1-in/1-out bus: widener skipped, IR channel 0 only, single-channel loops |
