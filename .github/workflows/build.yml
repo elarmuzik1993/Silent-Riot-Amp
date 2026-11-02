@@ -185,7 +185,8 @@ jobs:
     timeout-minutes: 45
     env:
       ASAN_OPTIONS: detect_leaks=0:detect_stack_use_after_return=1
-      UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+      # Third-party reports only; see the file before adding to it.
+      UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1:suppressions=${{ github.workspace }}/tests/sanitizers/ubsan.supp
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-linux-deps
@@ -205,11 +206,15 @@ jobs:
             -DSR_BUILD_TESTS=ON \
             -DCMAKE_C_COMPILER_LAUNCHER=ccache \
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
-            -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer" \
+            -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined -fno-sanitize-recover=all -fsanitize-recover=shift-base -fno-omit-frame-pointer" \
             -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address,undefined"
-          cmake --build build-san --target SilentRiotTests SilentRiotJuceTests
+          cmake --build build-san --target SilentRiotTests SilentRiotJuceTests SilentRiotProcessorTests
+      # shift-base is recoverable above only so ubsan.supp can excuse JUCE's
+      # bundled libjpeg; halt_on_error still stops on any unsuppressed report.
+      # The tone lock is skipped: it checks sound, not memory, the test job runs
+      # it, and its references are from MSVC (it fails on Linux by design).
       - name: Run sanitized tests
-        run: ctest --test-dir build-san --output-on-failure
+        run: ctest --test-dir build-san -E "^Tone lock:" --output-on-failure
 
   # ── pluginval: the standard JUCE VST3 release gate ────────────────────
   # (roadmap P3 — state save/restore, automation, threading, fuzzing).
