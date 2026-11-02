@@ -3,7 +3,7 @@
 _Updated 2026-11-02 (presets removed; save/load/curated presets tracked in #72)_
 
 ## Now
-- Silent Riot v0.3.4 (JUCE 7 VST3/Standalone), GPL-3.0-or-later, free + optional donations; no tagged
+- Silent Riot v0.4.0 (JUCE 7 VST3/Standalone), GPL-3.0-or-later, free + optional donations; no tagged
   release. **Tone frozen at `tone-v1`** (059b209), guarded by `tests/tone_lock_tests.cpp`.
 - ctest 513/513 on Windows/MSVC (2026-11-01, after the compact layout). On Linux/GCC the 5 tone-lock
   cases fail (band deltas ~−88 dB, per PR #66; unverified here).
@@ -28,13 +28,12 @@ _Updated 2026-11-02 (presets removed; save/load/curated presets tracked in #72)_
    (keep `main`, `feat/neural-hybrid-blend-sketch`); turn on "Keep my email addresses private".
 3. First release, in order: (a) item 2; (b) #41 is moot (browser removed; revisit with #72), fix #43 (IR
    panel stale after automation/state load), #45 (window taller than screen); check and close #38/#40
-   (look fixed in code, unverified); (c) item 5 + README hero (#48); (d) bump `CMakeLists.txt` version
-   (suggested v0.4.0: IR projects get louder), date the CHANGELOG *Unreleased*; (e) go public: standard
+   (look fixed in code, unverified); (c) done: images, README hero (#48), version 0.4.0, CHANGELOG
+   dated 2026-11-02 (re-date if the tag slips); (e) go public: standard
    Actions runners are free on public repos, so the `v*` tag can run `release.yml`; else package locally.
    Installers (#46/#47), macOS (#69), donations, E3 wait until after.
 4. Owner picks a donation platform → step 9 of `docs/plans/2026-10-28-open-source-docs-prep.md`.
-5. Re-shoot the manual's `resources/images/` (still Space Mono and the old 2×2 EFFECTS) with
-   `sr_editor_snapshot`.
+5. (done) manual images re-shot; redo them after any GUI change.
 6. Make `tests/rt_stress.cpp` build on MSVC (`_aligned_malloc`/`_aligned_free`), so full verify runs on Windows.
 7. E3: repoint the gate to `tests/fixtures/ir/bright.wav`, fix engine aliasing, owner A/B, `tone-v2`.
 8. Owner questions: delay FEEDBACK default? GRID I reads 0 — keep or read PI? Lamp colour, card weave,
