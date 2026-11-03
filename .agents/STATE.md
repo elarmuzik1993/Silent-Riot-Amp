@@ -9,7 +9,7 @@ _Updated 2026-11-02 (repo public; v0.4.0 ready to tag; sanitizers job covers the
 - Tone frozen at `tone-v1` (to be tagged on e56ab9f, the tone-lock merge), guarded by `tests/tone_lock_tests.cpp`.
 - Presets removed (amp opens on defaults); save/load/curated presets are #72.
 - CI runs again since the repo went public. Linux + Windows builds, pluginval and Windows tests pass;
-  the Linux `test` job is red only from the tone lock. Sanitizers build all 3 test targets under
+  the Linux tone lock now passes (silent floor −65 dB, fix/tone-lock-linux). Sanitizers build all 3 test targets under
   ASan/UBSan, skip the tone lock, and excuse only JUCE's libjpeg (`tests/sanitizers/ubsan.supp`).
 - Commit as `Boris Miscenco <219343213+elarmuzik1993@users.noreply.github.com>` via exported
   `GIT_AUTHOR_*`/`GIT_COMMITTER_*`. Cloud sessions can't push tags, create labels or dispatch workflows.
@@ -21,10 +21,9 @@ _Updated 2026-11-02 (repo public; v0.4.0 ready to tag; sanitizers job covers the
    what it is, features, getting started, known issues #43/#45, how to help); enable Discussions first.
 3. Owner settings: create the `tone` label; private vulnerability reporting; "Keep my email addresses
    private"; delete stale branches (keep `main`, `feat/neural-hybrid-blend-sketch`).
-4. Tone lock on Linux: per-platform references or a noise-floor tolerance (owner decision), so `test` goes green.
-5. Fix #43 (IR LOADER panel stale after automation/state load) and #45 (window not clamped to screen).
-6. Make `tests/rt_stress.cpp` build on MSVC (`_aligned_malloc`), so full verify runs on Windows.
-7. Later: donation platform (`docs/plans/2026-10-28-open-source-docs-prep.md` step 9); installers (#46/#47);
+4. Fix #43 (IR LOADER panel stale after automation/state load) and #45 (window not clamped to screen).
+5. Make `tests/rt_stress.cpp` build on MSVC (`_aligned_malloc`), so full verify runs on Windows.
+6. Later: donation platform (`docs/plans/2026-10-28-open-source-docs-prep.md` step 9); installers (#46/#47);
    macOS (#69); replace the two Pexels textures with own/CC0 photos; E3 aliasing fix → owner A/B → `tone-v2`.
 
 ## Decisions
@@ -36,8 +35,7 @@ _Updated 2026-11-02 (repo public; v0.4.0 ready to tag; sanitizers job covers the
 - Code/CLAUDE.md/docs/dev/handoffs beat DSP spec v2.13. Delay never self-oscillates; IRs level-matched.
 
 ## Known issues
-- `verify.sh` on Linux/GCC: 508/513; the 5 tone-lock cases fail on rounding noise (bands −84…−100 dB,
-  RMS ≤ 2e-4 dB), identical on `main`. References come from MSVC.
+- Tone lock: references come from MSVC; GCC differs only below −70 dB, so the silent floor is −65 dB on all platforms. `verify.sh` on Linux: 513/513.
 - Full `verify.sh` can't build on Windows (`rt_stress.cpp`): use `--quick` + the three ctest targets.
 - `signoff.py`: A1/B1 fail but accepted (frozen); E3 −37.9 dBc open.
 - Projects using an IR play louder (+5.4…+13.1 dB) since the IR level match (CHANGELOG).
