@@ -166,8 +166,10 @@ struct Comparison
 
 // Levels below floorDb count as "silent": two silent values match whatever
 // their exact level, so noise far under the music cannot make the lock flaky.
+// -60 dB sits above the float rounding noise that differs between compilers
+// (MSVC vs GCC: bands at -64 dB and lower moved by up to 0.5 dB on CI).
 inline Comparison compare(const Fingerprint& ref, const Fingerprint& got,
-                          float bandTolDb = 0.1f, float rmsTolDb = 0.02f, float floorDb = -100.0f)
+                          float bandTolDb = 0.1f, float rmsTolDb = 0.02f, float floorDb = -60.0f)
 {
     Comparison c;
     if (ref.frames != got.frames || ref.bands != got.bands
