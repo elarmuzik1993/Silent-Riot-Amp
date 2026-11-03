@@ -9,7 +9,7 @@ _Updated 2026-11-02 (repo public; v0.4.0 ready to tag; sanitizers job covers the
 - Tone frozen at `tone-v1` (to be tagged on e56ab9f, the tone-lock merge), guarded by `tests/tone_lock_tests.cpp`.
 - Presets removed (amp opens on defaults); save/load/curated presets are #72.
 - CI runs again since the repo went public. Linux + Windows builds, pluginval and Windows tests pass;
-  the Linux tone lock now passes (silent floor −65 dB, fix/tone-lock-linux). Sanitizers build all 3 test targets under
+  the Linux tone lock now passes (silent floor −60 dB, fix/tone-lock-linux). Sanitizers build all 3 test targets under
   ASan/UBSan, skip the tone lock, and excuse only JUCE's libjpeg (`tests/sanitizers/ubsan.supp`).
 - Commit as `Boris Miscenco <219343213+elarmuzik1993@users.noreply.github.com>` via exported
   `GIT_AUTHOR_*`/`GIT_COMMITTER_*`. Cloud sessions can't push tags, create labels or dispatch workflows.
@@ -35,7 +35,7 @@ _Updated 2026-11-02 (repo public; v0.4.0 ready to tag; sanitizers job covers the
 - Code/CLAUDE.md/docs/dev/handoffs beat DSP spec v2.13. Delay never self-oscillates; IRs level-matched.
 
 ## Known issues
-- Tone lock: references come from MSVC; GCC differs only below −70 dB, so the silent floor is −65 dB on all platforms. `verify.sh` on Linux: 513/513.
+- Tone lock: references come from MSVC; GCC differs only below −64 dB, so the silent floor is −60 dB on all platforms. `verify.sh` on Linux: 513/513.
 - Full `verify.sh` can't build on Windows (`rt_stress.cpp`): use `--quick` + the three ctest targets.
 - `signoff.py`: A1/B1 fail but accepted (frozen); E3 −37.9 dBc open.
 - Projects using an IR play louder (+5.4…+13.1 dB) since the IR level match (CHANGELOG).

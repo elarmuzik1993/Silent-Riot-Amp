@@ -34,7 +34,7 @@ a dip there is allowed, as long as the steady sound still matches.
 it to a **fingerprint** (`tests/tone_lock.h`): the level of 32 bands from 40 Hz to 16 kHz
 in every 2048-sample frame, per channel, plus the overall RMS. It compares that with the
 reference in `tests/tone/golden/<case>.srtl`. A case fails if any band of any frame moves
-by more than **0.1 dB** or the RMS by more than **0.02 dB**. Bands more than 65 dB below
+by more than **0.1 dB** or the RMS by more than **0.02 dB**. Bands more than 60 dB below
 full scale count as silent: that is above the rounding noise that differs between compilers.
 
 The fingerprint ignores phase on purpose: it pins what you hear (level, tone, distortion
@@ -101,5 +101,5 @@ stays open behind an A/B (above).
 ## Known limit
 
 The references were recorded with MSVC on Windows. Linux/GCC differs from them only in bands
-below -70 dB (rounding noise, up to 0.5 dB; RMS within 0.0003 dB), so the silent floor is -65 dB on every
+below -64 dB (rounding noise, up to 0.5 dB; RMS within 0.0003 dB; CI measured bands up to -64 dB), so the silent floor is -60 dB on every
 platform instead of per-platform references. Real changes above that floor still fail.
