@@ -37,6 +37,39 @@ you dig in, and gets its feel from the circuit rather than from a fixed curve.
 
 ![The EFFECTS panel](resources/images/effects-panel.png)
 
+## Signal flow
+
+```
+ Audio In
+    │
+    ├──────────────► Tuner (taps the DI, works with the amp muted)
+    ▼
+ Input trim → Noise gate → Boost
+    │
+    ▼  ↑ oversample (2× / 4× / 8×)
+ ┌─────────────────────────────────────────────────────────────┐
+ │ PREAMP     V1a triode → V1b triode (GAIN pot between them)  │
+ │ PHASE INV. Long-tail pair, asymmetric plate loads           │
+ │ TONE       SHAPE (mid scoop ↔ boost)                        │
+ │ POWER AMP  VOLUME → EL84 push-pull ⇄ PSU sag                │
+ │ OUTPUT TX  Transformer saturation + speaker coupling        │
+ └─────────────────────────────────────────────────────────────┘
+    │
+    ├── IR_INDEX = 0 ──► built-in filter cab ─────────┐
+    │                                                 ▼  ↓ downsample
+    └── IR_INDEX > 0 ──► ↓ downsample → IR convolution ─► tanh limiter
+                                                      │
+                                                      ▼
+                           Delay → Reverb → Stereo width → Output trim
+                                                      │
+                                                      ▼
+                                                  Audio Out
+```
+
+The tube stages share one voltage domain and the power supply is modelled, so VOLUME
+changes the feel as well as the level. Stage by stage detail is in
+[docs/dev/architecture.md](docs/dev/architecture.md).
+
 ## Install
 
 Download the archive for your system from the
