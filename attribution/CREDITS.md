@@ -77,24 +77,30 @@ The following DSP techniques are textbook knowledge and not owned by any party:
 
 ## Circuit Topology Reference
 
-The Silent Riot circuit is an **original fictional amplifier design** created by
-Boris Miscenco. It is not a direct model or clone of any specific commercial product.
+Silent Riot is a **model of a publicly documented amplifier architecture**, not a
+fictional design. Its reference is the Orange Tiny Terror: two 12AX7 preamp stages, a
+long-tail-pair phase inverter, a push-pull EL84 power section, GAIN / SHAPE / VOLUME controls
+and a 15W/7W power switch. The design spec (`docs/design/dsp-model-spec-v2.13.md`) names the
+Tiny Terror throughout for that reason, and the SHAPE control is modelled on the style of
+Orange's Shape control. Some of the topology is common to the Vox AC15 family, which is also
+referenced.
 
-The topology — cascaded ECC83 preamp stages feeding an EL84 push-pull power section
-via a long-tail pair phase inverter — is a general class of amplifier architecture
-that has appeared in countless amplifiers since the 1950s. The spec describes this
-class as "AC15-inspired," meaning it shares a family resemblance with that
-well-documented circuit topology.
+This is a tribute to and study of that circuit, not a copy of any product. The circuit
+architecture, component values and electrical behaviour are facts and ideas, which copyright
+does not protect. They come from publicly available documentation and published schematics
+of this class of amp. What is original here is the implementation:
 
-No proprietary schematic, trade secret, or copyrighted design document from Vox,
-Marshall, Fender, or any other manufacturer was used. The specific component values,
-gain staging, dual-gang gain pot arrangement, and post-phase-inverter tone control
-placement are the author's own design choices.
+- all source code, written from scratch (nothing taken from Orange, Vox or any other
+  manufacturer's software or firmware);
+- the normalized voltage-domain framework, the signal-chain structure and the numerical
+  methods (the bracketed LTP root-finder, the grid-conduction diode clamp, the
+  impedance-based PSU droop, the cathode-resistor sag model, the output-transformer
+  saturation and the speaker-coupling crossover);
+- the GUI, effects, cabinet/IR handling and test tooling.
 
-The Vox AC15 schematic has been publicly available in service manuals and repair
-documentation for over 60 years and is widely published in the amp DIY community.
-The general topology it represents — common-cathode triode stages + LTP + EL84
-push-pull — is not owned by any party.
+No manufacturer code, firmware, audio samples or copyrighted manual text or artwork is
+included. Silent Riot is not a clone of, and makes no claim to match the sound of, any
+commercial product.
 
 ---
 
@@ -153,11 +159,11 @@ not affiliated with, endorsed by or sponsored by any of them.
 | Item | Status |
 |---|---|
 | DSP source code | Original; designed, directed, reviewed and owned by Boris Miscenco, AI-assisted implementation ([`AI_USAGE.md`](AI_USAGE.md)) |
-| Signal chain architecture | Original design |
+| Signal chain implementation | Original; structure follows the documented architecture above |
 | Tube model equations | Public domain (Koren, published openly) |
 | Tube parameters | Public domain (datasheet values) |
 | Filter algorithms | Standard DSP textbook knowledge |
-| Circuit topology | Original fictional design in a common architectural family |
+| Circuit topology | Not original: modelled on the publicly documented Orange Tiny Terror architecture (see above) |
 | Code from Guitarix | None |
 | Code from SwankyAmp | None |
 | Code from ChowDSP / NAM | None |

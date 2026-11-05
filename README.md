@@ -1,8 +1,8 @@
 # Silent Riot
 
-**Silent Riot** is a free, open-source guitar amp simulator (VST3 and Standalone) built
-around one original amplifier design: two 12AX7 preamp stages, a long-tail-pair phase
-inverter and a push-pull pair of EL84 power tubes. It has three knobs (GAIN, SHAPE,
+**Silent Riot** is a free, open-source guitar amp simulator (VST3 and Standalone)
+that models a classic small tube amp, with the Orange Tiny Terror as its reference: two
+12AX7 preamp stages, a long-tail-pair phase inverter and a push-pull pair of EL84 power tubes. It has three knobs (GAIN, SHAPE,
 VOLUME) and a 15W/7W switch. The amp is modelled stage by stage, including the power
 supply, cathode sag and grid conduction, so it cleans up when you play softly, sags when
 you dig in, and gets its feel from the circuit rather than from a fixed curve.
@@ -93,8 +93,10 @@ Optional donations are planned; the project will always be free, with no gated f
 Copyright © 2026 Boris Miscenco (Monolit Beatz).
 Licensed under the GNU General Public License v3 or later; see [LICENSE](LICENSE).
 
-The DSP is original work. The tube models use the published Koren equations with
-datasheet parameters, and no code is taken from other amp simulators.
+The DSP code is original work, written from scratch; the circuit it models is not. It is
+based on the publicly documented architecture of the Orange Tiny Terror, which is not
+affiliated with or endorsed by this project. The tube models use the published Koren
+equations with datasheet parameters, and no code is taken from other amp simulators.
 [CREDITS.md](attribution/CREDITS.md) has the full statement and the third-party licences: JUCE
 (GPLv3), and the Oxanium font (SIL Open Font License 1.1).
 Silent Riot is built with AI-assisted implementation under the author's design, direction and
