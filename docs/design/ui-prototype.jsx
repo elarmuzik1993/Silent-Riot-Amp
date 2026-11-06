@@ -72,8 +72,8 @@ function useDrag(value, min, max, onChange) {
 
 /* ── IR Library ────────────────────────────────────────── */
 const IR_LIBRARY = [
-  { id: "tt_1x12_v30",   name: "TT 1×12 V30",       mic: "SM57",  category: "STOCK",     samples: 1024, sampleRate: 48000 },
-  { id: "tt_1x12_g12h",  name: "TT 1×12 G12H",      mic: "SM57",  category: "STOCK",     samples: 1024, sampleRate: 48000 },
+  { id: "cab_1x12_v30",   name: "1×12 V30",       mic: "SM57",  category: "STOCK",     samples: 1024, sampleRate: 48000 },
+  { id: "cab_1x12_g12h",  name: "1×12 G12H",      mic: "SM57",  category: "STOCK",     samples: 1024, sampleRate: 48000 },
   { id: "ppc_2x12_v30",  name: "PPC 2×12 V30",       mic: "R121",  category: "STOCK",     samples: 2048, sampleRate: 48000 },
   { id: "ppc_4x12_v30",  name: "PPC 4×12 V30",       mic: "MD421", category: "ORANGE",    samples: 2048, sampleRate: 48000 },
   { id: "ppc_4x12_g12t", name: "PPC 4×12 G12T-75",   mic: "U87",   category: "ORANGE",    samples: 2048, sampleRate: 48000 },
