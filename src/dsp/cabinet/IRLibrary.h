@@ -13,8 +13,8 @@
 namespace sr {
 
 struct IRDescriptor {
-    const char* id;            // e.g. "tt_1x12_v30"
-    const char* displayName;   // e.g. "TT 1x12 V30"
+    const char* id;            // e.g. "cab_1x12_v30"
+    const char* displayName;   // e.g. "1x12 V30"
     const char* mic;           // e.g. "SM57"
     int samples;               // IR length in samples
     int sampleRate;            // native sample rate
@@ -27,14 +27,14 @@ inline const IRDescriptor& getStockIRDescriptor(int stockIndex)
 {
     // stockIndex 0–7 maps to IR_INDEX 1–8
     static const IRDescriptor descriptors[NUM_STOCK_IRS] = {
-        { "tt_1x12_v30",       "TT 1x12 V30",       "SM57",   1024, 48000 },
-        { "tt_1x12_g12m",      "TT 1x12 G12M",      "SM57",   1024, 48000 },
-        { "tt_2x12_v30",       "2x12 V30",           "R121",   1024, 48000 },
-        { "tt_2x12_g12h",      "2x12 G12H",          "MD421",  1024, 48000 },
-        { "tt_4x12_v30",       "4x12 V30",           "SM57",   2048, 48000 },
-        { "tt_4x12_t75",       "4x12 T75",           "R121",   2048, 48000 },
-        { "tt_1x12_alnico",    "1x12 Alnico Blue",   "C414",   1024, 48000 },
-        { "tt_1x12_jensen",    "1x12 Jensen P12R",   "SM57",   1024, 48000 },
+        { "cab_1x12_v30",   "1x12 V30",         "SM57",   1024, 48000 },
+        { "cab_1x12_g12m",  "1x12 G12M",        "SM57",   1024, 48000 },
+        { "cab_2x12_v30",   "2x12 V30",         "R121",   1024, 48000 },
+        { "cab_2x12_g12h",  "2x12 G12H",        "MD421",  1024, 48000 },
+        { "cab_4x12_v30",   "4x12 V30",         "SM57",   2048, 48000 },
+        { "cab_4x12_t75",   "4x12 T75",         "R121",   2048, 48000 },
+        { "cab_1x12_alnico", "1x12 Alnico Blue", "C414",   1024, 48000 },
+        { "cab_1x12_jensen", "1x12 Jensen P12R", "SM57",   1024, 48000 },
     };
 
     jassert(stockIndex >= 0 && stockIndex < NUM_STOCK_IRS);
@@ -56,8 +56,8 @@ inline juce::AudioBuffer<float> generateSyntheticIR(int stockIndex, const IRDesc
     // Unique synthesis parameters per stock IR
     struct SynthParams { float resFreq; float decayRate; float brightness; };
     static constexpr SynthParams params[NUM_STOCK_IRS] = {
-        { 100.0f, 7.0f, 0.60f },  // 0: TT 1x12 V30      — tight, bright
-        {  90.0f, 6.0f, 0.45f },  // 1: TT 1x12 G12M     — warm, medium
+        { 100.0f, 7.0f, 0.60f },  // 0: 1x12 V30      — tight, bright
+        {  90.0f, 6.0f, 0.45f },  // 1: 1x12 G12M     — warm, medium
         {  80.0f, 5.0f, 0.40f },  // 2: 2x12 V30          — wider, balanced
         {  75.0f, 4.5f, 0.35f },  // 3: 2x12 G12H         — round, smooth
         {  60.0f, 4.0f, 0.30f },  // 4: 4x12 V30          — deep, big room

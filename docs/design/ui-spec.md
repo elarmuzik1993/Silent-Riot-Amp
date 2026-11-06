@@ -539,8 +539,8 @@ developer) beside the licence pill (green dot + "Free & open source — GPLv3").
 ```
 ID               NAME                  MIC      CATEGORY    SAMPLES   RATE
 ────────────────────────────────────────────────────────────────────────────
-tt_1x12_v30      TT 1×12 V30          SM57     STOCK       1024      48000
-tt_1x12_g12h     TT 1×12 G12H         SM57     STOCK       1024      48000
+cab_1x12_v30      1×12 V30          SM57     STOCK       1024      48000
+cab_1x12_g12h     1×12 G12H         SM57     STOCK       1024      48000
 ppc_2x12_v30     PPC 2×12 V30         R121     STOCK       2048      48000
 ppc_4x12_v30     PPC 4×12 V30         MD421    ORANGE      2048      48000
 ppc_4x12_g12t    PPC 4×12 G12T-75     U87      ORANGE      2048      48000
@@ -749,8 +749,8 @@ SilentRiot/
 │   │   ├── DMSans-SemiBold.ttf
 │   │   └── DMSans-Bold.ttf
 │   └── IRs/
-│       ├── tt_1x12_v30.wav
-│       ├── tt_1x12_g12h.wav
+│       ├── cab_1x12_v30.wav
+│       ├── cab_1x12_g12h.wav
 │       └── ... (all stock IRs)
 ├── Source/
 │   ├── PluginProcessor.h/.cpp
@@ -818,7 +818,7 @@ juce_add_binary_data(SilentRiotData
         Resources/Fonts/SpaceMono-Regular.ttf
         Resources/Fonts/SpaceMono-Bold.ttf
         Resources/Fonts/DMSans-Regular.ttf
-        Resources/IRs/tt_1x12_v30.wav
+        Resources/IRs/cab_1x12_v30.wav
         # ... all resources
 )
 
