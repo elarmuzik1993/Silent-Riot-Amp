@@ -22,6 +22,12 @@
 > | Master volume (§3.7) | `audioTaper(volume)` | `volumeDriveTaper()` with `VOLUME_KNOB_HEADROOM`, plus `OUTPUT_MAKEUP_GAIN` |
 > | Power stage additions | — | OT flux saturation, speaker-coupling crossover, effects, I/O trims (none in this spec) |
 
+> **Provenance.** This spec was written from general knowledge of common tube-amp circuits, not
+> from a Tiny Terror schematic or any manufacturer document. Textbook and datasheet values are
+> separated from unverified guesses in `attribution/CREDITS.md`. References here to "the Tiny
+> Terror" or "the original amp" describe the amp this design is modelled on; they are not
+> measurements of one.
+
 ## Monolit Beatz — Amp Sim Plugin v1.0
 
 ---
@@ -808,7 +814,7 @@ The Silent Riot is a deceptively simple all-valve amplifier built around two ECC
 - **Tubes:** 2× ECC83/12AX7 (preamp), 2× EL84 (power amp)
 - **Output:** 15W / 7W switchable (cathode bias)
 - **Topology:** Cascaded preamp → Long-tail pair phase inverter → Push-pull EL84 output (hot Class AB, marketed as "Class A")
-- **Unique features:**
+- **Notable circuit features (shared with the Orange Tiny Terror this design is modelled on):**
   - Dual-gang gain pot simultaneously controls two attenuation points
   - Tone control is post-phase-inverter (Vox "cut" style), not in the preamp
   - Volume control is also post-PI, so gain structure is unaffected by volume/tone

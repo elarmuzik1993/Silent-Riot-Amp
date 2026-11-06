@@ -86,9 +86,8 @@ Orange's Shape control. Some of the topology is common to the Vox AC15 family, w
 referenced.
 
 This is a tribute to and study of that circuit, not a copy of any product. The circuit
-architecture, component values and electrical behaviour are facts and ideas, which copyright
-does not protect. They come from publicly available documentation and published schematics
-of this class of amp. What is original here is the implementation:
+architecture and electrical behaviour are facts and ideas, which copyright does not protect.
+What is original here is the implementation:
 
 - all source code, written from scratch (nothing taken from Orange, Vox or any other
   manufacturer's software or firmware);
@@ -97,6 +96,20 @@ of this class of amp. What is original here is the implementation:
   impedance-based PSU droop, the cathode-resistor sag model, the output-transformer
   saturation and the speaker-coupling crossover);
 - the GUI, effects, cabinet/IR handling and test tooling.
+
+### Where the component values come from
+
+No Orange schematic, service manual or measurement of a real Tiny Terror was used. The
+values in `Constants.h` and the design spec were written from general knowledge of common
+tube-amp circuits and then tuned by ear. They fall into two groups:
+
+- **Textbook and datasheet values:** 12AX7 µ and r<sub>p</sub> (RCA/Mullard/GE datasheets), EL84
+  operating points (Mullard and Philips data), 100 kΩ preamp plate loads, 1 MΩ grid leaks,
+  25 µF cathode bypass, 0.1 µF coupling caps, the 12AX7 self-bias point.
+- **Educated guesses for this amp category, unverified against any real unit:** the 1.2 kΩ
+  phase-inverter tail resistor, the 100 kΩ / 82 kΩ asymmetric LTP plate loads, the 4.7 kΩ and
+  22 kΩ supply droppers, the 470 Ω screen resistor and the 300 V B+. These may differ from a
+  real Tiny Terror, and Silent Riot makes no claim that they match one.
 
 No manufacturer code, firmware, audio samples or copyrighted manual text or artwork is
 included. Silent Riot is not a clone of, and makes no claim to match the sound of, any
@@ -148,7 +161,7 @@ cabinet.
 
 ## Trademarks
 
-Vox, AC15, AC30, Orange, Tiny Terror, Marshall and Fender are trademarks of their respective owners.
+Vox, AC15, AC30, Orange, Tiny Terror, Marshall, Fender and Celestion are trademarks of their respective owners.
 They are named in this project only to describe a style or circuit family. Silent Riot is
 not affiliated with, endorsed by or sponsored by any of them.
 
