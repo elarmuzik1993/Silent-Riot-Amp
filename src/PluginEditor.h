@@ -73,6 +73,12 @@ private:
     void updateFaceplateGlow(bool powerOn, double dtSeconds);
     // Hash of the settings the glow's clean ratio depends on (GlowDriveFollower).
     uint32_t glowParamsSignature() const;
+    // Brings the IR LOADER panel's list, highlight and the IR bar's hint in
+    // step with the processor's user-IR list and IR_INDEX (#43). Message thread.
+    void syncIRPanel();
+    uint32_t shownIRListVersion = ~0u;        // ~0u: never synced
+    int shownIRIndex = -1;
+    std::vector<juce::String> shownIRNames;   // the listed IRs' names, for the hint
     void layoutContent();
     void saveUIState();
     void loadUIState();

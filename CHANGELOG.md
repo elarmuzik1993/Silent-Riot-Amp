@@ -10,6 +10,12 @@ pull requests.
 
 ## [Unreleased]
 
+### Fixed
+
+- The IR LOADER panel now follows host automation of the IR selection and a loaded session or
+  state: its list, highlight and the IR bar's name update within a frame instead of showing the
+  old IR until the editor reopens. [#43]
+
 ## [0.4.0] - 2026-11-02
 
 The first tagged release. It collects everything below; **projects that use a cabinet IR

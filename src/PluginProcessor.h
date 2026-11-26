@@ -111,6 +111,13 @@ public:
     int getNumUserIRs() const { return static_cast<int>(userIRs.size()); }
     const UserIREntry& getUserIR(int index) const { return userIRs[static_cast<size_t>(index)]; }
 
+    // Bumped whenever the user-IR list changes (a load, a state restore), so
+    // the editor's timer can tell its IR LOADER panel is stale (#43).
+    uint32_t getUserIRListVersion() const { return userIRListVersion.load(std::memory_order_acquire); }
+    // Copies the list under irStateLock — a host may restore state off the
+    // message thread — and returns the version that copy belongs to.
+    uint32_t copyUserIRs(std::vector<UserIREntry>& out) const;
+
 private:
     juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
     // Message thread, 20 Hz: publishes a latency the audio thread computed
@@ -136,6 +143,7 @@ private:
 
     // User IR persistence
     std::vector<UserIREntry> userIRs;
+    std::atomic<uint32_t> userIRListVersion { 0 };   // changed under irStateLock
     void saveUserIRsToState();
     void loadUserIRsFromState();
 
