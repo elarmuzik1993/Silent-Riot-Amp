@@ -15,6 +15,8 @@ pull requests.
 - The IR LOADER panel now follows host automation of the IR selection and a loaded session or
   state: its list, highlight and the IR bar's name update within a frame instead of showing the
   old IR until the editor reopens. [#43]
+- The footer shows the oversampling factor the amp runs at (4x by default) from the moment the
+  plugin opens, instead of "1x OS" until audio first plays.
 
 ## [0.4.0] - 2026-11-02
 
