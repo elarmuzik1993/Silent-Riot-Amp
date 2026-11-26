@@ -14,28 +14,28 @@
 #include <X11/Xatom.h>
 #endif
 
-DelayTimeAttachment::DelayTimeAttachment(juce::AudioProcessorValueTreeState& stateIn,
+DelayTimeAttachment::DelayTimeAttachment(SilentRiotProcessor& processor,
                                          sr::NotchKnob& timeKnob, sr::ToggleSwitch& syncToggle)
-    : state(stateIn),
+    : proc(processor),
       knob(timeKnob),
       slider(timeKnob.getSlider()),
       syncButton(syncToggle.getButton()),
       manualDefault(timeKnob.getSlider().getDoubleClickReturnValue()),
-      timeAttachment(*stateIn.getParameter(sr::Params::IDs::DELAY_TIME),
-                     [this](float v) { time = v; refresh(); }, stateIn.undoManager),
-      divisionAttachment(*stateIn.getParameter(sr::Params::IDs::DELAY_SYNC_DIV),
+      timeAttachment(*processor.apvts.getParameter(sr::Params::IDs::DELAY_TIME),
+                     [this](float v) { time = v; refresh(); }, processor.apvts.undoManager),
+      divisionAttachment(*processor.apvts.getParameter(sr::Params::IDs::DELAY_SYNC_DIV),
                          [this](float v) {
                              division = juce::jlimit(0, sr::kNumSyncDivisions - 1, juce::roundToInt(v));
                              if (synced())
                              {
                                  lastDivision = division;
-                                 state.state.setProperty(kLastDivisionProperty, division, nullptr);
+                                 proc.setUIProperty(kLastDivisionProperty, division);
                              }
                              refresh();
                          },
-                         stateIn.undoManager)
+                         processor.apvts.undoManager)
 {
-    const int saved = state.state.getProperty(kLastDivisionProperty, sr::kDefaultSyncDivision);
+    const int saved = proc.getUIProperty(kLastDivisionProperty, sr::kDefaultSyncDivision);
     lastDivision = juce::jlimit(1, sr::kNumSyncDivisions - 1, saved);
 
     // The readout follows the mode: the note division while synced, otherwise
@@ -190,34 +190,36 @@ SilentRiotEditor::SilentRiotEditor(SilentRiotProcessor& p)
         layoutContent();
     };
 
-    // Populate IR list from saved state
-    for (int i = 0; i < proc.getNumUserIRs(); ++i)
+    // Populate IR list from saved state. Copies, one locked read each: a host
+    // may restore (replace the list) from its own thread meanwhile.
     {
-        const auto& ir = proc.getUserIR(i);
-        irLoaderPanel.addUserIR(ir.name, ir.numSamples, ir.sampleRate,
-                                i + 1, ir.audioData);
+        SilentRiotProcessor::UserIREntry ir;
+        for (int i = 0; proc.copyUserIR(i, ir); ++i)
+            irLoaderPanel.addUserIR(ir.name, ir.numSamples, ir.sampleRate, i + 1, ir.audioData);
     }
+
+    // The IR bar's hint: the selected IR's name, or the built-in cab.
+    const auto showIRHint = [this](int irIdx)
+    {
+        SilentRiotProcessor::UserIREntry ir;
+        irSectionBar.setHintText(irIdx >= 1 && proc.copyUserIR(irIdx - 1, ir) ? ir.name
+                                                                               : juce::String("IIR Mode"));
+    };
 
     // Set selected IR and hint text from parameter
     {
         int irIdx = static_cast<int>(proc.apvts.getRawParameterValue(sr::Params::IDs::IR_INDEX)->load());
         irLoaderPanel.setSelectedIR(irIdx);
-        if (irIdx >= 1 && irIdx <= proc.getNumUserIRs())
-            irSectionBar.setHintText(proc.getUserIR(irIdx - 1).name);
-        else
-            irSectionBar.setHintText("IIR Mode");
+        showIRHint(irIdx);
     }
 
     // IR loader panel wiring
-    irLoaderPanel.onIRSelected = [this](int irIdx) {
+    irLoaderPanel.onIRSelected = [this, showIRHint](int irIdx) {
         if (irIdx == 0)
             proc.selectBuiltInCab();
         else
             proc.selectUserIR(irIdx - 1);  // convert 1-based to 0-based
-        if (irIdx >= 1 && irIdx <= proc.getNumUserIRs())
-            irSectionBar.setHintText(proc.getUserIR(irIdx - 1).name);
-        else
-            irSectionBar.setHintText("IIR Mode");
+        showIRHint(irIdx);
     };
 
     irLoaderPanel.onUserIRLoaded = [this](const juce::File& file) {
@@ -231,8 +233,10 @@ SilentRiotEditor::SilentRiotEditor(SilentRiotProcessor& p)
             irSectionBar.setHintText("Couldn't read IR file");
             return;
         }
-        int newIdx = proc.getNumUserIRs();
-        const auto& ir = proc.getUserIR(newIdx - 1);
+        const int newIdx = proc.getNumUserIRs();
+        SilentRiotProcessor::UserIREntry ir;
+        if (! proc.copyUserIR(newIdx - 1, ir))
+            return;   // a restore on a host thread replaced the list meanwhile
         irLoaderPanel.addUserIR(ir.name, ir.numSamples, ir.sampleRate,
                                 newIdx, ir.audioData);
         irLoaderPanel.setSelectedIR(newIdx);
@@ -287,7 +291,7 @@ SilentRiotEditor::SilentRiotEditor(SilentRiotProcessor& p)
     boostTightA  = std::make_unique<SliderA>(proc.apvts, IDs::BOOST_TIGHT,    effectsPanel.boostTightKnob().getSlider());
     boostBrightA = std::make_unique<SliderA>(proc.apvts, IDs::BOOST_BRIGHT,   effectsPanel.boostBrightKnob().getSlider());
     delayOnA     = std::make_unique<ButtonA>(proc.apvts, IDs::DELAY_ON,       effectsPanel.delayToggle().getButton());
-    delayTimeA   = std::make_unique<DelayTimeAttachment>(proc.apvts, effectsPanel.delayTimeKnob(),
+    delayTimeA   = std::make_unique<DelayTimeAttachment>(proc, effectsPanel.delayTimeKnob(),
                                                          effectsPanel.delaySyncToggle());
     delayFbA     = std::make_unique<SliderA>(proc.apvts, IDs::DELAY_FEEDBACK, effectsPanel.delayFbKnob().getSlider());
     delayMixA    = std::make_unique<SliderA>(proc.apvts, IDs::DELAY_MIX,      effectsPanel.delayMixKnob().getSlider());
@@ -433,63 +437,65 @@ void* SilentRiotEditor::getX11Display()
 
 void SilentRiotEditor::saveUIState()
 {
-    auto& state = proc.apvts.state;
-    state.setProperty("fxPanelOpen",  fxPanelOpen,  nullptr);
-    state.setProperty("irPanelOpen",  irPanelOpen,  nullptr);
-    state.setProperty("advPanelOpen", advPanelOpen,  nullptr);
-    state.setProperty("irView",       static_cast<int>(irLoaderPanel.getView()), nullptr);
-    state.setProperty("uiScale",      settingsPanel.uiScale, nullptr);
-    state.setProperty("theme",        settingsPanel.themeIndex, nullptr);
-    state.setProperty("meterBallistics", settingsPanel.meterBallistics, nullptr);
-    state.setProperty("knobMode",     settingsPanel.knobMode, nullptr);
-    state.setProperty("peakHold",     settingsPanel.peakHold, nullptr);
-    state.setProperty("tooltips",     settingsPanel.tooltipsEnabled, nullptr);
+    // Through the processor's locked store, never the live apvts.state: a host
+    // may be copying that tree from its own thread (getStateInformation).
+    proc.setUIProperty("fxPanelOpen",  fxPanelOpen);
+    proc.setUIProperty("irPanelOpen",  irPanelOpen);
+    proc.setUIProperty("advPanelOpen", advPanelOpen);
+    proc.setUIProperty("irView",       static_cast<int>(irLoaderPanel.getView()));
+    proc.setUIProperty("uiScale",      settingsPanel.uiScale);
+    proc.setUIProperty("theme",        settingsPanel.themeIndex);
+    proc.setUIProperty("meterBallistics", settingsPanel.meterBallistics);
+    proc.setUIProperty("knobMode",     settingsPanel.knobMode);
+    proc.setUIProperty("peakHold",     settingsPanel.peakHold);
+    proc.setUIProperty("tooltips",     settingsPanel.tooltipsEnabled);
 }
 
 void SilentRiotEditor::loadUIState()
 {
-    auto& state = proc.apvts.state;
+    const auto has = [this](const char* name) { return proc.hasUIProperty(name); };
+    const auto get = [this](const char* name) { return proc.getUIProperty(name); };
 
     // Snap panel heights on restore (no animation)
-    if (state.hasProperty("fxPanelOpen") && static_cast<bool>(state.getProperty("fxPanelOpen")))
+    if (has("fxPanelOpen") && static_cast<bool>(get("fxPanelOpen")))
     {
         fxPanelAnimH = static_cast<float>(sr::EffectsPanel::panelHeight);
         fxSectionBar.setOpen(true);
     }
-    if (state.hasProperty("irPanelOpen") && static_cast<bool>(state.getProperty("irPanelOpen")))
+    if (has("irPanelOpen") && static_cast<bool>(get("irPanelOpen")))
     {
         irPanelAnimH = static_cast<float>(sr::IRLoaderPanel::panelHeight);
         irSectionBar.setOpen(true);
     }
-    if (state.hasProperty("irView"))
-        irLoaderPanel.setView(static_cast<int>(state.getProperty("irView")) == 1
+    if (has("irView"))
+        irLoaderPanel.setView(static_cast<int>(get("irView")) == 1
                                   ? sr::IRLoaderPanel::View::Library
                                   : sr::IRLoaderPanel::View::Cab);
-    if (state.hasProperty("advPanelOpen") && static_cast<bool>(state.getProperty("advPanelOpen")))
+    if (has("advPanelOpen") && static_cast<bool>(get("advPanelOpen")))
     {
         advPanelAnimH = static_cast<float>(sr::AdvancedPanel::panelHeight);
         advSectionBar.setOpen(true);
     }
 
-    if (state.hasProperty("uiScale"))
+    if (has("uiScale"))
     {
-        int scaleIdx = static_cast<int>(state.getProperty("uiScale"));
+        int scaleIdx = static_cast<int>(get("uiScale"));
         settingsPanel.uiScale = scaleIdx;
         static const float scales[] = { 0.75f, 1.0f, 1.25f, 1.5f };
         currentScale = scales[juce::jlimit(0, 3, scaleIdx)];
         contentArea.setTransform(juce::AffineTransform::scale(currentScale));
     }
 
-    if (state.hasProperty("theme"))
-        settingsPanel.themeIndex = static_cast<int>(state.getProperty("theme"));
-    if (state.hasProperty("meterBallistics"))
-        settingsPanel.meterBallistics = static_cast<int>(state.getProperty("meterBallistics"));
-    if (state.hasProperty("knobMode"))
-        settingsPanel.knobMode = static_cast<int>(state.getProperty("knobMode"));
-    if (state.hasProperty("peakHold"))
-        settingsPanel.peakHold = static_cast<bool>(state.getProperty("peakHold"));
-    if (state.hasProperty("tooltips"))
-        settingsPanel.tooltipsEnabled = static_cast<bool>(state.getProperty("tooltips"));
+    if (has("theme"))
+        settingsPanel.themeIndex = static_cast<int>(get("theme"));
+    if (has("meterBallistics"))
+        settingsPanel.meterBallistics = static_cast<int>(get("meterBallistics"));
+    if (has("knobMode"))
+        settingsPanel.knobMode = static_cast<int>(get("knobMode"));
+    if (has("peakHold"))
+        settingsPanel.peakHold = static_cast<bool>(get("peakHold"));
+    if (has("tooltips"))
+        settingsPanel.tooltipsEnabled = static_cast<bool>(get("tooltips"));
 
     // Push restored values into the controls and apply them to the UI
     settingsPanel.syncControls();

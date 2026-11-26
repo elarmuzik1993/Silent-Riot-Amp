@@ -97,6 +97,16 @@ if [ ${#PY[@]} -gt 0 ]; then
     done < <("${PY[@]}" scripts/check_text.py)
 fi
 
+# 8. Editor and GUI code never touch the live apvts.state: a host may copy that
+#    tree from its own thread (getStateInformation) meanwhile. Editor settings
+#    go through SilentRiotProcessor::setUIProperty, the IR list through
+#    copyUserIR. Comment lines are skipped.
+while IFS= read -r hit; do
+    bad "${hit%%:*}:$(cut -d: -f2 <<<"$hit") touches the live apvts.state from editor code (use setUIProperty)"
+done < <(grep -n -E 'apvts\.state|\.state\.(set|get|has|add|remove|copy)' \
+             src/PluginEditor.cpp src/PluginEditor.h src/gui/*.cpp src/gui/*.h 2>/dev/null \
+         | grep -v -E '^[^:]+:[0-9]+:[[:space:]]*//')
+
 say "static checks: $([ $fail -eq 0 ] && echo pass || echo FAIL)"
 [ "$QUICK" -eq 1 ] && exit $fail
 
@@ -121,6 +131,21 @@ say "test"
 ctest --test-dir "$BUILD_DIR" -C Release --output-on-failure >"$LOG-test.log" 2>&1 \
     || { bad "ctest failed; see $LOG-test.log"; tail -n 40 "$LOG-test.log"; exit 1; }
 tail -n 3 "$LOG-test.log"
+
+# The real-time contracts, as CI runs them: no allocation, free or mutex on the
+# audio thread (mutexes are seen on Linux only) and finite output. Exits 1 on
+# any CRITICAL finding; a missed deadline is not one, so a busy machine can't
+# fail it. The full run (minutes) stays on demand: docs/dev/testing.md.
+say "rt_stress --quick"
+RT_BIN=
+for cand in "$BUILD_DIR/tests/SilentRiotRTStress" "$BUILD_DIR/tests/Release/SilentRiotRTStress.exe"; do
+    [ -f "$cand" ] && { RT_BIN=$cand; break; }
+done
+[ -n "$RT_BIN" ] || { bad "SilentRiotRTStress was not built"; exit 1; }
+"$RT_BIN" --quick >"$LOG-rtstress.log" 2>&1 \
+    || { bad "rt_stress reported a real-time violation; see $LOG-rtstress.log"
+         sed -n '/═══ summary ═══/,$p' "$LOG-rtstress.log"; exit 1; }
+say "rt_stress: no CRITICAL findings"
 
 [ $fail -eq 0 ] && echo "verify: all checks passed" || echo "verify: FAILED"
 exit $fail
