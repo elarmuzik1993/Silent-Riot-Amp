@@ -1379,16 +1379,53 @@ void SilentRiotProcessor::selectBuiltInCab()
     applyIRIndexParam(sr::IRLoad::Async);
 }
 
-void SilentRiotProcessor::saveUserIRsToState()
+int SilentRiotProcessor::getNumUserIRs() const
 {
-    // Remove any existing UserIRs node
-    auto existing = apvts.state.getChildWithName("UserIRs");
-    if (existing.isValid())
-        apvts.state.removeChild(existing, nullptr);
+    const juce::ScopedLock irLock(irStateLock);
+    return static_cast<int>(userIRs.size());
+}
 
-    if (userIRs.empty()) return;
+bool SilentRiotProcessor::copyUserIR(int index, UserIREntry& out) const
+{
+    // Message thread. Copies (allocates): never from the audio thread.
+    const juce::ScopedLock irLock(irStateLock);
+    if (index < 0 || index >= static_cast<int>(userIRs.size()))
+        return false;
+    out = userIRs[static_cast<size_t>(index)];
+    return true;
+}
 
-    apvts.state.addChild(sr::userIRsToValueTree(userIRs), -1, nullptr);
+void SilentRiotProcessor::setUIProperty(const juce::Identifier& name, const juce::var& value)
+{
+    const juce::ScopedLock uiLock(uiStateLock);
+    uiState.set(name, value);
+}
+
+juce::var SilentRiotProcessor::getUIProperty(const juce::Identifier& name,
+                                             const juce::var& fallback) const
+{
+    const juce::ScopedLock uiLock(uiStateLock);
+    return uiState.getWithDefault(name, fallback);
+}
+
+bool SilentRiotProcessor::hasUIProperty(const juce::Identifier& name) const
+{
+    const juce::ScopedLock uiLock(uiStateLock);
+    return uiState.contains(name);
+}
+
+void SilentRiotProcessor::saveUserIRsToState(juce::ValueTree& state) const
+{
+    // `state` is getStateInformation's copy, never the live apvts.state: a host
+    // may save from its own thread while the message thread uses that tree. A
+    // restore leaves an older UserIRs node in it, so that goes first.
+    state.removeChild(state.getChildWithName("UserIRs"), nullptr);
+
+    // loadUserIR() and a restore change the list under irStateLock; reading it
+    // without the lock races them (a push_back can reallocate mid-read).
+    const juce::ScopedLock irLock(irStateLock);
+    if (! userIRs.empty())
+        state.addChild(sr::userIRsToValueTree(userIRs), -1, nullptr);
 }
 
 void SilentRiotProcessor::loadUserIRsFromState()
@@ -1406,8 +1443,15 @@ void SilentRiotProcessor::loadUserIRsFromState()
 // ── State Persistence ──
 
 void SilentRiotProcessor::getStateInformation(juce::MemoryBlock& destData) {
-    saveUserIRsToState();
+    // Any thread: hosts save from their own (autosave). copyState() is the
+    // APVTS's locked snapshot, and nothing here writes to the live state.
     auto state = apvts.copyState();
+    saveUserIRsToState(state);
+    {
+        const juce::ScopedLock uiLock(uiStateLock);
+        for (const auto& property : uiState)
+            state.setProperty(property.name, property.value, nullptr);
+    }
     std::unique_ptr<juce::XmlElement> xml(state.createXml());
     copyXmlToBinary(*xml, destData);
 }
@@ -1416,10 +1460,25 @@ void SilentRiotProcessor::setStateInformation(const void* data, int sizeInBytes)
     auto xml = getXmlFromBinary(data, sizeInBytes);
     if (xml && xml->hasTagName(apvts.state.getType()))
     {
+        const auto restored = juce::ValueTree::fromXml(*xml);
+
+        // The editor's settings are the saved tree's root properties (APVTS
+        // keeps the parameters in child nodes); they replace the current ones.
+        // Read before replaceState, which makes `restored` the live tree.
+        {
+            const juce::ScopedLock uiLock(uiStateLock);
+            uiState.clear();
+            for (int i = 0; i < restored.getNumProperties(); ++i)
+            {
+                const auto name = restored.getPropertyName(i);
+                uiState.set(name, restored.getProperty(name));
+            }
+        }
+
         // Hosts may restore off the message thread: keep a timer tick from
         // applying IR_INDEX against a half-replaced userIRs (irStateLock).
         const juce::ScopedLock irLock(irStateLock);
-        apvts.replaceState(juce::ValueTree::fromXml(*xml));
+        apvts.replaceState(restored);
         loadUserIRsFromState();
 
         // Tuner mute is a transient performance control, not a session setting:

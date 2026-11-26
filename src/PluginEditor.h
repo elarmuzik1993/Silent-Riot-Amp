@@ -25,12 +25,13 @@
 // unchanged, and saved sessions and automation keep working.
 class DelayTimeAttachment {
 public:
-    DelayTimeAttachment(juce::AudioProcessorValueTreeState& state,
+    DelayTimeAttachment(SilentRiotProcessor& processor,
                         sr::NotchKnob& timeKnob, sr::ToggleSwitch& syncToggle);
     ~DelayTimeAttachment();
 
-    // apvts.state property holding the division SYNC returns to when switched
-    // back on, so a round trip through manual keeps the player's division.
+    // Saved editor setting (SilentRiotProcessor::setUIProperty) holding the
+    // division SYNC returns to when switched back on, so a round trip through
+    // manual keeps the player's division.
     static constexpr const char* kLastDivisionProperty = "delayLastSyncDiv";
 
 private:
@@ -39,7 +40,7 @@ private:
     void sliderChanged();    // knob → the active parameter
     juce::ParameterAttachment& active() { return synced() ? divisionAttachment : timeAttachment; }
 
-    juce::AudioProcessorValueTreeState& state;
+    SilentRiotProcessor& proc;
     sr::NotchKnob& knob;
     juce::Slider& slider;
     juce::Button& syncButton;

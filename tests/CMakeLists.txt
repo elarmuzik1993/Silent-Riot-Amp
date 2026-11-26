@@ -118,6 +118,7 @@ add_executable(SilentRiotProcessorTests
     processor_ir_tests.cpp
     processor_meter_tests.cpp
     processor_robustness_tests.cpp
+    processor_state_tests.cpp
     gui_ir_loader_tests.cpp
     gui_input_selector_tests.cpp
     glow_colour_tests.cpp

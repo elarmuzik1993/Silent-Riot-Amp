@@ -100,6 +100,16 @@ public:
     // first). Message thread only. Returns the number of samples written.
     int readLatestTunerSamples(float* dest, int maxN) const;
 
+    // ── Editor settings saved with the session (message thread) ──
+    // Panels, IR view, scale, theme, the delay's last sync division. They used
+    // to be written onto the live apvts.state, which a host may copy from its
+    // own thread meanwhile (getStateInformation). They live here instead,
+    // under uiStateLock, and the state save/restore moves them in and out of
+    // the saved tree as its root properties, where older sessions keep them.
+    void setUIProperty(const juce::Identifier& name, const juce::var& value);
+    juce::var getUIProperty(const juce::Identifier& name, const juce::var& fallback = {}) const;
+    bool hasUIProperty(const juce::Identifier& name) const;
+
     // ── User IR management (message thread only) ──
     using UserIREntry = sr::UserIREntry;  // see dsp/cabinet/UserIRState.h
 
@@ -108,8 +118,12 @@ public:
     bool loadUserIR(const juce::File& file);
     void selectUserIR(int userIndex);  // 0-based index into userIRs
     void selectBuiltInCab();           // IR_INDEX 0: the IIR cab, convolution off
-    int getNumUserIRs() const { return static_cast<int>(userIRs.size()); }
-    const UserIREntry& getUserIR(int index) const { return userIRs[static_cast<size_t>(index)]; }
+    // Both read under irStateLock: a host may restore state, replacing the
+    // list, from its own thread at any time. So a count can be stale by the
+    // next call, and a reference into the list could dangle: copyUserIR
+    // returns a copy, or false when there is no entry `index` (0-based).
+    int getNumUserIRs() const;
+    bool copyUserIR(int index, UserIREntry& out) const;
 
 private:
     juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
@@ -136,7 +150,7 @@ private:
 
     // User IR persistence
     std::vector<UserIREntry> userIRs;
-    void saveUserIRsToState();
+    void saveUserIRsToState(juce::ValueTree& state) const;   // into a copy, under irStateLock
     void loadUserIRsFromState();
 
     // ── DSP state (matches spec Section 6 hierarchy) ──
@@ -266,6 +280,11 @@ private:
     // reads useIR and the try-lock bufferTransfer. Recursive, so the GUI
     // paths may call applyIRIndexParam() under it.
     juce::CriticalSection irStateLock;
+
+    // The editor's saved settings (setUIProperty). Guarded by uiStateLock,
+    // which is never taken on the audio thread nor while holding irStateLock.
+    juce::NamedValueSet uiState;
+    juce::CriticalSection uiStateLock;
 
     // ── Live tuner ring buffer (single-producer audio / single-consumer GUI) ──
     // Power-of-two size; the writer stores a monotonically increasing total

@@ -23,8 +23,15 @@ The static checks, run in both modes:
 | 5 | Every hand-written source file has an `SPDX-License-Identifier` in its first 3 lines |
 | 6 | Every repo path named in the docs and in code comments exists (`scripts/check_links.py`; deliberate exceptions in `scripts/linkcheck-allow.txt`) |
 | 7 | Every non-ASCII character in a `src/` string literal can render (`scripts/check_text.py`): spelled as `\x` escapes inside `juce::CharPointer_UTF8` (a raw literal turns to mojibake) and present in every embedded font in `resources/fonts/` (a missing glyph draws as an empty box) |
+| 8 | Editor and GUI code never touch the live `apvts.state`, which a host may be copying from its own thread: settings go through `SilentRiotProcessor::setUIProperty`, the IR list through `copyUserIR` |
 
 The full run then configures Release with `SR_BUILD_TESTS=ON`, builds, and runs `ctest`.
+
+It runs on Windows too, from Git Bash. There it mirrors the CI `test-windows` job instead:
+CMake's default generator (the newest Visual Studio; `-G Ninja` needs a developer shell to
+find the compiler) with `--config Release` / `ctest -C Release`. Checks 4, 6 and 7 use the
+first Python 3 that runs (`python3`, `python`, then `py -3`): on Windows `python3` can be
+the Microsoft Store stub, which is on `PATH` but fails when run.
 
 ## The test targets
 
@@ -81,13 +88,17 @@ rather than argued about (`tests/rt_probe.h`):
 - **no allocation on the audio thread** — global `operator new`/`delete` are replaced, and
   every allocation made inside `processBlock` is counted with a backtrace;
 - **no blocking lock** — `pthread_mutex_lock` is interposed, and locks taken inside
-  `processBlock` are counted (contended ones separately);
+  `processBlock` are counted (contended ones separately). Linux only: on Windows the
+  allocation and deadline contracts are checked, and the lock counts stay at zero;
 - **no missed deadline** — every block is timed against `numSamples / sampleRate`.
 
 Every scenario also checks what the host receives: finite samples inside ±1.
 
-It is built by `verify.sh` but is **not** a ctest — it runs for minutes and is meant to be
-run on demand, and before a release:
+It is **not** a ctest. `verify.sh` and CI's `test` and `test-windows` jobs run its `--quick`
+matrix (about a minute) after ctest, and fail on any CRITICAL finding: an allocation, free
+or mutex on the audio thread, or non-finite output. A missed deadline is reported but is not
+CRITICAL, so a busy machine can't fail that gate. The full run takes minutes; run it on
+demand, and before a release:
 
 ```bash
 cmake -B build-verify -G Ninja -DCMAKE_BUILD_TYPE=Release -DSR_BUILD_TESTS=ON
@@ -98,6 +109,9 @@ cmake --build build-verify --target SilentRiotRTStress
 ./build-verify/tests/SilentRiotRTStress --only=modes,ir         # one or more scenarios
 ```
 
+On Windows the Visual Studio generator puts it at
+`build-verify/tests/Release/SilentRiotRTStress.exe`.
+
 | Scenario | What it stresses |
 |---|---|
 | `load` | Every sample rate × oversample factor × block size × effects on/off: can it hold its deadline at all |
@@ -107,6 +121,7 @@ cmake --build build-verify --target SilentRiotRTStress
 | `modes` | Power, tuner mute, CAB, 7W, oversample, host bypass and `reset()` churn |
 | `ir` | IR loading and IR_INDEX automation, including indices past the list |
 | `threads` | State save/restore and IR loads on the message thread during playback |
+| `hostsave` | State saves on a host thread (an autosave) while the message thread loads and selects IRs during playback |
 | `recover` | Whether one non-finite input sample permanently silences the amp |
 | `overhead` | Fixed cost per block before any DSP runs |
 | `mono` | The 1-in/1-out bus: widener skipped, IR channel 0 only, single-channel loops |
@@ -118,14 +133,18 @@ of the first run are in
 [`../records/reviews/review-rt-stress-2026-10-29.md`](../records/reviews/review-rt-stress-2026-10-29.md).
 
 Under a sanitizer the interposers compile themselves out, so the same binary can be built
-with ThreadSanitizer and the sanitizer stays the instrument:
+with ThreadSanitizer and the sanitizer stays the instrument. CI's `tsan` job does this on
+every push and pull request, over the scenarios where the audio, message and convolution
+loader threads meet; any data race fails it. To run it locally (Linux):
 
 ```bash
 cmake -B build-tsan -G Ninja -DCMAKE_BUILD_TYPE=Debug -DSR_BUILD_TESTS=ON \
       -DCMAKE_CXX_FLAGS="-fsanitize=thread -O1 -g -DNDEBUG" \
       -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=thread"
 cmake --build build-tsan --target SilentRiotRTStress
-./build-tsan/tests/SilentRiotRTStress --only=threads,ir --quick
+sudo sysctl -w vm.mmap_rnd_bits=28   # if TSan reports "unexpected memory mapping"
+TSAN_OPTIONS=halt_on_error=1 \
+  ./build-tsan/tests/SilentRiotRTStress --only=threads,hostsave,ir,modes,params,recover --quick
 ```
 
 ## Tone sign-off

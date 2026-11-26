@@ -260,6 +260,41 @@ TEST_CASE("Processor: saved state keeps the raw IR, not the level-matched copy",
                            stored.getReadPointer(ch)));
 }
 
+TEST_CASE("Processor: saving state never writes to the live state tree", "[processor][ir][state]")
+{
+    // A host may save from its own thread while the message thread uses
+    // apvts.state, so getStateInformation serialises the IR list into its copy
+    // of the state. It used to add the UserIRs node to the live tree, unlocked
+    // (rt_stress's hostsave scenario runs this under ThreadSanitizer in CI).
+    juce::TemporaryFile irFile(".wav");
+    ProcessorHarness h;
+    REQUIRE(h.proc.loadUserIR(writeWav(irFile, longDecayIR(99u), 8000.0)));
+
+    juce::MemoryBlock saved;
+    h.proc.getStateInformation(saved);
+    CHECK_FALSE(h.proc.apvts.state.getChildWithName("UserIRs").isValid());
+
+    auto xml = juce::AudioProcessor::getXmlFromBinary(saved.getData(),
+                                                      static_cast<int>(saved.getSize()));
+    REQUIRE(xml != nullptr);
+    CHECK(juce::ValueTree::fromXml(*xml).getChildWithName("UserIRs").getNumChildren() == 1);
+
+    // A restore puts its UserIRs node in the live tree; the next save must
+    // write the current list, not that one twice.
+    h.proc.setStateInformation(saved.getData(), static_cast<int>(saved.getSize()));
+    juce::MemoryBlock again;
+    h.proc.getStateInformation(again);
+    auto xml2 = juce::AudioProcessor::getXmlFromBinary(again.getData(),
+                                                       static_cast<int>(again.getSize()));
+    REQUIRE(xml2 != nullptr);
+    const auto tree = juce::ValueTree::fromXml(*xml2);
+    int userIRNodes = 0;
+    for (const auto& child : tree)
+        userIRNodes += child.hasType("UserIRs") ? 1 : 0;
+    CHECK(userIRNodes == 1);
+    CHECK(tree.getChildWithName("UserIRs").getNumChildren() == 1);
+}
+
 // ═══════════════════════════════════════════════════════════════
 // Cab-mode switches fade, and IR mode never plays un-cabbed (IR-path plan
 // Task 3). P-EDGE, a sustained 220 Hz note; every switch is made mid-note.
