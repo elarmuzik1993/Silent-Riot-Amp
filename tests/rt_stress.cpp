@@ -49,6 +49,9 @@
  #include <sched.h>
  #include <time.h>
 #endif
+#if defined(_WIN32)
+ #include <malloc.h>   // _aligned_malloc, _aligned_free
+#endif
 
 // ═══════════════════════════════════════════════════════════════
 // 1. Interposers. Exactly one TU may define these, and they have to live in
@@ -74,6 +77,27 @@
 #endif
 
 #if SR_RT_INTERPOSE_NEW
+
+// Over-aligned blocks. The MSVC CRT has no posix_memalign, and a block from
+// its _aligned_malloc must go back through _aligned_free, never free().
+static inline void* srAlignedAlloc(std::size_t n, std::size_t align)
+{
+#if defined(_WIN32)
+    return _aligned_malloc(n, align);
+#else
+    void* p = nullptr;
+    return posix_memalign(&p, align, n) == 0 ? p : nullptr;
+#endif
+}
+
+static inline void srAlignedFree(void* p)
+{
+#if defined(_WIN32)
+    _aligned_free(p);
+#else
+    std::free(p);
+#endif
+}
 
 void* operator new(std::size_t n)
 {
@@ -115,9 +139,8 @@ void* operator new(std::size_t n, std::align_val_t a)
         rt::note("operator new (aligned)", n);
     }
     const std::size_t align = static_cast<std::size_t>(a);
-    void* p = nullptr;
-    if (posix_memalign(&p, align < sizeof(void*) ? sizeof(void*) : align, n != 0 ? n : 1) != 0)
-        throw std::bad_alloc();
+    void* p = srAlignedAlloc(n != 0 ? n : 1, align < sizeof(void*) ? sizeof(void*) : align);
+    if (p == nullptr) throw std::bad_alloc();
     return p;
 }
 
@@ -134,10 +157,10 @@ void operator delete(void* p, std::size_t) noexcept           { srNoteFree(p); s
 void operator delete[](void* p, std::size_t) noexcept         { srNoteFree(p); std::free(p); }
 void operator delete(void* p, const std::nothrow_t&) noexcept { srNoteFree(p); std::free(p); }
 void operator delete[](void* p, const std::nothrow_t&) noexcept { srNoteFree(p); std::free(p); }
-void operator delete(void* p, std::align_val_t) noexcept      { srNoteFree(p); std::free(p); }
-void operator delete[](void* p, std::align_val_t) noexcept    { srNoteFree(p); std::free(p); }
-void operator delete(void* p, std::size_t, std::align_val_t) noexcept   { srNoteFree(p); std::free(p); }
-void operator delete[](void* p, std::size_t, std::align_val_t) noexcept { srNoteFree(p); std::free(p); }
+void operator delete(void* p, std::align_val_t) noexcept      { srNoteFree(p); srAlignedFree(p); }
+void operator delete[](void* p, std::align_val_t) noexcept    { srNoteFree(p); srAlignedFree(p); }
+void operator delete(void* p, std::size_t, std::align_val_t) noexcept   { srNoteFree(p); srAlignedFree(p); }
+void operator delete[](void* p, std::size_t, std::align_val_t) noexcept { srNoteFree(p); srAlignedFree(p); }
 
 #endif // SR_RT_INTERPOSE_NEW
 

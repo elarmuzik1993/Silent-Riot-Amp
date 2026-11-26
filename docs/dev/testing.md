@@ -26,6 +26,12 @@ The static checks, run in both modes:
 
 The full run then configures Release with `SR_BUILD_TESTS=ON`, builds, and runs `ctest`.
 
+It runs on Windows too, from Git Bash. There it mirrors the CI `test-windows` job instead:
+CMake's default generator (the newest Visual Studio; `-G Ninja` needs a developer shell to
+find the compiler) with `--config Release` / `ctest -C Release`. Checks 4, 6 and 7 use the
+first Python 3 that runs (`python3`, `python`, then `py -3`): on Windows `python3` can be
+the Microsoft Store stub, which is on `PATH` but fails when run.
+
 ## The test targets
 
 Tests use Catch2 v3, one test file per DSP module, all under `tests/`.
@@ -81,7 +87,8 @@ rather than argued about (`tests/rt_probe.h`):
 - **no allocation on the audio thread** — global `operator new`/`delete` are replaced, and
   every allocation made inside `processBlock` is counted with a backtrace;
 - **no blocking lock** — `pthread_mutex_lock` is interposed, and locks taken inside
-  `processBlock` are counted (contended ones separately);
+  `processBlock` are counted (contended ones separately). Linux only: on Windows the
+  allocation and deadline contracts are checked, and the lock counts stay at zero;
 - **no missed deadline** — every block is timed against `numSamples / sampleRate`.
 
 Every scenario also checks what the host receives: finite samples inside ±1.
@@ -97,6 +104,9 @@ cmake --build build-verify --target SilentRiotRTStress
 ./build-verify/tests/SilentRiotRTStress --md=rt-report.md       # full run, Markdown report
 ./build-verify/tests/SilentRiotRTStress --only=modes,ir         # one or more scenarios
 ```
+
+On Windows the Visual Studio generator puts it at
+`build-verify/tests/Release/SilentRiotRTStress.exe`.
 
 | Scenario | What it stresses |
 |---|---|

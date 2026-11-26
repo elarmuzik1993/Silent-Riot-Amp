@@ -21,6 +21,19 @@ fail=0
 say()  { [ "$QUICK" -eq 1 ] || echo "$@"; }
 bad()  { echo "FAIL: $*"; fail=1; }
 
+# A Python 3 that runs, not just one on PATH: on Windows `python3` can be the
+# Microsoft Store stub, which `command -v` finds and which fails when run.
+PY=()
+for cand in python3 python "py -3"; do
+    read -r -a try <<<"$cand"
+    if command -v "${try[0]}" >/dev/null 2>&1 \
+        && "${try[@]}" -c 'import sys; sys.exit(sys.version_info[0] != 3)' >/dev/null 2>&1; then
+        PY=("${try[@]}")
+        break
+    fi
+done
+[ ${#PY[@]} -gt 0 ] || say "note: no working Python 3; skipping the JSON, link and UI-text checks"
+
 # ── Static checks (both modes) ──────────────────────────────────────────
 
 # 1. Every .cpp under src/ is compiled into the plugin. An unlisted file is
@@ -53,8 +66,8 @@ for f in scripts/*.sh .agents/*.sh; do
 done
 
 # 4. The sign-off gate table is valid JSON (tools/signoff.py reads it).
-if command -v python3 >/dev/null; then
-    python3 -c 'import json,sys; json.load(open(sys.argv[1]))' tools/signoff_gates.json 2>/dev/null \
+if [ ${#PY[@]} -gt 0 ]; then
+    "${PY[@]}" -c 'import json,sys; json.load(open(sys.argv[1]))' tools/signoff_gates.json 2>/dev/null \
         || bad "tools/signoff_gates.json is not valid JSON"
 fi
 
@@ -69,36 +82,43 @@ done < <(git ls-files 'src/*.h' 'src/*.cpp' 'tests/*.h' 'tests/*.cpp' 'tools/*.c
 # 6. Every repo path the docs and code comments name exists: Markdown links and
 #    backticked paths in *.md, docs/... mentions in src/, tests/, tools/.
 #    Known non-file mentions: scripts/linkcheck-allow.txt.
-if command -v python3 >/dev/null; then
+if [ ${#PY[@]} -gt 0 ]; then
     while IFS= read -r line; do
-        bad "$line"
-    done < <(python3 scripts/check_links.py)
+        bad "${line%$'\r'}"
+    done < <("${PY[@]}" scripts/check_links.py)
 fi
 
 # 7. Every non-ASCII character in a src/ string literal can render: spelled as
 #    UTF-8 inside juce::CharPointer_UTF8 (a raw literal turns to mojibake) and
 #    present in the embedded fonts (a missing glyph draws as an empty box).
-if command -v python3 >/dev/null; then
+if [ ${#PY[@]} -gt 0 ]; then
     while IFS= read -r line; do
-        bad "$line"
-    done < <(python3 scripts/check_text.py)
+        bad "${line%$'\r'}"
+    done < <("${PY[@]}" scripts/check_text.py)
 fi
 
 say "static checks: $([ $fail -eq 0 ] && echo pass || echo FAIL)"
 [ "$QUICK" -eq 1 ] && exit $fail
 
 # ── Full: the CI `test` job (.github/workflows/build.yml) ───────────────
+# On Windows (Git Bash) it is the `test-windows` job instead: CMake's default
+# generator, the newest Visual Studio, since Ninja needs a developer shell to
+# find the compiler. --config / -C pick Release there and are ignored by Ninja.
+case "$(uname -s)" in
+    MINGW*|MSYS*|CYGWIN*) GEN=() ;;
+    *)                    GEN=(-G Ninja) ;;
+esac
 BUILD_DIR=build-verify
 LOG=$BUILD_DIR/verify
 mkdir -p "$BUILD_DIR"
 say "configure ($BUILD_DIR, Release, tests on)"
-cmake -B "$BUILD_DIR" -G Ninja -DCMAKE_BUILD_TYPE=Release -DSR_BUILD_TESTS=ON >"$LOG-configure.log" 2>&1 \
+cmake -B "$BUILD_DIR" "${GEN[@]}" -DCMAKE_BUILD_TYPE=Release -DSR_BUILD_TESTS=ON >"$LOG-configure.log" 2>&1 \
     || { bad "configure failed; see $LOG-configure.log"; exit 1; }
 say "build"
-cmake --build "$BUILD_DIR" -j"$(nproc)" >"$LOG-build.log" 2>&1 \
+cmake --build "$BUILD_DIR" --config Release --parallel >"$LOG-build.log" 2>&1 \
     || { bad "build failed; see $LOG-build.log"; tail -n 30 "$LOG-build.log"; exit 1; }
 say "test"
-ctest --test-dir "$BUILD_DIR" --output-on-failure >"$LOG-test.log" 2>&1 \
+ctest --test-dir "$BUILD_DIR" -C Release --output-on-failure >"$LOG-test.log" 2>&1 \
     || { bad "ctest failed; see $LOG-test.log"; tail -n 40 "$LOG-test.log"; exit 1; }
 tail -n 3 "$LOG-test.log"
 
