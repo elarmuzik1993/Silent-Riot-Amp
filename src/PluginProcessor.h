@@ -308,7 +308,7 @@ public:
     std::atomic<float> vPreampForGUI  { sr::V_PREAMP_NOMINAL_N };
     std::atomic<float> sagOffsetForGUI{ 0.0f };
     std::atomic<float> el84BiasForGUI { sr::PENTODE_BIAS_15W_N };
-    std::atomic<int>   osFactorForGUI { 1 };
+    std::atomic<int>   osFactorForGUI { 4 };   // the OVERSAMPLE default; prepareToPlay publishes the real one
 
 private:
 

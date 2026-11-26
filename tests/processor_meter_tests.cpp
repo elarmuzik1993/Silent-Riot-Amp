@@ -231,3 +231,21 @@ TEST_CASE("Processor: host bypass publishes the passthrough's peak", "[processor
     h.run(1.0, blockSine(0.1f), Mode::Bypassed);
     CHECK(outputPeak(h) == Catch::Approx(0.1f).epsilon(0.01));
 }
+
+// The footer's oversample readout must be right before the first audio block:
+// it started at 1 and only processBlock published the real factor, so the
+// footer read "1x OS" until audio ran. prepareToPlay now publishes it.
+TEST_CASE("Processor: the OS readout shows the prepared factor before any audio", "[processor][meters]")
+{
+    {
+        ProcessorHarness h;   // default mode, 4x; no processBlock yet
+        CHECK(h.proc.getDSPReadout().osFactor == 4);
+    }
+    {
+        // A saved 8x session: the parameter is restored, then the host prepares.
+        ProcessorHarness h;
+        h.set(IDs::OVERSAMPLE, 2.0f);   // choice index 2 = 8x
+        h.proc.prepareToPlay(h.sampleRate, h.blockSize);
+        CHECK(h.proc.getDSPReadout().osFactor == 8);
+    }
+}

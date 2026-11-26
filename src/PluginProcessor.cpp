@@ -382,6 +382,8 @@ void SilentRiotProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
     const float osRaw = apvts.getRawParameterValue(Params::IDs::OVERSAMPLE)->load();
     const int osMode = std::isfinite(osRaw) ? static_cast<int>(std::lround(osRaw)) : 1;
     oversampleSwitcher.init(getTotalNumOutputChannels(), samplesPerBlock, osMode);
+    // The footer reads this before the first block; processBlock only updates it.
+    osFactorForGUI.store(oversampleSwitcher.activeFactor(), std::memory_order_relaxed);
 
     // 4x polyphase-IIR oversampler dedicated to the IR-path output limiter
     // (see docs/records/handoffs/handoff-IR-limiter-aliasing.md). Runs at base SR -> 4x base SR,
