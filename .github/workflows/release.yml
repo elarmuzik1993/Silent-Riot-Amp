@@ -59,9 +59,15 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - uses: ./.github/actions/setup-linux-deps
+      # A tag push names the version (v1.2.3 → 1.2.3); a manual dry run uses its
+      # `tag` input, as the ref is then a branch, whose "/" broke the paths.
       - name: Resolve version
         id: ver
-        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+        env:
+          DRY_RUN_TAG: ${{ inputs.tag }}
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ]; then v="${DRY_RUN_TAG:-dev}"; else v="${GITHUB_REF_NAME#v}"; fi
+          echo "version=${v//\//-}" >> "$GITHUB_OUTPUT"
       - name: Build Release
         run: |
           cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
@@ -100,7 +106,11 @@ jobs:
       - name: Resolve version
         id: ver
         shell: bash
-        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+        env:
+          DRY_RUN_TAG: ${{ inputs.tag }}
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ]; then v="${DRY_RUN_TAG:-dev}"; else v="${GITHUB_REF_NAME#v}"; fi
+          echo "version=${v//\//-}" >> "$GITHUB_OUTPUT"
       - name: Build Release
         run: |
           cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded
