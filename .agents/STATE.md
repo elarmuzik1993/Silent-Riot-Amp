@@ -20,12 +20,11 @@ _Updated 2026-11-26 (test infra fixed; real-time and thread-safety rules enforce
   Cloud sessions can't push tags, create labels or dispatch workflows; only the owner pushes tags.
 
 ## Next
-1. Before the next tag, dry-run `release.yml` by hand ("Run workflow"): its rt-stress gate hasn't run yet.
-2. Owner settings: create the `tone` label; private vulnerability reporting; "Keep my email addresses
+1. Owner settings: create the `tone` label; private vulnerability reporting; "Keep my email addresses
    private"; delete stale branches (keep `main`, `feat/neural-hybrid-blend-sketch`).
-3. Fix #43 (IR LOADER panel stale after automation/state load) and #45 (window not clamped to screen).
-4. Footer shows "1x OS" until audio runs: initialise `osFactorForGUI` to 4 or set it in `prepareToPlay`.
-5. Later: donation platform (`docs/plans/2026-10-28-open-source-docs-prep.md` step 9); installers (#46/#47);
+2. Fix #43 (IR LOADER panel stale after automation/state load) and #45 (window not clamped to screen).
+3. Footer shows "1x OS" until audio runs: initialise `osFactorForGUI` to 4 or set it in `prepareToPlay`.
+4. Later: donation platform (`docs/plans/2026-10-28-open-source-docs-prep.md` step 9); installers (#46/#47);
    macOS (#69); replace the two Pexels textures with own/CC0 photos; E3 aliasing fix → owner A/B → `tone-v2`.
 
 ## Decisions
