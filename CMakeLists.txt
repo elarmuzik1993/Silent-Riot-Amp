@@ -15,6 +15,14 @@ option(SR_BUILD_TESTS   "Build unit tests"   OFF)
 option(SR_BUILD_TOOLS   "Build offline tone-sign-off render tool (headless)" OFF)
 
 # ── JUCE via FetchContent ───────────────────────
+# CI keeps FetchContent's checkouts (JUCE here, Catch2 in tests/) between runs
+# by caching the directory its FETCHCONTENT_BASE_DIR environment variable names
+# (.github/workflows/build.yml). FetchContent reads the CMake variable, not the
+# environment, so seed it from there; unset, the default (build/_deps) stands.
+if(DEFINED ENV{FETCHCONTENT_BASE_DIR})
+    set(FETCHCONTENT_BASE_DIR "$ENV{FETCHCONTENT_BASE_DIR}" CACHE PATH
+        "Where FetchContent puts its checkouts and their build trees")
+endif()
 include(FetchContent)
 FetchContent_Declare(
     JUCE

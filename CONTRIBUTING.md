@@ -87,9 +87,12 @@ project itself uses AI, and what you confirm when you contribute AI-assisted wor
 1. In `CHANGELOG.md`, rename `## [Unreleased]` to `## [x.y.z] - YYYY-MM-DD` and add a fresh,
    empty `## [Unreleased]` above it.
 2. Bump `VERSION` in the `project(SilentRiot ...)` call at the top of `CMakeLists.txt`.
-3. Merge that, then tag the merge commit `vx.y.z` and push the tag. `release.yml` builds the
+3. Merge that, then tag the merge commit `vx.y.z` and push the tag. `release.yml` first runs
+   the full `rt_stress` matrix (any real-time violation stops the release), then builds the
    packages and uses the `[x.y.z]` section as the release notes (falling back to
-   `[Unreleased]` if the section was not renamed).
+   `[Unreleased]` if the section was not renamed). The Linux package is built on Ubuntu 24.04
+   and checked to run on any x86-64 CPU with glibc 2.39 (`scripts/check_linux_portability.sh`).
+   To try the packaging without publishing, run `release.yml` by hand (Actions, "Run workflow").
 
 ## Licence
 
