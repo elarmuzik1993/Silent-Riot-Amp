@@ -125,6 +125,13 @@ public:
     int getNumUserIRs() const;
     bool copyUserIR(int index, UserIREntry& out) const;
 
+    // Bumped whenever the user-IR list changes (a load, a state restore), so
+    // the editor's timer can tell its IR LOADER panel is stale (#43).
+    uint32_t getUserIRListVersion() const { return userIRListVersion.load(std::memory_order_acquire); }
+    // Copies the list under irStateLock — a host may restore state off the
+    // message thread — and returns the version that copy belongs to.
+    uint32_t copyUserIRs(std::vector<UserIREntry>& out) const;
+
 private:
     juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
     // Message thread, 20 Hz: publishes a latency the audio thread computed
@@ -150,6 +157,7 @@ private:
 
     // User IR persistence
     std::vector<UserIREntry> userIRs;
+    std::atomic<uint32_t> userIRListVersion { 0 };   // changed under irStateLock
     void saveUserIRsToState(juce::ValueTree& state) const;   // into a copy, under irStateLock
     void loadUserIRsFromState();
 
@@ -319,7 +327,7 @@ public:
     std::atomic<float> vPreampForGUI  { sr::V_PREAMP_NOMINAL_N };
     std::atomic<float> sagOffsetForGUI{ 0.0f };
     std::atomic<float> el84BiasForGUI { sr::PENTODE_BIAS_15W_N };
-    std::atomic<int>   osFactorForGUI { 1 };
+    std::atomic<int>   osFactorForGUI { 4 };   // the OVERSAMPLE default; prepareToPlay publishes the real one
 
 private:
 

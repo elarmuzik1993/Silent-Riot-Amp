@@ -382,6 +382,8 @@ void SilentRiotProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
     const float osRaw = apvts.getRawParameterValue(Params::IDs::OVERSAMPLE)->load();
     const int osMode = std::isfinite(osRaw) ? static_cast<int>(std::lround(osRaw)) : 1;
     oversampleSwitcher.init(getTotalNumOutputChannels(), samplesPerBlock, osMode);
+    // The footer reads this before the first block; processBlock only updates it.
+    osFactorForGUI.store(oversampleSwitcher.activeFactor(), std::memory_order_relaxed);
 
     // 4x polyphase-IIR oversampler dedicated to the IR-path output limiter
     // (see docs/records/handoffs/handoff-IR-limiter-aliasing.md). Runs at base SR -> 4x base SR,
@@ -1340,6 +1342,7 @@ bool SilentRiotProcessor::loadUserIR(const juce::File& file)
     cabSim.loadIRFromBuffer(std::move(bufCopy), entry.sampleRate);
 
     userIRs.push_back(std::move(entry));
+    userIRListVersion.fetch_add(1, std::memory_order_acq_rel);
 
     // Set IR_INDEX to the new IR (1-based)
     int newIndex = static_cast<int>(userIRs.size());
@@ -1377,6 +1380,14 @@ void SilentRiotProcessor::selectBuiltInCab()
     if (auto* param = apvts.getParameter(sr::Params::IDs::IR_INDEX))
         param->setValueNotifyingHost(param->convertTo0to1(0.0f));
     applyIRIndexParam(sr::IRLoad::Async);
+}
+
+uint32_t SilentRiotProcessor::copyUserIRs(std::vector<UserIREntry>& out) const
+{
+    // Message thread (the editor). Allocates: never from the audio thread.
+    const juce::ScopedLock irLock(irStateLock);
+    out = userIRs;
+    return userIRListVersion.load(std::memory_order_acquire);
 }
 
 int SilentRiotProcessor::getNumUserIRs() const
@@ -1433,6 +1444,7 @@ void SilentRiotProcessor::loadUserIRsFromState()
     // userIRsFromValueTree() validates every entry — state comes from DAW
     // project files and must not be trusted (see UserIRState.h).
     userIRs = sr::userIRsFromValueTree(apvts.state.getChildWithName("UserIRs"));
+    userIRListVersion.fetch_add(1, std::memory_order_acq_rel);
 
     // Reload the saved active IR — or disable the live one when the saved
     // index is past the restored list (review S2). Async: a restore can run

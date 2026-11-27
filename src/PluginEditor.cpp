@@ -190,36 +190,18 @@ SilentRiotEditor::SilentRiotEditor(SilentRiotProcessor& p)
         layoutContent();
     };
 
-    // Populate IR list from saved state. Copies, one locked read each: a host
-    // may restore (replace the list) from its own thread meanwhile.
-    {
-        SilentRiotProcessor::UserIREntry ir;
-        for (int i = 0; proc.copyUserIR(i, ir); ++i)
-            irLoaderPanel.addUserIR(ir.name, ir.numSamples, ir.sampleRate, i + 1, ir.audioData);
-    }
-
-    // The IR bar's hint: the selected IR's name, or the built-in cab.
-    const auto showIRHint = [this](int irIdx)
-    {
-        SilentRiotProcessor::UserIREntry ir;
-        irSectionBar.setHintText(irIdx >= 1 && proc.copyUserIR(irIdx - 1, ir) ? ir.name
-                                                                               : juce::String("IIR Mode"));
-    };
-
-    // Set selected IR and hint text from parameter
-    {
-        int irIdx = static_cast<int>(proc.apvts.getRawParameterValue(sr::Params::IDs::IR_INDEX)->load());
-        irLoaderPanel.setSelectedIR(irIdx);
-        showIRHint(irIdx);
-    }
+    // Fill the IR list and selection from the processor (saved state); the
+    // timer keeps them in step from here on (syncIRPanel, #43). It reads the
+    // list through locked copies: a host may restore from its own thread.
+    syncIRPanel();
 
     // IR loader panel wiring
-    irLoaderPanel.onIRSelected = [this, showIRHint](int irIdx) {
+    irLoaderPanel.onIRSelected = [this](int irIdx) {
         if (irIdx == 0)
             proc.selectBuiltInCab();
         else
             proc.selectUserIR(irIdx - 1);  // convert 1-based to 0-based
-        showIRHint(irIdx);
+        syncIRPanel();   // the hint text, and records the index as shown
     };
 
     irLoaderPanel.onUserIRLoaded = [this](const juce::File& file) {
@@ -227,20 +209,27 @@ SilentRiotEditor::SilentRiotEditor(SilentRiotProcessor& p)
             irSectionBar.setHintText("IR list full (" + juce::String(sr::MAX_USER_IRS) + ")");
             return;
         }
+        const uint32_t before = proc.getUserIRListVersion();
         if (!proc.loadUserIR(file)) {
             // On failure nothing was appended — adding a panel entry here
             // would duplicate the previous IR.
             irSectionBar.setHintText("Couldn't read IR file");
             return;
         }
-        const int newIdx = proc.getNumUserIRs();
+        // Append the one new entry rather than let syncIRPanel rebuild the
+        // list, which would scroll it back to the top. Only when nothing else
+        // changed the list in between; otherwise the rebuild is right.
         SilentRiotProcessor::UserIREntry ir;
-        if (! proc.copyUserIR(newIdx - 1, ir))
-            return;   // a restore on a host thread replaced the list meanwhile
-        irLoaderPanel.addUserIR(ir.name, ir.numSamples, ir.sampleRate,
-                                newIdx, ir.audioData);
-        irLoaderPanel.setSelectedIR(newIdx);
-        irSectionBar.setHintText(ir.name);
+        const int newIdx = proc.getNumUserIRs();
+        if (before == shownIRListVersion && proc.getUserIRListVersion() == before + 1
+            && proc.copyUserIR(newIdx - 1, ir))
+        {
+            irLoaderPanel.addUserIR(ir.name, ir.numSamples, ir.sampleRate,
+                                    newIdx, ir.audioData);
+            shownIRNames.push_back(ir.name);
+            shownIRListVersion = before + 1;
+        }
+        syncIRPanel();
     };
 
     // CAB toggle auto-opens IR panel
@@ -672,10 +661,46 @@ void SilentRiotEditor::updateFaceplateGlow(bool powerOn, double dtSeconds)
     irLoaderPanel.setDrive(drive.level, drive.heat);   // the cab's piping glow
 }
 
+void SilentRiotEditor::syncIRPanel()
+{
+    // The panel only showed what the editor told it, so host automation of
+    // IR_INDEX and a state restore left its list and highlight stale (#43).
+    // Polled from the timer: cheap when nothing changed (an atomic and a
+    // parameter read), and never touches the GUI from the audio thread.
+    if (proc.getUserIRListVersion() != shownIRListVersion)
+    {
+        std::vector<SilentRiotProcessor::UserIREntry> irs;
+        shownIRListVersion = proc.copyUserIRs(irs);
+        irLoaderPanel.clearIRList();
+        shownIRNames.clear();
+        for (size_t i = 0; i < irs.size(); ++i)
+        {
+            const auto& ir = irs[i];
+            irLoaderPanel.addUserIR(ir.name, ir.numSamples, ir.sampleRate,
+                                    static_cast<int>(i) + 1, ir.audioData);
+            shownIRNames.push_back(ir.name);
+        }
+        shownIRIndex = -1;   // clearIRList dropped the selection
+    }
+
+    const float raw = proc.apvts.getRawParameterValue(sr::Params::IDs::IR_INDEX)->load();
+    const int irIdx = std::isfinite(raw) ? static_cast<int>(std::lround(raw)) : 0;
+    if (irIdx == shownIRIndex)
+        return;
+    shownIRIndex = irIdx;
+    irLoaderPanel.setSelectedIR(irIdx);
+    if (irIdx >= 1 && irIdx <= static_cast<int>(shownIRNames.size()))
+        irSectionBar.setHintText(shownIRNames[static_cast<size_t>(irIdx - 1)]);
+    else
+        irSectionBar.setHintText("IIR Mode");
+}
+
 void SilentRiotEditor::timerCallback()
 {
     if (!compositorBypassed)
         disableCompositorEffects();
+
+    syncIRPanel();
 
     // Animate collapsible sections within current window bounds
     {

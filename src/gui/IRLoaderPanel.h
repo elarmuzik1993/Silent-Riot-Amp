@@ -48,6 +48,8 @@ public:
     void addUserIR(const juce::String& name, int samples, double sampleRate,
                    int irIndex, const juce::AudioBuffer<float>& audioData);
     void clearIRList();
+    int getNumListedIRs() const { return static_cast<int>(irList.size()); }
+    juce::String getListedIRName(int row) const { return irList[static_cast<size_t>(row)].name; }
 
     std::function<void(int)> onIRSelected;
     std::function<void(const juce::File&)> onUserIRLoaded;
