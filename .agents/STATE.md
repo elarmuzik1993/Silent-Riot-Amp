@@ -12,20 +12,19 @@ _Updated 2026-11-26 (test infra fixed; real-time and thread-safety rules enforce
   the first Python 3 that runs. `SilentRiotRTStress` builds on MSVC (no lock interposition there).
 - Thread rules are gates: `rt_stress --quick` in `verify.sh` and both CI test jobs (alloc/free/mutex on
   the audio thread), CI `tsan` over the cross-thread scenarios (incl. `hostsave`), verify check 8.
-- Presets removed (amp opens on defaults); save/load/curated presets are #72.
-- Sanitizers (ASan/UBSan) build all 3 test targets, skip the tone lock, excuse only JUCE's libjpeg.
+  The full `rt_stress` matrix runs weekly (`build.yml` schedule, with all of CI) and gates `release.yml`.
+- Linux packages (`release.yml`, CI `build-linux`) build on `ubuntu-24.04` like v0.4.0, and
+  `scripts/check_linux_portability.sh` fails them on AVX/FMA code or glibc > 2.39.
+- Presets removed (#72 tracks save/load). ASan/UBSan run all 3 test targets bar the tone lock.
 - Commit as `Boris Miscenco <219343213+elarmuzik1993@users.noreply.github.com>` (exported `GIT_*` vars).
   Cloud sessions can't push tags, create labels or dispatch workflows; only the owner pushes tags.
 
 ## Next
-1. Before the next release (owner's call): `release.yml` builds Linux on `ubuntu-latest`, so its package
-   would need an x86-64-v3 CPU and Ubuntu 26.04's glibc. Pin it (and `build-linux`) to `ubuntu-24.04`
-   and/or set a `-march` baseline in CMake; move its actions to Node 24 majors; dry-run it.
-2. Owner settings: create the `tone` label; private vulnerability reporting; "Keep my email addresses
+1. Owner settings: create the `tone` label; private vulnerability reporting; "Keep my email addresses
    private"; delete stale branches (keep `main`, `feat/neural-hybrid-blend-sketch`).
-3. Fix #43 (IR LOADER panel stale after automation/state load) and #45 (window not clamped to screen).
-4. Footer shows "1x OS" until audio runs: initialise `osFactorForGUI` to 4 or set it in `prepareToPlay`.
-5. Later: donation platform (`docs/plans/2026-10-28-open-source-docs-prep.md` step 9); installers (#46/#47);
+2. Fix #43 (IR LOADER panel stale after automation/state load) and #45 (window not clamped to screen).
+3. Footer shows "1x OS" until audio runs: initialise `osFactorForGUI` to 4 or set it in `prepareToPlay`.
+4. Later: donation platform (`docs/plans/2026-10-28-open-source-docs-prep.md` step 9); installers (#46/#47);
    macOS (#69); replace the two Pexels textures with own/CC0 photos; E3 aliasing fix → owner A/B → `tone-v2`.
 
 ## Decisions
