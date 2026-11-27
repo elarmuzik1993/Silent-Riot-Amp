@@ -97,8 +97,9 @@ Every scenario also checks what the host receives: finite samples inside ±1.
 It is **not** a ctest. `verify.sh` and CI's `test` and `test-windows` jobs run its `--quick`
 matrix (about a minute) after ctest, and fail on any CRITICAL finding: an allocation, free
 or mutex on the audio thread, or non-finite output. A missed deadline is reported but is not
-CRITICAL, so a busy machine can't fail that gate. The full run takes minutes; run it on
-demand, and before a release:
+CRITICAL, so a busy machine can't fail that gate. The full matrix takes minutes, so CI runs
+it weekly and on demand (`rt-stress-full` in `build.yml`), and every release runs it before
+packaging (`release.yml`; a CRITICAL finding stops the release). To run it yourself:
 
 ```bash
 cmake -B build-verify -G Ninja -DCMAKE_BUILD_TYPE=Release -DSR_BUILD_TESTS=ON

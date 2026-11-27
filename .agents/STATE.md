@@ -12,15 +12,15 @@ _Updated 2026-11-26 (test infra fixed; real-time and thread-safety rules enforce
   the first Python 3 that runs. `SilentRiotRTStress` builds on MSVC (no lock interposition there).
 - Thread rules are gates: `rt_stress --quick` in `verify.sh` and both CI test jobs (alloc/free/mutex on
   the audio thread), CI `tsan` over the cross-thread scenarios (incl. `hostsave`), verify check 8.
-- Presets removed (amp opens on defaults); save/load/curated presets are #72.
-- Sanitizers (ASan/UBSan) build all 3 test targets, skip the tone lock, excuse only JUCE's libjpeg.
+  The full `rt_stress` matrix runs weekly (`build.yml` schedule, with all of CI) and gates `release.yml`.
+- Linux packages (`release.yml`, CI `build-linux`) build on `ubuntu-24.04` like v0.4.0, and
+  `scripts/check_linux_portability.sh` fails them on AVX/FMA code or glibc > 2.39.
+- Presets removed (#72 tracks save/load). ASan/UBSan run all 3 test targets bar the tone lock.
 - Commit as `Boris Miscenco <219343213+elarmuzik1993@users.noreply.github.com>` (exported `GIT_*` vars).
   Cloud sessions can't push tags, create labels or dispatch workflows; only the owner pushes tags.
 
 ## Next
-1. Before the next release (owner's call): `release.yml` builds Linux on `ubuntu-latest`, so its package
-   would need an x86-64-v3 CPU and Ubuntu 26.04's glibc. Pin it (and `build-linux`) to `ubuntu-24.04`
-   and/or set a `-march` baseline in CMake; move its actions to Node 24 majors; dry-run it.
+1. Before the next tag, dry-run `release.yml` by hand ("Run workflow"): its rt-stress gate hasn't run yet.
 2. Owner settings: create the `tone` label; private vulnerability reporting; "Keep my email addresses
    private"; delete stale branches (keep `main`, `feat/neural-hybrid-blend-sketch`).
 3. Fix #43 (IR LOADER panel stale after automation/state load) and #45 (window not clamped to screen).

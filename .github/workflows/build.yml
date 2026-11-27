@@ -5,15 +5,25 @@ on:
     branches: [main, develop]
   pull_request:
     branches: [main, develop]
+  # Weekly on main, so a runner image change shows up within days, not at the
+  # next push (ubuntu-latest moving to 26.04 kept the test job red for three
+  # weeks); this run also runs rt-stress-full. And on demand.
+  schedule:
+    - cron: "23 5 * * 1"
+  workflow_dispatch:
 
-# Cancel superseded runs on the same ref (roadmap P3 — CI hardening).
+# Cancel superseded runs on the same ref (roadmap P3 — CI hardening). The event
+# is in the group so the weekly run never cancels a push run, or the reverse.
 concurrency:
-  group: build-${{ github.workflow }}-${{ github.ref }}
+  group: build-${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: true
 
 env:
   # Persist FetchContent (JUCE 7.0.12 + Catch2) across runs so they aren't
-  # cloned fresh every job — slow and network-flaky (roadmap P3).
+  # cloned fresh every job — slow and network-flaky (roadmap P3). The root
+  # CMakeLists.txt hands this to FetchContent (it reads the CMake variable, so
+  # until 2026-11 the cache never saved). One cache per job: the directory also
+  # holds JUCE's juceaide tool, built with that job's compiler and sanitizer.
   FETCHCONTENT_BASE_DIR: ${{ github.workspace }}/.deps
   # Days to keep each run's uploaded builds. Without it they default to up to
   # 90 days, and four per run filled the account's artifact storage quota —
@@ -26,8 +36,11 @@ env:
 
 jobs:
   # ── Linux Release: the artifact we actually ship ──────────────────────
+  # On the same runner as release.yml's package (ubuntu-24.04, not -latest:
+  # 26.04's GCC 15 targets x86-64-v3 and its newer glibc), and held to the same
+  # portability check, so a PR can't break the shipped binary unseen.
   build-linux:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v5
@@ -36,7 +49,7 @@ jobs:
         uses: actions/cache@v5
         with:
           path: ${{ env.FETCHCONTENT_BASE_DIR }}
-          key: deps-${{ runner.os }}-${{ hashFiles('CMakeLists.txt', 'tests/CMakeLists.txt') }}
+          key: deps-${{ runner.os }}-${{ github.job }}-${{ hashFiles('CMakeLists.txt', 'tests/CMakeLists.txt') }}
       - name: ccache
         uses: hendrikmuhs/ccache-action@v1.2
         with:
@@ -49,6 +62,8 @@ jobs:
           -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
       - name: Build
         run: cmake --build build
+      - name: Portability (baseline x86-64, glibc 2.39)
+        run: bash scripts/check_linux_portability.sh build/SilentRiot_artefacts/Release
       - name: Upload VST3
         uses: actions/upload-artifact@v6
         with:
@@ -74,7 +89,7 @@ jobs:
         uses: actions/cache@v5
         with:
           path: ${{ env.FETCHCONTENT_BASE_DIR }}
-          key: deps-${{ runner.os }}-${{ hashFiles('CMakeLists.txt', 'tests/CMakeLists.txt') }}
+          key: deps-${{ runner.os }}-${{ github.job }}-${{ hashFiles('CMakeLists.txt', 'tests/CMakeLists.txt') }}
       - name: ccache
         uses: hendrikmuhs/ccache-action@v1.2
         with:
@@ -140,7 +155,7 @@ jobs:
         uses: actions/cache@v5
         with:
           path: ${{ env.FETCHCONTENT_BASE_DIR }}
-          key: deps-${{ runner.os }}-${{ hashFiles('CMakeLists.txt', 'tests/CMakeLists.txt') }}
+          key: deps-${{ runner.os }}-${{ github.job }}-${{ hashFiles('CMakeLists.txt', 'tests/CMakeLists.txt') }}
       - name: ccache
         uses: hendrikmuhs/ccache-action@v1.2
         with:
@@ -171,7 +186,7 @@ jobs:
         uses: actions/cache@v5
         with:
           path: ${{ env.FETCHCONTENT_BASE_DIR }}
-          key: deps-${{ runner.os }}-${{ hashFiles('CMakeLists.txt', 'tests/CMakeLists.txt') }}
+          key: deps-${{ runner.os }}-${{ github.job }}-${{ hashFiles('CMakeLists.txt', 'tests/CMakeLists.txt') }}
       - name: ccache
         uses: hendrikmuhs/ccache-action@v1.2
         with:
@@ -208,7 +223,7 @@ jobs:
         uses: actions/cache@v5
         with:
           path: ${{ env.FETCHCONTENT_BASE_DIR }}
-          key: deps-${{ runner.os }}-${{ hashFiles('CMakeLists.txt', 'tests/CMakeLists.txt') }}
+          key: deps-${{ runner.os }}-${{ github.job }}-${{ hashFiles('CMakeLists.txt', 'tests/CMakeLists.txt') }}
       - name: ccache
         uses: hendrikmuhs/ccache-action@v1.2
         with:
@@ -230,6 +245,37 @@ jobs:
       - name: Run sanitized tests
         run: ctest --test-dir build-san -E "^Tone lock:" --output-on-failure
 
+  # ── The full rt_stress matrix: weekly and on demand ───────────────────
+  # The test jobs gate every run on the --quick matrix; the full one takes
+  # minutes, so it runs on the weekly schedule and on demand here, and before
+  # every release in release.yml. A CRITICAL finding fails it.
+  rt-stress-full:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-linux-deps
+      - name: Cache dependencies (JUCE/Catch2)
+        uses: actions/cache@v5
+        with:
+          path: ${{ env.FETCHCONTENT_BASE_DIR }}
+          key: deps-${{ runner.os }}-${{ github.job }}-${{ hashFiles('CMakeLists.txt', 'tests/CMakeLists.txt') }}
+      - name: ccache
+        uses: hendrikmuhs/ccache-action@v1.2
+        with:
+          key: ccache-linux-rtfull
+      - name: Configure + Build
+        run: |
+          cmake -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DSR_BUILD_TESTS=ON \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+          cmake --build build --target SilentRiotRTStress
+      - name: Real-time contracts, full matrix
+        run: ./build/tests/SilentRiotRTStress
+
   # ── ThreadSanitizer over the cross-thread scenarios ───────────────────
   # The audio thread, the message thread (timer, state save/restore, IR loads),
   # a host's save thread and JUCE's convolution loader run at once in
@@ -249,7 +295,7 @@ jobs:
         uses: actions/cache@v5
         with:
           path: ${{ env.FETCHCONTENT_BASE_DIR }}
-          key: deps-${{ runner.os }}-${{ hashFiles('CMakeLists.txt', 'tests/CMakeLists.txt') }}
+          key: deps-${{ runner.os }}-${{ github.job }}-${{ hashFiles('CMakeLists.txt', 'tests/CMakeLists.txt') }}
       - name: ccache
         uses: hendrikmuhs/ccache-action@v1.2
         with:

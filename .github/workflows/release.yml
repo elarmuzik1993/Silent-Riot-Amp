@@ -32,11 +32,32 @@ env:
   ARTIFACT_RETENTION_DAYS: 6
 
 jobs:
-  package-linux:
+  # ── The real-time contracts, full matrix, before anything is packaged ──
+  # Every push runs rt_stress --quick in the test jobs; a release also runs the
+  # full matrix (docs/dev/testing.md). A CRITICAL finding (an allocation, free
+  # or mutex on the audio thread, non-finite output) stops the release.
+  rt-stress:
     runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-linux-deps
+      - name: Build rt_stress
+        run: |
+          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DSR_BUILD_TESTS=ON
+          cmake --build build --target SilentRiotRTStress
+      - name: Real-time contracts, full matrix
+        run: ./build/tests/SilentRiotRTStress
+
+  package-linux:
+    needs: rt-stress
+    # Pinned, not ubuntu-latest: v0.4.0 was built on 24.04, and 26.04's GCC 15
+    # defaults to -march=x86-64-v3 (an AVX2/FMA CPU) and links its newer glibc.
+    # The portability step below fails the job if that ever changes.
+    runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: ./.github/actions/setup-linux-deps
       - name: Resolve version
         id: ver
@@ -45,6 +66,8 @@ jobs:
         run: |
           cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
           cmake --build build
+      - name: Portability (baseline x86-64, glibc 2.39)
+        run: bash scripts/check_linux_portability.sh build/SilentRiot_artefacts/Release
       - name: Package
         run: |
           VER="${{ steps.ver.outputs.version }}"
@@ -59,7 +82,7 @@ jobs:
           sha256sum "${STAGE}.tar.gz" > "${STAGE}.tar.gz.sha256"
       # - name: Sign (placeholder — requires GPG secret) ...
       - name: Upload package
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: SilentRiot-Linux-package
           path: |
@@ -69,10 +92,11 @@ jobs:
           retention-days: ${{ env.ARTIFACT_RETENTION_DAYS }}
 
   package-windows:
+    needs: rt-stress
     runs-on: windows-latest
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Resolve version
         id: ver
         shell: bash
@@ -96,7 +120,7 @@ jobs:
           Compress-Archive -Path "$stage\*" -DestinationPath "$stage.zip" -Force
           (Get-FileHash "$stage.zip" -Algorithm SHA256).Hash | Out-File "$stage.zip.sha256"
       - name: Upload package
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: SilentRiot-Windows-package
           path: |
@@ -114,7 +138,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Extract release notes from CHANGELOG.md
         # The body is this version's "## [x.y.z]" section, else "## [Unreleased]"
         # (a tag pushed before the section was renamed); GitHub's generated
@@ -132,7 +156,7 @@ jobs:
           [ -s release-notes.md ] || section Unreleased > release-notes.md || true
           echo "release notes: $(wc -l < release-notes.md) lines for $VER"
       - name: Download all packages
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           path: dist
           merge-multiple: true
