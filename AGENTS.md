@@ -33,7 +33,9 @@ Silent Riot is a JUCE 7 amp simulator plugin built with C++17, CMake, and Ninja 
   references (`SR_TONE_LOCK_WRITE=1`) without the owner's explicit approval after an A/B; a
   failing tone lock means find out why. Transition and glitch fixes are allowed if the lock
   still passes. Procedure: `docs/dev/tone-lock.md`.
-- Do not allocate dynamically in `processBlock`; pre-allocate buffers and state.
+- The audio thread (`processBlock`) never allocates, frees, takes a lock or posts a message;
+  pre-allocate buffers and state, and share state with other threads through atomics.
+  `rt_stress --quick` enforces this in `verify.sh` and CI, and CI's `tsan` job fails on any data race.
 - Inject `ANTI_DENORMAL` into IIR filter state where needed.
 - Smooth parameters per sample at the oversampled rate using the existing `ParamSmoother` target/tick pattern.
 - Bias values are negative. Apply bias with `vGrid + vBias`.
@@ -47,7 +49,10 @@ Silent Riot is a JUCE 7 amp simulator plugin built with C++17, CMake, and Ninja 
 - Knob faces are painted by `SilentRiotLookAndFeel::drawRotarySlider`, not by the component. Any rotary slider using this LookAndFeel must call `setRotaryParameters(kRotaryStartAngle, kRotaryEndAngle, true)` or its ticks won't match its value.
 - The window is sized to content height by `applyShapeMask()` (the X11 shape-mask approach it replaced is gone). Note it does **not** clamp to the display work area, so tall panel combinations can exceed the screen.
 - **Size a child against what it needs to paint, not against the row it sits in.** JUCE clips `paint()` to a component's own bounds and reports nothing, so an under-sized control loses part of its graphic while still handling clicks — it looks broken but keeps changing the parameter. `ToggleSwitch::minHeight(Style)` exists for this reason and `EffectsPanel` static_asserts against it; follow that pattern for new controls.
-- Keep UI state in the APVTS `ValueTree` when it needs to persist with plugin state.
+- UI state that persists with the plugin state goes through `SilentRiotProcessor::setUIProperty`
+  (saved as root properties of the state tree). Editor code never writes the live `apvts.state`, and
+  reads the IR list only through `copyUserIR`: a host may save or restore from its own thread.
+  `verify.sh` (check 8) enforces the first part.
 - Non-ASCII UI text goes in `juce::CharPointer_UTF8("\x..")`, and only with characters the embedded fonts have (JUCE does not fall back to a system font). Draw symbols such as arrows or flat/sharp as paths. `scripts/check_text.py` (in `verify.sh`) enforces both.
 
 ## Commit & PR conventions
@@ -86,7 +91,9 @@ Tests use Catch2 v3:
   `tests/processor_harness.h` (links the plugin's SharedCode target; no source list to maintain).
 
 `SilentRiotRTStress` (`tests/rt_stress.cpp`) is a fourth executable and **not** a ctest: it holds
-the audio thread to its real-time contracts — no allocation, no blocking lock, no missed deadline —
-and runs for minutes, so run it on demand and before a release. See `docs/dev/testing.md`.
+the audio thread to its real-time contracts — no allocation, no blocking lock, no missed deadline.
+`verify.sh` and CI run its `--quick` matrix as a gate (a CRITICAL finding fails it), and CI runs its
+cross-thread scenarios under ThreadSanitizer. The full run takes minutes: run it on demand and
+before a release. See `docs/dev/testing.md`.
 
 Verify DSP, parameter, and GUI behavior with focused tests whenever changing behavior.

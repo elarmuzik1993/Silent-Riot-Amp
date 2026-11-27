@@ -49,6 +49,9 @@
  #include <sched.h>
  #include <time.h>
 #endif
+#if defined(_WIN32)
+ #include <malloc.h>   // _aligned_malloc, _aligned_free
+#endif
 
 // ═══════════════════════════════════════════════════════════════
 // 1. Interposers. Exactly one TU may define these, and they have to live in
@@ -74,6 +77,27 @@
 #endif
 
 #if SR_RT_INTERPOSE_NEW
+
+// Over-aligned blocks. The MSVC CRT has no posix_memalign, and a block from
+// its _aligned_malloc must go back through _aligned_free, never free().
+static inline void* srAlignedAlloc(std::size_t n, std::size_t align)
+{
+#if defined(_WIN32)
+    return _aligned_malloc(n, align);
+#else
+    void* p = nullptr;
+    return posix_memalign(&p, align, n) == 0 ? p : nullptr;
+#endif
+}
+
+static inline void srAlignedFree(void* p)
+{
+#if defined(_WIN32)
+    _aligned_free(p);
+#else
+    std::free(p);
+#endif
+}
 
 void* operator new(std::size_t n)
 {
@@ -115,9 +139,8 @@ void* operator new(std::size_t n, std::align_val_t a)
         rt::note("operator new (aligned)", n);
     }
     const std::size_t align = static_cast<std::size_t>(a);
-    void* p = nullptr;
-    if (posix_memalign(&p, align < sizeof(void*) ? sizeof(void*) : align, n != 0 ? n : 1) != 0)
-        throw std::bad_alloc();
+    void* p = srAlignedAlloc(n != 0 ? n : 1, align < sizeof(void*) ? sizeof(void*) : align);
+    if (p == nullptr) throw std::bad_alloc();
     return p;
 }
 
@@ -134,10 +157,10 @@ void operator delete(void* p, std::size_t) noexcept           { srNoteFree(p); s
 void operator delete[](void* p, std::size_t) noexcept         { srNoteFree(p); std::free(p); }
 void operator delete(void* p, const std::nothrow_t&) noexcept { srNoteFree(p); std::free(p); }
 void operator delete[](void* p, const std::nothrow_t&) noexcept { srNoteFree(p); std::free(p); }
-void operator delete(void* p, std::align_val_t) noexcept      { srNoteFree(p); std::free(p); }
-void operator delete[](void* p, std::align_val_t) noexcept    { srNoteFree(p); std::free(p); }
-void operator delete(void* p, std::size_t, std::align_val_t) noexcept   { srNoteFree(p); std::free(p); }
-void operator delete[](void* p, std::size_t, std::align_val_t) noexcept { srNoteFree(p); std::free(p); }
+void operator delete(void* p, std::align_val_t) noexcept      { srNoteFree(p); srAlignedFree(p); }
+void operator delete[](void* p, std::align_val_t) noexcept    { srNoteFree(p); srAlignedFree(p); }
+void operator delete(void* p, std::size_t, std::align_val_t) noexcept   { srNoteFree(p); srAlignedFree(p); }
+void operator delete[](void* p, std::size_t, std::align_val_t) noexcept { srNoteFree(p); srAlignedFree(p); }
 
 #endif // SR_RT_INTERPOSE_NEW
 
@@ -1011,6 +1034,88 @@ void scenarioThreads(double secs)
     keep(std::move(row));
 }
 
+// A host that saves from its own thread (an autosave) while the user loads and
+// selects IRs on the message thread and the audio thread plays. Saves only: a
+// restore off the message thread races inside JUCE's own
+// AudioProcessorValueTreeState::replaceState, which takes no lock.
+void scenarioHostSave(double secs)
+{
+    std::cout << "\n[hostsave] state saves on a host thread during IR loads and playback\n";
+
+    juce::TemporaryFile t1(".wav");
+    const juce::File ir = writeIR(t1, 4096, 48000.0, true);
+
+    Row row;
+    row.name = "hostsave";
+    row.config = "host save thread + msg thread IR loads";
+    row.t.reserve(1 << 16);
+    const rt::Counts before = rt::snapshot();
+
+    Amp a(48000.0, 128, 2);
+    allEffectsOn(a);
+    a.prepare();
+
+    std::atomic<bool> stop { false };
+    std::atomic<long long> saves { 0 };
+    std::thread host([&]
+    {
+        juce::MemoryBlock saved;
+        while (! stop.load())
+        {
+            saved.reset();
+            a.proc.getStateInformation(saved);
+            saves.fetch_add(1);
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        }
+    });
+
+    std::atomic<bool> done { false };
+    double cpu = 0.0;
+    std::thread audio([&]
+    {
+        const double c0 = threadCpuSeconds();
+        SignalGen g { Sig::DI, 48000.0, std::mt19937 { 26 } };
+        const long long total = static_cast<long long>(secs * 48000.0);
+        for (long long i = 0; i < total; i += 128) a.block(128, std::ref(g), row);
+        cpu = threadCpuSeconds() - c0;
+        done.store(true);
+    });
+
+    // The user, on the real message thread: load IRs (each one changes the
+    // list a save is reading), pick among them, and change editor settings
+    // (which a save copies into the tree it writes).
+    std::mt19937 rng { 4242 };
+    while (! done.load())
+    {
+        const bool ok = onMessageThread([&]
+        {
+            a.proc.setUIProperty("theme", static_cast<int>(rng() % 3));
+            if (rng() % 2 == 0 && ir.existsAsFile() && a.proc.getNumUserIRs() < 16)
+                a.proc.loadUserIR(ir);
+            else if (a.proc.getNumUserIRs() > 0)
+                a.proc.selectUserIR(static_cast<int>(
+                    rng() % static_cast<unsigned>(a.proc.getNumUserIRs())));
+            else
+                a.proc.selectBuiltInCab();
+        });
+        if (! ok)
+        {
+            report("HIGH", "hostsave", "message thread stalled over 5 s during playback");
+            break;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(2));
+    }
+    stop.store(true);
+    audio.join();
+    host.join();
+    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+
+    row.c = rt::since(before);
+    row.cpuSeconds = cpu;
+    std::cout << "    (" << saves.load() << " host-thread saves during playback)\n";
+    keep(std::move(row));
+}
+
 // ── 7b. Recovery from a poisoned input sample ───────────────────
 // A plugin upstream, a glitching interface or a corrupt file can hand the
 // amp a non-finite sample. processBlock scrubs its OUTPUT, so nothing
@@ -1338,8 +1443,8 @@ int main(int argc, char* argv[])
                 "  --scale=N          multiply every run length by N\n"
                 "  --overblock        also run the opt-in over-sized-block scenario\n"
                 "  --md=PATH          write a Markdown report\n"
-                "scenarios: load blocks params hostile modes ir threads recover overhead mono\n"
-                "           denormals stability\n";
+                "scenarios: load blocks params hostile modes ir threads hostsave recover overhead\n"
+                "           mono denormals stability\n";
             return 0;
         }
         if (arg == "--quick") quick = true;
@@ -1411,6 +1516,7 @@ int main(int argc, char* argv[])
         if (wanted("modes"))     scenarioModes(4.0 * s);
         if (wanted("ir"))        scenarioIR(4.0 * s);
         if (wanted("threads"))   scenarioThreads(8.0 * s);
+        if (wanted("hostsave"))  scenarioHostSave(4.0 * s);
         if (wanted("recover"))   scenarioRecover();
         if (wanted("overhead"))  scenarioOverhead();
         if (wanted("denormals")) scenarioDenormals();

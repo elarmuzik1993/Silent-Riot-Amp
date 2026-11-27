@@ -353,6 +353,14 @@ TEST_CASE("OnePoleLP seedDC: starts on its own steady state", "[filter][seed]") 
 TEST_CASE("OnePole seedDC: a seeded LP -> HP chain rests at 0 at awkward inputs", "[filter][seed]") {
     // 0.63387871 is the 7W idle plate, where rounding parked the LP furthest
     // from its exact steady state and the HP behind it passed a 4.4 mV step.
+    //
+    // "At 0" is up to float rounding, not exactly 0. When the compiler fuses
+    // the HP's x * b0 + z1 into one FMA (GCC's default -ffp-contract=fast on an
+    // FMA target, e.g. GCC 15 on Ubuntu 26.04, which defaults to x86-64-v3),
+    // the HP rests on that product's rounding error instead of exactly 0: up to
+    // half an ulp of its input, 1.5e-8 here (5.2e-9 measured). It is constant,
+    // not a step. The bug this guards against peaks at 5.8e-6 here (seedDC
+    // without its float settle), 58x the bound.
     for (float x : { 0.63387871f, 0.64771283f, 0.1f, 0.9f }) {
         OnePoleLP lp;
         OnePoleHP hp;
@@ -362,7 +370,8 @@ TEST_CASE("OnePole seedDC: a seeded LP -> HP chain rests at 0 at awkward inputs"
         float peak = 0.0f;
         for (int i = 0; i < 20000; ++i)
             peak = std::max(peak, std::abs(hp.process(x - lp.process(x) * 0.5f)));
-        REQUIRE(peak < 1e-9f);
+        INFO("x = " << x << ", peak = " << peak);
+        REQUIRE(peak < 1e-7f);
     }
 }
 

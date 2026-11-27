@@ -30,10 +30,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: ./.github/actions/setup-linux-deps
       - name: Cache dependencies (JUCE/Catch2)
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ${{ env.FETCHCONTENT_BASE_DIR }}
           key: deps-${{ runner.os }}-${{ hashFiles('CMakeLists.txt', 'tests/CMakeLists.txt') }}
@@ -50,14 +50,14 @@ jobs:
       - name: Build
         run: cmake --build build
       - name: Upload VST3
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: SilentRiot-Linux-VST3
           path: "build/SilentRiot_artefacts/Release/VST3/"
           if-no-files-found: error
           retention-days: ${{ env.ARTIFACT_RETENTION_DAYS }}
       - name: Upload Standalone
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: SilentRiot-Linux-Standalone
           path: "build/SilentRiot_artefacts/Release/Standalone/"
@@ -69,9 +69,9 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Cache dependencies (JUCE/Catch2)
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ${{ env.FETCHCONTENT_BASE_DIR }}
           key: deps-${{ runner.os }}-${{ hashFiles('CMakeLists.txt', 'tests/CMakeLists.txt') }}
@@ -110,14 +110,14 @@ jobs:
           Write-Host "=== Standalone dependencies ==="
           dumpbin /DEPENDENTS "$exe"
       - name: Upload VST3
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: SilentRiot-Windows-VST3
           path: "build/SilentRiot_artefacts/Release/VST3/"
           if-no-files-found: error
           retention-days: ${{ env.ARTIFACT_RETENTION_DAYS }}
       - name: Upload Standalone
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: SilentRiot-Windows-Standalone
           path: "build/SilentRiot_artefacts/Release/Standalone/"
@@ -131,13 +131,13 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       # verify.sh's static checks (source lists, licence headers, repo links); no build.
       - name: Static checks
         run: bash scripts/verify.sh --quick
       - uses: ./.github/actions/setup-linux-deps
       - name: Cache dependencies (JUCE/Catch2)
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ${{ env.FETCHCONTENT_BASE_DIR }}
           key: deps-${{ runner.os }}-${{ hashFiles('CMakeLists.txt', 'tests/CMakeLists.txt') }}
@@ -154,15 +154,21 @@ jobs:
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
           cmake --build build
           ctest --test-dir build --output-on-failure
+      # The audio thread's real-time contracts (tests/rt_stress.cpp): no
+      # allocation, free or mutex inside processBlock, finite output. Exits 1
+      # on any CRITICAL finding; a missed deadline is not one, so a busy runner
+      # can't fail it.
+      - name: Real-time contracts (rt_stress --quick)
+        run: ./build/tests/SilentRiotRTStress --quick
 
   # ── Tests on Windows (roadmap P3 — were Linux-only) ───────────────────
   test-windows:
     runs-on: windows-latest
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Cache dependencies (JUCE/Catch2)
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ${{ env.FETCHCONTENT_BASE_DIR }}
           key: deps-${{ runner.os }}-${{ hashFiles('CMakeLists.txt', 'tests/CMakeLists.txt') }}
@@ -173,10 +179,18 @@ jobs:
           variant: ccache
       - name: Configure + Build + Test
         run: |
+          # PowerShell only fails a step on its last command's exit code, so a
+          # failed build followed by a passing ctest went green: the step hid
+          # SilentRiotRTStress not compiling on MSVC. Stop on any native failure.
+          $PSNativeCommandUseErrorActionPreference = $true
           cmake -B build -DCMAKE_BUILD_TYPE=Release -DSR_BUILD_TESTS=ON `
             -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
           cmake --build build --config Release
           ctest --test-dir build -C Release --output-on-failure
+      # The same real-time gate on MSVC's runtime, whose containers allocate
+      # differently from libstdc++'s. No mutex interposer on Windows.
+      - name: Real-time contracts (rt_stress --quick)
+        run: build\tests\Release\SilentRiotRTStress.exe --quick
 
   # ── ASan + UBSan over the test targets ────────────────────────────────
   # (roadmap P3 — catch buffer/UB issues and threading bugs in the DSP).
@@ -188,10 +202,10 @@ jobs:
       # Third-party reports only; see the file before adding to it.
       UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1:suppressions=${{ github.workspace }}/tests/sanitizers/ubsan.supp
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: ./.github/actions/setup-linux-deps
       - name: Cache dependencies (JUCE/Catch2)
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ${{ env.FETCHCONTENT_BASE_DIR }}
           key: deps-${{ runner.os }}-${{ hashFiles('CMakeLists.txt', 'tests/CMakeLists.txt') }}
@@ -211,10 +225,51 @@ jobs:
           cmake --build build-san --target SilentRiotTests SilentRiotJuceTests SilentRiotProcessorTests
       # shift-base is recoverable above only so ubsan.supp can excuse JUCE's
       # bundled libjpeg; halt_on_error still stops on any unsuppressed report.
-      # The tone lock is skipped: it checks sound, not memory, the test job runs
-      # it, and its references are from MSVC (it fails on Linux by design).
+      # The tone lock is skipped: it checks sound, not memory, and the test job
+      # runs it.
       - name: Run sanitized tests
         run: ctest --test-dir build-san -E "^Tone lock:" --output-on-failure
+
+  # ── ThreadSanitizer over the cross-thread scenarios ───────────────────
+  # The audio thread, the message thread (timer, state save/restore, IR loads),
+  # a host's save thread and JUCE's convolution loader run at once in
+  # rt_stress's threads, hostsave, ir, modes, params and recover scenarios.
+  # Any data race fails the job. The
+  # harness compiles its own interposers out under TSan, which is the
+  # instrument here (docs/dev/testing.md).
+  tsan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      TSAN_OPTIONS: halt_on_error=1:second_deadlock_stack=1
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-linux-deps
+      - name: Cache dependencies (JUCE/Catch2)
+        uses: actions/cache@v5
+        with:
+          path: ${{ env.FETCHCONTENT_BASE_DIR }}
+          key: deps-${{ runner.os }}-${{ hashFiles('CMakeLists.txt', 'tests/CMakeLists.txt') }}
+      - name: ccache
+        uses: hendrikmuhs/ccache-action@v1.2
+        with:
+          key: ccache-linux-tsan
+      - name: Configure + Build (TSan)
+        run: |
+          cmake -B build-tsan -G Ninja \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DSR_BUILD_TESTS=ON \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+            -DCMAKE_CXX_FLAGS="-fsanitize=thread -O1 -g -DNDEBUG" \
+            -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=thread"
+          cmake --build build-tsan --target SilentRiotRTStress
+      - name: Races between the audio, message and loader threads
+        run: |
+          # TSan's shadow memory needs the kernel's mmap randomisation at 28 bits
+          # or less; recent runner kernels default higher.
+          sudo sysctl -w vm.mmap_rnd_bits=28
+          ./build-tsan/tests/SilentRiotRTStress --only=threads,hostsave,ir,modes,params,recover --quick
 
   # ── pluginval: the standard JUCE VST3 release gate ────────────────────
   # (roadmap P3 — state save/restore, automation, threading, fuzzing).
@@ -231,7 +286,7 @@ jobs:
             libx11-6 libxext6 libxrandr2 libxinerama1 libxcursor1 libxi6 \
             libglib2.0-0 libgl1 xvfb
       - name: Download built VST3
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: SilentRiot-Linux-VST3
           path: vst3

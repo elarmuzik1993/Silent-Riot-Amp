@@ -129,6 +129,8 @@ Read the matching file **before** changing that area. The bullets below are the 
 - `bufferTransfer.set()` is message-thread only; `.get()` is audio-thread only. `useIR` is set `true` only after the buffer is pushed.
 - Never pass JUCE's convolution `Normalise::yes`; the IR level match (`IRLevel.h`) passes `Normalise::no`. `installIRNow()` only from `prepareToPlay`.
 - IR_INDEX → convolution always through `applyUserIRIndex()`. The built-in cab's biquads run in every mode; don't gate or reset them.
+- Hosts save and restore from any thread. `getStateInformation` serialises `copyState()`, reads `userIRs` under `irStateLock` and the editor settings under `uiStateLock`, and never writes the live `apvts.state`; nor does editor code (`setUIProperty`; `copyUserIR`, never a reference into `userIRs`). Never hold `irStateLock` while taking `uiStateLock`.
+- Enforced, not just written down: `rt_stress --quick` (allocation, free, mutex on the audio thread) in `verify.sh` and CI, ThreadSanitizer over the cross-thread scenarios (CI `tsan`, incl. `hostsave`), `verify.sh` check 8 for the editor.
 
 **GUI**
 - `ToggleSwitch` uses `onStateChange` internally; external callbacks use `onClick`. Size every child against what it paints (`ToggleSwitch::minHeight`, `NotchKnob::stripHeight`). No focus ring on knobs without asking.

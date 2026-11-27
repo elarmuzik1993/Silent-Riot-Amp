@@ -129,8 +129,9 @@ struct EditorRig
     void requireListMatches() const
     {
         REQUIRE(panel->getNumListedIRs() == h.proc.getNumUserIRs());
-        for (int i = 0; i < h.proc.getNumUserIRs(); ++i)
-            CHECK(panel->getListedIRName(i) == h.proc.getUserIR(i).name);
+        SilentRiotProcessor::UserIREntry ir;
+        for (int i = 0; h.proc.copyUserIR(i, ir); ++i)
+            CHECK(panel->getListedIRName(i) == ir.name);
     }
 
     ~EditorRig() { editor.reset(); }

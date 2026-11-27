@@ -23,7 +23,7 @@ struct DelayTimeRig
     NotchKnob knob { "TIME", 0.337f };
     ToggleSwitch sync { "SYNC" };
     std::unique_ptr<DelayTimeAttachment> attachment =
-        std::make_unique<DelayTimeAttachment>(h.proc.apvts, knob, sync);
+        std::make_unique<DelayTimeAttachment>(h.proc, knob, sync);
 
     float param(const juce::String& id) { return h.proc.apvts.getRawParameterValue(id)->load(); }
     juce::Slider& slider() { return knob.getSlider(); }
@@ -84,7 +84,7 @@ TEST_CASE("Delay TIME knob: SYNC off restores the ms time, on restores the last 
     // The remembered division outlives the editor (it rides in the saved state)
     r.clickSync(false);
     r.attachment.reset();   // first: its destructor unhooks the knob and toggle
-    r.attachment = std::make_unique<DelayTimeAttachment>(r.h.proc.apvts, r.knob, r.sync);
+    r.attachment = std::make_unique<DelayTimeAttachment>(r.h.proc, r.knob, r.sync);
     r.clickSync(true);
     REQUIRE(static_cast<int>(r.param(IDs::DELAY_SYNC_DIV)) == 7);
 }

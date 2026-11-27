@@ -36,4 +36,4 @@ _Moved verbatim out of `CLAUDE.md` on 2026-11-01 to keep that file short. Same r
 
 **Keyboard**: Arrow keys ±0.1 display (±0.01 internal), PageUp/Down ±1.0 display (±0.1 internal) via `NotchKnob::KnobSlider` override — or one interval, when the slider's is coarser (synced DELAY TIME steps a division). Tab order: preset→INPUT→THRESH→GAIN→SHAPE→VOLUME→OUTPUT→WIDTH→7W→CAB→PWR.
 
-**UI state persistence**: Panel open states, theme, meter ballistics, knob mode, and UI scale stored as properties on `apvts.state` ValueTree — automatically saved/restored with plugin state.
+**UI state persistence**: Panel open states, IR view, theme, meter ballistics, knob mode, peak hold, tooltips, UI scale and the delay's last sync division are saved with the plugin state through `SilentRiotProcessor::setUIProperty` / `getUIProperty` (a `NamedValueSet` under `uiStateLock`). `getStateInformation` writes them as root properties of the saved tree, where sessions from older versions also keep them, and `setStateInformation` reads them back. The editor never writes the live `apvts.state`: a host may copy it from its own thread meanwhile (`verify.sh` check 8).
